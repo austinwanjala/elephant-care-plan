@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { QRCodeSVG } from "qrcode.react";
@@ -12,9 +11,7 @@ import {
   History,
   LogOut,
   Loader2,
-  Phone,
   FileText,
-  Download,
 } from "lucide-react";
 import {
   Dialog,
@@ -32,6 +29,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 
 interface Member {
   id: string;
@@ -41,7 +41,18 @@ interface Member {
   email: string;
   coverage_balance: number;
   total_contributions: number;
+  benefit_limit: number;
   qr_code_data: string;
+  membership_categories: { name: string; benefit_amount: number } | null;
+}
+
+interface Visit {
+  id: string;
+  benefit_deducted: number;
+  created_at: string;
+  notes: string | null;
+  services: { name: string } | null;
+  branches: { name: string } | null;
 }
 
 interface Payment {
@@ -53,25 +64,11 @@ interface Payment {
   payment_date: string;
 }
 
-interface Claim {
-  id: string;
-  diagnosis: string;
-  treatment: string;
-  amount: number;
-  status: string;
-  created_at: string;
-  branches: { name: string } | null;
-}
-
 const Dashboard = () => {
   const [member, setMember] = useState<Member | null>(null);
+  const [visits, setVisits] = useState<Visit[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [claims, setClaims] = useState<Claim[]>([]);
   const [loading, setLoading] = useState(true);
-  const [paymentAmount, setPaymentAmount] = useState("500");
-  const [paymentPhone, setPaymentPhone] = useState("");
-  const [processingPayment, setProcessingPayment] = useState(false);
-  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -88,8 +85,8 @@ const Dashboard = () => {
 
     await Promise.all([
       loadMemberData(user.id),
+      loadVisits(user.id),
       loadPayments(user.id),
-      loadClaims(user.id),
     ]);
     setLoading(false);
   };
@@ -97,13 +94,30 @@ const Dashboard = () => {
   const loadMemberData = async (userId: string) => {
     const { data } = await supabase
       .from("members")
-      .select("*")
+      .select("*, membership_categories(name, benefit_amount)")
       .eq("user_id", userId)
       .single();
     
     if (data) {
       setMember(data);
-      setPaymentPhone(data.phone);
+    }
+  };
+
+  const loadVisits = async (userId: string) => {
+    const { data: memberData } = await supabase
+      .from("members")
+      .select("id")
+      .eq("user_id", userId)
+      .single();
+
+    if (memberData) {
+      const { data } = await supabase
+        .from("visits")
+        .select("*, services(name), branches(name)")
+        .eq("member_id", memberData.id)
+        .order("created_at", { ascending: false });
+      
+      if (data) setVisits(data);
     }
   };
 
@@ -125,92 +139,27 @@ const Dashboard = () => {
     }
   };
 
-  const loadClaims = async (userId: string) => {
-    const { data: memberData } = await supabase
-      .from("members")
-      .select("id")
-      .eq("user_id", userId)
-      .single();
-
-    if (memberData) {
-      const { data } = await supabase
-        .from("claims")
-        .select("*, branches(name)")
-        .eq("member_id", memberData.id)
-        .order("created_at", { ascending: false });
-      
-      if (data) setClaims(data);
-    }
-  };
-
-  const handlePayment = async () => {
-    if (!member) return;
-    const amount = parseFloat(paymentAmount);
-    if (amount < 500) {
-      toast({
-        title: "Invalid amount",
-        description: "Minimum contribution is KES 500",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setProcessingPayment(true);
-
-    try {
-      // Simulate M-Pesa STK Push (mock for now)
-      const mockReference = `MPE${Date.now()}`;
-      
-      // Create payment record
-      const { error } = await supabase.from("payments").insert({
-        member_id: member.id,
-        amount: amount,
-        coverage_added: amount * 2,
-        mpesa_reference: mockReference,
-        phone_used: paymentPhone,
-        status: "completed",
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Payment successful!",
-        description: `KES ${amount} paid. KES ${amount * 2} added to your coverage.`,
-      });
-
-      setPaymentDialogOpen(false);
-      // Reload data
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await loadMemberData(user.id);
-        await loadPayments(user.id);
-      }
-    } catch (error: any) {
-      toast({
-        title: "Payment failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setProcessingPayment(false);
-    }
-  };
-
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/");
   };
 
   const getStatusBadge = (status: string) => {
-    const badges: Record<string, string> = {
-      completed: "badge-success",
-      pending: "badge-warning",
-      failed: "badge-error",
-      approved: "badge-success",
-      rejected: "badge-error",
-    };
-    return badges[status] || "badge-warning";
+    switch (status) {
+      case "completed":
+        return <Badge className="bg-success">Completed</Badge>;
+      case "pending":
+        return <Badge variant="secondary">Pending</Badge>;
+      case "failed":
+        return <Badge variant="destructive">Failed</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
   };
+
+  const coveragePercentage = member?.benefit_limit 
+    ? (member.coverage_balance / member.benefit_limit) * 100 
+    : 0;
 
   if (loading) {
     return (
@@ -245,45 +194,51 @@ const Dashboard = () => {
       <main className="container mx-auto px-4 py-8">
         {/* Stats Cards */}
         <div className="grid md:grid-cols-3 gap-6 mb-8">
-          <div className="stat-card">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Shield className="h-6 w-6 text-primary" />
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Coverage Balance</CardTitle>
+              <Shield className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-success">
+                KES {member?.coverage_balance?.toLocaleString() || 0}
               </div>
-              <div>
-                <p className="text-muted-foreground text-sm">Coverage Balance</p>
-                <p className="text-2xl font-bold text-foreground">
-                  KES {member?.coverage_balance?.toLocaleString() || 0}
+              <div className="mt-2">
+                <Progress value={coveragePercentage} className="h-2" />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {coveragePercentage.toFixed(0)}% of KES {member?.benefit_limit?.toLocaleString() || 0} remaining
                 </p>
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
-          <div className="stat-card">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-success/10 flex items-center justify-center">
-                <CreditCard className="h-6 w-6 text-success" />
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Membership</CardTitle>
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {member?.membership_categories?.name || "N/A"}
               </div>
-              <div>
-                <p className="text-muted-foreground text-sm">Total Contributions</p>
-                <p className="text-2xl font-bold text-foreground">
-                  KES {member?.total_contributions?.toLocaleString() || 0}
-                </p>
-              </div>
-            </div>
-          </div>
+              <p className="text-xs text-muted-foreground">
+                Total Contributions: KES {member?.total_contributions?.toLocaleString() || 0}
+              </p>
+            </CardContent>
+          </Card>
 
-          <div className="stat-card">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center">
-                <FileText className="h-6 w-6 text-accent" />
-              </div>
-              <div>
-                <p className="text-muted-foreground text-sm">Total Claims</p>
-                <p className="text-2xl font-bold text-foreground">{claims.length}</p>
-              </div>
-            </div>
-          </div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Services Used</CardTitle>
+              <FileText className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{visits.length}</div>
+              <p className="text-xs text-muted-foreground">
+                Total dental services received
+              </p>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8">
@@ -297,9 +252,12 @@ const Dashboard = () => {
                 <h3 className="font-serif font-bold text-foreground text-lg mb-1">
                   {member?.full_name}
                 </h3>
-                <p className="text-primary font-mono font-semibold mb-4">
+                <p className="text-primary font-mono font-semibold mb-2">
                   {member?.member_number}
                 </p>
+                {member?.membership_categories && (
+                  <Badge className="mb-4">{member.membership_categories.name}</Badge>
+                )}
                 
                 <div className="bg-background rounded-xl p-4 inline-block mb-4">
                   {member?.qr_code_data && (
@@ -312,188 +270,110 @@ const Dashboard = () => {
                   )}
                 </div>
 
-                <p className="text-sm text-muted-foreground mb-4">
+                <p className="text-sm text-muted-foreground">
                   Scan at any branch for instant service
                 </p>
-
-                <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button className="w-full btn-primary">
-                      <CreditCard className="mr-2 h-4 w-4" />
-                      Add Coverage
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle className="font-serif">Make a Contribution</DialogTitle>
-                      <DialogDescription>
-                        Pay via M-Pesa and get 2× coverage instantly
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 pt-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="amount">Amount (KES)</Label>
-                        <Input
-                          id="amount"
-                          type="number"
-                          min="500"
-                          value={paymentAmount}
-                          onChange={(e) => setPaymentAmount(e.target.value)}
-                          className="input-field"
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Minimum: KES 500
-                        </p>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="phone">M-Pesa Phone</Label>
-                        <Input
-                          id="phone"
-                          placeholder="0712345678"
-                          value={paymentPhone}
-                          onChange={(e) => setPaymentPhone(e.target.value)}
-                          className="input-field"
-                        />
-                      </div>
-                      <div className="bg-muted/50 rounded-lg p-4">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">You pay:</span>
-                          <span className="font-semibold">KES {parseInt(paymentAmount || "0").toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between text-sm mt-2">
-                          <span className="text-muted-foreground">Coverage added:</span>
-                          <span className="font-semibold text-success">
-                            KES {(parseInt(paymentAmount || "0") * 2).toLocaleString()}
-                          </span>
-                        </div>
-                      </div>
-                      <Button
-                        onClick={handlePayment}
-                        disabled={processingPayment}
-                        className="w-full btn-accent"
-                      >
-                        {processingPayment ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Processing...
-                          </>
-                        ) : (
-                          <>
-                            <Phone className="mr-2 h-4 w-4" />
-                            Pay with M-Pesa
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
               </div>
             </div>
           </div>
 
           {/* History Tables */}
           <div className="lg:col-span-2 space-y-8">
-            {/* Payments */}
-            <div className="card-elevated overflow-hidden">
-              <div className="p-6 border-b border-border">
-                <h2 className="text-xl font-serif font-bold text-foreground flex items-center gap-2">
+            {/* Service History */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <History className="h-5 w-5 text-primary" />
+                  Service History
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Service</TableHead>
+                        <TableHead>Branch</TableHead>
+                        <TableHead>Amount</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {visits.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                            No services yet. Visit any branch for dental care!
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        visits.map((visit) => (
+                          <TableRow key={visit.id}>
+                            <TableCell>
+                              {new Date(visit.created_at).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell>{visit.services?.name || "N/A"}</TableCell>
+                            <TableCell>{visit.branches?.name || "N/A"}</TableCell>
+                            <TableCell className="text-destructive">
+                              -KES {visit.benefit_deducted.toLocaleString()}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Payment History */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
                   <CreditCard className="h-5 w-5 text-primary" />
                   Payment History
-                </h2>
-              </div>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Coverage Added</TableHead>
-                      <TableHead>Reference</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {payments.length === 0 ? (
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                          No payments yet. Make your first contribution!
-                        </TableCell>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Coverage Added</TableHead>
+                        <TableHead>Reference</TableHead>
+                        <TableHead>Status</TableHead>
                       </TableRow>
-                    ) : (
-                      payments.map((payment) => (
-                        <TableRow key={payment.id} className="table-row-hover">
-                          <TableCell>
-                            {new Date(payment.payment_date).toLocaleDateString()}
-                          </TableCell>
-                          <TableCell>KES {payment.amount.toLocaleString()}</TableCell>
-                          <TableCell className="text-success">
-                            +KES {payment.coverage_added.toLocaleString()}
-                          </TableCell>
-                          <TableCell className="font-mono text-sm">
-                            {payment.mpesa_reference}
-                          </TableCell>
-                          <TableCell>
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(payment.status)}`}>
-                              {payment.status}
-                            </span>
+                    </TableHeader>
+                    <TableBody>
+                      {payments.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                            No payment records
                           </TableCell>
                         </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-
-            {/* Claims */}
-            <div className="card-elevated overflow-hidden">
-              <div className="p-6 border-b border-border">
-                <h2 className="text-xl font-serif font-bold text-foreground flex items-center gap-2">
-                  <History className="h-5 w-5 text-primary" />
-                  Claim History
-                </h2>
-              </div>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Branch</TableHead>
-                      <TableHead>Diagnosis</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {claims.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                          No claims yet. Visit any branch for dental services!
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      claims.map((claim) => (
-                        <TableRow key={claim.id} className="table-row-hover">
-                          <TableCell>
-                            {new Date(claim.created_at).toLocaleDateString()}
-                          </TableCell>
-                          <TableCell>{claim.branches?.name || "N/A"}</TableCell>
-                          <TableCell>{claim.diagnosis}</TableCell>
-                          <TableCell className="text-destructive">
-                            -KES {claim.amount.toLocaleString()}
-                          </TableCell>
-                          <TableCell>
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(claim.status)}`}>
-                              {claim.status}
-                            </span>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
+                      ) : (
+                        payments.map((payment) => (
+                          <TableRow key={payment.id}>
+                            <TableCell>
+                              {new Date(payment.payment_date).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell>KES {payment.amount.toLocaleString()}</TableCell>
+                            <TableCell className="text-success">
+                              +KES {payment.coverage_added.toLocaleString()}
+                            </TableCell>
+                            <TableCell className="font-mono text-sm">
+                              {payment.mpesa_reference || "N/A"}
+                            </TableCell>
+                            <TableCell>{getStatusBadge(payment.status)}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </main>

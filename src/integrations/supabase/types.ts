@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      branch_revenue: {
+        Row: {
+          branch_id: string
+          created_at: string
+          date: string
+          id: string
+          total_benefit_deductions: number
+          total_compensation: number
+          total_profit_loss: number
+          updated_at: string
+          visit_count: number
+        }
+        Insert: {
+          branch_id: string
+          created_at?: string
+          date?: string
+          id?: string
+          total_benefit_deductions?: number
+          total_compensation?: number
+          total_profit_loss?: number
+          updated_at?: string
+          visit_count?: number
+        }
+        Update: {
+          branch_id?: string
+          created_at?: string
+          date?: string
+          id?: string
+          total_benefit_deductions?: number
+          total_compensation?: number
+          total_profit_loss?: number
+          updated_at?: string
+          visit_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "branch_revenue_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       branches: {
         Row: {
           created_at: string
@@ -113,6 +157,8 @@ export type Database = {
       }
       members: {
         Row: {
+          benefit_limit: number | null
+          biometric_data: string | null
           branch_id: string | null
           coverage_balance: number | null
           created_at: string
@@ -122,15 +168,20 @@ export type Database = {
           id_number: string
           is_active: boolean | null
           member_number: string
+          membership_category_id: string | null
           next_of_kin_name: string | null
           next_of_kin_phone: string | null
           phone: string
           qr_code_data: string | null
+          rollover_balance: number | null
+          rollover_years: number | null
           total_contributions: number | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          benefit_limit?: number | null
+          biometric_data?: string | null
           branch_id?: string | null
           coverage_balance?: number | null
           created_at?: string
@@ -140,15 +191,20 @@ export type Database = {
           id_number: string
           is_active?: boolean | null
           member_number: string
+          membership_category_id?: string | null
           next_of_kin_name?: string | null
           next_of_kin_phone?: string | null
           phone: string
           qr_code_data?: string | null
+          rollover_balance?: number | null
+          rollover_years?: number | null
           total_contributions?: number | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          benefit_limit?: number | null
+          biometric_data?: string | null
           branch_id?: string | null
           coverage_balance?: number | null
           created_at?: string
@@ -158,10 +214,13 @@ export type Database = {
           id_number?: string
           is_active?: boolean | null
           member_number?: string
+          membership_category_id?: string | null
           next_of_kin_name?: string | null
           next_of_kin_phone?: string | null
           phone?: string
           qr_code_data?: string | null
+          rollover_balance?: number | null
+          rollover_years?: number | null
           total_contributions?: number | null
           updated_at?: string
           user_id?: string
@@ -174,7 +233,53 @@ export type Database = {
             referencedRelation: "branches"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "members_membership_category_id_fkey"
+            columns: ["membership_category_id"]
+            isOneToOne: false
+            referencedRelation: "membership_categories"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      membership_categories: {
+        Row: {
+          benefit_amount: number
+          created_at: string
+          id: string
+          is_active: boolean
+          level: Database["public"]["Enums"]["membership_level"]
+          management_fee: number
+          name: string
+          payment_amount: number
+          registration_fee: number
+          updated_at: string
+        }
+        Insert: {
+          benefit_amount: number
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          level: Database["public"]["Enums"]["membership_level"]
+          management_fee?: number
+          name: string
+          payment_amount: number
+          registration_fee?: number
+          updated_at?: string
+        }
+        Update: {
+          benefit_amount?: number
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          level?: Database["public"]["Enums"]["membership_level"]
+          management_fee?: number
+          name?: string
+          payment_amount?: number
+          registration_fee?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       payments: {
         Row: {
@@ -219,6 +324,81 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      service_preapprovals: {
+        Row: {
+          branch_id: string
+          created_at: string
+          id: string
+          service_id: string
+        }
+        Insert: {
+          branch_id: string
+          created_at?: string
+          id?: string
+          service_id: string
+        }
+        Update: {
+          branch_id?: string
+          created_at?: string
+          id?: string
+          service_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_preapprovals_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_preapprovals_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      services: {
+        Row: {
+          approval_type: Database["public"]["Enums"]["approval_type"]
+          benefit_cost: number
+          branch_compensation: number
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          profit_loss: number | null
+          real_cost: number
+          updated_at: string
+        }
+        Insert: {
+          approval_type?: Database["public"]["Enums"]["approval_type"]
+          benefit_cost: number
+          branch_compensation: number
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          profit_loss?: number | null
+          real_cost: number
+          updated_at?: string
+        }
+        Update: {
+          approval_type?: Database["public"]["Enums"]["approval_type"]
+          benefit_cost?: number
+          branch_compensation?: number
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          profit_loss?: number | null
+          real_cost?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       staff: {
         Row: {
@@ -282,11 +462,80 @@ export type Database = {
         }
         Relationships: []
       }
+      visits: {
+        Row: {
+          benefit_deducted: number
+          branch_compensation: number
+          branch_id: string
+          created_at: string
+          id: string
+          member_id: string
+          notes: string | null
+          profit_loss: number
+          service_id: string
+          staff_id: string | null
+        }
+        Insert: {
+          benefit_deducted: number
+          branch_compensation: number
+          branch_id: string
+          created_at?: string
+          id?: string
+          member_id: string
+          notes?: string | null
+          profit_loss: number
+          service_id: string
+          staff_id?: string | null
+        }
+        Update: {
+          benefit_deducted?: number
+          branch_compensation?: number
+          branch_id?: string
+          created_at?: string
+          id?: string
+          member_id?: string
+          notes?: string | null
+          profit_loss?: number
+          service_id?: string
+          staff_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visits_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visits_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visits_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visits_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      apply_yearly_rollover: { Args: never; Returns: undefined }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
@@ -301,7 +550,15 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "staff" | "member"
+      approval_type: "all_branches" | "pre_approved_only"
       claim_status: "pending" | "approved" | "rejected" | "completed"
+      membership_level:
+        | "level_1"
+        | "level_2"
+        | "level_3"
+        | "level_4"
+        | "level_5"
+        | "level_6"
       payment_status: "pending" | "completed" | "failed"
     }
     CompositeTypes: {
@@ -431,7 +688,16 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "staff", "member"],
+      approval_type: ["all_branches", "pre_approved_only"],
       claim_status: ["pending", "approved", "rejected", "completed"],
+      membership_level: [
+        "level_1",
+        "level_2",
+        "level_3",
+        "level_4",
+        "level_5",
+        "level_6",
+      ],
       payment_status: ["pending", "completed", "failed"],
     },
   },

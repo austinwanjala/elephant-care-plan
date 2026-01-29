@@ -1,8 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,8 +13,10 @@ import {
   User,
   Shield,
   FileText,
-  CheckCircle,
   AlertCircle,
+  CheckCircle,
+  DollarSign,
+  TrendingUp,
 } from "lucide-react";
 import {
   Dialog,
@@ -32,6 +33,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface Member {
   id: string;
@@ -41,6 +45,7 @@ interface Member {
   email: string;
   coverage_balance: number;
   qr_code_data: string;
+  membership_categories: { name: string } | null;
 }
 
 interface StaffInfo {
@@ -50,14 +55,31 @@ interface StaffInfo {
   branches: { name: string } | null;
 }
 
-interface Claim {
+interface Service {
   id: string;
-  diagnosis: string;
-  treatment: string;
-  amount: number;
-  status: string;
+  name: string;
+  real_cost: number;
+  branch_compensation: number;
+  benefit_cost: number;
+  profit_loss: number;
+  approval_type: "all_branches" | "pre_approved_only";
+}
+
+interface Visit {
+  id: string;
+  benefit_deducted: number;
+  branch_compensation: number;
+  profit_loss: number;
   created_at: string;
+  services: { name: string } | null;
   members: { full_name: string; member_number: string } | null;
+}
+
+interface BranchStats {
+  todayVisits: number;
+  todayRevenue: number;
+  todayDeductions: number;
+  todayProfitLoss: number;
 }
 
 const Staff = () => {
@@ -67,14 +89,19 @@ const Staff = () => {
   const [searchResults, setSearchResults] = useState<Member[]>([]);
   const [searching, setSearching] = useState(false);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
-  const [claimDialogOpen, setClaimDialogOpen] = useState(false);
-  const [recentClaims, setRecentClaims] = useState<Claim[]>([]);
-  const [claimForm, setClaimForm] = useState({
-    diagnosis: "",
-    treatment: "",
-    amount: "",
+  const [serviceDialogOpen, setServiceDialogOpen] = useState(false);
+  const [services, setServices] = useState<Service[]>([]);
+  const [preapprovedServiceIds, setPreapprovedServiceIds] = useState<string[]>([]);
+  const [recentVisits, setRecentVisits] = useState<Visit[]>([]);
+  const [branchStats, setBranchStats] = useState<BranchStats>({
+    todayVisits: 0,
+    todayRevenue: 0,
+    todayDeductions: 0,
+    todayProfitLoss: 0,
   });
-  const [submittingClaim, setSubmittingClaim] = useState(false);
+  const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [notes, setNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -89,7 +116,6 @@ const Staff = () => {
       return;
     }
 
-    // Check if user is staff
     const { data: roleData } = await supabase
       .from("user_roles")
       .select("role")
@@ -106,7 +132,6 @@ const Staff = () => {
       return;
     }
 
-    // Load staff info
     const { data: staffData } = await supabase
       .from("staff")
       .select("*, branches(name)")
@@ -115,21 +140,72 @@ const Staff = () => {
 
     if (staffData) {
       setStaffInfo(staffData);
-      loadRecentClaims(staffData.id);
+      await Promise.all([
+        loadServices(staffData.branch_id),
+        loadRecentVisits(staffData.branch_id),
+        loadBranchStats(staffData.branch_id),
+      ]);
     }
 
     setLoading(false);
   };
 
-  const loadRecentClaims = async (staffId: string) => {
+  const loadServices = async (branchId: string | null) => {
+    const { data: servicesData } = await supabase
+      .from("services")
+      .select("*")
+      .eq("is_active", true)
+      .order("name");
+
+    if (servicesData) {
+      setServices(servicesData);
+    }
+
+    // Load pre-approved services for this branch
+    if (branchId) {
+      const { data: preapprovals } = await supabase
+        .from("service_preapprovals")
+        .select("service_id")
+        .eq("branch_id", branchId);
+
+      if (preapprovals) {
+        setPreapprovedServiceIds(preapprovals.map((p) => p.service_id));
+      }
+    }
+  };
+
+  const loadRecentVisits = async (branchId: string | null) => {
+    if (!branchId) return;
+
     const { data } = await supabase
-      .from("claims")
-      .select("*, members(full_name, member_number)")
-      .eq("staff_id", staffId)
+      .from("visits")
+      .select("*, services(name), members(full_name, member_number)")
+      .eq("branch_id", branchId)
       .order("created_at", { ascending: false })
       .limit(10);
 
-    if (data) setRecentClaims(data);
+    if (data) setRecentVisits(data);
+  };
+
+  const loadBranchStats = async (branchId: string | null) => {
+    if (!branchId) return;
+
+    const today = new Date().toISOString().split("T")[0];
+    const { data } = await supabase
+      .from("branch_revenue")
+      .select("*")
+      .eq("branch_id", branchId)
+      .eq("date", today)
+      .maybeSingle();
+
+    if (data) {
+      setBranchStats({
+        todayVisits: data.visit_count,
+        todayRevenue: data.total_compensation,
+        todayDeductions: data.total_benefit_deductions,
+        todayProfitLoss: data.total_profit_loss,
+      });
+    }
   };
 
   const handleSearch = async () => {
@@ -139,7 +215,7 @@ const Staff = () => {
     try {
       const { data, error } = await supabase
         .from("members")
-        .select("*")
+        .select("*, membership_categories(name)")
         .or(`member_number.ilike.%${searchQuery}%,full_name.ilike.%${searchQuery}%,phone.ilike.%${searchQuery}%,qr_code_data.eq.${searchQuery}`)
         .eq("is_active", true)
         .limit(10);
@@ -167,81 +243,92 @@ const Staff = () => {
 
   const handleSelectMember = (member: Member) => {
     setSelectedMember(member);
-    setClaimDialogOpen(true);
-    setClaimForm({ diagnosis: "", treatment: "", amount: "" });
+    setServiceDialogOpen(true);
+    setSelectedService(null);
+    setNotes("");
   };
 
-  const handleSubmitClaim = async () => {
-    if (!selectedMember || !staffInfo) return;
+  const isServiceAvailable = (service: Service): boolean => {
+    if (service.approval_type === "all_branches") return true;
+    return preapprovedServiceIds.includes(service.id);
+  };
 
-    const amount = parseFloat(claimForm.amount);
-    if (isNaN(amount) || amount <= 0) {
+  const canAffordService = (service: Service): boolean => {
+    if (!selectedMember) return false;
+    return selectedMember.coverage_balance >= service.benefit_cost;
+  };
+
+  const handleSelectService = (service: Service) => {
+    if (!isServiceAvailable(service)) {
       toast({
-        title: "Invalid amount",
-        description: "Please enter a valid amount",
+        title: "Service not available",
+        description: "This service requires pre-approval for your branch",
         variant: "destructive",
       });
       return;
     }
 
-    if (amount > selectedMember.coverage_balance) {
+    if (!canAffordService(service)) {
       toast({
         title: "Insufficient coverage",
-        description: `Member only has KES ${selectedMember.coverage_balance.toLocaleString()} available`,
+        description: `Member only has KES ${selectedMember?.coverage_balance.toLocaleString()} available`,
         variant: "destructive",
       });
       return;
     }
 
-    setSubmittingClaim(true);
+    setSelectedService(service);
+  };
+
+  const handleProcessService = async () => {
+    if (!selectedMember || !selectedService || !staffInfo?.branch_id) return;
+
+    setSubmitting(true);
 
     try {
-      const { error } = await supabase.from("claims").insert({
+      const { error } = await supabase.from("visits").insert({
         member_id: selectedMember.id,
         branch_id: staffInfo.branch_id,
+        service_id: selectedService.id,
         staff_id: staffInfo.id,
-        diagnosis: claimForm.diagnosis,
-        treatment: claimForm.treatment,
-        amount: amount,
-        status: "completed",
-        processed_at: new Date().toISOString(),
+        benefit_deducted: selectedService.benefit_cost,
+        branch_compensation: selectedService.branch_compensation,
+        profit_loss: selectedService.profit_loss,
+        notes: notes || null,
       });
 
       if (error) throw error;
 
       toast({
-        title: "Claim processed!",
-        description: `KES ${amount.toLocaleString()} deducted from ${selectedMember.full_name}'s coverage`,
+        title: "Service processed!",
+        description: `${selectedService.name} - KES ${selectedService.benefit_cost.toLocaleString()} deducted from ${selectedMember.full_name}'s coverage`,
       });
 
-      setClaimDialogOpen(false);
+      setServiceDialogOpen(false);
       setSelectedMember(null);
+      setSelectedService(null);
       setSearchResults([]);
       setSearchQuery("");
-      loadRecentClaims(staffInfo.id);
+
+      // Reload data
+      await Promise.all([
+        loadRecentVisits(staffInfo.branch_id),
+        loadBranchStats(staffInfo.branch_id),
+      ]);
     } catch (error: any) {
       toast({
-        title: "Claim failed",
+        title: "Processing failed",
         description: error.message,
         variant: "destructive",
       });
     } finally {
-      setSubmittingClaim(false);
+      setSubmitting(false);
     }
   };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/");
-  };
-
-  const getStatusBadge = (status: string) => {
-    const badges: Record<string, string> = {
-      completed: "badge-success",
-      pending: "badge-warning",
-      rejected: "badge-error",
-    };
-    return badges[status] || "badge-warning";
   };
 
   if (loading) {
@@ -278,6 +365,55 @@ const Staff = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8">
+        {/* Branch Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Today's Visits</CardTitle>
+              <User className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{branchStats.todayVisits}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Branch Revenue</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-success">
+                KES {branchStats.todayRevenue.toLocaleString()}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Benefit Deductions</CardTitle>
+              <Shield className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                KES {branchStats.todayDeductions.toLocaleString()}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Profit/Loss</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${branchStats.todayProfitLoss >= 0 ? "text-success" : "text-destructive"}`}>
+                KES {branchStats.todayProfitLoss.toLocaleString()}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Search Section */}
         <div className="card-elevated p-8 mb-8">
           <div className="flex items-center gap-3 mb-6">
@@ -285,7 +421,7 @@ const Staff = () => {
               <QrCode className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl font-serif font-bold text-foreground">Claim Processing</h1>
+              <h1 className="text-2xl font-serif font-bold text-foreground">Service Processing</h1>
               <p className="text-muted-foreground">Search member by QR code, member number, name, or phone</p>
             </div>
           </div>
@@ -324,7 +460,12 @@ const Staff = () => {
                     </div>
                     <div>
                       <p className="font-semibold text-foreground">{member.full_name}</p>
-                      <p className="text-sm text-muted-foreground font-mono">{member.member_number}</p>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span className="font-mono">{member.member_number}</span>
+                        {member.membership_categories && (
+                          <Badge variant="outline">{member.membership_categories.name}</Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div className="text-right">
@@ -339,54 +480,56 @@ const Staff = () => {
           )}
         </div>
 
-        {/* Recent Claims */}
+        {/* Recent Visits */}
         <div className="card-elevated overflow-hidden">
           <div className="p-6 border-b border-border">
             <h2 className="text-xl font-serif font-bold text-foreground flex items-center gap-2">
               <FileText className="h-5 w-5 text-primary" />
-              Recent Claims
+              Recent Services
             </h2>
           </div>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date</TableHead>
+                  <TableHead>Time</TableHead>
                   <TableHead>Member</TableHead>
-                  <TableHead>Diagnosis</TableHead>
-                  <TableHead>Treatment</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Service</TableHead>
+                  <TableHead>Benefit Deducted</TableHead>
+                  <TableHead>Branch Comp.</TableHead>
+                  <TableHead>Profit/Loss</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recentClaims.length === 0 ? (
+                {recentVisits.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                      No claims processed yet today
+                      No services processed yet today
                     </TableCell>
                   </TableRow>
                 ) : (
-                  recentClaims.map((claim) => (
-                    <TableRow key={claim.id} className="table-row-hover">
+                  recentVisits.map((visit) => (
+                    <TableRow key={visit.id}>
                       <TableCell>
-                        {new Date(claim.created_at).toLocaleDateString()}
+                        {new Date(visit.created_at).toLocaleTimeString()}
                       </TableCell>
                       <TableCell>
                         <div>
-                          <p className="font-medium">{claim.members?.full_name}</p>
+                          <p className="font-medium">{visit.members?.full_name}</p>
                           <p className="text-xs text-muted-foreground font-mono">
-                            {claim.members?.member_number}
+                            {visit.members?.member_number}
                           </p>
                         </div>
                       </TableCell>
-                      <TableCell>{claim.diagnosis}</TableCell>
-                      <TableCell>{claim.treatment}</TableCell>
-                      <TableCell>KES {claim.amount.toLocaleString()}</TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(claim.status)}`}>
-                          {claim.status}
-                        </span>
+                      <TableCell>{visit.services?.name}</TableCell>
+                      <TableCell className="text-destructive">
+                        -KES {visit.benefit_deducted.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-success">
+                        +KES {visit.branch_compensation.toLocaleString()}
+                      </TableCell>
+                      <TableCell className={visit.profit_loss >= 0 ? "text-success" : "text-destructive"}>
+                        KES {visit.profit_loss.toLocaleString()}
                       </TableCell>
                     </TableRow>
                   ))
@@ -396,20 +539,20 @@ const Staff = () => {
           </div>
         </div>
 
-        {/* Claim Dialog */}
-        <Dialog open={claimDialogOpen} onOpenChange={setClaimDialogOpen}>
-          <DialogContent className="sm:max-w-lg">
+        {/* Service Selection Dialog */}
+        <Dialog open={serviceDialogOpen} onOpenChange={setServiceDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
             <DialogHeader>
-              <DialogTitle className="font-serif">Process Claim</DialogTitle>
+              <DialogTitle className="font-serif">Select Service</DialogTitle>
               <DialogDescription>
-                Enter treatment details for {selectedMember?.full_name}
+                Choose a service for {selectedMember?.full_name}
               </DialogDescription>
             </DialogHeader>
 
             {selectedMember && (
-              <div className="space-y-6 pt-4">
+              <div className="flex-1 overflow-hidden flex flex-col">
                 {/* Member Info */}
-                <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg mb-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                       <User className="h-5 w-5 text-primary" />
@@ -432,94 +575,125 @@ const Staff = () => {
                   </div>
                 </div>
 
-                {/* Claim Form */}
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="diagnosis">Diagnosis *</Label>
-                    <Input
-                      id="diagnosis"
-                      placeholder="e.g., Dental Cavity"
-                      value={claimForm.diagnosis}
-                      onChange={(e) => setClaimForm({ ...claimForm, diagnosis: e.target.value })}
-                      className="input-field"
-                    />
-                  </div>
+                {!selectedService ? (
+                  <ScrollArea className="flex-1 pr-4">
+                    <div className="grid md:grid-cols-2 gap-3">
+                      {services.map((service) => {
+                        const available = isServiceAvailable(service);
+                        const affordable = canAffordService(service);
 
-                  <div className="space-y-2">
-                    <Label htmlFor="treatment">Treatment *</Label>
-                    <Textarea
-                      id="treatment"
-                      placeholder="e.g., Tooth filling with composite material"
-                      value={claimForm.treatment}
-                      onChange={(e) => setClaimForm({ ...claimForm, treatment: e.target.value })}
-                      className="input-field"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="amount">Amount (KES) *</Label>
-                    <Input
-                      id="amount"
-                      type="number"
-                      placeholder="0"
-                      value={claimForm.amount}
-                      onChange={(e) => setClaimForm({ ...claimForm, amount: e.target.value })}
-                      className="input-field"
-                    />
-                    {parseFloat(claimForm.amount) > selectedMember.coverage_balance && (
-                      <p className="text-xs text-destructive flex items-center gap-1">
-                        <AlertCircle className="h-3 w-3" />
-                        Amount exceeds available coverage
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Summary */}
-                {claimForm.amount && parseFloat(claimForm.amount) > 0 && (
-                  <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Current balance:</span>
-                      <span>KES {selectedMember.coverage_balance.toLocaleString()}</span>
+                        return (
+                          <div
+                            key={service.id}
+                            className={`p-4 rounded-lg border transition-colors ${
+                              available && affordable
+                                ? "border-border hover:border-primary cursor-pointer"
+                                : "border-border/50 opacity-60 cursor-not-allowed"
+                            }`}
+                            onClick={() => available && affordable && handleSelectService(service)}
+                          >
+                            <div className="flex justify-between items-start mb-2">
+                              <p className="font-medium">{service.name}</p>
+                              {!available && (
+                                <Badge variant="secondary" className="text-xs">Pre-approval needed</Badge>
+                              )}
+                              {available && !affordable && (
+                                <Badge variant="destructive" className="text-xs">Insufficient funds</Badge>
+                              )}
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                              <div>
+                                <span className="text-muted-foreground">Benefit Cost:</span>
+                                <p className="font-semibold">KES {service.benefit_cost.toLocaleString()}</p>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Branch Comp:</span>
+                                <p className="font-semibold text-success">KES {service.branch_compensation.toLocaleString()}</p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Claim amount:</span>
-                      <span className="text-destructive">
-                        -KES {parseFloat(claimForm.amount).toLocaleString()}
-                      </span>
+                  </ScrollArea>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
+                      <h4 className="font-semibold mb-3">{selectedService.name}</h4>
+                      <div className="grid grid-cols-3 gap-4 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">Benefit Cost:</span>
+                          <p className="font-bold text-lg">KES {selectedService.benefit_cost.toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Branch Compensation:</span>
+                          <p className="font-bold text-lg text-success">KES {selectedService.branch_compensation.toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Profit/Loss:</span>
+                          <p className={`font-bold text-lg ${selectedService.profit_loss >= 0 ? "text-success" : "text-destructive"}`}>
+                            KES {selectedService.profit_loss.toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    <div className="border-t border-border pt-2 flex justify-between font-medium">
-                      <span>New balance:</span>
-                      <span className={selectedMember.coverage_balance - parseFloat(claimForm.amount) >= 0 ? "text-success" : "text-destructive"}>
-                        KES {(selectedMember.coverage_balance - parseFloat(claimForm.amount)).toLocaleString()}
-                      </span>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Notes (optional)</label>
+                      <Textarea
+                        placeholder="Add any notes about this service..."
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Current balance:</span>
+                        <span>KES {selectedMember.coverage_balance.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Deduction:</span>
+                        <span className="text-destructive">
+                          -KES {selectedService.benefit_cost.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex justify-between font-semibold border-t pt-2">
+                        <span>New balance:</span>
+                        <span className="text-success">
+                          KES {(selectedMember.coverage_balance - selectedService.benefit_cost).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <Button
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => setSelectedService(null)}
+                      >
+                        Back to Services
+                      </Button>
+                      <Button
+                        className="flex-1 btn-primary"
+                        onClick={handleProcessService}
+                        disabled={submitting}
+                      >
+                        {submitting ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="mr-2 h-4 w-4" />
+                            Process Service
+                          </>
+                        )}
+                      </Button>
                     </div>
                   </div>
                 )}
-
-                <Button
-                  onClick={handleSubmitClaim}
-                  disabled={
-                    submittingClaim ||
-                    !claimForm.diagnosis ||
-                    !claimForm.treatment ||
-                    !claimForm.amount ||
-                    parseFloat(claimForm.amount) > selectedMember.coverage_balance
-                  }
-                  className="w-full btn-primary"
-                >
-                  {submittingClaim ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="mr-2 h-4 w-4" />
-                      Process Claim
-                    </>
-                  )}
-                </Button>
               </div>
             )}
           </DialogContent>

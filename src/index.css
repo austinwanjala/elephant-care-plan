@@ -238,4 +238,11 @@
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
+
+  /* Custom utility to always show scrollbar */
+  .always-show-scrollbar [data-radix-scroll-area-scrollbar] {
+    opacity: 1 !important;
+    animation: none !important; /* Disable fade-out animation */
+    visibility: visible !important; /* Ensure it's always visible */
+  }
 }

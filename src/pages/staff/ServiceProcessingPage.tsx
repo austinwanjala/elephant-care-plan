@@ -370,7 +370,7 @@ const ServiceProcessingPage = () => {
 
       {/* Service Selection Dialog */}
       <Dialog open={serviceDialogOpen} onOpenChange={setServiceDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto flex flex-col"> {/* Changed overflow-hidden to overflow-y-auto */}
           <DialogHeader>
             <DialogTitle className="font-serif">Select Service</DialogTitle>
             <DialogDescription>
@@ -405,7 +405,7 @@ const ServiceProcessingPage = () => {
               </div>
 
               {!selectedService ? (
-                <ScrollArea className="flex-1 pr-4 always-show-scrollbar"> {/* Added always-show-scrollbar */}
+                <ScrollArea className="flex-1 pr-4 always-show-scrollbar">
                   <div className="grid md:grid-cols-2 gap-3">
                     {services.map((service) => {
                       const available = isServiceAvailable(service);
@@ -449,7 +449,7 @@ const ServiceProcessingPage = () => {
                   </div>
                 </ScrollArea>
               ) : (
-                <ScrollArea className="flex-1 pr-4 always-show-scrollbar"> {/* Added always-show-scrollbar */}
+                <ScrollArea className="flex-1 pr-4 always-show-scrollbar">
                   <div className="space-y-4">
                     <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
                       <h4 className="font-semibold mb-3">{selectedService.name}</h4>

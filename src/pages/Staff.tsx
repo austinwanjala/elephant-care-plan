@@ -82,7 +82,7 @@ interface BranchStats {
   todayProfitLoss: number;
 }
 
-const Staff = () => { // Renamed from StaffDashboard
+const Staff = () => {
   const [loading, setLoading] = useState(true);
   const [staffInfo, setStaffInfo] = useState<StaffInfo | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -116,11 +116,21 @@ const Staff = () => { // Renamed from StaffDashboard
       return;
     }
 
-    const { data: staffData } = await supabase
+    const { data: staffData, error: staffError } = await supabase
       .from("staff")
       .select("*, branches(name)")
       .eq("user_id", user.id)
       .single();
+
+    if (staffError) {
+      toast({
+        title: "Error loading staff profile",
+        description: staffError.message,
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
 
     if (staffData) {
       setStaffInfo(staffData);
@@ -132,7 +142,7 @@ const Staff = () => { // Renamed from StaffDashboard
     } else {
       toast({
         title: "Staff profile not found",
-        description: "Please contact support.",
+        description: "Please contact support. Redirecting to dashboard.",
         variant: "destructive",
       });
       navigate("/dashboard"); // Fallback if staff profile is missing
@@ -328,6 +338,29 @@ const Staff = () => { // Renamed from StaffDashboard
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // If not loading but staffInfo is null, something went wrong with fetching staff data
+  if (!staffInfo) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4 text-center">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-destructive flex items-center justify-center gap-2">
+              <AlertCircle className="h-6 w-6" /> Staff Profile Error
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">
+              We couldn't load your staff profile. This might mean your user account is not linked to a staff entry, or there was a database issue.
+            </p>
+            <Button onClick={() => navigate("/login")} className="btn-primary">
+              Go to Login
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

@@ -82,7 +82,7 @@ interface BranchStats {
   todayProfitLoss: number;
 }
 
-const Staff = () => {
+const StaffDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [staffInfo, setStaffInfo] = useState<StaffInfo | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -106,29 +106,13 @@ const Staff = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    checkAuthAndLoadData();
+    loadStaffDataAndRelatedInfo();
   }, []);
 
-  const checkAuthAndLoadData = async () => {
+  const loadStaffDataAndRelatedInfo = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       navigate("/login");
-      return;
-    }
-
-    const { data: roleData } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .single();
-
-    if (roleData?.role !== "staff" && roleData?.role !== "admin") {
-      toast({
-        title: "Access denied",
-        description: "You don't have staff privileges",
-        variant: "destructive",
-      });
-      navigate("/dashboard");
       return;
     }
 
@@ -145,6 +129,13 @@ const Staff = () => {
         loadRecentVisits(staffData.branch_id),
         loadBranchStats(staffData.branch_id),
       ]);
+    } else {
+      toast({
+        title: "Staff profile not found",
+        description: "Please contact support.",
+        variant: "destructive",
+      });
+      navigate("/dashboard"); // Fallback if staff profile is missing
     }
 
     setLoading(false);
@@ -204,6 +195,13 @@ const Staff = () => {
         todayRevenue: data.total_compensation,
         todayDeductions: data.total_benefit_deductions,
         todayProfitLoss: data.total_profit_loss,
+      });
+    } else {
+      setBranchStats({
+        todayVisits: 0,
+        todayRevenue: 0,
+        todayDeductions: 0,
+        todayProfitLoss: 0,
       });
     }
   };
@@ -326,11 +324,6 @@ const Staff = () => {
     }
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate("/");
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -341,29 +334,6 @@ const Staff = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-card border-b border-border sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
-              <span className="text-xl">🐘</span>
-            </div>
-            <div>
-              <span className="text-xl font-serif font-bold text-foreground">Elephant Dental</span>
-              <span className="ml-2 px-2 py-0.5 bg-accent/10 text-accent text-xs rounded-full">Staff</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-muted-foreground hidden sm:block">
-              {staffInfo?.full_name} • {staffInfo?.branches?.name}
-            </span>
-            <Button variant="ghost" size="icon" onClick={handleLogout}>
-              <LogOut className="h-5 w-5" />
-            </Button>
-          </div>
-        </div>
-      </header>
-
       <main className="container mx-auto px-4 py-8">
         {/* Branch Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -587,7 +557,7 @@ const Staff = () => {
                             key={service.id}
                             className={`p-4 rounded-lg border transition-colors ${
                               available && affordable
-                                ? "border-border hover:border-primary cursor-pointer"
+                                ? "border-primary hover:bg-primary/5 cursor-pointer"
                                 : "border-border/50 opacity-60 cursor-not-allowed"
                             }`}
                             onClick={() => available && affordable && handleSelectService(service)}
@@ -599,6 +569,9 @@ const Staff = () => {
                               )}
                               {available && !affordable && (
                                 <Badge variant="destructive" className="text-xs">Insufficient funds</Badge>
+                              )}
+                              {available && affordable && (
+                                <Badge className="bg-success text-xs">Available</Badge>
                               )}
                             </div>
                             <div className="grid grid-cols-2 gap-2 text-sm">
@@ -703,4 +676,4 @@ const Staff = () => {
   );
 };
 
-export default Staff;
+export default StaffDashboard;

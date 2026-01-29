@@ -9,7 +9,7 @@ import {
   CreditCard,
   Shield,
   History,
-  LogOut,
+  LogOut, // LogOut is no longer needed here, but keeping for now if other parts use it
   Loader2,
   FileText,
 } from "lucide-react";
@@ -73,25 +73,27 @@ const Dashboard = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    checkAuthAndLoadData();
+    loadMemberData();
   }, []);
 
-  const checkAuthAndLoadData = async () => {
+  const loadMemberData = async () => {
+    setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      navigate("/login");
+      navigate("/login"); // Should be caught by MemberLayout, but good fallback
+      setLoading(false);
       return;
     }
 
     await Promise.all([
-      loadMemberData(user.id),
-      loadVisits(user.id),
-      loadPayments(user.id),
+      fetchMemberProfile(user.id),
+      fetchVisits(user.id),
+      fetchPayments(user.id),
     ]);
     setLoading(false);
   };
 
-  const loadMemberData = async (userId: string) => {
+  const fetchMemberProfile = async (userId: string) => {
     const { data } = await supabase
       .from("members")
       .select("*, membership_categories(name, benefit_amount)")
@@ -103,7 +105,7 @@ const Dashboard = () => {
     }
   };
 
-  const loadVisits = async (userId: string) => {
+  const fetchVisits = async (userId: string) => {
     const { data: memberData } = await supabase
       .from("members")
       .select("id")
@@ -121,7 +123,7 @@ const Dashboard = () => {
     }
   };
 
-  const loadPayments = async (userId: string) => {
+  const fetchPayments = async (userId: string) => {
     const { data: memberData } = await supabase
       .from("members")
       .select("id")
@@ -137,11 +139,6 @@ const Dashboard = () => {
       
       if (data) setPayments(data);
     }
-  };
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate("/");
   };
 
   const getStatusBadge = (status: string) => {
@@ -170,27 +167,7 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-card border-b border-border sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
-              <span className="text-xl">🐘</span>
-            </div>
-            <span className="text-xl font-serif font-bold text-foreground">Elephant Dental</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-muted-foreground hidden sm:block">
-              Welcome, {member?.full_name}
-            </span>
-            <Button variant="ghost" size="icon" onClick={handleLogout}>
-              <LogOut className="h-5 w-5" />
-            </Button>
-          </div>
-        </div>
-      </header>
-
+    <div className="bg-background">
       <main className="container mx-auto px-4 py-8">
         {/* Stats Cards */}
         <div className="grid md:grid-cols-3 gap-6 mb-8">

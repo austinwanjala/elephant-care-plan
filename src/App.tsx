@@ -6,7 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import Dashboard from "./pages/Dashboard";
+import Dashboard from "./pages/Dashboard"; // This will become the index for MemberLayout
 import NotFound from "./pages/NotFound";
 
 // Admin pages
@@ -20,12 +20,15 @@ import AdminSettings from "./pages/admin/AdminSettings";
 
 // Staff pages
 import { StaffLayout } from "./components/staff/StaffLayout";
-import StaffDashboard from "./pages/staff/StaffDashboard"; // Renamed import
-import ServiceProcessingPage from "./pages/staff/ServiceProcessingPage"; // New import
+import StaffDashboard from "./pages/staff/StaffDashboard";
+import ServiceProcessingPage from "./pages/staff/ServiceProcessingPage";
 import TodaysList from "./pages/staff/TodaysList";
 import BranchRevenue from "./pages/staff/BranchRevenue";
 import MemberRegistration from "./pages/staff/MemberRegistration";
 import BranchServices from "./pages/staff/BranchServices";
+
+// Member pages
+import { MemberLayout } from "./components/member/MemberLayout"; // New import
 
 
 const queryClient = new QueryClient();
@@ -40,12 +43,20 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/dashboard" element={<Dashboard />} />
+          
+          {/* Member Routes */}
+          <Route path="/dashboard" element={<MemberLayout />}>
+            <Route index element={<Dashboard />} /> {/* Member Dashboard */}
+            {/* Add other member-specific routes here, e.g.: */}
+            {/* <Route path="payments" element={<MemberPayments />} /> */}
+            {/* <Route path="visits" element={<MemberVisits />} /> */}
+            {/* <Route path="profile" element={<MemberProfile />} /> */}
+          </Route>
           
           {/* Staff Routes */}
           <Route path="/staff" element={<StaffLayout />}>
-            <Route index element={<StaffDashboard />} /> {/* Changed to StaffDashboard */}
-            <Route path="process-service" element={<ServiceProcessingPage />} /> {/* New route */}
+            <Route index element={<StaffDashboard />} />
+            <Route path="process-service" element={<ServiceProcessingPage />} />
             <Route path="today" element={<TodaysList />} />
             <Route path="revenue" element={<BranchRevenue />} />
             <Route path="register-member" element={<MemberRegistration />} />

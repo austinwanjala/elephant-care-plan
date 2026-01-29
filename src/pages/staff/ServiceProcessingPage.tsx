@@ -370,7 +370,7 @@ const ServiceProcessingPage = () => {
 
       {/* Service Selection Dialog */}
       <Dialog open={serviceDialogOpen} onOpenChange={setServiceDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto flex flex-col"> {/* Changed overflow-hidden to overflow-y-auto */}
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col"> {/* Removed overflow-y-auto */}
           <DialogHeader>
             <DialogTitle className="font-serif">Select Service</DialogTitle>
             <DialogDescription>

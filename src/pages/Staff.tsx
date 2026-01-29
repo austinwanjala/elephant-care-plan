@@ -82,7 +82,7 @@ interface BranchStats {
   todayProfitLoss: number;
 }
 
-const StaffDashboard = () => {
+const Staff = () => { // Renamed from StaffDashboard
   const [loading, setLoading] = useState(true);
   const [staffInfo, setStaffInfo] = useState<StaffInfo | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -676,4 +676,4 @@ const StaffDashboard = () => {
   );
 };
 
-export default StaffDashboard;
+export default Staff;

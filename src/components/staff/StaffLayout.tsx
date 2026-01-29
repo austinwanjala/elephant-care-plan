@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Outlet } from "react-router-dom"; // Import Outlet
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { StaffSidebar } from "./StaffSidebar";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,10 +7,10 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 
 interface StaffLayoutProps {
-  children: ReactNode;
+  // children: ReactNode; // No longer needed when using Outlet
 }
 
-export function StaffLayout({ children }: StaffLayoutProps) {
+export function StaffLayout({ /* children */ }: StaffLayoutProps) {
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
   const navigate = useNavigate();
@@ -68,7 +68,7 @@ export function StaffLayout({ children }: StaffLayoutProps) {
             <SidebarTrigger className="mr-4" />
           </header>
           <main className="p-6">
-            {children}
+            <Outlet /> {/* Render nested routes here */}
           </main>
         </SidebarInset>
       </div>

@@ -366,345 +366,343 @@ const Staff = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <main className="container mx-auto px-4 py-8">
-        {/* Branch Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Today's Visits</CardTitle>
-              <User className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{branchStats.todayVisits}</div>
-            </CardContent>
-          </Card>
+    <div className="container mx-auto px-4 py-8"> {/* Removed min-h-screen bg-background */}
+      {/* Branch Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Today's Visits</CardTitle>
+            <User className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{branchStats.todayVisits}</div>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Branch Revenue</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-success">
-                KES {branchStats.todayRevenue.toLocaleString()}
-              </div>
-            </CardContent>
-          </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Branch Revenue</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-success">
+              KES {branchStats.todayRevenue.toLocaleString()}
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Benefit Deductions</CardTitle>
-              <Shield className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                KES {branchStats.todayDeductions.toLocaleString()}
-              </div>
-            </CardContent>
-          </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Benefit Deductions</CardTitle>
+            <Shield className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              KES {branchStats.todayDeductions.toLocaleString()}
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Profit/Loss</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold ${branchStats.todayProfitLoss >= 0 ? "text-success" : "text-destructive"}`}>
-                KES {branchStats.todayProfitLoss.toLocaleString()}
-              </div>
-            </CardContent>
-          </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Profit/Loss</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${branchStats.todayProfitLoss >= 0 ? "text-success" : "text-destructive"}`}>
+              KES {branchStats.todayProfitLoss.toLocaleString()}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Search Section */}
+      <div className="card-elevated p-8 mb-8">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+            <QrCode className="h-6 w-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-serif font-bold text-foreground">Service Processing</h1>
+            <p className="text-muted-foreground">Search member by QR code, member number, name, or phone</p>
+          </div>
         </div>
 
-        {/* Search Section */}
-        <div className="card-elevated p-8 mb-8">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-              <QrCode className="h-6 w-6 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-serif font-bold text-foreground">Service Processing</h1>
-              <p className="text-muted-foreground">Search member by QR code, member number, name, or phone</p>
-            </div>
+        <div className="flex gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            <Input
+              placeholder="Scan QR code or enter member number / name / phone..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              className="pl-11 h-12 text-lg input-field"
+            />
           </div>
+          <Button onClick={handleSearch} disabled={searching} className="btn-primary h-12 px-8">
+            {searching ? <Loader2 className="h-5 w-5 animate-spin" /> : "Search"}
+          </Button>
+        </div>
 
-          <div className="flex gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-              <Input
-                placeholder="Scan QR code or enter member number / name / phone..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                className="pl-11 h-12 text-lg input-field"
-              />
-            </div>
-            <Button onClick={handleSearch} disabled={searching} className="btn-primary h-12 px-8">
-              {searching ? <Loader2 className="h-5 w-5 animate-spin" /> : "Search"}
-            </Button>
-          </div>
-
-          {/* Search Results */}
-          {searchResults.length > 0 && (
-            <div className="mt-6 space-y-3">
-              <p className="text-sm text-muted-foreground">
-                {searchResults.length} member(s) found
-              </p>
-              {searchResults.map((member) => (
-                <div
-                  key={member.id}
-                  className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border border-border hover:border-primary/50 transition-colors cursor-pointer"
-                  onClick={() => handleSelectMember(member)}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                      <User className="h-6 w-6 text-primary" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-foreground">{member.full_name}</p>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span className="font-mono">{member.member_number}</span>
-                        {member.membership_categories && (
-                          <Badge variant="outline">{member.membership_categories.name}</Badge>
-                        )}
-                      </div>
-                    </div>
+        {/* Search Results */}
+        {searchResults.length > 0 && (
+          <div className="mt-6 space-y-3">
+            <p className="text-sm text-muted-foreground">
+              {searchResults.length} member(s) found
+            </p>
+            {searchResults.map((member) => (
+              <div
+                key={member.id}
+                className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border border-border hover:border-primary/50 transition-colors cursor-pointer"
+                onClick={() => handleSelectMember(member)}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <User className="h-6 w-6 text-primary" />
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm text-muted-foreground">Coverage Balance</p>
-                    <p className={`text-xl font-bold ${member.coverage_balance > 0 ? "text-success" : "text-destructive"}`}>
-                      KES {member.coverage_balance.toLocaleString()}
-                    </p>
+                  <div>
+                    <p className="font-semibold text-foreground">{member.full_name}</p>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span className="font-mono">{member.member_number}</span>
+                      {member.membership_categories && (
+                        <Badge variant="outline">{member.membership_categories.name}</Badge>
+                      )}
+                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Recent Visits */}
-        <div className="card-elevated overflow-hidden">
-          <div className="p-6 border-b border-border">
-            <h2 className="text-xl font-serif font-bold text-foreground flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" />
-              Recent Services
-            </h2>
+                <div className="text-right">
+                  <p className="text-sm text-muted-foreground">Coverage Balance</p>
+                  <p className={`text-xl font-bold ${member.coverage_balance > 0 ? "text-success" : "text-destructive"}`}>
+                    KES {member.coverage_balance.toLocaleString()}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
+        )}
+      </div>
+
+      {/* Recent Visits */}
+      <div className="card-elevated overflow-hidden">
+        <div className="p-6 border-b border-border">
+          <h2 className="text-xl font-serif font-bold text-foreground flex items-center gap-2">
+            <FileText className="h-5 w-5 text-primary" />
+            Recent Services
+          </h2>
+        </div>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Time</TableHead>
+                <TableHead>Member</TableHead>
+                <TableHead>Service</TableHead>
+                <TableHead>Benefit Deducted</TableHead>
+                <TableHead>Branch Comp.</TableHead>
+                <TableHead>Profit/Loss</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {recentVisits.length === 0 ? (
                 <TableRow>
-                  <TableHead>Time</TableHead>
-                  <TableHead>Member</TableHead>
-                  <TableHead>Service</TableHead>
-                  <TableHead>Benefit Deducted</TableHead>
-                  <TableHead>Branch Comp.</TableHead>
-                  <TableHead>Profit/Loss</TableHead>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                    No services processed yet today
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {recentVisits.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                      No services processed yet today
+              ) : (
+                recentVisits.map((visit) => (
+                  <TableRow key={visit.id}>
+                    <TableCell>
+                      {new Date(visit.created_at).toLocaleTimeString()}
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">{visit.members?.full_name}</p>
+                        <p className="text-xs text-muted-foreground font-mono">
+                          {visit.members?.member_number}
+                        </p>
+                      </div>
+                    </TableCell>
+                    <TableCell>{visit.services?.name}</TableCell>
+                    <TableCell className="text-destructive">
+                      -KES {visit.benefit_deducted.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-success">
+                      +KES {visit.branch_compensation.toLocaleString()}
+                    </TableCell>
+                    <TableCell className={visit.profit_loss >= 0 ? "text-success" : "text-destructive"}>
+                      KES {visit.profit_loss.toLocaleString()}
                     </TableCell>
                   </TableRow>
-                ) : (
-                  recentVisits.map((visit) => (
-                    <TableRow key={visit.id}>
-                      <TableCell>
-                        {new Date(visit.created_at).toLocaleTimeString()}
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <p className="font-medium">{visit.members?.full_name}</p>
-                          <p className="text-xs text-muted-foreground font-mono">
-                            {visit.members?.member_number}
-                          </p>
-                        </div>
-                      </TableCell>
-                      <TableCell>{visit.services?.name}</TableCell>
-                      <TableCell className="text-destructive">
-                        -KES {visit.benefit_deducted.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-success">
-                        +KES {visit.branch_compensation.toLocaleString()}
-                      </TableCell>
-                      <TableCell className={visit.profit_loss >= 0 ? "text-success" : "text-destructive"}>
-                        KES {visit.profit_loss.toLocaleString()}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                ))
+              )}
+            </TableBody>
+          </Table>
         </div>
+      </div>
 
-        {/* Service Selection Dialog */}
-        <Dialog open={serviceDialogOpen} onOpenChange={setServiceDialogOpen}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-            <DialogHeader>
-              <DialogTitle className="font-serif">Select Service</DialogTitle>
-              <DialogDescription>
-                Choose a service for {selectedMember?.full_name}
-              </DialogDescription>
-            </DialogHeader>
+      {/* Service Selection Dialog */}
+      <Dialog open={serviceDialogOpen} onOpenChange={setServiceDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="font-serif">Select Service</DialogTitle>
+            <DialogDescription>
+              Choose a service for {selectedMember?.full_name}
+            </DialogDescription>
+          </DialogHeader>
 
-            {selectedMember && (
-              <div className="flex-1 overflow-hidden flex flex-col">
-                {/* Member Info */}
-                <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <User className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="font-semibold">{selectedMember.full_name}</p>
-                      <p className="text-sm text-muted-foreground font-mono">
-                        {selectedMember.member_number}
-                      </p>
-                    </div>
+          {selectedMember && (
+            <div className="flex-1 overflow-hidden flex flex-col">
+              {/* Member Info */}
+              <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <User className="h-5 w-5 text-primary" />
                   </div>
-                  <div className="text-right">
-                    <div className="flex items-center gap-1">
-                      <Shield className="h-4 w-4 text-success" />
-                      <span className="text-sm text-muted-foreground">Available</span>
-                    </div>
-                    <p className="text-xl font-bold text-success">
-                      KES {selectedMember.coverage_balance.toLocaleString()}
+                  <div>
+                    <p className="font-semibold">{selectedMember.full_name}</p>
+                    <p className="text-sm text-muted-foreground font-mono">
+                      {selectedMember.member_number}
                     </p>
                   </div>
                 </div>
+                <div className="text-right">
+                  <div className="flex items-center gap-1">
+                    <Shield className="h-4 w-4 text-success" />
+                    <span className="text-sm text-muted-foreground">Available</span>
+                  </div>
+                  <p className="text-xl font-bold text-success">
+                    KES {selectedMember.coverage_balance.toLocaleString()}
+                  </p>
+                </div>
+              </div>
 
-                {!selectedService ? (
-                  <ScrollArea className="flex-1 pr-4">
-                    <div className="grid md:grid-cols-2 gap-3">
-                      {services.map((service) => {
-                        const available = isServiceAvailable(service);
-                        const affordable = canAffordService(service);
+              {!selectedService ? (
+                <ScrollArea className="flex-1 pr-4">
+                  <div className="grid md:grid-cols-2 gap-3">
+                    {services.map((service) => {
+                      const available = isServiceAvailable(service);
+                      const affordable = canAffordService(service);
 
-                        return (
-                          <div
-                            key={service.id}
-                            className={`p-4 rounded-lg border transition-colors ${
-                              available && affordable
-                                ? "border-primary hover:bg-primary/5 cursor-pointer"
-                                : "border-border/50 opacity-60 cursor-not-allowed"
-                            }`}
-                            onClick={() => available && affordable && handleSelectService(service)}
-                          >
-                            <div className="flex justify-between items-start mb-2">
-                              <p className="font-medium">{service.name}</p>
-                              {!available && (
-                                <Badge variant="secondary" className="text-xs">Pre-approval needed</Badge>
-                              )}
-                              {available && !affordable && (
-                                <Badge variant="destructive" className="text-xs">Insufficient funds</Badge>
-                              )}
-                              {available && affordable && (
-                                <Badge className="bg-success text-xs">Available</Badge>
-                              )}
+                      return (
+                        <div
+                          key={service.id}
+                          className={`p-4 rounded-lg border transition-colors ${
+                            available && affordable
+                              ? "border-primary hover:bg-primary/5 cursor-pointer"
+                              : "border-border/50 opacity-60 cursor-not-allowed"
+                          }`}
+                          onClick={() => available && affordable && handleSelectService(service)}
+                        >
+                          <div className="flex justify-between items-start mb-2">
+                            <p className="font-medium">{service.name}</p>
+                            {!available && (
+                              <Badge variant="secondary" className="text-xs">Pre-approval needed</Badge>
+                            )}
+                            {available && !affordable && (
+                              <Badge variant="destructive" className="text-xs">Insufficient funds</Badge>
+                            )}
+                            {available && affordable && (
+                              <Badge className="bg-success text-xs">Available</Badge>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">Benefit Cost:</span>
+                              <p className="font-semibold">KES {service.benefit_cost.toLocaleString()}</p>
                             </div>
-                            <div className="grid grid-cols-2 gap-2 text-sm">
-                              <div>
-                                <span className="text-muted-foreground">Benefit Cost:</span>
-                                <p className="font-semibold">KES {service.benefit_cost.toLocaleString()}</p>
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground">Branch Comp:</span>
-                                <p className="font-semibold text-success">KES {service.branch_compensation.toLocaleString()}</p>
-                              </div>
+                            <div>
+                              <span className="text-muted-foreground">Branch Comp:</span>
+                              <p className="font-semibold text-success">KES {service.branch_compensation.toLocaleString()}</p>
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
-                  </ScrollArea>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
-                      <h4 className="font-semibold mb-3">{selectedService.name}</h4>
-                      <div className="grid grid-cols-3 gap-4 text-sm">
-                        <div>
-                          <span className="text-muted-foreground">Benefit Cost:</span>
-                          <p className="font-bold text-lg">KES {selectedService.benefit_cost.toLocaleString()}</p>
                         </div>
-                        <div>
-                          <span className="text-muted-foreground">Branch Compensation:</span>
-                          <p className="font-bold text-lg text-success">KES {selectedService.branch_compensation.toLocaleString()}</p>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Profit/Loss:</span>
-                          <p className={`font-bold text-lg ${selectedService.profit_loss >= 0 ? "text-success" : "text-destructive"}`}>
-                            KES {selectedService.profit_loss.toLocaleString()}
-                          </p>
-                        </div>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
+              ) : (
+                <div className="space-y-4">
+                  <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
+                    <h4 className="font-semibold mb-3">{selectedService.name}</h4>
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Benefit Cost:</span>
+                        <p className="font-bold text-lg">KES {selectedService.benefit_cost.toLocaleString()}</p>
                       </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Notes (optional)</label>
-                      <Textarea
-                        placeholder="Add any notes about this service..."
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Current balance:</span>
-                        <span>KES {selectedMember.coverage_balance.toLocaleString()}</span>
+                      <div>
+                        <span className="text-muted-foreground">Branch Compensation:</span>
+                        <p className="font-bold text-lg text-success">KES {selectedService.branch_compensation.toLocaleString()}</p>
                       </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Deduction:</span>
-                        <span className="text-destructive">
-                          -KES {selectedService.benefit_cost.toLocaleString()}
-                        </span>
+                      <div>
+                        <span className="text-muted-foreground">Profit/Loss:</span>
+                        <p className={`font-bold text-lg ${selectedService.profit_loss >= 0 ? "text-success" : "text-destructive"}`}>
+                          KES {selectedService.profit_loss.toLocaleString()}
+                        </p>
                       </div>
-                      <div className="flex justify-between font-semibold border-t pt-2">
-                        <span>New balance:</span>
-                        <span className="text-success">
-                          KES {(selectedMember.coverage_balance - selectedService.benefit_cost).toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-3">
-                      <Button
-                        variant="outline"
-                        className="flex-1"
-                        onClick={() => setSelectedService(null)}
-                      >
-                        Back to Services
-                      </Button>
-                      <Button
-                        className="flex-1 btn-primary"
-                        onClick={handleProcessService}
-                        disabled={submitting}
-                      >
-                        {submitting ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Processing...
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle className="mr-2 h-4 w-4" />
-                            Process Service
-                          </>
-                        )}
-                      </Button>
                     </div>
                   </div>
-                )}
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-      </main>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Notes (optional)</label>
+                    <Textarea
+                      placeholder="Add any notes about this service..."
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Current balance:</span>
+                      <span>KES {selectedMember.coverage_balance.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Deduction:</span>
+                      <span className="text-destructive">
+                        -KES {selectedService.benefit_cost.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between font-semibold border-t pt-2">
+                      <span>New balance:</span>
+                      <span className="text-success">
+                        KES {(selectedMember.coverage_balance - selectedService.benefit_cost).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => setSelectedService(null)}
+                    >
+                      Back to Services
+                    </Button>
+                    <Button
+                      className="flex-1 btn-primary"
+                      onClick={handleProcessService}
+                      disabled={submitting}
+                    >
+                      {submitting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="mr-2 h-4 w-4" />
+                          Process Service
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -20,7 +20,6 @@ interface Service {
   real_cost: number;
   branch_compensation: number;
   benefit_cost: number;
-  profit_loss: number;
   approval_type: "all_branches" | "pre_approved_only";
   is_active: boolean;
 }
@@ -58,7 +57,7 @@ export default function BranchServices() {
     if (staffData?.branch_id) {
       setStaffInfo(staffData);
       const [servicesRes, preapprovalsRes] = await Promise.all([
-        supabase.from("services").select("*").eq("is_active", true).order("name"),
+        supabase.from("services").select("id, name, real_cost, branch_compensation, benefit_cost, approval_type, is_active").eq("is_active", true).order("name"), // Removed profit_loss
         supabase.from("service_preapprovals").select("service_id").eq("branch_id", staffData.branch_id),
       ]);
 
@@ -147,14 +146,13 @@ export default function BranchServices() {
                   <TableHead>Procedure</TableHead>
                   <TableHead>Benefit Cost</TableHead>
                   <TableHead>Branch Comp.</TableHead>
-                  <TableHead>Profit/Loss</TableHead>
                   <TableHead>Availability</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {services.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                       No active services found for your branch.
                     </TableCell>
                   </TableRow>
@@ -164,9 +162,6 @@ export default function BranchServices() {
                       <TableCell className="font-medium">{service.name}</TableCell>
                       <TableCell>KES {service.benefit_cost.toLocaleString()}</TableCell>
                       <TableCell>KES {service.branch_compensation.toLocaleString()}</TableCell>
-                      <TableCell className={service.profit_loss >= 0 ? "text-success" : "text-destructive"}>
-                        KES {service.profit_loss.toLocaleString()}
-                      </TableCell>
                       <TableCell>
                         {isServiceAvailableAtBranch(service) ? (
                           <Badge className="bg-success">Available</Badge>

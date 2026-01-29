@@ -10,7 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, Loader2, TrendingUp, AlertCircle } from "lucide-react";
+import { DollarSign, Loader2, AlertCircle } from "lucide-react";
 import { StaffLayout } from "@/components/staff/StaffLayout";
 
 interface BranchRevenueEntry {
@@ -19,7 +19,6 @@ interface BranchRevenueEntry {
   visit_count: number;
   total_compensation: number;
   total_benefit_deductions: number;
-  total_profit_loss: number;
 }
 
 interface StaffInfo {
@@ -55,7 +54,7 @@ export default function BranchRevenue() {
       setStaffInfo(staffData);
       const { data, error } = await supabase
         .from("branch_revenue")
-        .select("*")
+        .select("id, date, visit_count, total_compensation, total_benefit_deductions") // Removed total_profit_loss
         .eq("branch_id", staffData.branch_id)
         .order("date", { ascending: false })
         .limit(30);
@@ -131,13 +130,12 @@ export default function BranchRevenue() {
                   <TableHead>Visits</TableHead>
                   <TableHead>Compensation</TableHead>
                   <TableHead>Benefit Deductions</TableHead>
-                  <TableHead>Profit/Loss</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {revenueData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                       No revenue data available for your branch.
                     </TableCell>
                   </TableRow>
@@ -151,9 +149,6 @@ export default function BranchRevenue() {
                       </TableCell>
                       <TableCell>
                         KES {entry.total_benefit_deductions.toLocaleString()}
-                      </TableCell>
-                      <TableCell className={entry.total_profit_loss >= 0 ? "text-success" : "text-destructive"}>
-                        KES {entry.total_profit_loss.toLocaleString()}
                       </TableCell>
                     </TableRow>
                   ))

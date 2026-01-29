@@ -20,7 +20,8 @@ import AdminSettings from "./pages/admin/AdminSettings";
 
 // Staff pages
 import { StaffLayout } from "./components/staff/StaffLayout";
-import Staff from "./pages/Staff"; // Corrected import
+import StaffDashboard from "./pages/staff/StaffDashboard"; // Renamed import
+import ServiceProcessingPage from "./pages/staff/ServiceProcessingPage"; // New import
 import TodaysList from "./pages/staff/TodaysList";
 import BranchRevenue from "./pages/staff/BranchRevenue";
 import MemberRegistration from "./pages/staff/MemberRegistration";
@@ -43,7 +44,8 @@ const App = () => (
           
           {/* Staff Routes */}
           <Route path="/staff" element={<StaffLayout />}>
-            <Route index element={<Staff />} /> {/* Corrected to use Staff component */}
+            <Route index element={<StaffDashboard />} /> {/* Changed to StaffDashboard */}
+            <Route path="process-service" element={<ServiceProcessingPage />} /> {/* New route */}
             <Route path="today" element={<TodaysList />} />
             <Route path="revenue" element={<BranchRevenue />} />
             <Route path="register-member" element={<MemberRegistration />} />

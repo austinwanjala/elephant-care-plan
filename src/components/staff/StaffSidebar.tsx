@@ -6,6 +6,7 @@ import {
   UserPlus,
   Stethoscope,
   LogOut,
+  QrCode, // Added QrCode icon
 } from "lucide-react";
 import {
   Sidebar,
@@ -25,6 +26,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 const menuItems = [
   { title: "Dashboard", url: "/staff", icon: LayoutDashboard },
+  { title: "Service Processing", url: "/staff/process-service", icon: QrCode }, // New item
   { title: "Today's List", url: "/staff/today", icon: Users },
   { title: "Branch Revenue", url: "/staff/revenue", icon: DollarSign },
   { title: "Member Registration", url: "/staff/register-member", icon: UserPlus },

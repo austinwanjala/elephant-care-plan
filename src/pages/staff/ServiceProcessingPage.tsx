@@ -8,14 +8,11 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   QrCode,
   Search,
-  LogOut,
   Loader2,
   User,
   Shield,
-  FileText,
   AlertCircle,
   CheckCircle,
-  DollarSign,
 } from "lucide-react";
 import {
   Dialog,
@@ -24,14 +21,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -63,22 +52,7 @@ interface Service {
   approval_type: "all_branches" | "pre_approved_only";
 }
 
-interface Visit {
-  id: string;
-  benefit_deducted: number;
-  branch_compensation: number;
-  created_at: string;
-  services: { name: string } | null;
-  members: { full_name: string; member_number: string } | null;
-}
-
-interface BranchStats {
-  todayVisits: number;
-  todayRevenue: number;
-  todayDeductions: number;
-}
-
-const Staff = () => {
+const ServiceProcessingPage = () => {
   const [loading, setLoading] = useState(true);
   const [staffInfo, setStaffInfo] = useState<StaffInfo | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -88,12 +62,6 @@ const Staff = () => {
   const [serviceDialogOpen, setServiceDialogOpen] = useState(false);
   const [services, setServices] = useState<Service[]>([]);
   const [preapprovedServiceIds, setPreapprovedServiceIds] = useState<string[]>([]);
-  const [recentVisits, setRecentVisits] = useState<Visit[]>([]);
-  const [branchStats, setBranchStats] = useState<BranchStats>({
-    todayVisits: 0,
-    todayRevenue: 0,
-    todayDeductions: 0,
-  });
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -101,10 +69,10 @@ const Staff = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    loadStaffDataAndRelatedInfo();
+    loadStaffDataAndServices();
   }, []);
 
-  const loadStaffDataAndRelatedInfo = async () => {
+  const loadStaffDataAndServices = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       navigate("/login");
@@ -129,18 +97,10 @@ const Staff = () => {
 
     if (staffData) {
       setStaffInfo(staffData);
-      // Only load branch-specific data if branch_id is present
       if (staffData.branch_id) {
-        await Promise.all([
-          loadServices(staffData.branch_id),
-          loadRecentVisits(staffData.branch_id),
-          loadBranchStats(staffData.branch_id),
-        ]);
+        await loadServices(staffData.branch_id);
       } else {
-        // If no branch_id, set empty data for branch-specific sections
         setServices([]);
-        setRecentVisits([]);
-        setBranchStats({ todayVisits: 0, todayRevenue: 0, todayDeductions: 0 });
       }
     } else {
       toast({
@@ -148,7 +108,7 @@ const Staff = () => {
         description: "Please contact support. Redirecting to dashboard.",
         variant: "destructive",
       });
-      navigate("/dashboard");
+      navigate("/staff"); // Redirect to staff dashboard if profile not found
     }
 
     setLoading(false);
@@ -157,7 +117,7 @@ const Staff = () => {
   const loadServices = async (branchId: string | null) => {
     const { data: servicesData } = await supabase
       .from("services")
-      .select("id, name, real_cost, branch_compensation, benefit_cost, approval_type") // Removed profit_loss
+      .select("id, name, real_cost, branch_compensation, benefit_cost, approval_type")
       .eq("is_active", true)
       .order("name");
 
@@ -174,45 +134,6 @@ const Staff = () => {
       if (preapprovals) {
         setPreapprovedServiceIds(preapprovals.map((p) => p.service_id));
       }
-    }
-  };
-
-  const loadRecentVisits = async (branchId: string | null) => {
-    if (!branchId) return;
-
-    const { data } = await supabase
-      .from("visits")
-      .select("*, services(name), members(full_name, member_number)")
-      .eq("branch_id", branchId)
-      .order("created_at", { ascending: false })
-      .limit(10);
-
-    if (data) setRecentVisits(data);
-  };
-
-  const loadBranchStats = async (branchId: string | null) => {
-    if (!branchId) return;
-
-    const today = new Date().toISOString().split("T")[0];
-    const { data } = await supabase
-      .from("branch_revenue")
-      .select("visit_count, total_compensation, total_benefit_deductions") // Removed total_profit_loss
-      .eq("branch_id", branchId)
-      .eq("date", today)
-      .maybeSingle();
-
-    if (data) {
-      setBranchStats({
-        todayVisits: data.visit_count,
-        todayRevenue: data.total_compensation,
-        todayDeductions: data.total_benefit_deductions,
-      });
-    } else {
-      setBranchStats({
-        todayVisits: 0,
-        todayRevenue: 0,
-        todayDeductions: 0,
-      });
     }
   };
 
@@ -301,7 +222,6 @@ const Staff = () => {
         staff_id: staffInfo.id,
         benefit_deducted: selectedService.benefit_cost,
         branch_compensation: selectedService.branch_compensation,
-        // Removed profit_loss from insert
         notes: notes || null,
       });
 
@@ -318,11 +238,8 @@ const Staff = () => {
       setSearchResults([]);
       setSearchQuery("");
 
-      // Reload data
-      await Promise.all([
-        loadRecentVisits(staffInfo.branch_id),
-        loadBranchStats(staffInfo.branch_id),
-      ]);
+      // Optionally reload data on the dashboard if needed, or navigate back
+      // For now, just clear the form and close dialog
     } catch (error: any) {
       toast({
         title: "Processing failed",
@@ -364,7 +281,6 @@ const Staff = () => {
     );
   }
 
-  // NEW: Display message if staff is not assigned to a branch
   if (!staffInfo.branch_id) {
     return (
       <div className="container mx-auto px-4 py-8 text-center">
@@ -386,43 +302,6 @@ const Staff = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      {/* Branch Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Today's Visits</CardTitle>
-            <User className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{branchStats.todayVisits}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Branch Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-success">
-              KES {branchStats.todayRevenue.toLocaleString()}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Benefit Deductions</CardTitle>
-            <Shield className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              KES {branchStats.todayDeductions.toLocaleString()}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Search Section */}
       <div className="card-elevated p-8 mb-8">
         <div className="flex items-center gap-3 mb-6">
@@ -487,61 +366,6 @@ const Staff = () => {
             ))}
           </div>
         )}
-      </div>
-
-      {/* Recent Visits */}
-      <div className="card-elevated overflow-hidden">
-        <div className="p-6 border-b border-border">
-          <h2 className="text-xl font-serif font-bold text-foreground flex items-center gap-2">
-            <FileText className="h-5 w-5 text-primary" />
-            Recent Services
-          </h2>
-        </div>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Time</TableHead>
-                <TableHead>Member</TableHead>
-                <TableHead>Service</TableHead>
-                <TableHead>Benefit Deducted</TableHead>
-                <TableHead>Branch Comp.</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {recentVisits.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                    No services processed yet today
-                  </TableCell>
-                </TableRow>
-              ) : (
-                recentVisits.map((visit) => (
-                  <TableRow key={visit.id}>
-                    <TableCell>
-                      {new Date(visit.created_at).toLocaleTimeString()}
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{visit.members?.full_name}</p>
-                        <p className="text-xs text-muted-foreground font-mono">
-                          {visit.members?.member_number}
-                        </p>
-                      </div>
-                    </TableCell>
-                    <TableCell>{visit.services?.name}</TableCell>
-                    <TableCell className="text-destructive">
-                      -KES {visit.benefit_deducted.toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-success">
-                      +KES {visit.branch_compensation.toLocaleString()}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
       </div>
 
       {/* Service Selection Dialog */}
@@ -706,4 +530,4 @@ const Staff = () => {
   );
 };
 
-export default Staff;
+export default ServiceProcessingPage;

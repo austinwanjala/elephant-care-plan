@@ -6,9 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, UserPlus } from "lucide-react";
+import { Loader2, UserPlus, Fingerprint } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { StaffLayout } from "@/components/staff/StaffLayout";
 
 interface Branch {
   id: string;
@@ -41,6 +40,7 @@ const MemberRegistration = () => {
     branchId: "",
     categoryId: "",
   });
+  const [biometricData, setBiometricData] = useState<string | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [categories, setCategories] = useState<MembershipCategory[]>([]);
   const [loading, setLoading] = useState(false);
@@ -64,7 +64,7 @@ const MemberRegistration = () => {
       .from("staff")
       .select("branch_id")
       .eq("user_id", user.id)
-      .maybeSingle(); // Changed from .single() to .maybeSingle()
+      .maybeSingle();
 
     if (staffData) {
       setStaffInfo(staffData);
@@ -94,6 +94,16 @@ const MemberRegistration = () => {
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleBiometricCapture = () => {
+    // Simulate biometric capture
+    const mockBiometricData = `BIO_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    setBiometricData(mockBiometricData);
+    toast({
+      title: "Biometric data captured",
+      description: "Simulated biometric data has been recorded.",
+    });
   };
 
   const selectedCategory = categories.find((c) => c.id === formData.categoryId);
@@ -142,6 +152,7 @@ const MemberRegistration = () => {
         benefit_limit: category.benefit_amount,
         coverage_balance: category.benefit_amount,
         total_contributions: category.payment_amount + category.registration_fee + category.management_fee,
+        biometric_data: biometricData, // Include biometric data
       });
 
       if (memberError) throw memberError;
@@ -164,6 +175,7 @@ const MemberRegistration = () => {
         fullName: "", email: "", phone: "", idNumber: "", password: "",
         nextOfKinName: "", nextOfKinPhone: "", branchId: staffInfo?.branch_id || "", categoryId: "",
       });
+      setBiometricData(null);
       navigate("/staff");
     } catch (error: any) {
       toast({
@@ -178,209 +190,228 @@ const MemberRegistration = () => {
 
   if (loading) {
     return (
-      <StaffLayout>
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      </StaffLayout>
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
     );
   }
 
   return (
-    <StaffLayout>
-      <div className="max-w-2xl mx-auto">
-        <div className="flex items-center gap-2 mb-8">
-          <UserPlus className="h-8 w-8 text-primary" />
-          <div>
-            <h1 className="text-3xl font-serif font-bold text-foreground">Register New Member</h1>
-            <p className="text-muted-foreground">Enroll new patients into the dental insurance program</p>
-          </div>
-        </div>
-
-        <div className="card-elevated p-8">
-          <form onSubmit={handleRegister} className="space-y-6">
-            {/* Membership Category Selection */}
-            <div className="space-y-4">
-              <Label className="text-lg font-semibold">Select Membership Level *</Label>
-              <div className="grid md:grid-cols-2 gap-3">
-                {categories.map((category) => (
-                  <Card
-                    key={category.id}
-                    className={`cursor-pointer transition-all ${
-                      formData.categoryId === category.id
-                        ? "border-primary ring-2 ring-primary/20"
-                        : "hover:border-primary/50"
-                    }`}
-                    onClick={() => handleChange("categoryId", category.id)}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-semibold">{category.name}</h3>
-                        {formData.categoryId === category.id && (
-                          <span className="text-primary text-lg">✓</span>
-                        )}
-                      </div>
-                      <div className="space-y-1 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Payment:</span>
-                          <span className="font-medium">KES {category.payment_amount.toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Benefit:</span>
-                          <span className="font-medium text-success">KES {category.benefit_amount.toLocaleString()}</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-
-            {selectedCategory && (
-              <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-2">
-                <h4 className="font-semibold text-primary">Payment Summary</h4>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div className="flex justify-between">
-                    <span>Membership:</span>
-                    <span>KES {selectedCategory.payment_amount.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Registration Fee:</span>
-                    <span>KES {selectedCategory.registration_fee.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Management Fee:</span>
-                    <span>KES {selectedCategory.management_fee.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between font-bold text-primary col-span-2 border-t pt-2">
-                    <span>Total Payment:</span>
-                    <span>KES {(selectedCategory.payment_amount + selectedCategory.registration_fee + selectedCategory.management_fee).toLocaleString()}</span>
-                  </div>
-                </div>
-                <div className="flex justify-between font-bold text-success border-t pt-2">
-                  <span>Your Coverage:</span>
-                  <span>KES {selectedCategory.benefit_amount.toLocaleString()}</span>
-                </div>
-              </div>
-            )}
-
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="fullName">Full Name *</Label>
-                <Input
-                  id="fullName"
-                  placeholder="John Doe"
-                  value={formData.fullName}
-                  onChange={(e) => handleChange("fullName", e.target.value)}
-                  required
-                  className="input-field"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="john@example.com"
-                  value={formData.email}
-                  onChange={(e) => handleChange("email", e.target.value)}
-                  required
-                  className="input-field"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number *</Label>
-                <Input
-                  id="phone"
-                  placeholder="0712345678"
-                  value={formData.phone}
-                  onChange={(e) => handleChange("phone", e.target.value)}
-                  required
-                  className="input-field"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="idNumber">ID Number *</Label>
-                <Input
-                  id="idNumber"
-                  placeholder="12345678"
-                  value={formData.idNumber}
-                  onChange={(e) => handleChange("idNumber", e.target.value)}
-                  required
-                  className="input-field"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password">Password *</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={formData.password}
-                  onChange={(e) => handleChange("password", e.target.value)}
-                  required
-                  minLength={6}
-                  className="input-field"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="branch">Preferred Branch</Label>
-                <Select onValueChange={(value) => handleChange("branchId", value)} value={formData.branchId}>
-                  <SelectTrigger className="input-field">
-                    <SelectValue placeholder="Select a branch" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {branches.map((branch) => (
-                      <SelectItem key={branch.id} value={branch.id}>
-                        {branch.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="nextOfKinName">Next of Kin Name</Label>
-                <Input
-                  id="nextOfKinName"
-                  placeholder="Jane Doe"
-                  value={formData.nextOfKinName}
-                  onChange={(e) => handleChange("nextOfKinName", e.target.value)}
-                  className="input-field"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="nextOfKinPhone">Next of Kin Phone</Label>
-                <Input
-                  id="nextOfKinPhone"
-                  placeholder="0712345678"
-                  value={formData.nextOfKinPhone}
-                  onChange={(e) => handleChange("nextOfKinPhone", e.target.value)}
-                  className="input-field"
-                />
-              </div>
-            </div>
-
-            <Button type="submit" className="w-full btn-primary" disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating account...
-                </>
-              ) : (
-                "Register Member"
-              )}
-            </Button>
-          </form>
+    <div className="max-w-2xl mx-auto">
+      <div className="flex items-center gap-2 mb-8">
+        <UserPlus className="h-8 w-8 text-primary" />
+        <div>
+          <h1 className="text-3xl font-serif font-bold text-foreground">Register New Member</h1>
+          <p className="text-muted-foreground">Enroll new patients into the dental insurance program</p>
         </div>
       </div>
-    </StaffLayout>
+
+      <div className="card-elevated p-8">
+        <form onSubmit={handleRegister} className="space-y-6">
+          {/* Membership Category Selection */}
+          <div className="space-y-4">
+            <Label className="text-lg font-semibold">Select Membership Level *</Label>
+            <div className="grid md:grid-cols-2 gap-3">
+              {categories.map((category) => (
+                <Card
+                  key={category.id}
+                  className={`cursor-pointer transition-all ${
+                    formData.categoryId === category.id
+                      ? "border-primary ring-2 ring-primary/20"
+                      : "hover:border-primary/50"
+                  }`}
+                  onClick={() => handleChange("categoryId", category.id)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="font-semibold">{category.name}</h3>
+                      {formData.categoryId === category.id && (
+                        <span className="text-primary text-lg">✓</span>
+                      )}
+                    </div>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Payment:</span>
+                        <span className="font-medium">KES {category.payment_amount.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Benefit:</span>
+                        <span className="font-medium text-success">KES {category.benefit_amount.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+
+          {selectedCategory && (
+            <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-2">
+              <h4 className="font-semibold text-primary">Payment Summary</h4>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="flex justify-between">
+                  <span>Membership:</span>
+                  <span>KES {selectedCategory.payment_amount.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Registration Fee:</span>
+                  <span>KES {selectedCategory.registration_fee.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Management Fee:</span>
+                  <span>KES {selectedCategory.management_fee.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between font-bold text-primary col-span-2 border-t pt-2">
+                  <span>Total Payment:</span>
+                  <span>KES {(selectedCategory.payment_amount + selectedCategory.registration_fee + selectedCategory.management_fee).toLocaleString()}</span>
+                </div>
+              </div>
+              <div className="flex justify-between font-bold text-success border-t pt-2">
+                <span>Your Coverage:</span>
+                <span>KES {selectedCategory.benefit_amount.toLocaleString()}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label htmlFor="fullName">Full Name *</Label>
+              <Input
+                id="fullName"
+                placeholder="John Doe"
+                value={formData.fullName}
+                onChange={(e) => handleChange("fullName", e.target.value)}
+                required
+                className="input-field"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="email">Email Address *</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="john@example.com"
+                value={formData.email}
+                onChange={(e) => handleChange("email", e.target.value)}
+                required
+                className="input-field"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone Number *</Label>
+              <Input
+                id="phone"
+                placeholder="0712345678"
+                value={formData.phone}
+                onChange={(e) => handleChange("phone", e.target.value)}
+                required
+                className="input-field"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="idNumber">ID Number *</Label>
+              <Input
+                id="idNumber"
+                placeholder="12345678"
+                value={formData.idNumber}
+                onChange={(e) => handleChange("idNumber", e.target.value)}
+                required
+                className="input-field"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password">Password *</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                value={formData.password}
+                onChange={(e) => handleChange("password", e.target.value)}
+                required
+                minLength={6}
+                className="input-field"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="branch">Preferred Branch</Label>
+              <Select onValueChange={(value) => handleChange("branchId", value)} value={formData.branchId}>
+                <SelectTrigger className="input-field">
+                  <SelectValue placeholder="Select a branch" />
+                </SelectTrigger>
+                <SelectContent>
+                  {branches.map((branch) => (
+                    <SelectItem key={branch.id} value={branch.id}>
+                      {branch.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="nextOfKinName">Next of Kin Name</Label>
+              <Input
+                id="nextOfKinName"
+                placeholder="Jane Doe"
+                value={formData.nextOfKinName}
+                onChange={(e) => handleChange("nextOfKinName", e.target.value)}
+                className="input-field"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="nextOfKinPhone">Next of Kin Phone</Label>
+              <Input
+                id="nextOfKinPhone"
+                placeholder="0712345678"
+                value={formData.nextOfKinPhone}
+                onChange={(e) => handleChange("nextOfKinPhone", e.target.value)}
+                className="input-field"
+              />
+            </div>
+          </div>
+
+          {/* Biometric Capture Section */}
+          <div className="space-y-2">
+            <Label>Biometric Capture</Label>
+            <div className="flex items-center gap-4 p-4 border rounded-lg bg-muted/50">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <Fingerprint className="h-5 w-5 text-primary" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm text-muted-foreground">
+                  {biometricData ? "Biometric data captured." : "Capture fingerprint or facial recognition."}
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleBiometricCapture}
+                disabled={!!biometricData}
+              >
+                {biometricData ? "Captured" : "Capture"}
+              </Button>
+            </div>
+          </div>
+
+          <Button type="submit" className="w-full btn-primary" disabled={loading}>
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Creating account...
+              </>
+            ) : (
+              "Register Member"
+            )}
+          </Button>
+        </form>
+      </div>
+    </div>
   );
 };
 

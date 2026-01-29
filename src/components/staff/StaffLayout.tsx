@@ -31,7 +31,7 @@ export function StaffLayout({ /* children */ }: StaffLayoutProps) {
       .from("user_roles")
       .select("role")
       .eq("user_id", user.id)
-      .single();
+      .maybeSingle(); // Changed from .single() to .maybeSingle()
 
     if (roleData?.role !== "staff" && roleData?.role !== "admin") {
       toast({

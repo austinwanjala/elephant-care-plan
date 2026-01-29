@@ -120,7 +120,7 @@ const Staff = () => {
       .from("staff")
       .select("*, branches(name)")
       .eq("user_id", user.id)
-      .single();
+      .maybeSingle(); // Changed from .single() to .maybeSingle()
 
     if (staffError) {
       toast({

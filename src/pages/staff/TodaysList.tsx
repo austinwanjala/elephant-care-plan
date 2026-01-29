@@ -47,7 +47,7 @@ export default function TodaysList() {
       .from("staff")
       .select("branch_id")
       .eq("user_id", user.id)
-      .single();
+      .maybeSingle(); // Changed from .single() to .maybeSingle()
 
     if (staffData?.branch_id) {
       setStaffInfo(staffData);

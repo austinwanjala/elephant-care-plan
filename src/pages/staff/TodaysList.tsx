@@ -10,7 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Loader2 } from "lucide-react";
+import { Users, Loader2, AlertCircle } from "lucide-react";
 import { StaffLayout } from "@/components/staff/StaffLayout";
 
 interface Visit {
@@ -47,7 +47,7 @@ export default function TodaysList() {
       .from("staff")
       .select("branch_id")
       .eq("user_id", user.id)
-      .maybeSingle(); // Changed from .single() to .maybeSingle()
+      .maybeSingle();
 
     if (staffData?.branch_id) {
       setStaffInfo(staffData);
@@ -74,6 +74,7 @@ export default function TodaysList() {
         setVisits(data || []);
       }
     } else {
+      setStaffInfo(staffData); // Set staffInfo even if branch_id is null to trigger the conditional render
       toast({
         title: "Branch not assigned",
         description: "Your staff profile is not assigned to a branch.",
@@ -85,74 +86,90 @@ export default function TodaysList() {
 
   if (loading) {
     return (
-      <StaffLayout>
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      </StaffLayout>
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // NEW: Display message if staff is not assigned to a branch
+  if (!staffInfo?.branch_id) {
+    return (
+      <div className="container mx-auto px-4 py-8 text-center">
+        <Card className="w-full max-w-md mx-auto">
+          <CardHeader>
+            <CardTitle className="text-destructive flex items-center justify-center gap-2">
+              <AlertCircle className="h-6 w-6" /> Branch Not Assigned
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">
+              Your staff profile is not assigned to a branch. Please contact your administrator.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   return (
-    <StaffLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-serif font-bold text-foreground">Today's Patient List</h1>
-          <p className="text-muted-foreground">Patients who visited your branch today</p>
-        </div>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-serif font-bold text-foreground">Today's Patient List</h1>
+        <p className="text-muted-foreground">Patients who visited your branch today</p>
+      </div>
 
-        <Card className="card-elevated overflow-hidden">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" />
-              Visits for {new Date().toLocaleDateString()}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
+      <Card className="card-elevated overflow-hidden">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5 text-primary" />
+            Visits for {new Date().toLocaleDateString()}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Time</TableHead>
+                  <TableHead>Member</TableHead>
+                  <TableHead>Service</TableHead>
+                  <TableHead>Benefit Deducted</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {visits.length === 0 ? (
                   <TableRow>
-                    <TableHead>Time</TableHead>
-                    <TableHead>Member</TableHead>
-                    <TableHead>Service</TableHead>
-                    <TableHead>Benefit Deducted</TableHead>
+                    <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                      No patients visited your branch today.
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {visits.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                        No patients visited your branch today.
+                ) : (
+                  visits.map((visit) => (
+                    <TableRow key={visit.id}>
+                      <TableCell>
+                        {new Date(visit.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">{visit.members?.full_name}</p>
+                          <p className="text-xs text-muted-foreground font-mono">
+                            {visit.members?.member_number}
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell>{visit.services?.name || "N/A"}</TableCell>
+                      <TableCell className="text-destructive">
+                        -KES {visit.benefit_deducted.toLocaleString()}
                       </TableCell>
                     </TableRow>
-                  ) : (
-                    visits.map((visit) => (
-                      <TableRow key={visit.id}>
-                        <TableCell>
-                          {new Date(visit.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{visit.members?.full_name}</p>
-                            <p className="text-xs text-muted-foreground font-mono">
-                              {visit.members?.member_number}
-                            </p>
-                          </div>
-                        </TableCell>
-                        <TableCell>{visit.services?.name || "N/A"}</TableCell>
-                        <TableCell className="text-destructive">
-                          -KES {visit.benefit_deducted.toLocaleString()}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </StaffLayout>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

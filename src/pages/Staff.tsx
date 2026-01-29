@@ -120,7 +120,7 @@ const Staff = () => {
       .from("staff")
       .select("*, branches(name)")
       .eq("user_id", user.id)
-      .maybeSingle(); // Changed from .single() to .maybeSingle()
+      .maybeSingle();
 
     if (staffError) {
       toast({
@@ -134,18 +134,26 @@ const Staff = () => {
 
     if (staffData) {
       setStaffInfo(staffData);
-      await Promise.all([
-        loadServices(staffData.branch_id),
-        loadRecentVisits(staffData.branch_id),
-        loadBranchStats(staffData.branch_id),
-      ]);
+      // Only load branch-specific data if branch_id is present
+      if (staffData.branch_id) {
+        await Promise.all([
+          loadServices(staffData.branch_id),
+          loadRecentVisits(staffData.branch_id),
+          loadBranchStats(staffData.branch_id),
+        ]);
+      } else {
+        // If no branch_id, set empty data for branch-specific sections
+        setServices([]);
+        setRecentVisits([]);
+        setBranchStats({ todayVisits: 0, todayRevenue: 0, todayDeductions: 0, todayProfitLoss: 0 });
+      }
     } else {
       toast({
         title: "Staff profile not found",
         description: "Please contact support. Redirecting to dashboard.",
         variant: "destructive",
       });
-      navigate("/dashboard"); // Fallback if staff profile is missing
+      navigate("/dashboard");
     }
 
     setLoading(false);
@@ -162,7 +170,6 @@ const Staff = () => {
       setServices(servicesData);
     }
 
-    // Load pre-approved services for this branch
     if (branchId) {
       const { data: preapprovals } = await supabase
         .from("service_preapprovals")
@@ -342,7 +349,6 @@ const Staff = () => {
     );
   }
 
-  // If not loading but staffInfo is null, something went wrong with fetching staff data
   if (!staffInfo) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4 text-center">
@@ -365,8 +371,28 @@ const Staff = () => {
     );
   }
 
+  // NEW: Display message if staff is not assigned to a branch
+  if (!staffInfo.branch_id) {
+    return (
+      <div className="container mx-auto px-4 py-8 text-center">
+        <Card className="w-full max-w-md mx-auto">
+          <CardHeader>
+            <CardTitle className="text-destructive flex items-center justify-center gap-2">
+              <AlertCircle className="h-6 w-6" /> Branch Not Assigned
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">
+              Your staff profile is not assigned to a branch. Please contact your administrator to assign a branch.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
-    <div className="container mx-auto px-4 py-8"> {/* Removed min-h-screen bg-background */}
+    <div className="container mx-auto px-4 py-8">
       {/* Branch Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <Card>

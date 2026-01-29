@@ -10,7 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, Loader2, TrendingUp } from "lucide-react";
+import { DollarSign, Loader2, TrendingUp, AlertCircle } from "lucide-react";
 import { StaffLayout } from "@/components/staff/StaffLayout";
 
 interface BranchRevenueEntry {
@@ -49,7 +49,7 @@ export default function BranchRevenue() {
       .from("staff")
       .select("branch_id, branches(name)")
       .eq("user_id", user.id)
-      .maybeSingle(); // Changed from .single() to .maybeSingle()
+      .maybeSingle();
 
     if (staffData?.branch_id) {
       setStaffInfo(staffData);
@@ -58,7 +58,7 @@ export default function BranchRevenue() {
         .select("*")
         .eq("branch_id", staffData.branch_id)
         .order("date", { ascending: false })
-        .limit(30); // Show last 30 days of revenue
+        .limit(30);
 
       if (error) {
         toast({
@@ -70,6 +70,7 @@ export default function BranchRevenue() {
         setRevenueData(data || []);
       }
     } else {
+      setStaffInfo(staffData); // Set staffInfo even if branch_id is null to trigger the conditional render
       toast({
         title: "Branch not assigned",
         description: "Your staff profile is not assigned to a branch.",
@@ -81,71 +82,87 @@ export default function BranchRevenue() {
 
   if (loading) {
     return (
-      <StaffLayout>
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      </StaffLayout>
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // NEW: Display message if staff is not assigned to a branch
+  if (!staffInfo?.branch_id) {
+    return (
+      <div className="container mx-auto px-4 py-8 text-center">
+        <Card className="w-full max-w-md mx-auto">
+          <CardHeader>
+            <CardTitle className="text-destructive flex items-center justify-center gap-2">
+              <AlertCircle className="h-6 w-6" /> Branch Not Assigned
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">
+              Your staff profile is not assigned to a branch. Please contact your administrator.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   return (
-    <StaffLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-serif font-bold text-foreground">Branch Revenue</h1>
-          <p className="text-muted-foreground">Financial overview for {staffInfo?.branches?.name || "your assigned branch"}</p>
-        </div>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-serif font-bold text-foreground">Branch Revenue</h1>
+        <p className="text-muted-foreground">Financial overview for {staffInfo?.branches?.name || "your assigned branch"}</p>
+      </div>
 
-        <Card className="card-elevated overflow-hidden">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-primary" />
-              Recent Revenue Trends
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
+      <Card className="card-elevated overflow-hidden">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <DollarSign className="h-5 w-5 text-primary" />
+            Recent Revenue Trends
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Visits</TableHead>
+                  <TableHead>Compensation</TableHead>
+                  <TableHead>Benefit Deductions</TableHead>
+                  <TableHead>Profit/Loss</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {revenueData.length === 0 ? (
                   <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Visits</TableHead>
-                    <TableHead>Compensation</TableHead>
-                    <TableHead>Benefit Deductions</TableHead>
-                    <TableHead>Profit/Loss</TableHead>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                      No revenue data available for your branch.
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {revenueData.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                        No revenue data available for your branch.
+                ) : (
+                  revenueData.map((entry) => (
+                    <TableRow key={entry.id}>
+                      <TableCell>{new Date(entry.date).toLocaleDateString()}</TableCell>
+                      <TableCell>{entry.visit_count}</TableCell>
+                      <TableCell className="text-success">
+                        KES {entry.total_compensation.toLocaleString()}
+                      </TableCell>
+                      <TableCell>
+                        KES {entry.total_benefit_deductions.toLocaleString()}
+                      </TableCell>
+                      <TableCell className={entry.total_profit_loss >= 0 ? "text-success" : "text-destructive"}>
+                        KES {entry.total_profit_loss.toLocaleString()}
                       </TableCell>
                     </TableRow>
-                  ) : (
-                    revenueData.map((entry) => (
-                      <TableRow key={entry.id}>
-                        <TableCell>{new Date(entry.date).toLocaleDateString()}</TableCell>
-                        <TableCell>{entry.visit_count}</TableCell>
-                        <TableCell className="text-success">
-                          KES {entry.total_compensation.toLocaleString()}
-                        </TableCell>
-                        <TableCell>
-                          KES {entry.total_benefit_deductions.toLocaleString()}
-                        </TableCell>
-                        <TableCell className={entry.total_profit_loss >= 0 ? "text-success" : "text-destructive"}>
-                          KES {entry.total_profit_loss.toLocaleString()}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </StaffLayout>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

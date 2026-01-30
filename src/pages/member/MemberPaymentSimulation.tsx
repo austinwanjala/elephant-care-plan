@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ArrowLeft, DollarSign, CheckCircle } from "lucide-react";
+import { Loader2, ArrowLeft, CheckCircle } from "lucide-react";
+import QRCode from "qrcode.react"; // Import QRCode for generation
 
 interface MemberInfo {
   id: string;
@@ -14,6 +15,8 @@ interface MemberInfo {
   coverage_balance: number;
   total_contributions: number;
   membership_category_id: string;
+  is_active: boolean; // Added is_active
+  member_number: string; // Added member_number for QR code
 }
 
 interface MembershipCategory {
@@ -48,7 +51,7 @@ const MemberPaymentSimulation = () => {
 
     const { data: memberData, error: memberError } = await supabase
       .from("members")
-      .select("id, full_name, coverage_balance, total_contributions, membership_category_id")
+      .select("id, full_name, coverage_balance, total_contributions, membership_category_id, is_active, member_number")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -112,13 +115,22 @@ const MemberPaymentSimulation = () => {
       const totalPayment = membershipCategory.payment_amount + membershipCategory.registration_fee + membershipCategory.management_fee;
       const benefitToAdd = membershipCategory.benefit_amount;
 
+      let updatePayload: any = {
+        coverage_balance: member.coverage_balance + benefitToAdd,
+        total_contributions: member.total_contributions + totalPayment,
+      };
+
+      // If it's the first payment, activate the member and generate QR code
+      if (!member.is_active && member.coverage_balance === 0) {
+        const qrCodeValue = `MEMBER-${member.member_number}`; // Generate QR code data
+        updatePayload.is_active = true;
+        updatePayload.qr_code_data = qrCodeValue;
+      }
+
       // 1. Update member's coverage and contributions
       const { error: updateError } = await supabase
         .from("members")
-        .update({
-          coverage_balance: member.coverage_balance + benefitToAdd,
-          total_contributions: member.total_contributions + totalPayment,
-        })
+        .update(updatePayload)
         .eq("id", member.id);
 
       if (updateError) throw updateError;

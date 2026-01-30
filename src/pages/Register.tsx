@@ -91,7 +91,7 @@ const Register = () => {
       if (authError) throw authError;
       if (!authData.user) throw new Error("User creation failed");
 
-      // 2. Create member profile with category
+      // 2. Create member profile with initial zero coverage and inactive status
       const { error: memberError } = await supabase.from("members").insert({
         user_id: authData.user.id,
         member_number: "TEMP", // Will be overwritten by trigger
@@ -103,9 +103,11 @@ const Register = () => {
         next_of_kin_phone: formData.nextOfKinPhone || null,
         branch_id: formData.branchId || null,
         membership_category_id: formData.categoryId,
-        benefit_limit: category.benefit_amount,
-        coverage_balance: category.benefit_amount,
-        total_contributions: category.payment_amount + category.registration_fee + category.management_fee,
+        benefit_limit: category.benefit_amount, // Store benefit limit, but coverage starts at 0
+        coverage_balance: 0, // Start with 0 coverage
+        total_contributions: 0, // Start with 0 contributions
+        is_active: false, // Member is inactive until first payment
+        qr_code_data: null, // QR code generated after first payment
       });
 
       if (memberError) throw memberError;
@@ -120,10 +122,10 @@ const Register = () => {
 
       toast({
         title: "Registration successful!",
-        description: `Welcome to Elephant Dental. Your ${category.name} membership is now active with KES ${category.benefit_amount.toLocaleString()} coverage.`,
+        description: `Welcome to Elephant Dental. Please make your first payment to activate your ${category.name} membership.`,
       });
 
-      navigate("/dashboard");
+      navigate("/dashboard/pay"); // Redirect to payment page
     } catch (error: any) {
       toast({
         title: "Registration failed",
@@ -216,7 +218,7 @@ const Register = () => {
                   </div>
                 </div>
                 <div className="flex justify-between font-bold text-success border-t pt-2">
-                  <span>Your Coverage:</span>
+                  <span>Your Initial Coverage:</span>
                   <span>KES {selectedCategory.benefit_amount.toLocaleString()}</span>
                 </div>
               </div>

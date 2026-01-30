@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -9,9 +9,10 @@ import {
   CreditCard,
   Shield,
   History,
-  LogOut, // LogOut is no longer needed here, but keeping for now if other parts use it
   Loader2,
   FileText,
+  AlertCircle,
+  DollarSign,
 } from "lucide-react";
 import {
   Dialog,
@@ -32,6 +33,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface Member {
   id: string;
@@ -42,7 +44,8 @@ interface Member {
   coverage_balance: number;
   total_contributions: number;
   benefit_limit: number;
-  qr_code_data: string;
+  qr_code_data: string | null; // Can be null if not active
+  is_active: boolean; // Added is_active
   membership_categories: { name: string; benefit_amount: number } | null;
 }
 
@@ -166,6 +169,54 @@ const Dashboard = () => {
     );
   }
 
+  if (!member) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4 text-center">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-destructive flex items-center justify-center gap-2">
+              <AlertCircle className="h-6 w-6" /> Member Profile Error
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">
+              We couldn't load your member profile. Please contact support.
+            </p>
+            <Button onClick={() => navigate("/login")} className="btn-primary">
+              Go to Login
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // If member is not active, show a prompt to make payment
+  if (!member.is_active) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Card className="card-elevated p-8 text-center max-w-lg mx-auto">
+          <CardHeader className="flex flex-col items-center">
+            <AlertCircle className="h-12 w-12 text-accent mb-4" />
+            <CardTitle className="text-2xl font-serif font-bold text-foreground mb-2">
+              Membership Uncovered
+            </CardTitle>
+            <CardDescription className="text-muted-foreground">
+              Your membership is currently inactive. Please make your first payment to activate your dental coverage and access services.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link to="/dashboard/pay">
+              <Button size="lg" className="btn-primary mt-4">
+                <DollarSign className="mr-2 h-5 w-5" /> Make First Payment
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-background">
       <main className="container mx-auto px-4 py-8">
@@ -224,7 +275,7 @@ const Dashboard = () => {
             <div className="qr-card">
               <div className="text-center">
                 <div className="w-16 h-16 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4">
-                  <span className="text-3xl">🐘</span>
+                  <span className="text-xl">🐘</span>
                 </div>
                 <h3 className="font-serif font-bold text-foreground text-lg mb-1">
                   {member?.full_name}

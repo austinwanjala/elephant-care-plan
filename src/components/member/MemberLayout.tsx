@@ -32,30 +32,20 @@ export function MemberLayout({ children }: MemberLayoutProps) {
       return;
     }
 
+    // First check if user has a role
     const { data: roleData } = await supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", user.id)
       .maybeSingle();
 
-    if (roleData?.role !== "member" && roleData?.role !== "admin") {
-      toast({
-        title: "Access denied",
-        description: "You don't have member privileges",
-        variant: "destructive",
-      });
-      // Redirect to appropriate dashboard if not a member but has other roles
-      if (roleData?.role === "staff") {
-        navigate("/staff");
-      } else if (roleData?.role === "admin") {
-        navigate("/admin");
-      } else {
-        navigate("/"); // Fallback to home
-      }
+    // If user is staff (not member or admin), redirect to staff portal
+    if (roleData?.role === "staff") {
+      navigate("/staff");
       return;
     }
 
-    // Fetch member details
+    // Check if user exists in members table (primary authorization)
     const { data: memberDetails, error: memberError } = await supabase
       .from("members")
       .select("full_name")
@@ -69,6 +59,17 @@ export function MemberLayout({ children }: MemberLayoutProps) {
         variant: "destructive",
       });
       setLoading(false);
+      return;
+    }
+
+    // User must either be in members table OR have admin role
+    if (!memberDetails && roleData?.role !== "admin") {
+      toast({
+        title: "Access denied",
+        description: "You don't have member privileges",
+        variant: "destructive",
+      });
+      navigate("/");
       return;
     }
 

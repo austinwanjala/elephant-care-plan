@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { FileText, Building2, Stethoscope, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useNavigate } from "react-router-dom"; // Import useNavigate
 
 interface Branch {
   id: string;
@@ -29,6 +30,8 @@ interface Member {
   benefit_limit: number | null;
 }
 
+const MIN_COVERAGE_THRESHOLD = 500; // Define a minimum coverage threshold
+
 export default function MemberClaims() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [services, setServices] = useState<Service[]>([]);
@@ -40,6 +43,7 @@ export default function MemberClaims() {
   const [submitting, setSubmitting] = useState(false);
   const [member, setMember] = useState<Member | null>(null);
   const { toast } = useToast();
+  const navigate = useNavigate(); // Initialize useNavigate
 
   useEffect(() => {
     fetchInitialData();
@@ -65,7 +69,19 @@ export default function MemberClaims() {
       ]);
 
       if (branchesRes.data) setBranches(branchesRes.data);
-      if (memberRes.data) setMember(memberRes.data);
+      if (memberRes.data) {
+        setMember(memberRes.data);
+        // Redirect to payment simulation if coverage is too low
+        if ((memberRes.data.coverage_balance || 0) < MIN_COVERAGE_THRESHOLD) {
+          toast({
+            title: "Low Coverage Alert",
+            description: "Your coverage balance is low. Please top up to access services.",
+            variant: "destructive",
+          });
+          navigate("/dashboard/pay");
+          return; // Stop further loading on this page
+        }
+      }
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -153,6 +169,8 @@ export default function MemberClaims() {
       setSelectedService("");
       setDiagnosis("");
       setNotes("");
+      // Re-fetch member data to update coverage balance on the UI
+      fetchInitialData(); 
     } catch (error) {
       console.error("Error submitting claim:", error);
       toast({
@@ -182,12 +200,12 @@ export default function MemberClaims() {
         <p className="text-muted-foreground">Choose a hospital and service to submit your claim</p>
       </div>
 
-      {member && (member.coverage_balance || 0) < 500 && (
+      {member && (member.coverage_balance || 0) < MIN_COVERAGE_THRESHOLD && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
             Your coverage balance is low (KES {(member.coverage_balance || 0).toLocaleString()}). 
-            Please make a payment to access services.
+            Please <Button variant="link" className="p-0 h-auto text-destructive" onClick={() => navigate("/dashboard/pay")}>top up</Button> to access services.
           </AlertDescription>
         </Alert>
       )}

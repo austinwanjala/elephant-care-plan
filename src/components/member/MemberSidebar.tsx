@@ -25,7 +25,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 const menuItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Claims", url: "/dashboard/claims", icon: FileText },
+  { title: "Claims", url: "/dashboard/claims", icon: FileText }, // Updated URL
   { title: "Payments", url: "/dashboard/payments", icon: CreditCard },
   { title: "Visits", url: "/dashboard/visits", icon: History },
   { title: "Profile", url: "/dashboard/profile", icon: User },
@@ -68,31 +68,29 @@ export function MemberSidebar() {
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>My Account</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isActive(item.url)}
-                    tooltip={item.title}
+          <SidebarMenu>
+            {menuItems.map((item) => (
+              <SidebarMenuItem key={item.title}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive(item.url)}
+                  tooltip={item.title}
+                >
+                  <a
+                    href={item.url}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      navigate(item.url);
+                    }}
+                    className="flex items-center gap-3"
                   >
-                    <a
-                      href={item.url}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        navigate(item.url);
-                      }}
-                      className="flex items-center gap-3"
-                    >
-                      <item.icon className="h-5 w-5" />
-                      <span>{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
+                    <item.icon className="h-5 w-5" />
+                    <span>{item.title}</span>
+                  </a>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
 

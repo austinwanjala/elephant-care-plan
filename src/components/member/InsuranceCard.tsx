@@ -31,15 +31,25 @@ export function InsuranceCard({ member }: InsuranceCardProps) {
 
   const handleDownloadCard = async () => {
     if (cardRef.current) {
-      const canvas = await html2canvas(cardRef.current, { scale: 2, useCORS: true }); // Scale for better resolution, useCORS for images
+      // Temporarily apply a fixed width to the card for consistent capture
+      const originalWidth = cardRef.current.style.width;
+      const originalHeight = cardRef.current.style.height;
+      cardRef.current.style.width = '384px'; // max-w-sm is 24rem = 384px
+      cardRef.current.style.height = '500px'; // A fixed height for consistent PDF output
+
+      const canvas = await html2canvas(cardRef.current, { scale: 2, useCORS: true });
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'px',
-        format: [canvas.width, canvas.height], // Use canvas dimensions for PDF
+        format: [canvas.width, canvas.height],
       });
       pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
       pdf.save(`ElephantDental_InsuranceCard_${member.member_number}.pdf`);
+
+      // Restore original styles
+      cardRef.current.style.width = originalWidth;
+      cardRef.current.style.height = originalHeight;
     }
   };
 

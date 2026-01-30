@@ -32,7 +32,8 @@ import { MemberLayout } from "./components/member/MemberLayout";
 import MemberPayments from "./pages/member/MemberPayments";
 import MemberVisits from "./pages/member/MemberVisits";
 import MemberProfile from "./pages/member/MemberProfile";
-import MemberClaims from "./pages/member/MemberClaims";
+import MemberClaimsList from "./pages/member/MemberClaimsList"; // New import
+import MemberSubmitClaim from "./pages/member/MemberSubmitClaim"; // Renamed import
 import MemberPaymentSimulation from "./pages/member/MemberPaymentSimulation"; // Import the new page
 
 const queryClient = new QueryClient();
@@ -51,7 +52,8 @@ const App = () => (
 {/* Member Routes */}
           <Route path="/dashboard" element={<MemberLayout />}>
             <Route index element={<Dashboard />} />
-            <Route path="claims" element={<MemberClaims />} />
+            <Route path="claims" element={<MemberClaimsList />} /> {/* Route for claims list */}
+            <Route path="claims/new" element={<MemberSubmitClaim />} /> {/* Route for submitting new claim */}
             <Route path="payments" element={<MemberPayments />} />
             <Route path="visits" element={<MemberVisits />} />
             <Route path="profile" element={<MemberProfile />} />

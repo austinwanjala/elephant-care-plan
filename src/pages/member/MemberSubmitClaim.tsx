@@ -7,9 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { FileText, Building2, Stethoscope, AlertCircle } from "lucide-react";
+import { FileText, Building2, Stethoscope, AlertCircle, ArrowLeft } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useNavigate } from "react-router-dom"; // Import useNavigate
+import { useNavigate, Link } from "react-router-dom"; // Import Link
 
 interface Branch {
   id: string;
@@ -32,7 +32,7 @@ interface Member {
 
 const MIN_COVERAGE_THRESHOLD = 500; // Define a minimum coverage threshold
 
-export default function MemberClaims() {
+export default function MemberSubmitClaim() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [selectedBranch, setSelectedBranch] = useState<string>("");
@@ -171,6 +171,7 @@ export default function MemberClaims() {
       setNotes("");
       // Re-fetch member data to update coverage balance on the UI
       fetchInitialData(); 
+      navigate("/dashboard/claims"); // Navigate back to claims list
     } catch (error: any) { // Explicitly type error as any to access .message
       console.error("Error submitting claim:", error);
       toast({
@@ -195,9 +196,16 @@ export default function MemberClaims() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Submit a Claim</h1>
-        <p className="text-muted-foreground">Choose a hospital and service to submit your claim</p>
+      <div className="flex items-center gap-4 mb-6">
+        <Link to="/dashboard/claims">
+          <Button variant="ghost" size="icon">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        </Link>
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Submit New Claim</h1>
+          <p className="text-muted-foreground">Choose a hospital and service to submit your claim</p>
+        </div>
       </div>
 
       {member && (member.coverage_balance || 0) < MIN_COVERAGE_THRESHOLD && (
@@ -214,10 +222,10 @@ export default function MemberClaims() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            New Claim
+            Claim Details
           </CardTitle>
           <CardDescription>
-            Select a hospital to see available services
+            Fill in the details for your new claim
           </CardDescription>
         </CardHeader>
         <CardContent>

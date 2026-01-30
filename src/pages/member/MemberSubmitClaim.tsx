@@ -15,6 +15,7 @@ interface Branch {
   id: string;
   name: string;
   location: string;
+  is_globally_preapproved_for_services: boolean | null; // Added global pre-approval
 }
 
 interface Service {
@@ -35,7 +36,7 @@ const MIN_COVERAGE_THRESHOLD = 500; // Define a minimum coverage threshold
 export default function MemberSubmitClaim() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [services, setServices] = useState<Service[]>([]);
-  const [selectedBranch, setSelectedBranch] = useState<string>("");
+  const [selectedBranchId, setSelectedBranchId] = useState<string>(""); // Renamed to selectedBranchId
   const [selectedService, setSelectedService] = useState<string>("");
   const [diagnosis, setDiagnosis] = useState("");
   const [notes, setNotes] = useState("");
@@ -50,13 +51,16 @@ export default function MemberSubmitClaim() {
   }, []);
 
   useEffect(() => {
-    if (selectedBranch) {
-      fetchServicesForBranch(selectedBranch);
+    if (selectedBranchId) {
+      const branch = branches.find(b => b.id === selectedBranchId);
+      if (branch) {
+        fetchServicesForBranch(branch.id, branch.is_globally_preapproved_for_services || false);
+      }
     } else {
       setServices([]);
     }
     setSelectedService("");
-  }, [selectedBranch]);
+  }, [selectedBranchId, branches]); // Depend on branches to ensure it's loaded
 
   const fetchInitialData = async () => {
     try {
@@ -64,7 +68,7 @@ export default function MemberSubmitClaim() {
       if (!user) return;
 
       const [branchesRes, memberRes] = await Promise.all([
-        supabase.from("branches").select("id, name, location").eq("is_active", true),
+        supabase.from("branches").select("id, name, location, is_globally_preapproved_for_services").eq("is_active", true), // Fetch global pre-approval
         supabase.from("members").select("id, coverage_balance, benefit_limit").eq("user_id", user.id).maybeSingle()
       ]);
 
@@ -89,7 +93,7 @@ export default function MemberSubmitClaim() {
     }
   };
 
-  const fetchServicesForBranch = async (branchId: string) => {
+  const fetchServicesForBranch = async (branchId: string, isGloballyPreapproved: boolean) => {
     try {
       // Fetch services available at all branches
       const allBranchServicesRes = await supabase
@@ -98,16 +102,27 @@ export default function MemberSubmitClaim() {
         .eq("approval_type", "all_branches")
         .eq("is_active", true);
 
-      // Fetch pre-approved services for this specific branch
-      const preapprovedRes = await supabase
-        .from("service_preapprovals")
-        .select("service_id, services(id, name, benefit_cost, approval_type)")
-        .eq("branch_id", branchId);
-
       const allBranchServices = allBranchServicesRes.data || [];
-      const preapprovedServices = preapprovedRes.data
-        ?.map(p => p.services)
-        .filter((s): s is Service => s !== null) || [];
+      let preapprovedServices: Service[] = [];
+
+      if (isGloballyPreapproved) {
+        // If branch is globally pre-approved, all 'pre_approved_only' services are available
+        const globallyPreapprovedRes = await supabase
+          .from("services")
+          .select("id, name, benefit_cost, approval_type")
+          .eq("approval_type", "pre_approved_only")
+          .eq("is_active", true);
+        preapprovedServices = globallyPreapprovedRes.data || [];
+      } else {
+        // Otherwise, fetch specific pre-approvals for this branch
+        const preapprovedRes = await supabase
+          .from("service_preapprovals")
+          .select("service_id, services(id, name, benefit_cost, approval_type)")
+          .eq("branch_id", branchId);
+        preapprovedServices = preapprovedRes.data
+          ?.map(p => p.services)
+          .filter((s): s is Service => s !== null) || [];
+      }
 
       // Combine and deduplicate
       const serviceMap = new Map<string, Service>();
@@ -124,7 +139,7 @@ export default function MemberSubmitClaim() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!member || !selectedBranch || !selectedService || !diagnosis) {
+    if (!member || !selectedBranchId || !selectedService || !diagnosis) {
       toast({
         title: "Missing Information",
         description: "Please fill in all required fields.",
@@ -149,7 +164,7 @@ export default function MemberSubmitClaim() {
     try {
       const { error } = await supabase.from("claims").insert({
         member_id: member.id,
-        branch_id: selectedBranch,
+        branch_id: selectedBranchId,
         amount: service.benefit_cost,
         diagnosis,
         treatment: service.name,
@@ -165,7 +180,7 @@ export default function MemberSubmitClaim() {
       });
 
       // Reset form
-      setSelectedBranch("");
+      setSelectedBranchId("");
       setSelectedService("");
       setDiagnosis("");
       setNotes("");
@@ -235,7 +250,7 @@ export default function MemberSubmitClaim() {
                 <Building2 className="h-4 w-4" />
                 Select Hospital
               </Label>
-              <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+              <Select value={selectedBranchId} onValueChange={setSelectedBranchId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choose a hospital..." />
                 </SelectTrigger>
@@ -249,7 +264,7 @@ export default function MemberSubmitClaim() {
               </Select>
             </div>
 
-            {selectedBranch && (
+            {selectedBranchId && (
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
                   <Stethoscope className="h-4 w-4" />
@@ -314,7 +329,7 @@ export default function MemberSubmitClaim() {
             <Button 
               type="submit" 
               className="w-full" 
-              disabled={submitting || !selectedBranch || !selectedService || !diagnosis}
+              disabled={submitting || !selectedBranchId || !selectedService || !diagnosis}
             >
               {submitting ? "Submitting..." : "Submit Claim"}
             </Button>

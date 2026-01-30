@@ -26,7 +26,7 @@ interface Service {
 
 interface StaffInfo {
   branch_id: string | null;
-  branches: { name: string } | null;
+  branches: { name: string; is_globally_preapproved_for_services: boolean | null } | null; // Added global pre-approval
 }
 
 export default function BranchServices() {
@@ -50,15 +50,17 @@ export default function BranchServices() {
 
     const { data: staffData } = await supabase
       .from("staff")
-      .select("branch_id, branches(name)")
+      .select("branch_id, branches(name, is_globally_preapproved_for_services)") // Fetch global pre-approval
       .eq("user_id", user.id)
       .maybeSingle();
 
     if (staffData?.branch_id) {
       setStaffInfo(staffData);
       const [servicesRes, preapprovalsRes] = await Promise.all([
-        supabase.from("services").select("id, name, real_cost, branch_compensation, benefit_cost, approval_type, is_active").eq("is_active", true).order("name"), // Removed profit_loss
-        supabase.from("service_preapprovals").select("service_id").eq("branch_id", staffData.branch_id),
+        supabase.from("services").select("id, name, real_cost, branch_compensation, benefit_cost, approval_type, is_active").eq("is_active", true).order("name"),
+        staffData.branches?.is_globally_preapproved_for_services
+          ? Promise.resolve({ data: [] }) // If globally pre-approved, no need for individual pre-approvals
+          : supabase.from("service_preapprovals").select("service_id").eq("branch_id", staffData.branch_id),
       ]);
 
       if (servicesRes.error) {
@@ -77,6 +79,9 @@ export default function BranchServices() {
           description: preapprovalsRes.error.message,
           variant: "destructive",
         });
+      } else if (staffData.branches?.is_globally_preapproved_for_services) {
+        // If globally pre-approved, all 'pre_approved_only' services are considered available
+        setPreapprovedServiceIds(servicesRes.data?.filter(s => s.approval_type === "pre_approved_only").map(s => s.id) || []);
       } else {
         setPreapprovedServiceIds(preapprovalsRes.data?.map((p) => p.service_id) || []);
       }
@@ -93,6 +98,13 @@ export default function BranchServices() {
 
   const isServiceAvailableAtBranch = (service: Service): boolean => {
     if (service.approval_type === "all_branches") return true;
+    
+    // Check global pre-approval first
+    if (staffInfo?.branches?.is_globally_preapproved_for_services) {
+      return true;
+    }
+    
+    // Fallback to individual service pre-approvals
     return preapprovedServiceIds.includes(service.id);
   };
 

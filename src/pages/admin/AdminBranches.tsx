@@ -27,7 +27,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, Edit, Trash2 } from "lucide-react";
+import { Plus, MoreHorizontal, Edit, Trash2, CheckCircle, XCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 interface Branch {
   id: string;
@@ -36,6 +37,7 @@ interface Branch {
   phone: string | null;
   email: string | null;
   is_active: boolean;
+  is_globally_preapproved_for_services: boolean | null; // Added this field
 }
 
 interface BranchRevenue {
@@ -55,6 +57,7 @@ export default function AdminBranches() {
     location: "",
     phone: "",
     email: "",
+    isGloballyPreapprovedForServices: false, // Added to form data
   });
   const { toast } = useToast();
 
@@ -89,6 +92,7 @@ export default function AdminBranches() {
         location: formData.location,
         phone: formData.phone || null,
         email: formData.email || null,
+        is_globally_preapproved_for_services: formData.isGloballyPreapprovedForServices, // Save new field
       });
 
       if (error) throw error;
@@ -113,6 +117,7 @@ export default function AdminBranches() {
           location: formData.location,
           phone: formData.phone || null,
           email: formData.email || null,
+          is_globally_preapproved_for_services: formData.isGloballyPreapprovedForServices, // Update new field
         })
         .eq("id", selectedBranch.id);
 
@@ -161,12 +166,13 @@ export default function AdminBranches() {
       location: branch.location,
       phone: branch.phone || "",
       email: branch.email || "",
+      isGloballyPreapprovedForServices: branch.is_globally_preapproved_for_services || false, // Populate new field
     });
     setEditDialogOpen(true);
   };
 
   const resetForm = () => {
-    setFormData({ name: "", location: "", phone: "", email: "" });
+    setFormData({ name: "", location: "", phone: "", email: "", isGloballyPreapprovedForServices: false });
   };
 
   return (
@@ -220,6 +226,16 @@ export default function AdminBranches() {
                     placeholder="branch@elephantdental.co.ke"
                   />
                 </div>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="globally-preapproved"
+                    checked={formData.isGloballyPreapprovedForServices}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, isGloballyPreapprovedForServices: checked })
+                    }
+                  />
+                  <Label htmlFor="globally-preapproved">Globally Pre-approved for Services</Label>
+                </div>
                 <Button onClick={handleAddBranch} className="btn-primary">
                   Add Branch
                 </Button>
@@ -240,6 +256,7 @@ export default function AdminBranches() {
                   <TableHead>Revenue</TableHead>
                   <TableHead>Visits</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Global Pre-approval</TableHead> {/* New column */}
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
@@ -259,6 +276,13 @@ export default function AdminBranches() {
                         checked={branch.is_active}
                         onCheckedChange={() => handleToggleActive(branch)}
                       />
+                    </TableCell>
+                    <TableCell>
+                      {branch.is_globally_preapproved_for_services ? (
+                        <CheckCircle className="h-5 w-5 text-success" />
+                      ) : (
+                        <XCircle className="h-5 w-5 text-muted-foreground" />
+                      )}
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
@@ -321,6 +345,16 @@ export default function AdminBranches() {
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 />
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="globally-preapproved-edit"
+                  checked={formData.isGloballyPreapprovedForServices}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, isGloballyPreapprovedForServices: checked })
+                  }
+                />
+                <Label htmlFor="globally-preapproved-edit">Globally Pre-approved for Services</Label>
               </div>
               <Button onClick={handleEditBranch} className="btn-primary">
                 Update Branch

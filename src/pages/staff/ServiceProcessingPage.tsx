@@ -49,7 +49,7 @@ interface StaffInfo {
   id: string;
   full_name: string;
   branch_id: string | null;
-  branches: { name: string } | null;
+  branches: { name: string; is_globally_preapproved_for_services: boolean | null } | null; // Added global pre-approval
 }
 
 interface Service {
@@ -90,7 +90,7 @@ const ServiceProcessingPage = () => {
 
     const { data: staffData, error: staffError } = await supabase
       .from("staff")
-      .select("*, branches(name)")
+      .select("*, branches(name, is_globally_preapproved_for_services)") // Fetch global pre-approval
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -107,7 +107,7 @@ const ServiceProcessingPage = () => {
     if (staffData) {
       setStaffInfo(staffData);
       if (staffData.branch_id) {
-        await loadServices(staffData.branch_id);
+        await loadServices(staffData.branch_id, staffData.branches?.is_globally_preapproved_for_services || false);
       } else {
         setServices([]);
       }
@@ -123,7 +123,7 @@ const ServiceProcessingPage = () => {
     setLoading(false);
   };
 
-  const loadServices = async (branchId: string | null) => {
+  const loadServices = async (branchId: string | null, isGloballyPreapproved: boolean) => {
     const { data: servicesData } = await supabase
       .from("services")
       .select("id, name, real_cost, branch_compensation, benefit_cost, approval_type")
@@ -134,7 +134,7 @@ const ServiceProcessingPage = () => {
       setServices(servicesData);
     }
 
-    if (branchId) {
+    if (branchId && !isGloballyPreapproved) { // Only load specific pre-approvals if not globally pre-approved
       const { data: preapprovals } = await supabase
         .from("service_preapprovals")
         .select("service_id")
@@ -143,6 +143,9 @@ const ServiceProcessingPage = () => {
       if (preapprovals) {
         setPreapprovedServiceIds(preapprovals.map((p) => p.service_id));
       }
+    } else if (isGloballyPreapproved) {
+      // If globally pre-approved, all 'pre_approved_only' services are considered available
+      setPreapprovedServiceIds(servicesData?.filter(s => s.approval_type === "pre_approved_only").map(s => s.id) || []);
     }
   };
 
@@ -188,6 +191,13 @@ const ServiceProcessingPage = () => {
 
   const isServiceAvailable = (service: Service): boolean => {
     if (service.approval_type === "all_branches") return true;
+    
+    // Check global pre-approval first
+    if (staffInfo?.branches?.is_globally_preapproved_for_services) {
+      return true;
+    }
+    
+    // Fallback to individual service pre-approvals
     return preapprovedServiceIds.includes(service.id);
   };
 

@@ -84,6 +84,7 @@ export default function MemberProfile() {
               is_active: profile.is_active,
               coverage_balance: profile.coverage_balance || 0,
               benefit_limit: profile.benefit_limit || 0,
+              id_number: profile.id_number, // Pass id_number
             }} />
           </div>
         )}

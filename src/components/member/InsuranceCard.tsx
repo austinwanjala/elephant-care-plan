@@ -15,6 +15,7 @@ interface MemberDetails {
   is_active: boolean;
   coverage_balance: number;
   benefit_limit: number;
+  id_number: string; // Added ID number
 }
 
 interface InsuranceCardProps {
@@ -30,7 +31,7 @@ export function InsuranceCard({ member }: InsuranceCardProps) {
 
   const handleDownloadCard = async () => {
     if (cardRef.current) {
-      const canvas = await html2canvas(cardRef.current, { scale: 2 }); // Scale for better resolution
+      const canvas = await html2canvas(cardRef.current, { scale: 2, useCORS: true }); // Scale for better resolution, useCORS for images
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({
         orientation: 'portrait',
@@ -43,60 +44,84 @@ export function InsuranceCard({ member }: InsuranceCardProps) {
   };
 
   return (
-    <Card className="qr-card p-6 flex flex-col items-center text-center">
-      <div ref={cardRef} className="flex flex-col items-center text-center w-full"> {/* Wrap content to be captured */}
-        <div className="w-16 h-16 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4">
-          <span className="text-xl">🐘</span>
+    <Card className="relative w-full max-w-sm mx-auto overflow-hidden rounded-xl shadow-xl bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
+      <div ref={cardRef} className="p-6 space-y-4 w-full">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-primary-foreground/30 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-primary-foreground/20 flex items-center justify-center shrink-0">
+              <span className="text-xl">🐘</span>
+            </div>
+            <span className="text-lg font-serif font-bold">Elephant Dental</span>
+          </div>
+          <Badge variant="secondary" className="bg-primary-foreground/20 text-primary-foreground">
+            Insurance Card
+          </Badge>
         </div>
-        <h3 className="font-serif font-bold text-foreground text-lg mb-1">
-          {member.full_name}
-        </h3>
-        <p className="text-primary font-mono font-semibold mb-2">
-          {member.member_number}
-        </p>
-        {member.membership_categories && (
-          <Badge className="mb-4">{member.membership_categories.name}</Badge>
-        )}
 
-        {member.qr_code_data ? (
-          <div className="bg-background rounded-xl p-4 inline-block mb-4">
-            <QRCodeSVG
-              value={member.qr_code_data}
-              size={140}
-              level="H"
-              includeMargin
-            />
+        {/* Member Info & QR Code */}
+        <div className="flex flex-col items-center text-center">
+          <div className="w-24 h-24 rounded-full bg-primary-foreground/20 flex items-center justify-center mb-4">
+            <User className="h-12 w-12 text-primary-foreground/70" />
           </div>
-        ) : (
-          <div className="bg-muted rounded-xl p-4 inline-block mb-4 text-muted-foreground">
-            <User className="h-24 w-24" />
-            <p className="text-sm mt-2">QR Code not active</p>
-          </div>
-        )}
+          <h3 className="font-serif font-bold text-2xl mb-1">
+            {member.full_name}
+          </h3>
+          <p className="text-primary-foreground/80 font-mono text-sm mb-1">
+            Member ID: {member.member_number}
+          </p>
+          <p className="text-primary-foreground/80 font-mono text-sm mb-4">
+            National ID: {member.id_number}
+          </p>
+          {member.membership_categories && (
+            <Badge className="bg-accent text-accent-foreground mb-4">
+              {member.membership_categories.name}
+            </Badge>
+          )}
 
-        <p className="text-sm text-muted-foreground">
-          Scan at any branch for instant service
-        </p>
+          {member.qr_code_data ? (
+            <div className="bg-white rounded-lg p-3 inline-block shadow-md">
+              <QRCodeSVG
+                value={member.qr_code_data}
+                size={120}
+                level="H"
+                includeMargin={false}
+              />
+            </div>
+          ) : (
+            <div className="bg-primary-foreground/10 rounded-lg p-4 inline-block text-primary-foreground/70">
+              <User className="h-20 w-20" />
+              <p className="text-xs mt-2">QR Code not active</p>
+            </div>
+          )}
+          <p className="text-xs text-primary-foreground/70 mt-4">
+            Scan at any branch for instant service
+          </p>
+        </div>
 
+        {/* Coverage Status */}
         {member.is_active && (
-          <div className="mt-4 w-full text-left">
-            <div className="flex items-center justify-between text-sm text-muted-foreground mb-1">
-              <span>Coverage:</span>
-              <span className="font-semibold text-foreground">
+          <div className="pt-4 border-t border-primary-foreground/30">
+            <div className="flex items-center justify-between text-sm text-primary-foreground/80 mb-1">
+              <span>Coverage Balance:</span>
+              <span className="font-semibold">
                 KES {member.coverage_balance.toLocaleString()} / {member.benefit_limit?.toLocaleString() || 'N/A'}
               </span>
             </div>
-            <div className="h-2 bg-muted rounded-full">
+            <div className="h-2 bg-primary-foreground/30 rounded-full">
               <div
-                className="h-full bg-primary rounded-full"
+                className="h-full bg-primary-foreground rounded-full"
                 style={{ width: `${coveragePercentage}%` }}
               ></div>
             </div>
+            <p className="text-xs text-primary-foreground/70 mt-2 text-center">
+              Status: {member.is_active ? "Active" : "Inactive"}
+            </p>
           </div>
         )}
       </div>
       {member.is_active && (
-        <Button onClick={handleDownloadCard} className="mt-6 w-full btn-primary">
+        <Button onClick={handleDownloadCard} className="w-full rounded-t-none btn-accent">
           <Download className="mr-2 h-4 w-4" /> Download Card
         </Button>
       )}

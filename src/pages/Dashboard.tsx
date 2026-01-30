@@ -48,6 +48,7 @@ interface Member {
   qr_code_data: string | null; // Can be null if not active
   is_active: boolean; // Added is_active
   membership_categories: { name: string; benefit_amount: number } | null;
+  id_number: string; // Added id_number
 }
 
 interface Visit {
@@ -132,7 +133,6 @@ const Dashboard = () => {
         .order("created_at", { ascending: false });
       
       if (error) {
-        console.error("Error fetching visits:", error);
       } else if (data) {
         setVisits(data);
       }
@@ -154,7 +154,6 @@ const Dashboard = () => {
         .order("created_at", { ascending: false });
       
       if (error) {
-        console.error("Error fetching payments:", error);
       } else if (data) {
         setPayments(data);
       }
@@ -179,7 +178,6 @@ const Dashboard = () => {
     : 0;
 
   if (loading) {
-    console.log("Dashboard: Loading member data...");
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -188,7 +186,6 @@ const Dashboard = () => {
   }
 
   if (!member) {
-    console.log("Dashboard: Member data is null, showing error card.");
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4 text-center">
         <Card className="w-full max-w-md">
@@ -212,7 +209,6 @@ const Dashboard = () => {
 
   // If member is not active, show a prompt to make payment
   if (!member.is_active) {
-    console.log("Dashboard: Member is not active, rendering uncovered message.");
     return (
       <div className="container mx-auto px-4 py-8">
         <Card className="card-elevated p-8 text-center max-w-lg mx-auto">
@@ -237,7 +233,6 @@ const Dashboard = () => {
     );
   }
 
-  console.log("Dashboard: Member is active, rendering full dashboard.");
   return (
     <div className="bg-background">
       <main className="container mx-auto px-4 py-8">
@@ -300,7 +295,16 @@ const Dashboard = () => {
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Insurance Card */}
           <div className="lg:col-span-1">
-            {member && <InsuranceCard member={member} />}
+            {member && <InsuranceCard member={{
+              full_name: member.full_name,
+              member_number: member.member_number,
+              membership_categories: member.membership_categories,
+              qr_code_data: member.qr_code_data,
+              is_active: member.is_active,
+              coverage_balance: member.coverage_balance || 0,
+              benefit_limit: member.benefit_limit || 0,
+              id_number: member.id_number, // Pass id_number
+            }} />}
           </div>
 
           {/* History Tables */}

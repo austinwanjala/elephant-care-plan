@@ -56,22 +56,22 @@ export default function AdminClaims() {
     if (data) setClaims(data);
   };
 
-  const handleUpdateStatus = async (claimId: string, status: "completed" | "rejected") => {
+  const handleUpdateStatus = async (claimId: string, status: "approved" | "rejected") => {
     try {
       const { data: claimToUpdate, error: fetchClaimError } = await supabase
         .from("claims")
-        .select("*, members(coverage_balance), branches(name)")
+        .select("*, members(coverage_balance)")
         .eq("id", claimId)
         .single();
 
       if (fetchClaimError) throw fetchClaimError;
       if (!claimToUpdate) throw new Error("Claim not found.");
 
-      if (status === "completed") {
+      if (status === "approved") {
         const { data: serviceData, error: fetchServiceError } = await supabase
           .from("services")
-          .select("id, name, benefit_cost, branch_compensation, profit_loss")
-          .eq("name", claimToUpdate.treatment) // Assuming treatment name matches service name
+          .select("id, name, benefit_cost") // Only need benefit_cost for initial check
+          .eq("name", claimToUpdate.treatment)
           .single();
 
         if (fetchServiceError) throw fetchServiceError;
@@ -105,69 +105,14 @@ export default function AdminClaims() {
           staffId = staffProfile?.id || null;
         }
 
-        // Start a "transaction" like operation
-        // 1. Update claim status
+        // Only update claim status to 'approved' and set processed_at
         const { error: updateClaimError } = await supabase
           .from("claims")
-          .update({ status, processed_at: new Date().toISOString(), staff_id: staffId })
+          .update({ status: "approved", processed_at: new Date().toISOString(), staff_id: staffId })
           .eq("id", claimId);
         if (updateClaimError) throw updateClaimError;
 
-        // 2. Insert into visits table
-        const { error: insertVisitError } = await supabase.from("visits").insert({
-          member_id: claimToUpdate.member_id,
-          branch_id: claimToUpdate.branch_id,
-          service_id: serviceData.id,
-          staff_id: staffId,
-          benefit_deducted: serviceData.benefit_cost,
-          branch_compensation: serviceData.branch_compensation,
-          profit_loss: serviceData.profit_loss,
-          notes: claimToUpdate.notes,
-        });
-        if (insertVisitError) throw insertVisitError;
-
-        // 3. Update member's coverage balance
-        const { error: updateMemberError } = await supabase
-          .from("members")
-          .update({ coverage_balance: memberCurrentCoverage - serviceData.benefit_cost })
-          .eq("id", claimToUpdate.member_id);
-        if (updateMemberError) throw updateMemberError;
-
-        // 4. Update branch revenue for today
-        const today = format(new Date(), "yyyy-MM-dd");
-        const { data: existingRevenue, error: fetchRevenueError } = await supabase
-          .from("branch_revenue")
-          .select("*")
-          .eq("branch_id", claimToUpdate.branch_id)
-          .eq("date", today)
-          .maybeSingle();
-
-        if (fetchRevenueError) throw fetchRevenueError;
-
-        if (existingRevenue) {
-          const { error: updateRevenueError } = await supabase
-            .from("branch_revenue")
-            .update({
-              visit_count: existingRevenue.visit_count + 1,
-              total_compensation: existingRevenue.total_compensation + serviceData.branch_compensation,
-              total_benefit_deductions: existingRevenue.total_benefit_deductions + serviceData.benefit_cost,
-              total_profit_loss: existingRevenue.total_profit_loss + serviceData.profit_loss,
-            })
-            .eq("id", existingRevenue.id);
-          if (updateRevenueError) throw updateRevenueError;
-        } else {
-          const { error: insertRevenueError } = await supabase.from("branch_revenue").insert({
-            branch_id: claimToUpdate.branch_id,
-            date: today,
-            visit_count: 1,
-            total_compensation: serviceData.branch_compensation,
-            total_benefit_deductions: serviceData.benefit_cost,
-            total_profit_loss: serviceData.profit_loss,
-          });
-          if (insertRevenueError) throw insertRevenueError;
-        }
-
-        toast({ title: `Claim approved and visit recorded!` });
+        toast({ title: `Claim approved, awaiting member visit at branch.` });
 
       } else if (status === "rejected") {
         const { error: updateClaimError } = await supabase
@@ -197,6 +142,8 @@ export default function AdminClaims() {
         return <Badge variant="destructive">Rejected</Badge>;
       case "pending":
         return <Badge variant="secondary">Pending</Badge>;
+      case "approved": // New status badge
+        return <Badge className="bg-blue-500/10 text-blue-600">Approved</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -253,7 +200,7 @@ export default function AdminClaims() {
                             size="sm"
                             variant="ghost"
                             className="text-success hover:text-success"
-                            onClick={() => handleUpdateStatus(claim.id, "completed")}
+                            onClick={() => handleUpdateStatus(claim.id, "approved")}
                           >
                             <CheckCircle className="h-4 w-4" />
                           </Button>

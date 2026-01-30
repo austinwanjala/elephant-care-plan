@@ -98,6 +98,8 @@ export default function MemberClaimsList() {
         return <Badge variant="destructive">Rejected</Badge>;
       case "pending":
         return <Badge variant="secondary">Pending</Badge>;
+      case "approved": // New status badge
+        return <Badge className="bg-blue-500/10 text-blue-600">Approved</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }

@@ -74,7 +74,7 @@ export default function PendingVisits() {
         .from("claims")
         .select("*, members(full_name, member_number, coverage_balance), branches(name)")
         .eq("branch_id", staffData.branch_id)
-        .eq("status", "pending")
+        .eq("status", "approved") // Now fetching 'approved' claims
         .order("created_at", { ascending: false });
 
       if (error) {
@@ -295,7 +295,7 @@ export default function PendingVisits() {
                       <TableCell className="max-w-[150px] truncate">{claim.treatment}</TableCell>
                       <TableCell>KES {claim.amount.toLocaleString()}</TableCell>
                       <TableCell>
-                        <Badge variant="secondary">Pending</Badge>
+                        <Badge variant="secondary">Approved</Badge> {/* Display as Approved */}
                       </TableCell>
                       <TableCell>
                         <Button

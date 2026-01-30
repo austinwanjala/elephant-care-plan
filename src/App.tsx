@@ -32,6 +32,7 @@ import { MemberLayout } from "./components/member/MemberLayout";
 import MemberPayments from "./pages/member/MemberPayments";
 import MemberVisits from "./pages/member/MemberVisits";
 import MemberProfile from "./pages/member/MemberProfile";
+import MemberClaims from "./pages/member/MemberClaims";
 
 const queryClient = new QueryClient();
 
@@ -49,6 +50,7 @@ const App = () => (
 {/* Member Routes */}
           <Route path="/dashboard" element={<MemberLayout />}>
             <Route index element={<Dashboard />} />
+            <Route path="claims" element={<MemberClaims />} />
             <Route path="payments" element={<MemberPayments />} />
             <Route path="visits" element={<MemberVisits />} />
             <Route path="profile" element={<MemberProfile />} />

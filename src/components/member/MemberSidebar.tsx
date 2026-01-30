@@ -5,6 +5,7 @@ import {
   History,
   User,
   LogOut,
+  FileText,
 } from "lucide-react";
 import {
   Sidebar,
@@ -24,6 +25,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 const menuItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { title: "Claims", url: "/dashboard/claims", icon: FileText },
   { title: "Payments", url: "/dashboard/payments", icon: CreditCard },
   { title: "Visits", url: "/dashboard/visits", icon: History },
   { title: "Profile", url: "/dashboard/profile", icon: User },

@@ -294,6 +294,7 @@ const Staff = () => {
     setSubmitting(true);
 
     try {
+      const profitLoss = selectedService.benefit_cost - selectedService.branch_compensation;
       const { error } = await supabase.from("visits").insert({
         member_id: selectedMember.id,
         branch_id: staffInfo.branch_id,
@@ -301,7 +302,7 @@ const Staff = () => {
         staff_id: staffInfo.id,
         benefit_deducted: selectedService.benefit_cost,
         branch_compensation: selectedService.branch_compensation,
-        // Removed profit_loss from insert
+        profit_loss: profitLoss,
         notes: notes || null,
       });
 

@@ -171,11 +171,11 @@ export default function MemberClaims() {
       setNotes("");
       // Re-fetch member data to update coverage balance on the UI
       fetchInitialData(); 
-    } catch (error) {
+    } catch (error: any) { // Explicitly type error as any to access .message
       console.error("Error submitting claim:", error);
       toast({
         title: "Error",
-        description: "Failed to submit claim. Please try again.",
+        description: error.message || "Failed to submit claim. Please try again.", // Use error.message
         variant: "destructive",
       });
     } finally {

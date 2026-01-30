@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   LogOut,
   Settings,
+  History, // Added History icon for visits
 } from "lucide-react";
 import {
   Sidebar,
@@ -31,6 +32,7 @@ const menuItems = [
   { title: "Branches", url: "/admin/branches", icon: Building2 },
   { title: "Staff", url: "/admin/staff", icon: UserCog },
   { title: "Claims", url: "/admin/claims", icon: FileText },
+  { title: "Visits", url: "/admin/visits", icon: History }, // New item
   { title: "Services", url: "/admin/services", icon: Stethoscope },
   { title: "Settings", url: "/admin/settings", icon: Settings },
 ];
@@ -72,31 +74,29 @@ export function AdminSidebar() {
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Management</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isActive(item.url)}
-                    tooltip={item.title}
-                  >
-                    <a
-                      href={item.url}
-                      onClick={(e) => {
+          <SidebarMenu>
+            {menuItems.map((item) => (
+              <SidebarMenuItem key={item.title}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive(item.url)}
+                  tooltip={item.title}
+                >
+                  <a
+                    href={item.url}
+                    onClick={(e) => {
                         e.preventDefault();
                         navigate(item.url);
-                      }}
-                      className="flex items-center gap-3"
-                    >
-                      <item.icon className="h-5 w-5" />
-                      <span>{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
+                    }}
+                    className="flex items-center gap-3"
+                  >
+                    <item.icon className="h-5 w-5" />
+                    <span>{item.title}</span>
+                  </a>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
 

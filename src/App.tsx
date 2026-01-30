@@ -17,6 +17,7 @@ import AdminStaff from "./pages/admin/AdminStaff";
 import AdminClaims from "./pages/admin/AdminClaims";
 import AdminServices from "./pages/admin/AdminServices";
 import AdminSettings from "./pages/admin/AdminSettings";
+import AdminVisits from "./pages/admin/AdminVisits"; // New import
 
 // Staff pages
 import { StaffLayout } from "./components/staff/StaffLayout";
@@ -26,15 +27,16 @@ import TodaysList from "./pages/staff/TodaysList";
 import BranchRevenue from "./pages/staff/BranchRevenue";
 import MemberRegistration from "./pages/staff/MemberRegistration";
 import BranchServices from "./pages/staff/BranchServices";
+import PendingVisits from "./pages/staff/PendingVisits"; // New import
 
 // Member pages
 import { MemberLayout } from "./components/member/MemberLayout";
 import MemberPayments from "./pages/member/MemberPayments";
 import MemberVisits from "./pages/member/MemberVisits";
 import MemberProfile from "./pages/member/MemberProfile";
-import MemberClaimsList from "./pages/member/MemberClaimsList"; // New import
-import MemberSubmitClaim from "./pages/member/MemberSubmitClaim"; // Renamed import
-import MemberPaymentSimulation from "./pages/member/MemberPaymentSimulation"; // Import the new page
+import MemberClaimsList from "./pages/member/MemberClaimsList";
+import MemberSubmitClaim from "./pages/member/MemberSubmitClaim";
+import MemberPaymentSimulation from "./pages/member/MemberPaymentSimulation";
 
 const queryClient = new QueryClient();
 
@@ -52,18 +54,19 @@ const App = () => (
 {/* Member Routes */}
           <Route path="/dashboard" element={<MemberLayout />}>
             <Route index element={<Dashboard />} />
-            <Route path="claims" element={<MemberClaimsList />} /> {/* Route for claims list */}
-            <Route path="claims/new" element={<MemberSubmitClaim />} /> {/* Route for submitting new claim */}
+            <Route path="claims" element={<MemberClaimsList />} />
+            <Route path="claims/new" element={<MemberSubmitClaim />} />
             <Route path="payments" element={<MemberPayments />} />
             <Route path="visits" element={<MemberVisits />} />
             <Route path="profile" element={<MemberProfile />} />
-            <Route path="pay" element={<MemberPaymentSimulation />} /> {/* New payment simulation route */}
+            <Route path="pay" element={<MemberPaymentSimulation />} />
           </Route>
           
           {/* Staff Routes */}
           <Route path="/staff" element={<StaffLayout />}>
             <Route index element={<StaffDashboard />} />
             <Route path="process-service" element={<ServiceProcessingPage />} />
+            <Route path="pending-visits" element={<PendingVisits />} /> {/* New route */}
             <Route path="today" element={<TodaysList />} />
             <Route path="revenue" element={<BranchRevenue />} />
             <Route path="register-member" element={<MemberRegistration />} />
@@ -76,6 +79,7 @@ const App = () => (
           <Route path="/admin/branches" element={<AdminBranches />} />
           <Route path="/admin/staff" element={<AdminStaff />} />
           <Route path="/admin/claims" element={<AdminClaims />} />
+          <Route path="/admin/visits" element={<AdminVisits />} /> {/* New route */}
           <Route path="/admin/services" element={<AdminServices />} />
           <Route path="/admin/settings" element={<AdminSettings />} />
           

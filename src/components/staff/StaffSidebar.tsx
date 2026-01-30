@@ -6,7 +6,8 @@ import {
   UserPlus,
   Stethoscope,
   LogOut,
-  QrCode, // Added QrCode icon
+  QrCode,
+  Clock, // Added Clock icon for pending visits
 } from "lucide-react";
 import {
   Sidebar,
@@ -26,8 +27,9 @@ import { supabase } from "@/integrations/supabase/client";
 
 const menuItems = [
   { title: "Dashboard", url: "/staff", icon: LayoutDashboard },
-  { title: "Service Processing", url: "/staff/process-service", icon: QrCode }, // New item
-  { title: "Today's List", url: "/staff/today", icon: Users },
+  { title: "Service Processing", url: "/staff/process-service", icon: QrCode },
+  { title: "Pending Visits", url: "/staff/pending-visits", icon: Clock }, // New item
+  { title: "Processed Visits", url: "/staff/today", icon: Users }, // Renamed from Today's List
   { title: "Branch Revenue", url: "/staff/revenue", icon: DollarSign },
   { title: "Member Registration", url: "/staff/register-member", icon: UserPlus },
   { title: "Services", url: "/staff/services", icon: Stethoscope },
@@ -70,31 +72,29 @@ export function StaffSidebar() {
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Operations</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isActive(item.url)}
-                    tooltip={item.title}
+          <SidebarMenu>
+            {menuItems.map((item) => (
+              <SidebarMenuItem key={item.title}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive(item.url)}
+                  tooltip={item.title}
+                >
+                  <a
+                    href={item.url}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      navigate(item.url);
+                    }}
+                    className="flex items-center gap-3"
                   >
-                    <a
-                      href={item.url}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        navigate(item.url);
-                      }}
-                      className="flex items-center gap-3"
-                    >
-                      <item.icon className="h-5 w-5" />
-                      <span>{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
+                    <item.icon className="h-5 w-5" />
+                    <span>{item.title}</span>
+                  </a>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
 

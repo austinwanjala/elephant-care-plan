@@ -115,8 +115,8 @@ export default function TodaysList() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-serif font-bold text-foreground">Today's Patient List</h1>
-        <p className="text-muted-foreground">Patients who visited your branch today</p>
+        <h1 className="text-3xl font-serif font-bold text-foreground">Processed Visits Today</h1>
+        <p className="text-muted-foreground">Services processed at your branch today</p>
       </div>
 
       <Card className="card-elevated overflow-hidden">

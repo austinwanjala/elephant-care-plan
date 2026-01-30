@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, XCircle } from "lucide-react";
+import { format } from "date-fns";
 
 interface Claim {
   id: string;
@@ -22,9 +23,20 @@ interface Claim {
   status: string;
   created_at: string;
   processed_at: string | null;
-  members: { full_name: string; member_number: string } | null;
+  member_id: string; // Added for logic
+  branch_id: string; // Added for logic
+  notes: string | null; // Added for logic
+  members: { full_name: string; member_number: string; coverage_balance: number | null } | null;
   branches: { name: string } | null;
   staff: { full_name: string } | null;
+}
+
+interface Service {
+  id: string;
+  name: string;
+  benefit_cost: number;
+  branch_compensation: number;
+  profit_loss: number;
 }
 
 export default function AdminClaims() {
@@ -38,7 +50,7 @@ export default function AdminClaims() {
   const loadClaims = async () => {
     const { data } = await supabase
       .from("claims")
-      .select("*, members(full_name, member_number), branches(name), staff(full_name)")
+      .select("*, members(full_name, member_number, coverage_balance), branches(name), staff(full_name)")
       .order("created_at", { ascending: false });
 
     if (data) setClaims(data);
@@ -46,17 +58,134 @@ export default function AdminClaims() {
 
   const handleUpdateStatus = async (claimId: string, status: "completed" | "rejected") => {
     try {
-      const { error } = await supabase
+      const { data: claimToUpdate, error: fetchClaimError } = await supabase
         .from("claims")
-        .update({ status, processed_at: new Date().toISOString() })
-        .eq("id", claimId);
+        .select("*, members(coverage_balance), branches(name)")
+        .eq("id", claimId)
+        .single();
 
-      if (error) throw error;
+      if (fetchClaimError) throw fetchClaimError;
+      if (!claimToUpdate) throw new Error("Claim not found.");
 
-      toast({ title: `Claim ${status}` });
-      loadClaims();
+      if (status === "completed") {
+        const { data: serviceData, error: fetchServiceError } = await supabase
+          .from("services")
+          .select("id, name, benefit_cost, branch_compensation, profit_loss")
+          .eq("name", claimToUpdate.treatment) // Assuming treatment name matches service name
+          .single();
+
+        if (fetchServiceError) throw fetchServiceError;
+        if (!serviceData) throw new Error(`Service '${claimToUpdate.treatment}' not found.`);
+
+        const memberCurrentCoverage = claimToUpdate.members?.coverage_balance || 0;
+        if (memberCurrentCoverage < serviceData.benefit_cost) {
+          toast({
+            title: "Approval Failed",
+            description: `Member has insufficient coverage (KES ${memberCurrentCoverage.toLocaleString()}) for this service (KES ${serviceData.benefit_cost.toLocaleString()}). Claim rejected.`,
+            variant: "destructive",
+          });
+          // Automatically reject if coverage is insufficient
+          await supabase
+            .from("claims")
+            .update({ status: "rejected", processed_at: new Date().toISOString() })
+            .eq("id", claimId);
+          loadClaims();
+          return;
+        }
+
+        // Get current admin's staff_id if available
+        const { data: { user } } = await supabase.auth.getUser();
+        let staffId: string | null = null;
+        if (user) {
+          const { data: staffProfile } = await supabase
+            .from("staff")
+            .select("id")
+            .eq("user_id", user.id)
+            .maybeSingle();
+          staffId = staffProfile?.id || null;
+        }
+
+        // Start a "transaction" like operation
+        // 1. Update claim status
+        const { error: updateClaimError } = await supabase
+          .from("claims")
+          .update({ status, processed_at: new Date().toISOString(), staff_id: staffId })
+          .eq("id", claimId);
+        if (updateClaimError) throw updateClaimError;
+
+        // 2. Insert into visits table
+        const { error: insertVisitError } = await supabase.from("visits").insert({
+          member_id: claimToUpdate.member_id,
+          branch_id: claimToUpdate.branch_id,
+          service_id: serviceData.id,
+          staff_id: staffId,
+          benefit_deducted: serviceData.benefit_cost,
+          branch_compensation: serviceData.branch_compensation,
+          profit_loss: serviceData.profit_loss,
+          notes: claimToUpdate.notes,
+        });
+        if (insertVisitError) throw insertVisitError;
+
+        // 3. Update member's coverage balance
+        const { error: updateMemberError } = await supabase
+          .from("members")
+          .update({ coverage_balance: memberCurrentCoverage - serviceData.benefit_cost })
+          .eq("id", claimToUpdate.member_id);
+        if (updateMemberError) throw updateMemberError;
+
+        // 4. Update branch revenue for today
+        const today = format(new Date(), "yyyy-MM-dd");
+        const { data: existingRevenue, error: fetchRevenueError } = await supabase
+          .from("branch_revenue")
+          .select("*")
+          .eq("branch_id", claimToUpdate.branch_id)
+          .eq("date", today)
+          .maybeSingle();
+
+        if (fetchRevenueError) throw fetchRevenueError;
+
+        if (existingRevenue) {
+          const { error: updateRevenueError } = await supabase
+            .from("branch_revenue")
+            .update({
+              visit_count: existingRevenue.visit_count + 1,
+              total_compensation: existingRevenue.total_compensation + serviceData.branch_compensation,
+              total_benefit_deductions: existingRevenue.total_benefit_deductions + serviceData.benefit_cost,
+              total_profit_loss: existingRevenue.total_profit_loss + serviceData.profit_loss,
+            })
+            .eq("id", existingRevenue.id);
+          if (updateRevenueError) throw updateRevenueError;
+        } else {
+          const { error: insertRevenueError } = await supabase.from("branch_revenue").insert({
+            branch_id: claimToUpdate.branch_id,
+            date: today,
+            visit_count: 1,
+            total_compensation: serviceData.branch_compensation,
+            total_benefit_deductions: serviceData.benefit_cost,
+            total_profit_loss: serviceData.profit_loss,
+          });
+          if (insertRevenueError) throw insertRevenueError;
+        }
+
+        toast({ title: `Claim approved and visit recorded!` });
+
+      } else if (status === "rejected") {
+        const { error: updateClaimError } = await supabase
+          .from("claims")
+          .update({ status, processed_at: new Date().toISOString() })
+          .eq("id", claimId);
+        if (updateClaimError) throw updateClaimError;
+        toast({ title: `Claim rejected.` });
+      }
+
+      loadClaims(); // Reload claims to reflect changes
     } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      console.error("Error processing claim:", error);
+      toast({
+        title: "Error processing claim",
+        description: error.message || "An unexpected error occurred.",
+        variant: "destructive",
+      });
     }
   };
 

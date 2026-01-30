@@ -28,8 +28,10 @@ import MemberRegistration from "./pages/staff/MemberRegistration";
 import BranchServices from "./pages/staff/BranchServices";
 
 // Member pages
-import { MemberLayout } from "./components/member/MemberLayout"; // New import
-
+import { MemberLayout } from "./components/member/MemberLayout";
+import MemberPayments from "./pages/member/MemberPayments";
+import MemberVisits from "./pages/member/MemberVisits";
+import MemberProfile from "./pages/member/MemberProfile";
 
 const queryClient = new QueryClient();
 
@@ -44,13 +46,12 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           
-          {/* Member Routes */}
+{/* Member Routes */}
           <Route path="/dashboard" element={<MemberLayout />}>
-            <Route index element={<Dashboard />} /> {/* Member Dashboard */}
-            {/* Add other member-specific routes here, e.g.: */}
-            {/* <Route path="payments" element={<MemberPayments />} /> */}
-            {/* <Route path="visits" element={<MemberVisits />} /> */}
-            {/* <Route path="profile" element={<MemberProfile />} /> */}
+            <Route index element={<Dashboard />} />
+            <Route path="payments" element={<MemberPayments />} />
+            <Route path="visits" element={<MemberVisits />} />
+            <Route path="profile" element={<MemberProfile />} />
           </Route>
           
           {/* Staff Routes */}

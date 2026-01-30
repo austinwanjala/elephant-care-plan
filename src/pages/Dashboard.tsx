@@ -97,50 +97,76 @@ const Dashboard = () => {
   };
 
   const fetchMemberProfile = async (userId: string) => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("members")
       .select("*, membership_categories(name, benefit_amount)")
       .eq("user_id", userId)
       .single();
     
-    if (data) {
+    if (error) {
+      console.error("Error fetching member profile:", error);
+      toast({
+        title: "Error loading profile",
+        description: error.message,
+        variant: "destructive",
+      });
+      setMember(null); // Ensure member is null on error
+    } else if (data) {
       setMember(data);
     }
   };
 
   const fetchVisits = async (userId: string) => {
-    const { data: memberData } = await supabase
+    const { data: memberData, error: memberError } = await supabase
       .from("members")
       .select("id")
       .eq("user_id", userId)
       .single();
 
+    if (memberError) {
+      console.error("Error fetching member ID for visits:", memberError);
+      return;
+    }
+
     if (memberData) {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("visits")
         .select("*, services(name), branches(name)")
         .eq("member_id", memberData.id)
         .order("created_at", { ascending: false });
       
-      if (data) setVisits(data);
+      if (error) {
+        console.error("Error fetching visits:", error);
+      } else if (data) {
+        setVisits(data);
+      }
     }
   };
 
   const fetchPayments = async (userId: string) => {
-    const { data: memberData } = await supabase
+    const { data: memberData, error: memberError } = await supabase
       .from("members")
       .select("id")
       .eq("user_id", userId)
       .single();
 
+    if (memberError) {
+      console.error("Error fetching member ID for payments:", memberError);
+      return;
+    }
+
     if (memberData) {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("payments")
         .select("*")
         .eq("member_id", memberData.id)
         .order("created_at", { ascending: false });
       
-      if (data) setPayments(data);
+      if (error) {
+        console.error("Error fetching payments:", error);
+      } else if (data) {
+        setPayments(data);
+      }
     }
   };
 
@@ -162,6 +188,7 @@ const Dashboard = () => {
     : 0;
 
   if (loading) {
+    console.log("Dashboard: Loading member data...");
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -170,6 +197,7 @@ const Dashboard = () => {
   }
 
   if (!member) {
+    console.log("Dashboard: Member data is null, showing error card.");
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4 text-center">
         <Card className="w-full max-w-md">
@@ -193,6 +221,7 @@ const Dashboard = () => {
 
   // If member is not active, show a prompt to make payment
   if (!member.is_active) {
+    console.log("Dashboard: Member is not active, rendering uncovered message.");
     return (
       <div className="container mx-auto px-4 py-8">
         <Card className="card-elevated p-8 text-center max-w-lg mx-auto">
@@ -217,6 +246,7 @@ const Dashboard = () => {
     );
   }
 
+  console.log("Dashboard: Member is active, rendering full dashboard.");
   return (
     <div className="bg-background">
       <main className="container mx-auto px-4 py-8">
@@ -228,8 +258,15 @@ const Dashboard = () => {
               <Shield className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-success">
-                KES {member?.coverage_balance?.toLocaleString() || 0}
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-2xl font-bold text-success">
+                  KES {member?.coverage_balance?.toLocaleString() || 0}
+                </div>
+                {member.is_active ? (
+                  <Badge className="bg-success">Covered</Badge>
+                ) : (
+                  <Badge variant="destructive">Uncovered</Badge>
+                )}
               </div>
               <div className="mt-2">
                 <Progress value={coveragePercentage} className="h-2" />

@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Loader2, User, Phone, Mail, CreditCard } from "lucide-react";
-import { QRCodeSVG } from "qrcode.react";
+import { InsuranceCard } from "@/components/member/InsuranceCard"; // New import
 
 interface MemberProfile {
   id: string;
@@ -16,6 +16,7 @@ interface MemberProfile {
   benefit_limit: number | null;
   total_contributions: number | null;
   qr_code_data: string | null;
+  is_active: boolean; // Added is_active
   membership_categories: { name: string; level: string } | null;
 }
 
@@ -72,32 +73,22 @@ export default function MemberProfile() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        {/* Member Card */}
-        <Card className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
-          <CardContent className="p-6">
-            <div className="flex justify-between items-start">
-              <div className="space-y-4">
-                <div>
-                  <p className="text-sm opacity-80">Member Number</p>
-                  <p className="text-xl font-bold">{profile.member_number}</p>
-                </div>
-                <div>
-                  <p className="text-lg font-semibold">{profile.full_name}</p>
-                  <p className="text-sm opacity-80">
-                    {profile.membership_categories?.name || "Standard Member"}
-                  </p>
-                </div>
-              </div>
-              {profile.qr_code_data && (
-                <div className="bg-white p-2 rounded">
-                  <QRCodeSVG value={profile.qr_code_data} size={80} />
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        {/* Member Card - Replaced with InsuranceCard */}
+        {profile && (
+          <div className="md:col-span-1">
+            <InsuranceCard member={{
+              full_name: profile.full_name,
+              member_number: profile.member_number,
+              membership_categories: profile.membership_categories,
+              qr_code_data: profile.qr_code_data,
+              is_active: profile.is_active,
+              coverage_balance: profile.coverage_balance || 0,
+              benefit_limit: profile.benefit_limit || 0,
+            }} />
+          </div>
+        )}
 
-        {/* Coverage Card */}
+        {/* Coverage Card - This remains as is */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

@@ -13,6 +13,9 @@ import {
   Shield,
   AlertCircle,
   CheckCircle,
+  Mail,
+  Phone,
+  Fingerprint,
 } from "lucide-react";
 import {
   Dialog,
@@ -21,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -34,6 +37,12 @@ interface Member {
   coverage_balance: number;
   qr_code_data: string;
   membership_categories: { name: string } | null;
+  id_number: string;
+  benefit_limit: number;
+  total_contributions: number;
+  next_of_kin_name: string | null;
+  next_of_kin_phone: string | null;
+  biometric_data: string | null;
 }
 
 interface StaffInfo {
@@ -382,29 +391,55 @@ const ServiceProcessingPage = () => {
 
           {selectedMember && (
             <div className="flex-1 overflow-hidden flex flex-col">
-              {/* Member Info */}
-              <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <User className="h-5 w-5 text-primary" />
+              {/* Member Info - Enhanced display */}
+              <Card className="p-4 bg-muted/50 rounded-lg mb-4">
+                <CardHeader className="p-0 pb-2 border-b border-border mb-2">
+                  <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                    <User className="h-5 w-5" />
+                    {selectedMember.full_name}
+                  </CardTitle>
+                  <CardDescription className="text-sm text-muted-foreground font-mono">
+                    {selectedMember.member_number} - {selectedMember.membership_categories?.name || "N/A"}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-0 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Email:</span>
+                    <p className="font-medium">{selectedMember.email}</p>
                   </div>
                   <div>
-                    <p className="font-semibold">{selectedMember.full_name}</p>
-                    <p className="text-sm text-muted-foreground font-mono">
-                      {selectedMember.member_number}
-                    </p>
+                    <span className="text-muted-foreground">Phone:</span>
+                    <p className="font-medium">{selectedMember.phone}</p>
                   </div>
-                </div>
-                <div className="text-right">
-                  <div className="flex items-center gap-1">
-                    <Shield className="h-4 w-4 text-success" />
-                    <span className="text-sm text-muted-foreground">Available</span>
+                  <div>
+                    <span className="text-muted-foreground">ID Number:</span>
+                    <p className="font-medium">{selectedMember.id_number}</p>
                   </div>
-                  <p className="text-xl font-bold text-success">
-                    KES {selectedMember.coverage_balance.toLocaleString()}
-                  </p>
-                </div>
-              </div>
+                  <div>
+                    <span className="text-muted-foreground">Coverage:</span>
+                    <p className="font-medium text-success">KES {selectedMember.coverage_balance.toLocaleString()}</p>
+                  </div>
+                  {selectedMember.next_of_kin_name && (
+                    <div>
+                      <span className="text-muted-foreground">Next of Kin:</span>
+                      <p className="font-medium">{selectedMember.next_of_kin_name}</p>
+                    </div>
+                  )}
+                  {selectedMember.next_of_kin_phone && (
+                    <div>
+                      <span className="text-muted-foreground">NOK Phone:</span>
+                      <p className="font-medium">{selectedMember.next_of_kin_phone}</p>
+                    </div>
+                  )}
+                  {selectedMember.biometric_data && (
+                    <div className="col-span-2 flex items-center gap-2">
+                      <Fingerprint className="h-4 w-4 text-primary" />
+                      <span className="text-muted-foreground">Biometric:</span>
+                      <p className="font-medium text-success">Captured</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
 
               {!selectedService ? (
                 <ScrollArea className="flex-1 pr-4 always-show-scrollbar min-h-[200px]">

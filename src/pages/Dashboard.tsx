@@ -34,6 +34,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { InsuranceCard } from "@/components/member/InsuranceCard"; // New import
 
 interface Member {
   id: string;
@@ -117,16 +118,11 @@ const Dashboard = () => {
   };
 
   const fetchVisits = async (userId: string) => {
-    const { data: memberData, error: memberError } = await supabase
+    const { data: memberData } = await supabase
       .from("members")
       .select("id")
       .eq("user_id", userId)
       .single();
-
-    if (memberError) {
-      console.error("Error fetching member ID for visits:", memberError);
-      return;
-    }
 
     if (memberData) {
       const { data, error } = await supabase
@@ -144,16 +140,11 @@ const Dashboard = () => {
   };
 
   const fetchPayments = async (userId: string) => {
-    const { data: memberData, error: memberError } = await supabase
+    const { data: memberData } = await supabase
       .from("members")
       .select("id")
       .eq("user_id", userId)
       .single();
-
-    if (memberError) {
-      console.error("Error fetching member ID for payments:", memberError);
-      return;
-    }
 
     if (memberData) {
       const { data, error } = await supabase
@@ -309,37 +300,7 @@ const Dashboard = () => {
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Insurance Card */}
           <div className="lg:col-span-1">
-            <div className="qr-card">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4">
-                  <span className="text-xl">🐘</span>
-                </div>
-                <h3 className="font-serif font-bold text-foreground text-lg mb-1">
-                  {member?.full_name}
-                </h3>
-                <p className="text-primary font-mono font-semibold mb-2">
-                  {member?.member_number}
-                </p>
-                {member?.membership_categories && (
-                  <Badge className="mb-4">{member.membership_categories.name}</Badge>
-                )}
-                
-                <div className="bg-background rounded-xl p-4 inline-block mb-4">
-                  {member?.qr_code_data && (
-                    <QRCodeSVG
-                      value={member.qr_code_data}
-                      size={140}
-                      level="H"
-                      includeMargin
-                    />
-                  )}
-                </div>
-
-                <p className="text-sm text-muted-foreground">
-                  Scan at any branch for instant service
-                </p>
-              </div>
-            </div>
+            {member && <InsuranceCard member={member} />}
           </div>
 
           {/* History Tables */}

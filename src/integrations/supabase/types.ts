@@ -64,6 +64,7 @@ export type Database = {
           email: string | null
           id: string
           is_active: boolean | null
+          is_globally_preapproved_for_services: boolean | null
           location: string
           name: string
           phone: string | null
@@ -74,6 +75,7 @@ export type Database = {
           email?: string | null
           id?: string
           is_active?: boolean | null
+          is_globally_preapproved_for_services?: boolean | null
           location: string
           name: string
           phone?: string | null
@@ -84,6 +86,7 @@ export type Database = {
           email?: string | null
           id?: string
           is_active?: boolean | null
+          is_globally_preapproved_for_services?: boolean | null
           location?: string
           name?: string
           phone?: string | null

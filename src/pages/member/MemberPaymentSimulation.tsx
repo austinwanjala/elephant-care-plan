@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, ArrowLeft, CheckCircle } from "lucide-react";
-import QRCode from "qrcode.react"; // Import QRCode for generation
+import { QRCodeSVG } from "qrcode.react";
 
 interface MemberInfo {
   id: string;

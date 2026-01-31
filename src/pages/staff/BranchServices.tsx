@@ -73,7 +73,7 @@ export default function BranchServices() {
         setServices(servicesRes.data || []);
       }
 
-      if (preapprovalsRes.error) {
+      if ('error' in preapprovalsRes && preapprovalsRes.error) {
         toast({
           title: "Error loading pre-approvals",
           description: preapprovalsRes.error.message,

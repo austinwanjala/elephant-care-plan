@@ -17,7 +17,8 @@ import AdminStaff from "./pages/admin/AdminStaff";
 import AdminClaims from "./pages/admin/AdminClaims";
 import AdminServices from "./pages/admin/AdminServices";
 import AdminSettings from "./pages/admin/AdminSettings";
-import AdminVisits from "./pages/admin/AdminVisits"; // New import
+import AdminVisits from "./pages/admin/AdminVisits";
+import AdminBranchPayments from "./pages/admin/AdminBranchPayments"; // New import
 
 // Staff pages
 import { StaffLayout } from "./components/staff/StaffLayout";
@@ -27,7 +28,7 @@ import TodaysList from "./pages/staff/TodaysList";
 import BranchRevenue from "./pages/staff/BranchRevenue";
 import MemberRegistration from "./pages/staff/MemberRegistration";
 import BranchServices from "./pages/staff/BranchServices";
-import PendingVisits from "./pages/staff/PendingVisits"; // New import
+import PendingVisits from "./pages/staff/PendingVisits";
 
 // Member pages
 import { MemberLayout } from "./components/member/MemberLayout";
@@ -66,7 +67,7 @@ const App = () => (
           <Route path="/staff" element={<StaffLayout />}>
             <Route index element={<StaffDashboard />} />
             <Route path="process-service" element={<ServiceProcessingPage />} />
-            <Route path="pending-visits" element={<PendingVisits />} /> {/* New route */}
+            <Route path="pending-visits" element={<PendingVisits />} />
             <Route path="today" element={<TodaysList />} />
             <Route path="revenue" element={<BranchRevenue />} />
             <Route path="register-member" element={<MemberRegistration />} />
@@ -79,8 +80,9 @@ const App = () => (
           <Route path="/admin/branches" element={<AdminBranches />} />
           <Route path="/admin/staff" element={<AdminStaff />} />
           <Route path="/admin/claims" element={<AdminClaims />} />
-          <Route path="/admin/visits" element={<AdminVisits />} /> {/* New route */}
+          <Route path="/admin/visits" element={<AdminVisits />} />
           <Route path="/admin/services" element={<AdminServices />} />
+          <Route path="/admin/branch-payments" element={<AdminBranchPayments />} /> {/* New route */}
           <Route path="/admin/settings" element={<AdminSettings />} />
           
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

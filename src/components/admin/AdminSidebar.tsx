@@ -8,7 +8,8 @@ import {
   LayoutDashboard,
   LogOut,
   Settings,
-  History, // Added History icon for visits
+  History,
+  DollarSign, // Added DollarSign icon for payments
 } from "lucide-react";
 import {
   Sidebar,
@@ -32,8 +33,9 @@ const menuItems = [
   { title: "Branches", url: "/admin/branches", icon: Building2 },
   { title: "Staff", url: "/admin/staff", icon: UserCog },
   { title: "Claims", url: "/admin/claims", icon: FileText },
-  { title: "Visits", url: "/admin/visits", icon: History }, // New item
+  { title: "Visits", url: "/admin/visits", icon: History },
   { title: "Services", url: "/admin/services", icon: Stethoscope },
+  { title: "Branch Payments", url: "/admin/branch-payments", icon: DollarSign }, // New item
   { title: "Settings", url: "/admin/settings", icon: Settings },
 ];
 

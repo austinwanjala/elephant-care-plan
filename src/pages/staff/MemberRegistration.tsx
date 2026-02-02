@@ -6,8 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, UserPlus, Fingerprint } from "lucide-react";
+import { Loader2, UserPlus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { BiometricCapture } from "@/components/BiometricCapture";
 
 interface Branch {
   id: string;
@@ -96,15 +97,6 @@ const MemberRegistration = () => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleBiometricCapture = () => {
-    // Simulate biometric capture
-    const mockBiometricData = `BIO_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    setBiometricData(mockBiometricData);
-    toast({
-      title: "Biometric data captured",
-      description: "Simulated biometric data has been recorded.",
-    });
-  };
 
   const selectedCategory = categories.find((c) => c.id === formData.categoryId);
 
@@ -378,25 +370,13 @@ const MemberRegistration = () => {
 
           {/* Biometric Capture Section */}
           <div className="space-y-2">
-            <Label>Biometric Capture</Label>
-            <div className="flex items-center gap-4 p-4 border rounded-lg bg-muted/50">
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                <Fingerprint className="h-5 w-5 text-primary" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm text-muted-foreground">
-                  {biometricData ? "Biometric data captured." : "Capture fingerprint or facial recognition."}
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleBiometricCapture}
-                disabled={!!biometricData}
-              >
-                {biometricData ? "Captured" : "Capture"}
-              </Button>
-            </div>
+            <Label>Fingerprint Registration *</Label>
+            <BiometricCapture
+              mode="register"
+              userId={formData.idNumber || `temp_${Date.now()}`}
+              userName={formData.fullName || "New Member"}
+              onCaptureComplete={(credentialData) => setBiometricData(credentialData)}
+            />
           </div>
 
           <Button type="submit" className="w-full btn-primary" disabled={loading}>

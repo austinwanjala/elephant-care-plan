@@ -11,10 +11,24 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, Loader2, AlertCircle, CheckCircle } from "lucide-react";
-import { StaffLayout } from "@/components/staff/StaffLayout";
+import { Clock, Loader2, AlertCircle, CheckCircle, Fingerprint, X } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { BiometricCapture } from "@/components/BiometricCapture";
+
+interface MemberInfo {
+  full_name: string;
+  member_number: string;
+  coverage_balance: number | null;
+  biometric_data: string | null;
+}
 
 interface Claim {
   id: string;
@@ -26,7 +40,7 @@ interface Claim {
   member_id: string;
   branch_id: string;
   notes: string | null;
-  members: { full_name: string; member_number: string; coverage_balance: number | null } | null;
+  members: MemberInfo | null;
   branches: { name: string } | null;
 }
 
@@ -48,6 +62,11 @@ export default function PendingVisits() {
   const [pendingClaims, setPendingClaims] = useState<Claim[]>([]);
   const [loading, setLoading] = useState(true);
   const [staffInfo, setStaffInfo] = useState<StaffInfo | null>(null);
+  const [verificationDialog, setVerificationDialog] = useState<{
+    open: boolean;
+    claim: Claim | null;
+    verified: boolean;
+  }>({ open: false, claim: null, verified: false });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -72,7 +91,7 @@ export default function PendingVisits() {
       setStaffInfo(staffData);
       const { data, error } = await supabase
         .from("claims")
-        .select("*, members(full_name, member_number, coverage_balance), branches(name)")
+        .select("*, members(full_name, member_number, coverage_balance, biometric_data), branches(name)")
         .eq("branch_id", staffData.branch_id)
         .eq("status", "approved") // Now fetching 'approved' claims
         .order("created_at", { ascending: false });
@@ -95,6 +114,14 @@ export default function PendingVisits() {
       });
     }
     setLoading(false);
+  };
+
+  const openVerificationDialog = (claim: Claim) => {
+    setVerificationDialog({ open: true, claim, verified: false });
+  };
+
+  const handleVerificationComplete = (success: boolean) => {
+    setVerificationDialog(prev => ({ ...prev, verified: success }));
   };
 
   const handleMarkAsVisited = async (claimId: string) => {
@@ -301,9 +328,9 @@ export default function PendingVisits() {
                         <Button
                           size="sm"
                           className="btn-primary"
-                          onClick={() => handleMarkAsVisited(claim.id)}
+                          onClick={() => openVerificationDialog(claim)}
                         >
-                          <CheckCircle className="mr-2 h-4 w-4" /> Mark as Visited
+                          <Fingerprint className="mr-2 h-4 w-4" /> Verify & Process
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -314,6 +341,80 @@ export default function PendingVisits() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Biometric Verification Dialog */}
+      <Dialog 
+        open={verificationDialog.open} 
+        onOpenChange={(open) => !open && setVerificationDialog({ open: false, claim: null, verified: false })}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Fingerprint className="h-5 w-5 text-primary" />
+              Biometric Verification
+            </DialogTitle>
+            <DialogDescription>
+              Verify the member's identity before processing this visit.
+            </DialogDescription>
+          </DialogHeader>
+
+          {verificationDialog.claim && (
+            <div className="space-y-4">
+              {/* Member Info */}
+              <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Member:</span>
+                  <span className="font-medium">{verificationDialog.claim.members?.full_name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Member #:</span>
+                  <span className="font-mono text-sm">{verificationDialog.claim.members?.member_number}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Treatment:</span>
+                  <span className="font-medium">{verificationDialog.claim.treatment}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Amount:</span>
+                  <span className="font-medium">KES {verificationDialog.claim.amount.toLocaleString()}</span>
+                </div>
+              </div>
+
+              {/* Biometric Verification */}
+              <BiometricCapture
+                mode="verify"
+                credentialId={verificationDialog.claim.members?.biometric_data}
+                onVerificationComplete={handleVerificationComplete}
+              />
+
+              {/* Action Buttons */}
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setVerificationDialog({ open: false, claim: null, verified: false })}
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1 btn-primary"
+                  disabled={!verificationDialog.verified}
+                  onClick={async () => {
+                    if (verificationDialog.claim) {
+                      await handleMarkAsVisited(verificationDialog.claim.id);
+                      setVerificationDialog({ open: false, claim: null, verified: false });
+                    }
+                  }}
+                >
+                  <CheckCircle className="h-4 w-4 mr-1" />
+                  Process Visit
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -24,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -391,69 +391,64 @@ const ServiceProcessingPage = () => {
 
       {/* Service Selection Dialog */}
       <Dialog open={serviceDialogOpen} onOpenChange={setServiceDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="font-serif">Select Service</DialogTitle>
+        <DialogContent className="w-[95vw] max-w-3xl h-[85vh] max-h-[700px] p-0 flex flex-col overflow-hidden">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b border-border shrink-0">
+            <DialogTitle className="font-serif text-xl">Select Service</DialogTitle>
             <DialogDescription>
               Choose a service for {selectedMember?.full_name}
             </DialogDescription>
           </DialogHeader>
 
           {selectedMember && (
-            <div className="flex-1 overflow-hidden flex flex-col">
-              {/* Member Info - Enhanced display */}
-              <Card className="p-4 bg-muted/50 rounded-lg mb-4">
-                <CardHeader className="p-0 pb-2 border-b border-border mb-2">
-                  <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                    <User className="h-5 w-5" />
-                    {selectedMember.full_name}
-                  </CardTitle>
-                  <CardDescription className="text-sm text-muted-foreground font-mono">
-                    {selectedMember.member_number} - {selectedMember.membership_categories?.name || "N/A"}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="p-0 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Email:</span>
-                    <p className="font-medium">{selectedMember.email}</p>
+            <div className="flex-1 overflow-hidden flex flex-col px-6 py-4">
+              {/* Compact Member Info Header */}
+              <div className="bg-muted/50 rounded-lg p-4 mb-4 shrink-0">
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                      <User className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-foreground">{selectedMember.full_name}</p>
+                      <p className="text-sm text-muted-foreground font-mono">
+                        {selectedMember.member_number} • {selectedMember.membership_categories?.name || "N/A"}
+                      </p>
+                    </div>
                   </div>
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Coverage</p>
+                    <p className={`text-lg font-bold ${selectedMember.coverage_balance > 0 ? "text-success" : "text-destructive"}`}>
+                      KES {selectedMember.coverage_balance.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 pt-3 border-t border-border text-xs">
                   <div>
                     <span className="text-muted-foreground">Phone:</span>
-                    <p className="font-medium">{selectedMember.phone}</p>
+                    <p className="font-medium truncate">{selectedMember.phone}</p>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">ID Number:</span>
-                    <p className="font-medium">{selectedMember.id_number}</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Coverage:</span>
-                    <p className="font-medium text-success">KES {selectedMember.coverage_balance.toLocaleString()}</p>
+                    <span className="text-muted-foreground">ID:</span>
+                    <p className="font-medium truncate">{selectedMember.id_number}</p>
                   </div>
                   {selectedMember.next_of_kin_name && (
                     <div>
                       <span className="text-muted-foreground">Next of Kin:</span>
-                      <p className="font-medium">{selectedMember.next_of_kin_name}</p>
-                    </div>
-                  )}
-                  {selectedMember.next_of_kin_phone && (
-                    <div>
-                      <span className="text-muted-foreground">NOK Phone:</span>
-                      <p className="font-medium">{selectedMember.next_of_kin_phone}</p>
+                      <p className="font-medium truncate">{selectedMember.next_of_kin_name}</p>
                     </div>
                   )}
                   {selectedMember.biometric_data && (
-                    <div className="col-span-2 flex items-center gap-2">
-                      <Fingerprint className="h-4 w-4 text-primary" />
-                      <span className="text-muted-foreground">Biometric:</span>
-                      <p className="font-medium text-success">Captured</p>
+                    <div className="flex items-center gap-1">
+                      <Fingerprint className="h-3 w-3 text-primary" />
+                      <span className="text-success font-medium">Biometric ✓</span>
                     </div>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
 
               {!selectedService ? (
-                <ScrollArea className="flex-1 pr-4 always-show-scrollbar min-h-[200px]">
-                  <div className="grid md:grid-cols-2 gap-3">
+                <ScrollArea className="flex-1 -mx-2 px-2">
+                  <div className="grid sm:grid-cols-2 gap-3 pb-2">
                     {services.map((service) => {
                       const available = isServiceAvailable(service);
                       const affordable = canAffordService(service);
@@ -461,32 +456,32 @@ const ServiceProcessingPage = () => {
                       return (
                         <div
                           key={service.id}
-                          className={`p-4 rounded-lg border transition-colors ${
+                          className={`p-3 rounded-lg border transition-all ${
                             available && affordable
-                              ? "border-primary hover:bg-primary/5 cursor-pointer"
-                              : "border-border/50 opacity-60 cursor-not-allowed"
+                              ? "border-primary/50 hover:border-primary hover:bg-primary/5 cursor-pointer hover:shadow-sm"
+                              : "border-border/50 opacity-50 cursor-not-allowed bg-muted/30"
                           }`}
                           onClick={() => available && affordable && handleSelectService(service)}
                         >
-                          <div className="flex justify-between items-start mb-2">
-                            <p className="font-medium">{service.name}</p>
+                          <div className="flex justify-between items-start gap-2 mb-2">
+                            <p className="font-medium text-sm leading-tight">{service.name}</p>
                             {!available && (
-                              <Badge variant="secondary" className="text-xs">Pre-approval needed</Badge>
+                              <Badge variant="secondary" className="text-[10px] shrink-0">Pre-approval</Badge>
                             )}
                             {available && !affordable && (
-                              <Badge variant="destructive" className="text-xs">Insufficient funds</Badge>
+                              <Badge variant="destructive" className="text-[10px] shrink-0">Low funds</Badge>
                             )}
                             {available && affordable && (
-                              <Badge className="bg-success text-xs">Available</Badge>
+                              <Badge className="bg-success text-[10px] shrink-0">Available</Badge>
                             )}
                           </div>
-                          <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div className="flex justify-between text-xs">
                             <div>
-                              <span className="text-muted-foreground">Benefit Cost:</span>
+                              <span className="text-muted-foreground">Cost:</span>
                               <p className="font-semibold">KES {service.benefit_cost.toLocaleString()}</p>
                             </div>
-                            <div>
-                              <span className="text-muted-foreground">Branch Comp:</span>
+                            <div className="text-right">
+                              <span className="text-muted-foreground">Comp:</span>
                               <p className="font-semibold text-success">KES {service.branch_compensation.toLocaleString()}</p>
                             </div>
                           </div>
@@ -496,17 +491,17 @@ const ServiceProcessingPage = () => {
                   </div>
                 </ScrollArea>
               ) : (
-                <ScrollArea className="flex-1 pr-4 always-show-scrollbar min-h-[200px]">
-                  <div className="space-y-4">
+                <ScrollArea className="flex-1 -mx-2 px-2">
+                  <div className="space-y-4 pb-2">
                     <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
-                      <h4 className="font-semibold mb-3">{selectedService.name}</h4>
+                      <h4 className="font-semibold mb-2">{selectedService.name}</h4>
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
-                          <span className="text-muted-foreground">Benefit Cost:</span>
+                          <span className="text-muted-foreground text-xs">Benefit Cost</span>
                           <p className="font-bold text-lg">KES {selectedService.benefit_cost.toLocaleString()}</p>
                         </div>
                         <div>
-                          <span className="text-muted-foreground">Branch Compensation:</span>
+                          <span className="text-muted-foreground text-xs">Branch Compensation</span>
                           <p className="font-bold text-lg text-success">KES {selectedService.branch_compensation.toLocaleString()}</p>
                         </div>
                       </div>
@@ -518,21 +513,22 @@ const ServiceProcessingPage = () => {
                         placeholder="Add any notes about this service..."
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
+                        className="min-h-[80px] resize-none"
                       />
                     </div>
 
-                    <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-                      <div className="flex justify-between text-sm">
+                    <div className="bg-muted/50 rounded-lg p-3 space-y-1 text-sm">
+                      <div className="flex justify-between">
                         <span className="text-muted-foreground">Current balance:</span>
                         <span>KES {selectedMember.coverage_balance.toLocaleString()}</span>
                       </div>
-                      <div className="flex justify-between text-sm">
+                      <div className="flex justify-between">
                         <span className="text-muted-foreground">Deduction:</span>
                         <span className="text-destructive">
                           -KES {selectedService.benefit_cost.toLocaleString()}
                         </span>
                       </div>
-                      <div className="flex justify-between font-semibold border-t pt-2">
+                      <div className="flex justify-between font-semibold border-t border-border pt-2 mt-2">
                         <span>New balance:</span>
                         <span className="text-success">
                           KES {(selectedMember.coverage_balance - selectedService.benefit_cost).toLocaleString()}
@@ -540,13 +536,13 @@ const ServiceProcessingPage = () => {
                       </div>
                     </div>
 
-                    <div className="flex gap-3">
+                    <div className="flex gap-3 pt-2">
                       <Button
                         variant="outline"
                         className="flex-1"
                         onClick={() => setSelectedService(null)}
                       >
-                        Back to Services
+                        Back
                       </Button>
                       <Button
                         className="flex-1 btn-primary"

@@ -35,6 +35,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Search, Plus, MoreHorizontal, Edit, Trash2, Fingerprint } from "lucide-react";
+import { BiometricCapture } from "@/components/BiometricCapture"; // Import BiometricCapture
 
 interface Member {
   id: string;
@@ -204,23 +205,20 @@ export default function AdminMembers() {
     }
   };
 
-  const handleCaptureBiometric = async () => {
+  const handleBiometricCaptureComplete = async (credentialData: string) => {
     if (!selectedMember) return;
-
-    // Simulate biometric capture (in real implementation, use WebAuthn or device SDK)
-    const mockBiometricData = `BIO_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     try {
       const { error } = await supabase
         .from("members")
-        .update({ biometric_data: mockBiometricData })
+        .update({ biometric_data: credentialData })
         .eq("id", selectedMember.id);
 
       if (error) throw error;
 
       toast({ title: "Biometric data captured successfully" });
       setBiometricDialogOpen(false);
-      loadData();
+      loadData(); // Reload data to show updated biometric status
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
@@ -565,19 +563,15 @@ export default function AdminMembers() {
                 Capture fingerprint or facial recognition for {selectedMember?.full_name}
               </DialogDescription>
             </DialogHeader>
-            <div className="py-8 text-center space-y-6">
-              <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-                <Fingerprint className="h-12 w-12 text-primary" />
-              </div>
-              <p className="text-muted-foreground">
-                Click the button below to simulate biometric capture.
-                <br />
-                <span className="text-xs">(In production, this would use device SDK or WebAuthn)</span>
-              </p>
-              <Button onClick={handleCaptureBiometric} className="btn-primary">
-                <Fingerprint className="mr-2 h-4 w-4" />
-                Capture Biometric
-              </Button>
+            <div className="py-4 space-y-6">
+              {selectedMember && (
+                <BiometricCapture
+                  mode="register"
+                  userId={selectedMember.id}
+                  userName={selectedMember.full_name}
+                  onCaptureComplete={handleBiometricCaptureComplete}
+                />
+              )}
             </div>
           </DialogContent>
         </Dialog>

@@ -49,20 +49,29 @@ export default function RegisterVisit() {
 
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!searchTerm) return;
+        const term = searchTerm.trim();
+        if (!term) return;
+        
         setSearching(true);
         setMember(null);
         setBiometricsVerified(false);
 
         try {
-            // Improved search query to be more flexible with partial matches for name and member number
+            // Use exact matches for Phone and ID, and partial matches for Name and Member Number
+            // We wrap values in quotes to handle spaces or special characters in the search term
             const { data, error } = await supabase
                 .from("members")
                 .select("*, membership_categories(name)")
-                .or(`phone.ilike.%${searchTerm}%,id_number.ilike.%${searchTerm}%,member_number.ilike.%${searchTerm}%,full_name.ilike.%${searchTerm}%`)
+                .or(`phone.eq."${term}",id_number.eq."${term}",member_number.ilike."%${term}%",full_name.ilike."%${term}%"`)
                 .maybeSingle();
 
-            if (error) throw error;
+            if (error) {
+                // If multiple rows are found, maybeSingle returns an error PGRST116
+                if (error.code === 'PGRST116') {
+                    throw new Error("Multiple members found. Please be more specific with the Phone, ID, or Member Number.");
+                }
+                throw error;
+            }
 
             if (data) {
                 setMember(data);

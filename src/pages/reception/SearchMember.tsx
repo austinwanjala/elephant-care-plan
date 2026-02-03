@@ -17,7 +17,9 @@ export default function ReceptionSearchMember() {
 
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!searchTerm) return;
+        const term = searchTerm.trim();
+        if (!term) return;
+        
         setSearching(true);
         setMember(null);
 
@@ -25,10 +27,15 @@ export default function ReceptionSearchMember() {
             const { data, error } = await supabase
                 .from("members")
                 .select("*, membership_categories(name), branches(name)")
-                .or(`phone.eq.${searchTerm},id_number.eq.${searchTerm},member_number.ilike.%${searchTerm}%,full_name.ilike.%${searchTerm}%`)
+                .or(`phone.eq."${term}",id_number.eq."${term}",member_number.ilike."%${term}%",full_name.ilike."%${term}%"`)
                 .maybeSingle();
 
-            if (error) throw error;
+            if (error) {
+                if (error.code === 'PGRST116') {
+                    throw new Error("Multiple members found. Please be more specific.");
+                }
+                throw error;
+            }
 
             if (data) {
                 setMember(data);

@@ -118,21 +118,22 @@ const MemberSchemeSelection = () => {
 
     try {
       const principalAmount = selectedCategory.payment_amount;
-      const benefitToAdd = principalAmount * 2; // Explicitly double the principal amount for coverage
+      // Use benefit_amount from category as the source of truth for coverage
+      const benefitToAdd = selectedCategory.benefit_amount; 
       const totalPayment = principalAmount + selectedCategory.registration_fee + selectedCategory.management_fee;
 
       const qrCodeValue = `MEMBER-${member.member_number}`;
 
-      // 1. Update member's coverage, contributions (principal only), activate, and set category
+      // 1. Update member's coverage, contributions, activate, and set category
       const { error: updateError } = await supabase
         .from("members")
         .update({
           coverage_balance: (member.coverage_balance || 0) + benefitToAdd,
-          total_contributions: (member.total_contributions || 0) + principalAmount, // Only principal amount
+          total_contributions: (member.total_contributions || 0) + principalAmount,
           is_active: true,
           qr_code_data: qrCodeValue,
           membership_category_id: selectedCategory.id,
-          benefit_limit: (member.benefit_limit || 0) + benefitToAdd, // Increment benefit limit
+          benefit_limit: (member.benefit_limit || 0) + benefitToAdd,
         })
         .eq("id", member.id);
 
@@ -152,7 +153,7 @@ const MemberSchemeSelection = () => {
 
       toast({
         title: "Payment Successful!",
-        description: `KES ${totalPayment.toLocaleString()} received. KES ${benefitToAdd.toLocaleString()} added to your coverage. KES ${principalAmount.toLocaleString()} added to your contributions.`,
+        description: `KES ${totalPayment.toLocaleString()} received. KES ${benefitToAdd.toLocaleString()} added to your coverage.`,
       });
 
       navigate("/dashboard");
@@ -223,7 +224,7 @@ const MemberSchemeSelection = () => {
                       <span className="text-primary font-bold">KES {(cat.payment_amount + cat.registration_fee + cat.management_fee).toLocaleString()}</span>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Benefit: KES {(cat.payment_amount * 2).toLocaleString()} | Fees: KES {(cat.registration_fee + cat.management_fee).toLocaleString()}
+                      Benefit: KES {cat.benefit_amount.toLocaleString()} | Fees: KES {(cat.registration_fee + cat.management_fee).toLocaleString()}
                     </p>
                   </div>
                 ))}
@@ -254,7 +255,7 @@ const MemberSchemeSelection = () => {
                   </div>
                   <div className="flex justify-between font-bold text-success border-t pt-2">
                     <span>Coverage to Add:</span>
-                    <span>KES {(selectedCategory.payment_amount * 2).toLocaleString()}</span>
+                    <span>KES {selectedCategory.benefit_amount.toLocaleString()}</span>
                   </div>
                 </div>
 

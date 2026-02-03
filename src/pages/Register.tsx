@@ -75,37 +75,57 @@ const Register = () => {
     setLoading(true);
 
     try {
-      // 1. Create auth user with all metadata for atomic setup
-      // The trigger 'on_auth_user_created' handles role and profile creation
+      // 1. Create auth user
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
-        options: {
-          data: {
-            role: 'member',
-            full_name: formData.fullName,
-            phone: formData.phone,
-            id_number: formData.idNumber,
-            age: formData.age,
-            marketer_code: marketerCode || null
-          }
-        }
+        // We'll explicitly set the role and member profile after auth user creation
+        // to ensure consistency and immediate availability.
       });
 
       if (authError) throw authError;
       if (!authData.user) throw new Error("User creation failed");
 
-      // 2. Fetch the created member record to add dependants
-      // The trigger is atomic so it should be there immediately
-      const { data: memberData, error: memberError } = await supabase
+      const userId = authData.user.id;
+
+      // 2. Explicitly insert the role into user_roles table
+      const { error: roleInsertError } = await supabase
+        .from("user_roles")
+        .insert({ user_id: userId, role: 'member' });
+
+      if (roleInsertError) {
+        // If role insertion fails, consider deleting the auth user to prevent orphaned accounts
+        await supabase.auth.admin.deleteUser(userId);
+        throw new Error(`Failed to assign role: ${roleInsertError.message}. User account rolled back.`);
+      }
+
+      // 3. Create the member profile
+      const { data: memberData, error: memberProfileError } = await supabase
         .from("members")
-        .select("id")
-        .eq("user_id", authData.user.id)
-        .maybeSingle();
+        .insert({
+          user_id: userId,
+          full_name: formData.fullName,
+          phone: formData.phone,
+          id_number: formData.idNumber,
+          age: parseInt(formData.age),
+          email: formData.email,
+          member_number: `ED${Math.floor(100000 + Math.random() * 900000)}`, // Generate a simple member number
+          is_active: false, // Member is inactive until scheme selection and payment
+          coverage_balance: 0,
+          total_contributions: 0,
+          benefit_limit: 0,
+          marketer_id: marketerCode ? (await supabase.from('marketers').select('id').eq('code', marketerCode).single()).data?.id : null,
+        })
+        .select('id')
+        .single();
 
-      if (memberError) throw memberError;
+      if (memberProfileError) {
+        await supabase.auth.admin.deleteUser(userId); // Rollback auth user
+        await supabase.from("user_roles").delete().eq("user_id", userId); // Rollback role
+        throw new Error(`Failed to create member profile: ${memberProfileError.message}. Account rolled back.`);
+      }
 
-      // 3. Add Dependants if any
+      // 4. Add Dependants if any
       if (dependants.length > 0 && memberData) {
         const dependantsToInsert = dependants.map(d => ({
           member_id: memberData.id,

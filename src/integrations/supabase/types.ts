@@ -14,108 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      bill_items: {
-        Row: {
-          benefit_cost: number
-          bill_id: string
-          branch_compensation: number
-          created_at: string
-          id: string
-          real_cost: number
-          service_id: string
-          service_name: string
-        }
-        Insert: {
-          benefit_cost: number
-          bill_id: string
-          branch_compensation: number
-          created_at?: string
-          id?: string
-          real_cost: number
-          service_id: string
-          service_name: string
-        }
-        Update: {
-          benefit_cost?: number
-          bill_id?: string
-          branch_compensation?: number
-          created_at?: string
-          id?: string
-          real_cost?: number
-          service_id?: string
-          service_name?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "bill_items_bill_id_fkey"
-            columns: ["bill_id"]
-            isOneToOne: false
-            referencedRelation: "bills"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "bill_items_service_id_fkey"
-            columns: ["service_id"]
-            isOneToOne: false
-            referencedRelation: "services"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      bills: {
-        Row: {
-          created_at: string
-          finalized_at: string | null
-          id: string
-          is_finalized: boolean | null
-          receptionist_id: string | null
-          total_benefit_cost: number
-          total_branch_compensation: number
-          total_profit_loss: number
-          total_real_cost: number
-          visit_id: string
-        }
-        Insert: {
-          created_at?: string
-          finalized_at?: string | null
-          id?: string
-          is_finalized?: boolean | null
-          receptionist_id?: string | null
-          total_benefit_cost: number
-          total_branch_compensation: number
-          total_profit_loss: number
-          total_real_cost: number
-          visit_id: string
-        }
-        Update: {
-          created_at?: string
-          finalized_at?: string | null
-          id?: string
-          is_finalized?: boolean | null
-          receptionist_id?: string | null
-          total_benefit_cost?: number
-          total_branch_compensation?: number
-          total_profit_loss?: number
-          total_real_cost?: number
-          visit_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "bills_receptionist_id_fkey"
-            columns: ["receptionist_id"]
-            isOneToOne: false
-            referencedRelation: "staff"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "bills_visit_id_fkey"
-            columns: ["visit_id"]
-            isOneToOne: true
-            referencedRelation: "visits"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       branch_payments: {
         Row: {
           amount_paid: number
@@ -304,136 +202,6 @@ export type Database = {
           },
         ]
       }
-      dental_records: {
-        Row: {
-          created_at: string
-          id: string
-          member_id: string
-          notes: string | null
-          status: string
-          tooth_number: number
-          updated_at: string
-          visit_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          member_id: string
-          notes?: string | null
-          status: string
-          tooth_number: number
-          updated_at?: string
-          visit_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          member_id?: string
-          notes?: string | null
-          status?: string
-          tooth_number?: number
-          updated_at?: string
-          visit_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "dental_records_member_id_fkey"
-            columns: ["member_id"]
-            isOneToOne: false
-            referencedRelation: "members"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "dental_records_visit_id_fkey"
-            columns: ["visit_id"]
-            isOneToOne: false
-            referencedRelation: "visits"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      dependants: {
-        Row: {
-          created_at: string
-          dob: string
-          full_name: string
-          id: string
-          identification_number: string
-          member_id: string
-          relationship: string
-        }
-        Insert: {
-          created_at?: string
-          dob: string
-          full_name: string
-          id?: string
-          identification_number: string
-          member_id: string
-          relationship: string
-        }
-        Update: {
-          created_at?: string
-          dob?: string
-          full_name?: string
-          id?: string
-          identification_number?: string
-          member_id?: string
-          relationship?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "dependants_member_id_fkey"
-            columns: ["member_id"]
-            isOneToOne: false
-            referencedRelation: "members"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      marketers: {
-        Row: {
-          code: string
-          created_at: string
-          email: string
-          full_name: string
-          id: string
-          is_active: boolean | null
-          phone: string | null
-          total_earnings: number | null
-          user_id: string
-        }
-        Insert: {
-          code: string
-          created_at?: string
-          email: string
-          full_name: string
-          id?: string
-          is_active?: boolean | null
-          phone?: string | null
-          total_earnings?: number | null
-          user_id: string
-        }
-        Update: {
-          code?: string
-          created_at?: string
-          email?: string
-          full_name?: string
-          id?: string
-          is_active?: boolean | null
-          phone?: string | null
-          total_earnings?: number | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "marketers_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: true
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       members: {
         Row: {
           age: number | null
@@ -442,11 +210,14 @@ export type Database = {
           branch_id: string | null
           coverage_balance: number | null
           created_at: string
+          data_consent: boolean | null
+          digital_signature: string | null
           email: string
           full_name: string
           id: string
           id_number: string
           is_active: boolean | null
+          marketer_code: string | null
           member_number: string
           membership_category_id: string | null
           marketer_id: string | null
@@ -455,6 +226,7 @@ export type Database = {
           phone: string
           rollover_balance: number | null
           rollover_years: number | null
+          scheme_selected: boolean | null
           total_contributions: number | null
           updated_at: string
           user_id: string
@@ -466,11 +238,14 @@ export type Database = {
           branch_id?: string | null
           coverage_balance?: number | null
           created_at?: string
+          data_consent?: boolean | null
+          digital_signature?: string | null
           email: string
           full_name: string
           id?: string
           id_number: string
           is_active?: boolean | null
+          marketer_code?: string | null
           member_number: string
           membership_category_id?: string | null
           marketer_id?: string | null
@@ -479,6 +254,7 @@ export type Database = {
           phone: string
           rollover_balance?: number | null
           rollover_years?: number | null
+          scheme_selected?: boolean | null
           total_contributions?: number | null
           updated_at?: string
           user_id: string
@@ -490,11 +266,14 @@ export type Database = {
           branch_id?: string | null
           coverage_balance?: number | null
           created_at?: string
+          data_consent?: boolean | null
+          digital_signature?: string | null
           email?: string
           full_name?: string
           id?: string
           id_number?: string
           is_active?: boolean | null
+          marketer_code?: string | null
           member_number?: string
           membership_category_id?: string | null
           marketer_id?: string | null
@@ -503,6 +282,7 @@ export type Database = {
           phone?: string
           rollover_balance?: number | null
           rollover_years?: number | null
+          scheme_selected?: boolean | null
           total_contributions?: number | null
           updated_at?: string
           user_id?: string
@@ -617,6 +397,50 @@ export type Database = {
             columns: ["member_id"]
             isOneToOne: false
             referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      receptionists: {
+        Row: {
+          branch_id: string | null
+          created_at: string | null
+          email: string
+          full_name: string
+          id: string
+          is_active: boolean | null
+          phone: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          branch_id?: string | null
+          created_at?: string | null
+          email: string
+          full_name: string
+          id?: string
+          is_active?: boolean | null
+          phone?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          branch_id?: string | null
+          created_at?: string | null
+          email?: string
+          full_name?: string
+          id?: string
+          is_active?: boolean | null
+          phone?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "receptionists_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
             referencedColumns: ["id"]
           },
         ]
@@ -888,16 +712,16 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "staff" | "member" | "receptionist" | "doctor" | "branch_director" | "marketer"
+      app_role: "admin" | "staff" | "member"
       approval_type: "all_branches" | "pre_approved_only"
       claim_status: "pending" | "approved" | "rejected" | "completed"
       membership_level:
-        | "level_1"
-        | "level_2"
-        | "level_3"
-        | "level_4"
-        | "level_5"
-        | "level_6"
+      | "level_1"
+      | "level_2"
+      | "level_3"
+      | "level_4"
+      | "level_5"
+      | "level_6"
       payment_status: "pending" | "completed" | "failed"
     }
     CompositeTypes: {
@@ -912,121 +736,121 @@ type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof DatabaseWithoutInternals },
+  | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+  | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+  ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+  : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
-    ? R
-    : never
+  ? R
+  : never
   : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
-      }
-      ? R
-      : never
-    : never
+    DefaultSchema["Views"])
+  ? (DefaultSchema["Tables"] &
+    DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+      Row: infer R
+    }
+  ? R
+  : never
+  : never
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
+  | keyof DefaultSchema["Tables"]
+  | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+  : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I
-    }
-    ? I
-    : never
+    Insert: infer I
+  }
+  ? I
+  : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
-      }
-      ? I
-      : never
-    : never
+  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+    Insert: infer I
+  }
+  ? I
+  : never
+  : never
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
+  | keyof DefaultSchema["Tables"]
+  | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+  : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U
-    }
-    ? U
-    : never
+    Update: infer U
+  }
+  ? U
+  : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
-      }
-      ? U
-      : never
-    : never
+  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+    Update: infer U
+  }
+  ? U
+  : never
+  : never
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
+  | keyof DefaultSchema["Enums"]
+  | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+  ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+  : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
+  ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+  : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof DatabaseWithoutInternals },
+  | keyof DefaultSchema["CompositeTypes"]
+  | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+  ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+  : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
+  ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+  : never
 
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "staff", "member", "receptionist", "doctor", "branch_director", "marketer"],
+      app_role: ["admin", "staff", "member"],
       approval_type: ["all_branches", "pre_approved_only"],
       claim_status: ["pending", "approved", "rejected", "completed"],
       membership_level: [

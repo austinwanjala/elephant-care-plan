@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Outlet } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AdminSidebar } from "./AdminSidebar";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,17 +21,30 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   }, []);
 
   const checkAuth = async () => {
+    setLoading(true); // Ensure loading starts
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       navigate("/login");
+      setLoading(false); // IMPORTANT: Set loading to false here
       return;
     }
 
-    const { data: roleData } = await supabase
+    const { data: roleData, error: roleError } = await supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", user.id)
-      .maybeSingle(); // Changed from .single() to .maybeSingle()
+      .maybeSingle();
+
+    if (roleError) {
+      toast({
+        title: "Error fetching role",
+        description: roleError.message,
+        variant: "destructive",
+      });
+      navigate("/"); // Redirect on error
+      setLoading(false);
+      return;
+    }
 
     if (roleData?.role !== "admin") {
       toast({
@@ -39,7 +52,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         description: "You don't have admin privileges",
         variant: "destructive",
       });
-      navigate("/dashboard");
+      navigate("/dashboard"); // Redirect to a non-admin dashboard or home
+      setLoading(false);
       return;
     }
 
@@ -56,7 +70,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   }
 
   if (!authorized) {
-    return null;
+    return null; // Should have been redirected by checkAuth if not authorized
   }
 
   return (

@@ -20,15 +20,29 @@ import AdminSettings from "./pages/admin/AdminSettings";
 import AdminVisits from "./pages/admin/AdminVisits";
 import AdminBranchPayments from "./pages/admin/AdminBranchPayments"; // New import
 
-// Staff pages
-import { StaffLayout } from "./components/staff/StaffLayout";
-import StaffDashboard from "./pages/staff/StaffDashboard";
-import ServiceProcessingPage from "./pages/staff/ServiceProcessingPage";
-import TodaysList from "./pages/staff/TodaysList";
-import BranchRevenue from "./pages/staff/BranchRevenue";
-import MemberRegistration from "./pages/staff/MemberRegistration";
-import BranchServices from "./pages/staff/BranchServices";
-import PendingVisits from "./pages/staff/PendingVisits";
+// Reception pages
+import { ReceptionLayout } from "./components/reception/ReceptionLayout";
+import ReceptionDashboard from "./pages/reception/Dashboard";
+import RegisterVisit from "./pages/reception/RegisterVisit";
+import ReceptionBilling from "./pages/reception/Billing";
+
+// Doctor pages
+import { DoctorLayout } from "./components/doctor/DoctorLayout";
+import DoctorDashboard from "./pages/doctor/Dashboard";
+import Consultation from "./pages/doctor/Consultation";
+
+// Branch Director pages
+import { DirectorLayout } from "./components/director/DirectorLayout";
+import DirectorDashboard from "./pages/director/Dashboard";
+
+// Marketer pages
+import { MarketerLayout } from "./components/marketer/MarketerLayout";
+import MarketerDashboard from "./pages/marketer/Dashboard";
+
+// Staff pages (Legacy - to be removed fully if any left, but removing imports now)
+// import { StaffLayout } from "./components/staff/StaffLayout";
+// import StaffDashboard from "./pages/staff/StaffDashboard";
+// ... imports removed to fix errors
 
 // Member pages
 import { MemberLayout } from "./components/member/MemberLayout";
@@ -51,8 +65,8 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          
-{/* Member Routes */}
+
+          {/* Member Routes */}
           <Route path="/dashboard" element={<MemberLayout />}>
             <Route index element={<Dashboard />} />
             <Route path="claims" element={<MemberClaimsList />} />
@@ -62,16 +76,29 @@ const App = () => (
             <Route path="profile" element={<MemberProfile />} />
             <Route path="pay" element={<MemberPaymentSimulation />} />
           </Route>
-          
-          {/* Staff Routes */}
-          <Route path="/staff" element={<StaffLayout />}>
-            <Route index element={<StaffDashboard />} />
-            <Route path="process-service" element={<ServiceProcessingPage />} />
-            <Route path="pending-visits" element={<PendingVisits />} />
-            <Route path="today" element={<TodaysList />} />
-            <Route path="revenue" element={<BranchRevenue />} />
-            <Route path="register-member" element={<MemberRegistration />} />
-            <Route path="services" element={<BranchServices />} />
+
+          {/* Receptionist Routes */}
+          <Route path="/reception" element={<ReceptionLayout />}>
+            <Route index element={<ReceptionDashboard />} />
+            <Route path="register-visit" element={<RegisterVisit />} />
+          </Route>
+
+
+          {/* Doctor Routes */}
+          <Route path="/doctor" element={<DoctorLayout />}>
+            <Route index element={<DoctorDashboard />} />
+          </Route>
+
+
+          {/* Branch Director Routes */}
+          <Route path="/director" element={<DirectorLayout />}>
+            <Route index element={<DirectorDashboard />} />
+          </Route>
+
+
+          {/* Marketer Routes */}
+          <Route path="/marketer" element={<MarketerLayout />}>
+            <Route index element={<MarketerDashboard />} />
           </Route>
 
           {/* Admin Routes */}
@@ -82,9 +109,9 @@ const App = () => (
           <Route path="/admin/claims" element={<AdminClaims />} />
           <Route path="/admin/visits" element={<AdminVisits />} />
           <Route path="/admin/services" element={<AdminServices />} />
-          <Route path="/admin/branch-payments" element={<AdminBranchPayments />} /> {/* New route */}
+          <Route path="/admin/branch-payments" element={<AdminBranchPayments />} />
           <Route path="/admin/settings" element={<AdminSettings />} />
-          
+
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

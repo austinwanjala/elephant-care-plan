@@ -33,6 +33,7 @@ const MemberPaymentSimulation = () => {
   const [submitting, setSubmitting] = useState(false);
   const [member, setMember] = useState<MemberInfo | null>(null);
   const [membershipCategory, setMembershipCategory] = useState<MembershipCategory | null>(null);
+  const [allCategories, setAllCategories] = useState<MembershipCategory[]>([]);
   const [mpesaReference, setMpesaReference] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -77,29 +78,20 @@ const MemberPaymentSimulation = () => {
 
     setMember(memberData);
 
-    if (memberData.membership_category_id) {
-      const { data: categoryData, error: categoryError } = await supabase
-        .from("membership_categories")
-        .select("*")
-        .eq("id", memberData.membership_category_id)
-        .maybeSingle();
+    const { data: categoriesData, error: categoriesError } = await supabase
+      .from("membership_categories")
+      .select("*")
+      .eq("is_active", true); // Assuming active filter exists or just select all
 
-      if (categoryError) {
-        toast({
-          title: "Error loading membership category",
-          description: categoryError.message,
-          variant: "destructive",
-        });
-      } else {
-        setMembershipCategory(categoryData);
+    if (categoriesData) {
+      setAllCategories(categoriesData);
+    }
+
+    if (memberData.membership_category_id) {
+      const category = categoriesData?.find(c => c.id === memberData.membership_category_id);
+      if (category) {
+        setMembershipCategory(category);
       }
-    } else {
-      toast({
-        title: "No membership category found",
-        description: "Please select a membership category first.",
-        variant: "destructive",
-      });
-      navigate("/dashboard/profile"); // Or to a page where they can select a category
     }
 
     setLoading(false);
@@ -128,6 +120,10 @@ const MemberPaymentSimulation = () => {
       }
 
       // 1. Update member's coverage and contributions
+      if (!member.membership_category_id && membershipCategory) {
+        updatePayload.membership_category_id = membershipCategory.id;
+      }
+
       const { error: updateError } = await supabase
         .from("members")
         .update(updatePayload)
@@ -196,61 +192,93 @@ const MemberPaymentSimulation = () => {
             Top Up Coverage
           </CardTitle>
           <p className="text-muted-foreground">
-            Make a payment to increase your dental coverage balance.
+            {member.membership_category_id
+              ? "Make a payment to increase your dental coverage balance."
+              : "Select a membership scheme and make your first payment to activate coverage."}
           </p>
         </CardHeader>
         <CardContent className="px-0 pb-0">
           <form onSubmit={handleSimulatePayment} className="space-y-6">
-            <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-2">
-              <h4 className="font-semibold text-primary">Payment Summary for {membershipCategory.name}</h4>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="flex justify-between">
-                  <span>Membership:</span>
-                  <span>KES {membershipCategory.payment_amount.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Registration Fee:</span>
-                  <span>KES {membershipCategory.registration_fee.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Management Fee:</span>
-                  <span>KES {membershipCategory.management_fee.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between font-bold text-primary col-span-2 border-t pt-2">
-                  <span>Total Payment:</span>
-                  <span>KES {totalPayment.toLocaleString()}</span>
+            {!member.membership_category_id && (
+              <div className="space-y-4">
+                <Label>Select Membership Scheme</Label>
+                <div className="grid gap-3">
+                  {allCategories.map((cat) => (
+                    <div
+                      key={cat.id}
+                      onClick={() => setMembershipCategory(cat)}
+                      className={`p-4 border rounded-lg cursor-pointer transition-all ${membershipCategory?.id === cat.id
+                        ? "border-primary bg-primary/5 ring-1 ring-primary"
+                        : "hover:border-primary/50"
+                        }`}
+                    >
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="font-bold">{cat.name}</span>
+                        <span className="text-primary font-bold">KES {(cat.payment_amount + cat.registration_fee + cat.management_fee).toLocaleString()}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Benefit: KES {cat.benefit_amount.toLocaleString()} | Fee: KES {(cat.registration_fee + cat.management_fee).toLocaleString()}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               </div>
-              <div className="flex justify-between font-bold text-success border-t pt-2">
-                <span>Coverage to Add:</span>
-                <span>KES {membershipCategory.benefit_amount.toLocaleString()}</span>
-              </div>
-            </div>
+            )}
 
-            <div className="space-y-2">
-              <Label htmlFor="mpesaReference">M-Pesa Reference (Simulated)</Label>
-              <Input
-                id="mpesaReference"
-                placeholder="Enter M-Pesa transaction code (e.g., NBO123ABC)"
-                value={mpesaReference}
-                onChange={(e) => setMpesaReference(e.target.value)}
-                className="input-field"
-              />
-            </div>
+            {membershipCategory && (
+              <>
+                <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-2">
+                  <h4 className="font-semibold text-primary">Payment Summary for {membershipCategory.name}</h4>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="flex justify-between">
+                      <span>Membership:</span>
+                      <span>KES {membershipCategory.payment_amount.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Registration Fee:</span>
+                      <span>KES {membershipCategory.registration_fee.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Management Fee:</span>
+                      <span>KES {membershipCategory.management_fee.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between font-bold text-primary col-span-2 border-t pt-2">
+                      <span>Total Payment:</span>
+                      <span>KES {totalPayment.toLocaleString()}</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between font-bold text-success border-t pt-2">
+                    <span>Coverage to Add:</span>
+                    <span>KES {membershipCategory.benefit_amount.toLocaleString()}</span>
+                  </div>
+                </div>
 
-            <Button type="submit" className="w-full btn-primary" disabled={submitting}>
-              {submitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing Payment...
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                  Simulate Payment
-                </>
-              )}
-            </Button>
+                <div className="space-y-2">
+                  <Label htmlFor="mpesaReference">M-Pesa Reference (Simulated)</Label>
+                  <Input
+                    id="mpesaReference"
+                    placeholder="Enter M-Pesa transaction code (e.g., NBO123ABC)"
+                    value={mpesaReference}
+                    onChange={(e) => setMpesaReference(e.target.value)}
+                    className="input-field"
+                  />
+                </div>
+
+                <Button type="submit" className="w-full btn-primary" disabled={submitting}>
+                  {submitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing Payment...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                      Simulate Payment
+                    </>
+                  )}
+                </Button>
+              </>
+            )}
           </form>
         </CardContent>
       </Card>

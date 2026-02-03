@@ -71,11 +71,7 @@ interface Payment {
 
 const Dashboard = () => {
   const [member, setMember] = useState<Member | null>(null);
-  const [visits, setVisits] = useState<Visit[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
-  const { toast } = useToast();
+  const [dependants, setDependants] = useState<any[]>([]);
 
   useEffect(() => {
     loadMemberData();
@@ -85,7 +81,7 @@ const Dashboard = () => {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      navigate("/login"); // Should be caught by MemberLayout, but good fallback
+      navigate("/login");
       setLoading(false);
       return;
     }
@@ -94,17 +90,19 @@ const Dashboard = () => {
       fetchMemberProfile(user.id),
       fetchVisits(user.id),
       fetchPayments(user.id),
+      fetchDependants(user.id),
     ]);
     setLoading(false);
   };
 
   const fetchMemberProfile = async (userId: string) => {
+    // @ts-ignore
     const { data, error } = await supabase
       .from("members")
       .select("*, membership_categories(name, benefit_amount)")
       .eq("user_id", userId)
       .single();
-    
+
     if (error) {
       console.error("Error fetching member profile:", error);
       toast({
@@ -112,13 +110,24 @@ const Dashboard = () => {
         description: error.message,
         variant: "destructive",
       });
-      setMember(null); // Ensure member is null on error
+      setMember(null);
     } else if (data) {
       setMember(data);
     }
   };
 
+  const fetchDependants = async (userId: string) => {
+    // @ts-ignore
+    const { data: memberData } = await supabase.from("members").select("id").eq("user_id", userId).single();
+    if (memberData) {
+      // @ts-ignore
+      const { data } = await supabase.from("dependants").select("*").eq("member_id", memberData.id);
+      if (data) setDependants(data);
+    }
+  }
+
   const fetchVisits = async (userId: string) => {
+    // @ts-ignore
     const { data: memberData } = await supabase
       .from("members")
       .select("id")
@@ -131,10 +140,9 @@ const Dashboard = () => {
         .select("*, services(name), branches(name)")
         .eq("member_id", memberData.id)
         .order("created_at", { ascending: false });
-      
-      if (error) {
-      } else if (data) {
-        setVisits(data);
+
+      if (data) {
+        setVisits(data as any);
       }
     }
   };
@@ -152,7 +160,7 @@ const Dashboard = () => {
         .select("*")
         .eq("member_id", memberData.id)
         .order("created_at", { ascending: false });
-      
+
       if (error) {
       } else if (data) {
         setPayments(data);
@@ -173,8 +181,8 @@ const Dashboard = () => {
     }
   };
 
-  const coveragePercentage = member?.benefit_limit 
-    ? (member.coverage_balance / member.benefit_limit) * 100 
+  const coveragePercentage = member?.benefit_limit
+    ? (member.coverage_balance / member.benefit_limit) * 100
     : 0;
 
   if (loading) {
@@ -294,7 +302,7 @@ const Dashboard = () => {
 
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Insurance Card */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 space-y-8">
             {member && <InsuranceCard member={{
               full_name: member.full_name,
               member_number: member.member_number,
@@ -303,8 +311,35 @@ const Dashboard = () => {
               is_active: member.is_active,
               coverage_balance: member.coverage_balance || 0,
               benefit_limit: member.benefit_limit || 0,
-              id_number: member.id_number, // Pass id_number
+              id_number: member.id_number,
             }} />}
+
+            {/* Dependants Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-primary" />
+                  Dependants
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {dependants.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">No dependants registered.</p>
+                  ) : (
+                    dependants.map((dep, idx) => (
+                      <div key={idx} className="flex justify-between items-center border-b pb-2 last:border-0 last:pb-0">
+                        <div>
+                          <p className="font-medium">{dep.full_name}</p>
+                          <p className="text-xs text-muted-foreground">{dep.relationship}</p>
+                        </div>
+                        <Badge variant="outline">{dep.identification_number}</Badge>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* History Tables */}
@@ -344,7 +379,7 @@ const Dashboard = () => {
                             <TableCell>{visit.services?.name || "N/A"}</TableCell>
                             <TableCell>{visit.branches?.name || "N/A"}</TableCell>
                             <TableCell className="text-destructive">
-                              -KES {visit.benefit_deducted.toLocaleString()}
+                              -KES {visit.benefit_deducted?.toLocaleString()}
                             </TableCell>
                           </TableRow>
                         ))

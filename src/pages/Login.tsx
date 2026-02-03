@@ -33,16 +33,26 @@ const Login = () => {
         .eq("user_id", data.user.id)
         .single();
 
+      const role = roleData?.role as any;
+
       toast({
         title: "Welcome back!",
         description: "You have successfully logged in.",
       });
 
-      if (roleData?.role === "admin") {
+      if (role === "admin") {
         navigate("/admin");
-      } else if (roleData?.role === "staff") {
-        navigate("/staff");
+      } else if (role === "receptionist") {
+        navigate("/reception"); // Will fail if route not exists yet but that's planned
+      } else if (role === "doctor") {
+        navigate("/doctor");
+      } else if (role === "branch_director") {
+        navigate("/director");
+      } else if (role === "marketer") {
+        navigate("/marketer");
       } else {
+        // Default to dashboard for members
+        // Check if member is active? No, let dashboard handle that state
         navigate("/dashboard");
       }
     } catch (error: any) {
@@ -65,7 +75,7 @@ const Login = () => {
             <ArrowLeft className="h-4 w-4" />
             Back to home
           </Link>
-          
+
           <div className="flex items-center gap-2 mb-8">
             <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
               <span className="text-xl">🐘</span>

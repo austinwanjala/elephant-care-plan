@@ -1,0 +1,76 @@
+import { useNavigate, useLocation } from "react-router-dom";
+import { useSidebar, Sidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
+import { BarChart3, TrendingUp, Users, LogOut, LayoutDashboard, Building2, FileText } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+
+const menuItems = [
+    { title: "Dashboard", url: "/director", icon: LayoutDashboard },
+    { title: "Revenue", url: "/director/revenue", icon: TrendingUp },
+    { title: "Doctor Performance", url: "/director/performance", icon: Users },
+    { title: "Branch Reports", url: "/director/reports", icon: FileText },
+];
+
+export function DirectorSidebar() {
+    const { state } = useSidebar();
+    const collapsed = state === "collapsed";
+    const navigate = useNavigate();
+    const location = useLocation();
+
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        navigate("/");
+    };
+
+    const isActive = (path: string) => {
+        if (path === "/director") return location.pathname === "/director";
+        return location.pathname.startsWith(path);
+    }
+
+    return (
+        <Sidebar collapsible="icon" className="border-r border-border">
+            <SidebarHeader className="p-4 border-b border-border">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-emerald-600 flex items-center justify-center shrink-0">
+                        <Building2 className="text-white h-6 w-6" />
+                    </div>
+                    {!collapsed && (
+                        <div>
+                            <span className="text-lg font-serif font-bold text-foreground">Elephant Dental</span>
+                            <span className="ml-2 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs rounded-full">Director</span>
+                        </div>
+                    )}
+                </div>
+            </SidebarHeader>
+
+            <SidebarContent>
+                <SidebarGroup>
+                    <SidebarGroupLabel>Management</SidebarGroupLabel>
+                    <SidebarMenu>
+                        {menuItems.map((item) => (
+                            <SidebarMenuItem key={item.title}>
+                                <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={item.title}>
+                                    <a
+                                        href={item.url}
+                                        onClick={(e) => { e.preventDefault(); navigate(item.url); }}
+                                        className="flex items-center gap-3"
+                                    >
+                                        <item.icon className="h-5 w-5" />
+                                        <span>{item.title}</span>
+                                    </a>
+                                </SidebarMenuButton>
+                            </SidebarMenuItem>
+                        ))}
+                    </SidebarMenu>
+                </SidebarGroup>
+            </SidebarContent>
+
+            <SidebarFooter className="p-4 border-t border-border">
+                <Button variant="ghost" className="w-full justify-start gap-3" onClick={handleLogout}>
+                    <LogOut className="h-5 w-5" />
+                    {!collapsed && <span>Logout</span>}
+                </Button>
+            </SidebarFooter>
+        </Sidebar>
+    );
+}

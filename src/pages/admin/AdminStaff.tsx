@@ -125,6 +125,37 @@ export default function AdminStaff() {
         throw new Error(`Failed to assign role: ${roleInsertError.message}. User account rolled back.`);
       }
 
+      // 4. Create the corresponding profile (staff or marketer)
+      if (formData.role === 'receptionist' || formData.role === 'doctor' || formData.role === 'branch_director') {
+        const { error: profileError } = await supabase.from("staff").insert({
+          user_id: userId,
+          full_name: formData.fullName,
+          email: formData.email,
+          phone: formData.phone || null,
+          branch_id: formData.branchId || null,
+          is_active: true,
+        });
+        if (profileError) {
+          await supabase.auth.admin.deleteUser(userId); // Rollback auth user
+          await supabase.from("user_roles").delete().eq("user_id", userId); // Rollback role
+          throw new Error(`Failed to create staff profile: ${profileError.message}. Account rolled back.`);
+        }
+      } else if (formData.role === 'marketer') {
+        const { error: profileError } = await supabase.from("marketers").insert({
+          user_id: userId,
+          full_name: formData.fullName,
+          email: formData.email,
+          phone: formData.phone || null,
+          code: formData.marketerCode || `MARKETER-${Math.random().toString(36).substring(2, 9).toUpperCase()}`, // Generate if not provided
+          is_active: true,
+        });
+        if (profileError) {
+          await supabase.auth.admin.deleteUser(userId); // Rollback auth user
+          await supabase.from("user_roles").delete().eq("user_id", userId); // Rollback role
+          throw new Error(`Failed to create marketer profile: ${profileError.message}. Account rolled back.`);
+        }
+      }
+
       toast({
         title: "Account Created Successfully",
         description: `${formData.fullName} has been setup as ${formData.role}.`

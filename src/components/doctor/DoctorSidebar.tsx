@@ -6,8 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
 
 const menuItems = [
     { title: "Dashboard", url: "/doctor", icon: LayoutDashboard },
-    { title: "My Visits", url: "/doctor/visits", icon: ClipboardList }, // This will be the dashboard itself
-    { title: "Patient History", url: "/doctor/history", icon: History }, // New item
+    { title: "Today's Queue", url: "/doctor", icon: ClipboardList }, // Updated title and URL
+    { title: "Patient History", url: "/doctor/history", icon: History },
 ];
 
 export function DoctorSidebar() {

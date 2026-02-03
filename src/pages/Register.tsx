@@ -107,7 +107,6 @@ const Register = () => {
     setLoading(true);
 
     try {
-      // Pass metadata to signUp so triggers can use it
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -128,14 +127,12 @@ const Register = () => {
 
       const userId = authData.user.id;
 
-      // Ensure role is set
       const { error: roleInsertError } = await supabase
         .from("user_roles")
         .upsert({ user_id: userId, role: 'member' });
 
       if (roleInsertError) throw roleInsertError;
 
-      // Upsert member profile to ensure all fields are set correctly
       const { data: memberData, error: memberProfileError } = await supabase
         .from("members")
         .upsert({
@@ -162,7 +159,7 @@ const Register = () => {
           member_id: memberData.id,
           name: d.fullName,
           date_of_birth: d.dob,
-          id_number: d.idNumber, // Changed from identification_number to id_number
+          identification_number: d.idNumber,
           relationship: d.relationship || 'Dependant'
         }));
 

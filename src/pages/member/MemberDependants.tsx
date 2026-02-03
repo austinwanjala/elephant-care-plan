@@ -13,7 +13,7 @@ interface Dependant {
   id: string;
   name: string;
   date_of_birth: string;
-  id_number: string; // Changed from identification_number to id_number
+  identification_number: string;
   relationship: string;
 }
 
@@ -75,15 +75,7 @@ const MemberDependants = () => {
           variant: "destructive",
         });
       } else {
-        // Map database columns to interface
-        const mappedData = (dependantsData || []).map((d: any) => ({
-          id: d.id,
-          name: d.name,
-          date_of_birth: d.date_of_birth,
-          id_number: d.id_number,
-          relationship: d.relationship
-        }));
-        setDependants(mappedData);
+        setDependants(dependantsData || []);
       }
     } else {
       toast({
@@ -110,7 +102,7 @@ const MemberDependants = () => {
         member_id: memberId,
         name: newDependant.fullName,
         date_of_birth: newDependant.dob,
-        id_number: newDependant.idNumber, // Changed from identification_number to id_number
+        identification_number: newDependant.idNumber,
         relationship: newDependant.relationship,
       });
 
@@ -253,7 +245,7 @@ const MemberDependants = () => {
                       <CalendarDays className="h-4 w-4" /> {dep.date_of_birth}
                     </div>
                     <div className="text-sm text-muted-foreground flex items-center gap-1">
-                      <CreditCard className="h-4 w-4" /> {dep.id_number}
+                      <CreditCard className="h-4 w-4" /> {dep.identification_number}
                     </div>
                     <Button variant="ghost" size="icon" onClick={() => handleDeleteDependant(dep.id)}>
                       <Trash className="h-4 w-4 text-destructive" />

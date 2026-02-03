@@ -63,7 +63,7 @@ interface Dependant {
   id: string;
   name: string;
   relationship: string;
-  id_number: string; // Changed from identification_number to id_number
+  identification_number: string;
 }
 
 const MemberDashboard = () => {
@@ -121,15 +121,7 @@ const MemberDashboard = () => {
     const { data: memberData } = await supabase.from("members").select("id").eq("user_id", userId).single();
     if (memberData) {
       const { data } = await supabase.from("dependants").select("*").eq("member_id", memberData.id);
-      if (data) {
-        const mapped = (data || []).map((d: any) => ({
-          id: d.id,
-          name: d.name,
-          relationship: d.relationship,
-          id_number: d.id_number
-        }));
-        setDependants(mapped);
-      }
+      if (data) setDependants(data);
     }
   }
 
@@ -338,7 +330,7 @@ const MemberDashboard = () => {
                           <p className="font-medium">{dep.name}</p>
                           <p className="text-xs text-muted-foreground">{dep.relationship}</p>
                         </div>
-                        <Badge variant="outline">{dep.id_number}</Badge>
+                        <Badge variant="outline">{dep.identification_number}</Badge>
                       </div>
                     ))
                   )}

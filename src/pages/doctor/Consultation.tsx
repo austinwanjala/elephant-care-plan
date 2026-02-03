@@ -133,7 +133,7 @@ export default function Consultation() {
 
             if (error) throw error;
 
-            // Save dental records
+            -- Save dental records
             const recordsToUpsert = Object.entries(toothStatus).map(([tooth_number, status]) => ({
                 member_id: visit.member_id,
                 visit_id: visitId,
@@ -164,7 +164,7 @@ export default function Consultation() {
 
         setSubmitting(true);
         try {
-            // 1. Save Dental Records (if any changes were made)
+            -- 1. Save Dental Records (if any changes were made)
             const recordsToUpsert = Object.entries(toothStatus).map(([tooth_number, status]) => ({
                 member_id: visit.member_id,
                 visit_id: visitId,
@@ -178,13 +178,13 @@ export default function Consultation() {
                 if (dentalError) throw dentalError;
             }
 
-            // 2. Calculate Bill Totals
+            -- 2. Calculate Bill Totals
             const totalBenefit = selectedServices.reduce((acc, s) => acc + Number(s.benefit_cost), 0);
             const totalCompensation = selectedServices.reduce((acc, s) => acc + Number(s.branch_compensation), 0);
             const totalReal = selectedServices.reduce((acc, s) => acc + Number(s.real_cost), 0);
             const totalProfitLoss = totalBenefit - totalCompensation; // Profit/Loss is benefit - compensation
 
-            // 3. Create Bill
+            -- 3. Create Bill
             const { data: bill, error: billError } = await supabase.from("bills").insert({
                 visit_id: visitId,
                 total_benefit_cost: totalBenefit,
@@ -196,7 +196,7 @@ export default function Consultation() {
 
             if (billError) throw billError;
 
-            // 4. Add Bill Items
+            -- 4. Add Bill Items
             const itemsToInsert = selectedServices.map(s => ({
                 bill_id: bill.id,
                 service_id: s.id,
@@ -209,13 +209,13 @@ export default function Consultation() {
             const { error: itemsError } = await supabase.from("bill_items").insert(itemsToInsert);
             if (itemsError) throw itemsError;
 
-            // 5. Update Visit Status and Doctor Notes
+            -- 5. Update Visit Status and Doctor Notes
             const { error: visitUpdateError } = await supabase.from("visits").update({
                 status: 'billed', // Change status to 'billed'
                 diagnosis: diagnosis,
                 treatment_notes: treatmentNotes,
                 doctor_id: doctorId,
-                // These fields are now derived from the bill, so set to 0 or remove from visits table
+                -- These fields are now derived from the bill, so set to 0 or remove from visits table
                 benefit_deducted: 0,
                 branch_compensation: 0,
                 profit_loss: 0,

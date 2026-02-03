@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, ArrowLeft, Link2, Copy, QrCode } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react"; // Import QRCodeSVG
 
 interface MarketerInfo {
     id: string;
@@ -106,9 +107,13 @@ export default function MarketerLinks() {
                     <CardDescription>Scan this QR code to quickly access your referral link.</CardDescription>
                 </CardHeader>
                 <CardContent className="flex justify-center p-6">
-                    {/* Placeholder for QR Code generation */}
                     <div className="bg-white p-4 rounded-lg shadow-md">
-                        <QrCode className="h-32 w-32 text-gray-700" />
+                        <QRCodeSVG
+                            value={referralLink}
+                            size={128}
+                            level="H"
+                            includeMargin={false}
+                        />
                         <p className="text-center text-xs text-muted-foreground mt-2">Scan to register</p>
                     </div>
                 </CardContent>

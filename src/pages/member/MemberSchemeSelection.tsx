@@ -126,8 +126,8 @@ const MemberSchemeSelection = () => {
       const { error: updateError } = await supabase
         .from("members")
         .update({
-          coverage_balance: member.coverage_balance + benefitToAdd,
-          total_contributions: member.total_contributions + totalPayment,
+          coverage_balance: (member.coverage_balance || 0) + benefitToAdd,
+          total_contributions: (member.total_contributions || 0) + totalPayment,
           is_active: true,
           qr_code_data: qrCodeValue,
           membership_category_id: selectedCategory.id,

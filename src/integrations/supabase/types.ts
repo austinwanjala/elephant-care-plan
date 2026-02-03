@@ -140,7 +140,7 @@ export type Database = {
           period_year: number
         }
         Update: {
-          amount_paid?: number
+          amount?: number
           branch_id?: string
           created_at?: string | null
           id?: string

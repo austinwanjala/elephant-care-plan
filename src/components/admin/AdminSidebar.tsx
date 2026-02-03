@@ -3,7 +3,7 @@ import {
   Users,
   Building2,
   UserCog,
-  FileText, // Removed for claims
+  // FileText, // Removed for claims
   Stethoscope,
   LayoutDashboard,
   LogOut,

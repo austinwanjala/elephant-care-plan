@@ -20,6 +20,8 @@ import AdminSettings from "./pages/admin/AdminSettings";
 import AdminVisits from "./pages/admin/AdminVisits";
 import AdminBranchPayments from "./pages/admin/AdminBranchPayments";
 import AdminMembershipCategories from "./pages/admin/AdminMembershipCategories"; // New Admin page
+import AdminMarketerClaims from "./pages/admin/AdminMarketerClaims"; // Marketer commission claims
+import AdminCommissionSettings from "./pages/admin/AdminCommissionSettings"; // Marketer commission settings
 
 // Reception pages
 import { ReceptionLayout } from "./components/reception/ReceptionLayout";
@@ -121,6 +123,8 @@ const App = () => (
             <Route path="visits" element={<AdminVisits />} />
             <Route path="services" element={<AdminServices />} />
             <Route path="branch-payments" element={<AdminBranchPayments />} />
+            <Route path="marketer-claims" element={<AdminMarketerClaims />} />
+            <Route path="commission-settings" element={<AdminCommissionSettings />} />
             <Route path="settings" element={<AdminSettings />} />
             <Route path="membership-categories" element={<AdminMembershipCategories />} />
           </Route>

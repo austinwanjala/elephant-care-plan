@@ -39,6 +39,7 @@ interface Member {
   is_active: boolean;
   membership_categories: { name: string; benefit_amount: number } | null;
   id_number: string;
+  marketers?: { full_name: string; code: string } | null;
 }
 
 interface Visit {
@@ -100,7 +101,7 @@ const MemberDashboard = () => {
   const fetchMemberProfile = async (userId: string) => {
     const { data, error } = await supabase
       .from("members")
-      .select("*, membership_categories(name, benefit_amount)")
+      .select("*, membership_categories(name, benefit_amount), marketers(full_name, code)")
       .eq("user_id", userId)
       .single();
 
@@ -276,9 +277,16 @@ const MemberDashboard = () => {
               <div className="text-2xl font-bold">
                 {member?.membership_categories?.name || "N/A"}
               </div>
-              <p className="text-xs text-muted-foreground">
-                Total Contributions: KES {member?.total_contributions?.toLocaleString() || 0}
-              </p>
+              <div className="flex flex-col gap-1 mt-1">
+                <p className="text-xs text-muted-foreground">
+                  Total Contributions: KES {member?.total_contributions?.toLocaleString() || 0}
+                </p>
+                {member?.marketers && (
+                  <p className="text-xs font-medium text-primary">
+                    Referred by: {member.marketers.full_name} ({member.marketers.code})
+                  </p>
+                )}
+              </div>
             </CardContent>
           </Card>
 

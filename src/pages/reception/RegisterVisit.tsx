@@ -57,18 +57,17 @@ export default function RegisterVisit() {
         setBiometricsVerified(false);
 
         try {
-            // Use exact matches for Phone and ID, and partial matches for Name and Member Number
-            // We wrap values in quotes to handle spaces or special characters in the search term
+            // Search by Phone, ID, Member Number (exact) or Name (partial)
+            // Removed double quotes around values which were causing literal match failures
             const { data, error } = await supabase
                 .from("members")
                 .select("*, membership_categories(name)")
-                .or(`phone.eq."${term}",id_number.eq."${term}",member_number.ilike."%${term}%",full_name.ilike."%${term}%"`)
+                .or(`phone.eq.${term},id_number.eq.${term},member_number.eq.${term},full_name.ilike.%${term}%`)
                 .maybeSingle();
 
             if (error) {
-                // If multiple rows are found, maybeSingle returns an error PGRST116
                 if (error.code === 'PGRST116') {
-                    throw new Error("Multiple members found. Please be more specific with the Phone, ID, or Member Number.");
+                    throw new Error("Multiple members found. Please enter a unique ID or Phone number.");
                 }
                 throw error;
             }
@@ -82,7 +81,7 @@ export default function RegisterVisit() {
                     toast({ title: "No Biometric Data", description: "Member has no registered biometric data. Proceeding without biometric verification.", variant: "default" });
                 }
             } else {
-                toast({ title: "Member not found", description: "No member found with that Phone, ID, Name, or Member Number.", variant: "destructive" });
+                toast({ title: "Member not found", description: "No member found with that Phone, ID, or Member Number.", variant: "destructive" });
             }
         } catch (error: any) {
             toast({ title: "Search failed", description: error.message, variant: "destructive" });

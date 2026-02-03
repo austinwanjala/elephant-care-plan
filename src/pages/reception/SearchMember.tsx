@@ -27,7 +27,7 @@ export default function ReceptionSearchMember() {
             const { data, error } = await supabase
                 .from("members")
                 .select("*, membership_categories(name), branches(name)")
-                .or(`phone.eq."${term}",id_number.eq."${term}",member_number.ilike."%${term}%",full_name.ilike."%${term}%"`)
+                .or(`phone.eq.${term},id_number.eq.${term},member_number.eq.${term},full_name.ilike.%${term}%`)
                 .maybeSingle();
 
             if (error) {
@@ -40,7 +40,7 @@ export default function ReceptionSearchMember() {
             if (data) {
                 setMember(data);
             } else {
-                toast({ title: "Member not found", description: "No member found with that Phone, ID, Name, or Member Number.", variant: "destructive" });
+                toast({ title: "Member not found", description: "No member found with that Phone, ID, or Member Number.", variant: "destructive" });
             }
         } catch (error: any) {
             toast({ title: "Search failed", description: error.message, variant: "destructive" });

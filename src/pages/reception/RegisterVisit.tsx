@@ -97,41 +97,7 @@ export default function RegisterVisit() {
         }
     };
 
-      const handleRegisterVisit = async () => {
-        if (!member || !receptionistId || !receptionistBranchId) return;
-        if (!biometricsVerified) {
-            toast({ title: "Biometrics required", description: "Please verify identity first.", variant: "destructive" });
-            return;
-        }
-        if (!member.is_active) {
-            toast({ title: "Inactive Member", description: "Member is inactive. Advise payment before service.", variant: "destructive" });
-            return;
-        }
-
-        setLoading(true);
-        try {
-            const { error } = await supabase.from('visits').insert({
-                member_id: member.id,
-                branch_id: receptionistBranchId,
-                receptionist_id: receptionistId,
-                status: 'registered',
-                biometrics_verified: biometricsVerified,
-                benefit_deducted: 0,
-                branch_compensation: 0,
-                profit_loss: 0
-            });
-
-            if (error) throw error;
-
-            toast({ title: "Visit Registered", description: "Member is now in the queue for the doctor." });
-            navigate("/reception");
-        } catch (error: any) {
-            toast({ title: "Registration failed", description: error.message, variant: "destructive" });
-        } finally {
-            setLoading(false);
-        }
-    };
-  const handleRegisterVisit = async () => {
+    const handleRegisterVisit = async () => {
         if (!member || !receptionistId || !receptionistBranchId) return;
         if (!biometricsVerified) {
             toast({ title: "Biometrics required", description: "Please verify identity first.", variant: "destructive" });

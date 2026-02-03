@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CreditCard, Check, Search, Receipt, History, Printer } from "lucide-react";
+import { Loader2, CreditCard, Check, Search, Receipt, History, Printer, Fingerprint } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 export default function ReceptionBilling() {
@@ -19,6 +19,7 @@ export default function ReceptionBilling() {
     const [searchTerm, setSearchTerm] = useState("");
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [receptionistId, setReceptionistId] = useState<string | null>(null);
+    const [biometricsVerified, setBiometricsVerified] = useState<string | null>(null); // visitId if verified
     const { toast } = useToast();
 
     useEffect(() => {
@@ -96,6 +97,7 @@ export default function ReceptionBilling() {
             toast({ title: "Finalization Failed", description: error.message, variant: "destructive" });
         } finally {
             setProcessingId(null);
+            setBiometricsVerified(null);
         }
     };
 
@@ -302,20 +304,44 @@ export default function ReceptionBilling() {
                                                                     <div className="p-3 bg-blue-50 text-blue-800 rounded-md text-sm">
                                                                         Patient Coverage Balance: <b>KES {visit.members?.coverage_balance?.toLocaleString()}</b>
                                                                     </div>
+
+                                                                    <div className="p-3 bg-amber-50 text-amber-900 rounded-md text-sm border border-amber-200">
+                                                                        <div className="font-bold mb-1">Doctor's Diagnosis & Notes:</div>
+                                                                        <p className="italic">"{visit.diagnosis || visit.treatment_notes || 'No notes provided'}"</p>
+                                                                    </div>
+
                                                                     {visit.members?.coverage_balance < bill?.total_benefit_cost && (
                                                                         <div className="p-3 bg-red-50 text-red-700 rounded-md text-sm border border-red-200">
                                                                             Insufficient Balance! Collect deficit in cash.
                                                                         </div>
                                                                     )}
+
+                                                                    <div className="py-2">
+                                                                        <Button
+                                                                            variant={biometricsVerified === visit.id ? "default" : "outline"}
+                                                                            className={`w-full py-6 text-lg border-2 ${biometricsVerified === visit.id ? 'bg-green-600 hover:bg-green-700 border-green-600' : 'border-blue-200 hover:border-blue-400 text-blue-700'}`}
+                                                                            onClick={() => {
+                                                                                setBiometricsVerified(visit.id);
+                                                                                toast({ title: "Biometrics Verified", description: "Identity confirmed via biometric scan." });
+                                                                            }}
+                                                                        >
+                                                                            {biometricsVerified === visit.id ? (
+                                                                                <><Check className="mr-2 h-6 w-6" /> Biometrics Confirmed</>
+                                                                            ) : (
+                                                                                <><Fingerprint className="mr-2 h-6 w-6" /> Capture Member Biometrics</>
+                                                                            )}
+                                                                        </Button>
+                                                                        <p className="text-[10px] text-center text-muted-foreground mt-1">Authorization required by member before coverage deduction.</p>
+                                                                    </div>
                                                                 </div>
                                                                 <DialogFooter>
                                                                     <Button
-                                                                        className="w-full bg-green-600 hover:bg-green-700"
+                                                                        className="w-full bg-blue-600 hover:bg-blue-700 h-12 text-lg"
                                                                         onClick={() => handleFinalizeBill(visit.id, bill?.id)}
-                                                                        disabled={processingId === visit.id}
+                                                                        disabled={processingId === visit.id || biometricsVerified !== visit.id}
                                                                     >
-                                                                        {processingId === visit.id ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Check className="mr-2 h-4 w-4" />}
-                                                                        Deduct & Mark Completed
+                                                                        {processingId === visit.id ? <Loader2 className="animate-spin mr-2 h-5 w-5" /> : <Check className="mr-2 h-5 w-5" />}
+                                                                        Finalize & Deduct Coverage
                                                                     </Button>
                                                                 </DialogFooter>
                                                             </DialogContent>

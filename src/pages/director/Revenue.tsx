@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ArrowLeft, DollarSign, TrendingUp, CalendarDays } from "lucide-react";
-import { format, getMonth, getYear, subMonths } from "date-fns";
+import { Loader2, ArrowLeft, DollarSign, TrendingUp, CalendarDays, CheckCircle2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { format, getMonth, getYear, subMonths, startOfMonth, endOfMonth } from "date-fns";
 
 interface BranchRevenueEntry {
     date: string;
@@ -22,6 +23,10 @@ export default function DirectorRevenue() {
     const [currentMonth, setCurrentMonth] = useState(getMonth(new Date()) + 1); // 1-indexed
     const [currentYear, setCurrentYear] = useState(getYear(new Date()));
     const [directorBranchId, setDirectorBranchId] = useState<string | null>(null);
+    const [staffId, setStaffId] = useState<string | null>(null);
+    const [accumulatedRevenue, setAccumulatedRevenue] = useState(0);
+    const [claims, setClaims] = useState<any[]>([]);
+    const [claiming, setClaiming] = useState(false);
     const { toast } = useToast();
     const navigate = useNavigate();
 
@@ -32,6 +37,8 @@ export default function DirectorRevenue() {
     useEffect(() => {
         if (directorBranchId) {
             fetchRevenueData(directorBranchId, currentMonth, currentYear);
+            fetchAccumulatedRevenue(directorBranchId);
+            fetchClaims(directorBranchId);
         }
     }, [directorBranchId, currentMonth, currentYear]);
 
@@ -44,7 +51,7 @@ export default function DirectorRevenue() {
 
         const { data: staffData, error: staffError } = await supabase
             .from("staff")
-            .select("branch_id")
+            .select("id, branch_id")
             .eq("user_id", user.id)
             .maybeSingle();
 
@@ -54,6 +61,91 @@ export default function DirectorRevenue() {
             return;
         }
         setDirectorBranchId(staffData.branch_id);
+        setStaffId(staffData.id);
+    };
+
+    const fetchAccumulatedRevenue = async (branchId: string) => {
+        // Calculate accumulated revenue as: (Total Revenue Made from Bills) - (Total Claims Submitted)
+        // This directly tallies total branch compensation made from the services.
+        try {
+            const [billsRes, claimRes] = await Promise.all([
+                (supabase.from("bills" as any))
+                    .select("total_branch_compensation")
+                    .eq("branch_id", branchId),
+                (supabase.from("revenue_claims" as any))
+                    .select("amount")
+                    .eq("branch_id", branchId)
+                    .in("status", ["pending", "paid"])
+            ]);
+
+            if (billsRes.error) throw billsRes.error;
+            if (claimRes.error) throw claimRes.error;
+
+            const totalMade = (billsRes.data as any[] || []).reduce((sum, b) => sum + Number(b.total_branch_compensation), 0);
+            const totalClaimed = (claimRes.data as any[] || []).reduce((sum, c) => sum + Number(c.amount), 0);
+
+            setAccumulatedRevenue(Math.max(0, totalMade - totalClaimed));
+        } catch (error: any) {
+            console.error("Error fetching accumulated revenue:", error);
+        }
+    };
+
+    const fetchClaims = async (branchId: string) => {
+        const { data, error } = await (supabase.from("revenue_claims" as any))
+            .select("*")
+            .eq("branch_id", branchId)
+            .order("created_at", { ascending: false });
+
+        if (error) {
+            console.error("Error fetching claims:", error);
+        } else {
+            setClaims(data || []);
+        }
+    };
+
+    const handleSubmitClaim = async () => {
+        if (accumulatedRevenue <= 0) {
+            toast({ title: "No Revenue", description: "There is no accumulated revenue to claim.", variant: "destructive" });
+            return;
+        }
+
+        setClaiming(true);
+        try {
+            // 1. Create the claim
+            const { data: claim, error: claimError } = await (supabase.from("revenue_claims" as any))
+                .insert({
+                    branch_id: directorBranchId,
+                    director_id: staffId,
+                    amount: accumulatedRevenue,
+                    status: 'pending'
+                })
+                .select()
+                .single();
+
+            if (claimError) throw claimError;
+
+            // 2. Link all un-claimed finalized bills to this claim for record keeping
+            const { data: billsToLink } = await (supabase.from("bills" as any))
+                .select("id")
+                .eq("branch_id", directorBranchId)
+                .eq("is_finalized", true)
+                .is("claim_id", null);
+
+            if (billsToLink && (billsToLink as any[]).length > 0) {
+                const billIds = (billsToLink as any[]).map((b: any) => b.id);
+                await (supabase.from("bills" as any))
+                    .update({ claim_id: (claim as any).id })
+                    .in("id", billIds);
+            }
+
+            toast({ title: "Claim Submitted", description: `Claim for KES ${accumulatedRevenue.toLocaleString()} submitted successfully.` });
+            fetchAccumulatedRevenue(directorBranchId!);
+            fetchClaims(directorBranchId!);
+        } catch (error: any) {
+            toast({ title: "Claim Failed", description: error.message, variant: "destructive" });
+        } finally {
+            setClaiming(false);
+        }
     };
 
     const fetchRevenueData = async (branchId: string, month: number, year: number) => {
@@ -138,31 +230,36 @@ export default function DirectorRevenue() {
                     </Select>
                 </CardHeader>
                 <CardContent className="grid grid-cols-3 gap-4">
-                    <div className="border rounded-lg p-4 text-center">
-                        <DollarSign className="h-6 w-6 text-blue-600 mx-auto mb-2" />
-                        <p className="text-lg font-bold">KES {totalMonthlyCompensation.toLocaleString()}</p>
-                        <p className="text-xs text-muted-foreground">Total Compensation</p>
-                    </div>
-                    <div className="border rounded-lg p-4 text-center">
-                        <TrendingUp className="h-6 w-6 text-orange-600 mx-auto mb-2" />
-                        <p className={`text-lg font-bold ${totalMonthlyProfitLoss >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                            KES {totalMonthlyProfitLoss.toLocaleString()}
-                        </p>
-                        <p className="text-xs text-muted-foreground">Net Profit/Loss</p>
-                    </div>
-                    <div className="border rounded-lg p-4 text-center">
-                        <CalendarDays className="h-6 w-6 text-emerald-600 mx-auto mb-2" />
-                        <p className="text-lg font-bold">{totalMonthlyVisits}</p>
-                        <p className="text-xs text-muted-foreground">Total Visits</p>
-                    </div>
+                    <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="border-2 border-primary/20 bg-primary/5 rounded-xl p-6 text-center shadow-sm">
+                            <DollarSign className="h-8 w-8 text-primary mx-auto mb-2" />
+                            <p className="text-3xl font-bold text-primary">KES {accumulatedRevenue.toLocaleString()}</p>
+                            <p className="text-sm text-muted-foreground font-medium mb-4">Unclaimed Branch Compensation</p>
+                            <Button
+                                className="w-full bg-primary hover:bg-primary/90"
+                                disabled={claiming || accumulatedRevenue <= 0}
+                                onClick={handleSubmitClaim}
+                            >
+                                {claiming ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DollarSign className="mr-2 h-4 w-4" />}
+                                Submit Compensation Claim
+                            </Button>
+                            {accumulatedRevenue === 0 && (
+                                <p className="text-[10px] text-amber-600 mt-3 italic">
+                                    * Note: Only finalized bills from the receptionist portal can be claimed.
+                                    Consultation bills must be approved and finalized to appear here.
+                                </p>
+                            )}
+                        </div>
+                        <div className="border rounded-xl p-6 text-center bg-blue-50/30">
+                            <CalendarDays className="h-8 w-8 text-blue-600 mx-auto mb-2" />
+                            <p className="text-3xl font-bold text-blue-900">KES {totalMonthlyCompensation.toLocaleString()}</p>
+                            <p className="text-sm text-muted-foreground font-medium">Monthly Branch Compensation ({format(new Date(currentYear, currentMonth - 1), "MMM")})</p>
+                        </div>
+                    </CardContent>
                 </CardContent>
             </Card>
 
             <Card className="shadow-sm border-slate-100">
-                <CardHeader>
-                    <CardTitle>Daily Revenue Breakdown</CardTitle>
-                    <CardDescription>Detailed daily compensation and profit/loss for {format(new Date(currentYear, currentMonth - 1), "MMM yyyy")}.</CardDescription>
-                </CardHeader>
                 <CardContent>
                     {revenueData.length === 0 ? (
                         <p className="text-center text-muted-foreground py-8">No revenue data for this period.</p>
@@ -172,8 +269,7 @@ export default function DirectorRevenue() {
                                 <thead>
                                     <tr className="text-left text-sm text-muted-foreground">
                                         <th className="py-3 pr-3 font-semibold">Date</th>
-                                        <th className="py-3 px-3 font-semibold">Compensation</th>
-                                        <th className="py-3 px-3 font-semibold">Profit/Loss</th>
+                                        <th className="py-3 px-3 font-semibold text-right">Compensation</th>
                                         <th className="py-3 pl-3 font-semibold text-right">Visits</th>
                                     </tr>
                                 </thead>
@@ -181,16 +277,54 @@ export default function DirectorRevenue() {
                                     {revenueData.map(entry => (
                                         <tr key={entry.date} className="hover:bg-muted/50">
                                             <td className="py-3 pr-3 text-sm">{format(new Date(entry.date), 'MMM d, yyyy')}</td>
-                                            <td className="py-3 px-3 text-sm text-blue-700">KES {entry.total_compensation.toLocaleString()}</td>
-                                            <td className={`py-3 px-3 text-sm ${entry.total_profit_loss >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                                                KES {entry.total_profit_loss.toLocaleString()}
-                                            </td>
+                                            <td className="py-3 px-3 text-sm text-blue-700 text-right font-medium">KES {entry.total_compensation.toLocaleString()}</td>
                                             <td className="py-3 pl-3 text-sm text-right">{entry.visit_count}</td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
                         </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            <Card className="shadow-sm border-slate-100 mt-6">
+                <CardHeader>
+                    <CardTitle>Claims History</CardTitle>
+                    <CardDescription>History of revenue claims submitted to admin.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {claims.length === 0 ? (
+                        <p className="text-center text-muted-foreground py-8">No claims history found.</p>
+                    ) : (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Date</TableHead>
+                                    <TableHead>Amount</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Paid Date</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {claims.map((claim) => (
+                                    <TableRow key={claim.id}>
+                                        <TableCell>{format(new Date(claim.created_at), 'MMM d, yyyy')}</TableCell>
+                                        <TableCell className="font-bold text-blue-700">KES {claim.amount.toLocaleString()}</TableCell>
+                                        <TableCell>
+                                            <Badge className={
+                                                claim.status === 'paid' ? 'bg-green-100 text-green-800' :
+                                                    claim.status === 'pending' ? 'bg-amber-100 text-amber-800' :
+                                                        'bg-red-100 text-red-800'
+                                            }>
+                                                {claim.status.toUpperCase()}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell>{claim.paid_at ? format(new Date(claim.paid_at), 'MMM d, yyyy') : '-'}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
                     )}
                 </CardContent>
             </Card>

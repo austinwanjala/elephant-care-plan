@@ -226,6 +226,7 @@ export default function Consultation() {
             // 3. Create Bill
             const { data: bill, error: billError } = await supabase.from("bills").insert({
                 visit_id: visitId,
+                branch_id: doctorBranchId,
                 total_benefit_cost: totalBenefit,
                 total_branch_compensation: totalCompensation,
                 total_real_cost: totalReal,
@@ -257,8 +258,7 @@ export default function Consultation() {
                 // These fields are now derived from the bill, so set to 0 or remove from visits table
                 benefit_deducted: 0,
                 branch_compensation: 0,
-                profit_loss: 0,
-                service_id: '00000000-0000-0000-0000-000000000000' // Placeholder, as services are now in bill_items
+                profit_loss: 0
             }).eq("id", visitId);
 
             if (visitUpdateError) throw visitUpdateError;

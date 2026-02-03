@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,12 +7,19 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, ArrowLeft, Plus, Trash } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Dependant {
   fullName: string;
   dob: string;
   idNumber: string; // Birth Cert or Student ID
   relationship: string;
+}
+
+interface Marketer {
+  id: string;
+  full_name: string;
+  code: string;
 }
 
 const Register = () => {
@@ -24,7 +31,9 @@ const Register = () => {
     email: "",
     password: "",
   });
-  const [marketerCode, setMarketerCode] = useState("");
+  const [referralSource, setReferralSource] = useState<string>("none");
+  const [availableMarketers, setAvailableMarketers] = useState<Marketer[]>([]);
+  const [selectedMarketerId, setSelectedMarketerId] = useState<string | null>(null);
   const [dependants, setDependants] = useState<Dependant[]>([]);
   const [consent, setConsent] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -33,13 +42,32 @@ const Register = () => {
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
 
-  // Pre-fill marketer code if present in URL
-  useState(() => {
-    const refCode = searchParams.get("ref");
-    if (refCode) {
-      setMarketerCode(refCode);
-    }
-  });
+  useEffect(() => {
+    const fetchMarketers = async () => {
+      const { data, error } = await supabase
+        .from("marketers")
+        .select("id, full_name, code")
+        .eq("is_active", true)
+        .order("full_name", { ascending: true });
+
+      if (error) {
+        console.error("Error fetching marketers:", error);
+        toast({ title: "Error loading marketers", description: error.message, variant: "destructive" });
+      } else {
+        setAvailableMarketers(data || []);
+        const refCode = searchParams.get("ref");
+        if (refCode) {
+          const referredMarketer = data?.find(m => m.code === refCode);
+          if (referredMarketer) {
+            setReferralSource("marketer");
+            setSelectedMarketerId(referredMarketer.id);
+          }
+        }
+      }
+    };
+
+    fetchMarketers();
+  }, [searchParams, toast]);
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -72,6 +100,11 @@ const Register = () => {
       return;
     }
 
+    if (referralSource === "marketer" && !selectedMarketerId) {
+      toast({ title: "Marketer Selection Required", description: "Please select a marketer from the list.", variant: "destructive" });
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -79,8 +112,6 @@ const Register = () => {
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
-        // We'll explicitly set the role and member profile after auth user creation
-        // to ensure consistency and immediate availability.
       });
 
       if (authError) throw authError;
@@ -94,7 +125,6 @@ const Register = () => {
         .insert({ user_id: userId, role: 'member' });
 
       if (roleInsertError) {
-        // If role insertion fails, consider deleting the auth user to prevent orphaned accounts
         await supabase.auth.admin.deleteUser(userId);
         throw new Error(`Failed to assign role: ${roleInsertError.message}. User account rolled back.`);
       }
@@ -114,14 +144,14 @@ const Register = () => {
           coverage_balance: 0,
           total_contributions: 0,
           benefit_limit: 0,
-          marketer_id: marketerCode ? (await supabase.from('marketers').select('id').eq('code', marketerCode).single()).data?.id : null,
+          marketer_id: selectedMarketerId, // Use the selected marketer ID
         })
         .select('id')
         .single();
 
       if (memberProfileError) {
-        await supabase.auth.admin.deleteUser(userId); // Rollback auth user
-        await supabase.from("user_roles").delete().eq("user_id", userId); // Rollback role
+        await supabase.auth.admin.deleteUser(userId);
+        await supabase.from("user_roles").delete().eq("user_id", userId);
         throw new Error(`Failed to create member profile: ${memberProfileError.message}. Account rolled back.`);
       }
 
@@ -247,15 +277,52 @@ const Register = () => {
                   minLength={6}
                 />
               </div>
+              
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="marketerCode">Marketer Referral Code (Optional)</Label>
-                <Input
-                  id="marketerCode"
-                  placeholder="Enter code if referred by a marketer"
-                  value={marketerCode}
-                  onChange={(e) => setMarketerCode(e.target.value)}
-                />
+                <Label htmlFor="referralSource">How did you hear about us?</Label>
+                <Select
+                  value={referralSource}
+                  onValueChange={(value) => {
+                    setReferralSource(value);
+                    if (value !== "marketer") {
+                      setSelectedMarketerId(null);
+                    }
+                  }}
+                >
+                  <SelectTrigger id="referralSource">
+                    <SelectValue placeholder="Select an option" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    <SelectItem value="marketer">Marketer</SelectItem>
+                    <SelectItem value="friend">Friend/Family</SelectItem>
+                    <SelectItem value="social">Social Media</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+
+              {referralSource === "marketer" && (
+                <div className="space-y-2 md:col-span-2 animate-in fade-in slide-in-from-top-2">
+                  <Label htmlFor="marketerSelect">Select Marketer</Label>
+                  <Select
+                    value={selectedMarketerId || ""}
+                    onValueChange={(value) => setSelectedMarketerId(value)}
+                    required
+                  >
+                    <SelectTrigger id="marketerSelect">
+                      <SelectValue placeholder="Choose a marketer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableMarketers.map((marketer) => (
+                        <SelectItem key={marketer.id} value={marketer.id}>
+                          {marketer.full_name} ({marketer.code})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
             <div className="space-y-4 pt-4 border-t">

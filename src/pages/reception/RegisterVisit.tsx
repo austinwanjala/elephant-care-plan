@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Search, UserCheck, UserX, Fingerprint, ArrowRight, Loader2, CheckCircle, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, Link } from "react-router-dom";
-import { BiometricCapture } from "@/components/BiometricCapture"; // Import the BiometricCapture component
+import { BiometricCapture } from "@/components/BiometricCapture";
 
 export default function RegisterVisit() {
     const [searchTerm, setSearchTerm] = useState("");
@@ -58,24 +58,21 @@ export default function RegisterVisit() {
             const { data, error } = await supabase
                 .from("members")
                 .select("*, membership_categories(name)")
-                .or(`phone.eq.${searchTerm},id_number.eq.${searchTerm}`)
-                .single();
+                .or(`phone.eq.${searchTerm},id_number.eq.${searchTerm},member_number.ilike.%${searchTerm}%,full_name.ilike.%${searchTerm}%`)
+                .maybeSingle();
 
-            if (error && error.code !== 'PGRST116') { // PGRST116 is "No rows found"
-                throw error;
-            }
+            if (error) throw error;
 
             if (data) {
                 setMember(data);
-                // If member has biometric data, enable verification
                 if (data.biometric_data) {
-                    setBiometricsVerified(false); // Reset for new verification
+                    setBiometricsVerified(false);
                 } else {
-                    setBiometricsVerified(true); // No biometric data to verify, proceed
+                    setBiometricsVerified(true);
                     toast({ title: "No Biometric Data", description: "Member has no registered biometric data. Proceeding without biometric verification.", variant: "default" });
                 }
             } else {
-                toast({ title: "Member not found", description: "No member found with that Phone or ID.", variant: "destructive" });
+                toast({ title: "Member not found", description: "No member found with that Phone, ID, Name, or Member Number.", variant: "destructive" });
             }
         } catch (error: any) {
             toast({ title: "Search failed", description: error.message, variant: "destructive" });
@@ -108,18 +105,18 @@ export default function RegisterVisit() {
                 member_id: member.id,
                 branch_id: receptionistBranchId,
                 receptionist_id: receptionistId,
-                status: 'registered', // Initial status
+                status: 'registered',
                 biometrics_verified: biometricsVerified,
-                benefit_deducted: 0, // Initial values
+                benefit_deducted: 0,
                 branch_compensation: 0,
                 profit_loss: 0,
-                service_id: '00000000-0000-0000-0000-000000000000' // Placeholder, will be updated by doctor
+                service_id: '00000000-0000-0000-0000-000000000000'
             });
 
             if (error) throw error;
 
             toast({ title: "Visit Registered", description: "Member is now in the queue for the doctor." });
-            navigate("/reception"); // Back to dashboard
+            navigate("/reception");
         } catch (error: any) {
             toast({ title: "Registration failed", description: error.message, variant: "destructive" });
         } finally {
@@ -141,12 +138,12 @@ export default function RegisterVisit() {
             <Card>
                 <CardHeader>
                     <CardTitle>Member Search</CardTitle>
-                    <CardDescription>Enter Phone Number or National ID to find the member.</CardDescription>
+                    <CardDescription>Enter Name, Phone, ID, or Member Number to find the member.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleSearch} className="flex gap-4">
                         <Input
-                            placeholder="Phone or ID Number"
+                            placeholder="Name, Phone, ID, or Member #"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />

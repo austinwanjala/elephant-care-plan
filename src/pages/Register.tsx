@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 interface Dependant {
   fullName: string;
   dob: string;
-  idNumber: string; // Birth Cert or Student ID
+  idNumber: string;
   relationship: string;
 }
 
@@ -52,7 +52,6 @@ const Register = () => {
 
       if (error) {
         console.error("Error fetching marketers:", error);
-        toast({ title: "Error loading marketers", description: error.message, variant: "destructive" });
       } else {
         setAvailableMarketers(data || []);
         const refCode = searchParams.get("ref");
@@ -67,7 +66,7 @@ const Register = () => {
     };
 
     fetchMarketers();
-  }, [searchParams, toast]);
+  }, [searchParams]);
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -108,7 +107,6 @@ const Register = () => {
     setLoading(true);
 
     try {
-      // 1. Create auth user
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -119,17 +117,12 @@ const Register = () => {
 
       const userId = authData.user.id;
 
-      // 2. Explicitly insert the role into user_roles table
       const { error: roleInsertError } = await supabase
         .from("user_roles")
         .insert({ user_id: userId, role: 'member' });
 
-      if (roleInsertError) {
-        await supabase.auth.admin.deleteUser(userId);
-        throw new Error(`Failed to assign role: ${roleInsertError.message}. User account rolled back.`);
-      }
+      if (roleInsertError) throw roleInsertError;
 
-      // 3. Create the member profile
       const { data: memberData, error: memberProfileError } = await supabase
         .from("members")
         .insert({
@@ -139,27 +132,22 @@ const Register = () => {
           id_number: formData.idNumber,
           age: parseInt(formData.age),
           email: formData.email,
-          member_number: `ED${Math.floor(100000 + Math.random() * 900000)}`, // Generate a simple member number
-          is_active: false, // Member is inactive until scheme selection and payment
+          member_number: `ED${Math.floor(100000 + Math.random() * 900000)}`,
+          is_active: false,
           coverage_balance: 0,
           total_contributions: 0,
           benefit_limit: 0,
-          marketer_id: selectedMarketerId, // Use the selected marketer ID
+          marketer_id: selectedMarketerId,
         })
         .select('id')
         .single();
 
-      if (memberProfileError) {
-        await supabase.auth.admin.deleteUser(userId);
-        await supabase.from("user_roles").delete().eq("user_id", userId);
-        throw new Error(`Failed to create member profile: ${memberProfileError.message}. Account rolled back.`);
-      }
+      if (memberProfileError) throw memberProfileError;
 
-      // 4. Add Dependants if any
       if (dependants.length > 0 && memberData) {
         const dependantsToInsert = dependants.map(d => ({
           member_id: memberData.id,
-          full_name: d.fullName,
+          name: d.fullName, // Changed from full_name to name
           dob: d.dob,
           identification_number: d.idNumber,
           relationship: d.relationship || 'Dependant'

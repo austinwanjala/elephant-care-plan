@@ -107,9 +107,20 @@ const Register = () => {
     setLoading(true);
 
     try {
+      // Pass metadata to signUp so triggers can use it
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
+        options: {
+          data: {
+            full_name: formData.fullName,
+            phone: formData.phone,
+            id_number: formData.idNumber,
+            age: parseInt(formData.age),
+            marketer_id: selectedMarketerId,
+            role: 'member'
+          }
+        }
       });
 
       if (authError) throw authError;
@@ -117,15 +128,17 @@ const Register = () => {
 
       const userId = authData.user.id;
 
+      // Ensure role is set
       const { error: roleInsertError } = await supabase
         .from("user_roles")
-        .insert({ user_id: userId, role: 'member' });
+        .upsert({ user_id: userId, role: 'member' });
 
       if (roleInsertError) throw roleInsertError;
 
+      // Upsert member profile to ensure all fields are set correctly
       const { data: memberData, error: memberProfileError } = await supabase
         .from("members")
-        .insert({
+        .upsert({
           user_id: userId,
           full_name: formData.fullName,
           phone: formData.phone,
@@ -138,7 +151,7 @@ const Register = () => {
           total_contributions: 0,
           benefit_limit: 0,
           marketer_id: selectedMarketerId,
-        })
+        }, { onConflict: 'user_id' })
         .select('id')
         .single();
 
@@ -148,8 +161,8 @@ const Register = () => {
         const dependantsToInsert = dependants.map(d => ({
           member_id: memberData.id,
           name: d.fullName,
-          date_of_birth: d.dob, // Changed from dob to date_of_birth
-          identification_number: d.idNumber,
+          date_of_birth: d.dob,
+          id_number: d.idNumber, // Changed from identification_number to id_number
           relationship: d.relationship || 'Dependant'
         }));
 

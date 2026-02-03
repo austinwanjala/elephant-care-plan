@@ -61,9 +61,9 @@ interface Payment {
 
 interface Dependant {
   id: string;
-  name: string; // Changed from full_name to name
+  name: string;
   relationship: string;
-  identification_number: string;
+  id_number: string; // Changed from identification_number to id_number
 }
 
 const MemberDashboard = () => {
@@ -121,7 +121,15 @@ const MemberDashboard = () => {
     const { data: memberData } = await supabase.from("members").select("id").eq("user_id", userId).single();
     if (memberData) {
       const { data } = await supabase.from("dependants").select("*").eq("member_id", memberData.id);
-      if (data) setDependants(data);
+      if (data) {
+        const mapped = (data || []).map((d: any) => ({
+          id: d.id,
+          name: d.name,
+          relationship: d.relationship,
+          id_number: d.id_number
+        }));
+        setDependants(mapped);
+      }
     }
   }
 
@@ -330,7 +338,7 @@ const MemberDashboard = () => {
                           <p className="font-medium">{dep.name}</p>
                           <p className="text-xs text-muted-foreground">{dep.relationship}</p>
                         </div>
-                        <Badge variant="outline">{dep.identification_number}</Badge>
+                        <Badge variant="outline">{dep.id_number}</Badge>
                       </div>
                     ))
                   )}

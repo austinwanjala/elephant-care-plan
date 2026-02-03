@@ -12,8 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 interface Dependant {
   id: string;
   name: string;
-  date_of_birth: string; // Changed from dob to date_of_birth
-  identification_number: string;
+  date_of_birth: string;
+  id_number: string; // Changed from identification_number to id_number
   relationship: string;
 }
 
@@ -75,7 +75,15 @@ const MemberDependants = () => {
           variant: "destructive",
         });
       } else {
-        setDependants(dependantsData || []);
+        // Map database columns to interface
+        const mappedData = (dependantsData || []).map((d: any) => ({
+          id: d.id,
+          name: d.name,
+          date_of_birth: d.date_of_birth,
+          id_number: d.id_number,
+          relationship: d.relationship
+        }));
+        setDependants(mappedData);
       }
     } else {
       toast({
@@ -101,8 +109,8 @@ const MemberDependants = () => {
       const { error } = await supabase.from("dependants").insert({
         member_id: memberId,
         name: newDependant.fullName,
-        date_of_birth: newDependant.dob, // Changed from dob to date_of_birth
-        identification_number: newDependant.idNumber,
+        date_of_birth: newDependant.dob,
+        id_number: newDependant.idNumber, // Changed from identification_number to id_number
         relationship: newDependant.relationship,
       });
 
@@ -245,7 +253,7 @@ const MemberDependants = () => {
                       <CalendarDays className="h-4 w-4" /> {dep.date_of_birth}
                     </div>
                     <div className="text-sm text-muted-foreground flex items-center gap-1">
-                      <CreditCard className="h-4 w-4" /> {dep.identification_number}
+                      <CreditCard className="h-4 w-4" /> {dep.id_number}
                     </div>
                     <Button variant="ghost" size="icon" onClick={() => handleDeleteDependant(dep.id)}>
                       <Trash className="h-4 w-4 text-destructive" />

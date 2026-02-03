@@ -61,7 +61,7 @@ interface Payment {
 
 interface Dependant {
   id: string;
-  name: string;
+  full_name: string;
   relationship: string;
   identification_number: string;
 }
@@ -327,7 +327,7 @@ const MemberDashboard = () => {
                     dependants.map((dep, idx) => (
                       <div key={idx} className="flex justify-between items-center border-b pb-2 last:border-0 last:pb-0">
                         <div>
-                          <p className="font-medium">{dep.name}</p>
+                          <p className="font-medium">{dep.full_name}</p>
                           <p className="text-xs text-muted-foreground">{dep.relationship}</p>
                         </div>
                         <Badge variant="outline">{dep.identification_number}</Badge>

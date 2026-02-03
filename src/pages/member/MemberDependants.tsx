@@ -11,8 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 
 interface Dependant {
   id: string;
-  name: string;
-  date_of_birth: string;
+  full_name: string;
+  dob: string;
   identification_number: string;
   relationship: string;
 }
@@ -66,7 +66,7 @@ const MemberDependants = () => {
         .from("dependants")
         .select("*")
         .eq("member_id", memberData.id)
-        .order("name", { ascending: true });
+        .order("full_name", { ascending: true });
 
       if (dependantsError) {
         toast({
@@ -100,8 +100,8 @@ const MemberDependants = () => {
     try {
       const { error } = await supabase.from("dependants").insert({
         member_id: memberId,
-        name: newDependant.fullName,
-        date_of_birth: newDependant.dob,
+        full_name: newDependant.fullName,
+        dob: newDependant.dob,
         identification_number: newDependant.idNumber,
         relationship: newDependant.relationship,
       });
@@ -233,16 +233,16 @@ const MemberDependants = () => {
                 <Card key={dep.id} className="flex items-center justify-between p-4">
                   <div className="flex items-center gap-4">
                     <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                      {dep.name.charAt(0)}
+                      {dep.full_name.charAt(0)}
                     </div>
                     <div>
-                      <p className="font-semibold">{dep.name}</p>
+                      <p className="font-semibold">{dep.full_name}</p>
                       <p className="text-sm text-muted-foreground">{dep.relationship}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-sm text-muted-foreground flex items-center gap-1">
-                      <CalendarDays className="h-4 w-4" /> {dep.date_of_birth}
+                      <CalendarDays className="h-4 w-4" /> {dep.dob}
                     </div>
                     <div className="text-sm text-muted-foreground flex items-center gap-1">
                       <CreditCard className="h-4 w-4" /> {dep.identification_number}

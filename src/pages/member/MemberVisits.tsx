@@ -6,11 +6,11 @@ import { format } from "date-fns";
 
 interface Visit {
   id: string;
-  benefit_deducted: number;
   created_at: string;
   notes: string | null;
   services: { name: string } | null;
   branches: { name: string } | null;
+  bills: { total_benefit_cost: number }[] | null;
 }
 
 export default function MemberVisits() {
@@ -38,11 +38,11 @@ export default function MemberVisits() {
 
     const { data } = await supabase
       .from("visits")
-      .select("id, benefit_deducted, created_at, notes, services(name), branches(name)")
+      .select("id, created_at, notes, services(name), branches(name), bills(total_benefit_cost)")
       .eq("member_id", member.id)
       .order("created_at", { ascending: false });
 
-    setVisits(data || []);
+    setVisits(data as any || []);
     setLoading(false);
   };
 
@@ -80,7 +80,7 @@ export default function MemberVisits() {
                     {visit.notes && <p className="text-xs text-muted-foreground">{visit.notes}</p>}
                   </div>
                   <div className="text-right">
-                    <p className="font-semibold text-destructive">-KES {visit.benefit_deducted.toLocaleString()}</p>
+                    <p className="font-semibold text-destructive">-KES {visit.bills?.[0]?.total_benefit_cost?.toLocaleString() || 0}</p>
                     <p className="text-xs text-muted-foreground">
                       {format(new Date(visit.created_at), "MMM d, yyyy")}
                     </p>

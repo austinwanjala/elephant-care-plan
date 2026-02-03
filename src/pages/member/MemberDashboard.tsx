@@ -11,7 +11,7 @@ import {
   FileText,
   AlertCircle,
   DollarSign,
-  Users, // Added for dependants
+  Users,
 } from "lucide-react";
 import {
   Table,
@@ -43,11 +43,11 @@ interface Member {
 
 interface Visit {
   id: string;
-  benefit_deducted: number;
   created_at: string;
   notes: string | null;
   services: { name: string } | null;
   branches: { name: string } | null;
+  bills: { total_benefit_cost: number }[] | null;
 }
 
 interface Payment {
@@ -135,7 +135,7 @@ const MemberDashboard = () => {
     if (memberData) {
       const { data, error } = await supabase
         .from("visits")
-        .select("*, services(name), branches(name)")
+        .select("*, services(name), branches(name), bills(total_benefit_cost)")
         .eq("member_id", memberData.id)
         .order("created_at", { ascending: false });
 
@@ -380,7 +380,7 @@ const MemberDashboard = () => {
                             <TableCell>{visit.services?.name || "N/A"}</TableCell>
                             <TableCell>{visit.branches?.name || "N/A"}</TableCell>
                             <TableCell className="text-destructive">
-                              -KES {visit.benefit_deducted?.toLocaleString()}
+                              -KES {visit.bills?.[0]?.total_benefit_cost?.toLocaleString() || 0}
                             </TableCell>
                           </TableRow>
                         ))

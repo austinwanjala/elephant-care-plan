@@ -63,7 +63,7 @@ interface Dependant {
   id: string;
   full_name: string;
   relationship: string;
-  identification_number: string;
+  id_number: string;
 }
 
 const MemberDashboard = () => {
@@ -330,7 +330,7 @@ const MemberDashboard = () => {
                           <p className="font-medium">{dep.full_name}</p>
                           <p className="text-xs text-muted-foreground">{dep.relationship}</p>
                         </div>
-                        <Badge variant="outline">{dep.identification_number}</Badge>
+                        <Badge variant="outline">{dep.id_number}</Badge>
                       </div>
                     ))
                   )}

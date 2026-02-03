@@ -159,7 +159,7 @@ const Register = () => {
           member_id: memberData.id,
           full_name: d.fullName,
           dob: d.dob,
-          identification_number: d.idNumber,
+          id_number: d.idNumber,
           relationship: d.relationship || 'Dependant'
         }));
 

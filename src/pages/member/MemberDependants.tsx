@@ -13,7 +13,7 @@ interface Dependant {
   id: string;
   full_name: string;
   dob: string;
-  identification_number: string;
+  id_number: string;
   relationship: string;
 }
 
@@ -102,7 +102,7 @@ const MemberDependants = () => {
         member_id: memberId,
         full_name: newDependant.fullName,
         dob: newDependant.dob,
-        identification_number: newDependant.idNumber,
+        id_number: newDependant.idNumber,
         relationship: newDependant.relationship,
       });
 
@@ -245,7 +245,7 @@ const MemberDependants = () => {
                       <CalendarDays className="h-4 w-4" /> {dep.dob}
                     </div>
                     <div className="text-sm text-muted-foreground flex items-center gap-1">
-                      <CreditCard className="h-4 w-4" /> {dep.identification_number}
+                      <CreditCard className="h-4 w-4" /> {dep.id_number}
                     </div>
                     <Button variant="ghost" size="icon" onClick={() => handleDeleteDependant(dep.id)}>
                       <Trash className="h-4 w-4 text-destructive" />

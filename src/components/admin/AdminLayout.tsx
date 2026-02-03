@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 
 interface AdminLayoutProps {
-  children: ReactNode;
+  children?: ReactNode; // Made optional as Outlet will be used for nested routes
 }
 
 export function AdminLayout({ children }: AdminLayoutProps) {
@@ -82,7 +82,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             <SidebarTrigger className="mr-4" />
           </header>
           <main className="p-6">
-            {children}
+            {children || <Outlet />} {/* Render children or nested routes */}
           </main>
         </SidebarInset>
       </div>

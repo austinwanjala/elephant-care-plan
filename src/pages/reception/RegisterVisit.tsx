@@ -57,17 +57,17 @@ export default function RegisterVisit() {
         setBiometricsVerified(false);
 
         try {
-            // Search by Phone, ID, Member Number (exact) or Name (partial)
-            // Removed double quotes around values which were causing literal match failures
+            // Use ilike with wildcards and double quotes for all fields to handle spaces and partial matches
+            // This is the most robust way to search across multiple text columns in Supabase/Postgrest
             const { data, error } = await supabase
                 .from("members")
                 .select("*, membership_categories(name)")
-                .or(`phone.eq.${term},id_number.eq.${term},member_number.eq.${term},full_name.ilike.%${term}%`)
+                .or(`phone.ilike."%${term}%",id_number.ilike."%${term}%",member_number.ilike."%${term}%",full_name.ilike."%${term}%"`)
                 .maybeSingle();
 
             if (error) {
                 if (error.code === 'PGRST116') {
-                    throw new Error("Multiple members found. Please enter a unique ID or Phone number.");
+                    throw new Error("Multiple members found. Please enter a more specific ID, Phone, or Member Number.");
                 }
                 throw error;
             }
@@ -81,7 +81,7 @@ export default function RegisterVisit() {
                     toast({ title: "No Biometric Data", description: "Member has no registered biometric data. Proceeding without biometric verification.", variant: "default" });
                 }
             } else {
-                toast({ title: "Member not found", description: "No member found with that Phone, ID, or Member Number.", variant: "destructive" });
+                toast({ title: "Member not found", description: "No member found matching that criteria.", variant: "destructive" });
             }
         } catch (error: any) {
             toast({ title: "Search failed", description: error.message, variant: "destructive" });

@@ -14,11 +14,12 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminMembers from "./pages/admin/AdminMembers";
 import AdminBranches from "./pages/admin/AdminBranches";
 import AdminStaff from "./pages/admin/AdminStaff";
-import AdminClaims from "./pages/admin/AdminClaims";
+// import AdminClaims from "./pages/admin/AdminClaims"; // Removed
 import AdminServices from "./pages/admin/AdminServices";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminVisits from "./pages/admin/AdminVisits";
 import AdminBranchPayments from "./pages/admin/AdminBranchPayments";
+import AdminMembershipCategories from "./pages/admin/AdminMembershipCategories"; // New Admin page
 
 // Reception pages
 import { ReceptionLayout } from "./components/reception/ReceptionLayout";
@@ -49,7 +50,7 @@ import MarketerLinks from "./pages/marketer/Links"; // New Marketer page
 
 // Member pages
 import { MemberLayout } from "./components/member/MemberLayout";
-import MemberDashboard from "./pages/member/Dashboard"; // Renamed from Dashboard to MemberDashboard
+import MemberDashboard from "./pages/member/MemberDashboard"; // Renamed from Dashboard to MemberDashboard
 import MemberPayments from "./pages/member/MemberPayments";
 import MemberVisits from "./pages/member/MemberVisits";
 import MemberProfile from "./pages/member/MemberProfile";
@@ -121,6 +122,7 @@ const App = () => (
             <Route path="services" element={<AdminServices />} />
             <Route path="branch-payments" element={<AdminBranchPayments />} />
             <Route path="settings" element={<AdminSettings />} />
+            <Route path="membership-categories" element={<AdminMembershipCategories />} /> {/* New route */}
           </Route>
 
           <Route path="*" element={<NotFound />} />

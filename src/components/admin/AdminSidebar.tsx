@@ -36,7 +36,11 @@ const menuItems = [
   { title: "Visits", url: "/admin/visits", icon: History },
   { title: "Services", url: "/admin/services", icon: Stethoscope },
   { title: "Branch Payments", url: "/admin/branch-payments", icon: DollarSign },
-  { title: "Settings", url: "/admin/settings", icon: Settings },
+];
+
+const settingsMenuItems = [
+  { title: "General Settings", url: "/admin/settings", icon: Settings },
+  { title: "Membership Categories", url: "/admin/membership-categories", icon: Users },
 ];
 
 export function AdminSidebar() {
@@ -78,6 +82,33 @@ export function AdminSidebar() {
           <SidebarGroupLabel>Management</SidebarGroupLabel>
           <SidebarMenu>
             {menuItems.map((item) => (
+              <SidebarMenuItem key={item.title}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive(item.url)}
+                  tooltip={item.title}
+                >
+                  <a
+                    href={item.url}
+                    onClick={(e) => {
+                        e.preventDefault();
+                        navigate(item.url);
+                    }}
+                    className="flex items-center gap-3"
+                  >
+                    <item.icon className="h-5 w-5" />
+                    <span>{item.title}</span>
+                  </a>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Configuration</SidebarGroupLabel>
+          <SidebarMenu>
+            {settingsMenuItems.map((item) => (
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton
                   asChild

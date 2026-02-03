@@ -55,10 +55,11 @@ export default function RegisterVisit() {
         setBiometricsVerified(false);
 
         try {
+            // Improved search query to be more flexible with partial matches for name and member number
             const { data, error } = await supabase
                 .from("members")
                 .select("*, membership_categories(name)")
-                .or(`phone.eq.${searchTerm},id_number.eq.${searchTerm},member_number.ilike.%${searchTerm}%,full_name.ilike.%${searchTerm}%`)
+                .or(`phone.ilike.%${searchTerm}%,id_number.ilike.%${searchTerm}%,member_number.ilike.%${searchTerm}%,full_name.ilike.%${searchTerm}%`)
                 .maybeSingle();
 
             if (error) throw error;

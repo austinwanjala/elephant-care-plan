@@ -11,8 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 
 interface Dependant {
   id: string;
-  name: string; // Changed from full_name to name
-  dob: string;
+  name: string;
+  date_of_birth: string; // Changed from dob to date_of_birth
   identification_number: string;
   relationship: string;
 }
@@ -66,7 +66,7 @@ const MemberDependants = () => {
         .from("dependants")
         .select("*")
         .eq("member_id", memberData.id)
-        .order("name", { ascending: true }); // Changed from full_name to name
+        .order("name", { ascending: true });
 
       if (dependantsError) {
         toast({
@@ -100,8 +100,8 @@ const MemberDependants = () => {
     try {
       const { error } = await supabase.from("dependants").insert({
         member_id: memberId,
-        name: newDependant.fullName, // Changed from full_name to name
-        dob: newDependant.dob,
+        name: newDependant.fullName,
+        date_of_birth: newDependant.dob, // Changed from dob to date_of_birth
         identification_number: newDependant.idNumber,
         relationship: newDependant.relationship,
       });
@@ -242,7 +242,7 @@ const MemberDependants = () => {
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-sm text-muted-foreground flex items-center gap-1">
-                      <CalendarDays className="h-4 w-4" /> {dep.dob}
+                      <CalendarDays className="h-4 w-4" /> {dep.date_of_birth}
                     </div>
                     <div className="text-sm text-muted-foreground flex items-center gap-1">
                       <CreditCard className="h-4 w-4" /> {dep.identification_number}

@@ -147,8 +147,8 @@ const Register = () => {
       if (dependants.length > 0 && memberData) {
         const dependantsToInsert = dependants.map(d => ({
           member_id: memberData.id,
-          name: d.fullName, // Changed from full_name to name
-          dob: d.dob,
+          name: d.fullName,
+          date_of_birth: d.dob, // Changed from dob to date_of_birth
           identification_number: d.idNumber,
           relationship: d.relationship || 'Dependant'
         }));

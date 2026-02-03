@@ -118,28 +118,29 @@ const MemberSchemeSelection = () => {
 
     try {
       const principalAmount = selectedCategory.payment_amount;
-      // Use benefit_amount from category as the source of truth for coverage
       const benefitToAdd = selectedCategory.benefit_amount; 
       const totalPayment = principalAmount + selectedCategory.registration_fee + selectedCategory.management_fee;
 
       const qrCodeValue = `MEMBER-${member.member_number}`;
 
-      // 1. Update member's coverage, contributions, activate, and set category
+      // 1. Update member's activation status and category info
+      // We remove manual updates to coverage_balance and total_contributions 
+      // as these are handled by database triggers on the payments table.
       const { error: updateError } = await supabase
         .from("members")
         .update({
-          coverage_balance: (member.coverage_balance || 0) + benefitToAdd,
-          total_contributions: (member.total_contributions || 0) + principalAmount,
           is_active: true,
           qr_code_data: qrCodeValue,
           membership_category_id: selectedCategory.id,
-          benefit_limit: (member.benefit_limit || 0) + benefitToAdd,
+          benefit_limit: benefitToAdd, // Set the initial benefit limit
         })
         .eq("id", member.id);
 
       if (updateError) throw updateError;
 
       // 2. Record the payment
+      // The database trigger will automatically update members.coverage_balance 
+      // and members.total_contributions based on this record.
       const { error: paymentError } = await supabase.from("payments").insert({
         member_id: member.id,
         amount: totalPayment,
@@ -153,7 +154,7 @@ const MemberSchemeSelection = () => {
 
       toast({
         title: "Payment Successful!",
-        description: `KES ${totalPayment.toLocaleString()} received. KES ${benefitToAdd.toLocaleString()} added to your coverage.`,
+        description: `KES ${totalPayment.toLocaleString()} received. Your coverage has been activated.`,
       });
 
       navigate("/dashboard");

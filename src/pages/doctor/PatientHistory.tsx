@@ -31,10 +31,13 @@ export default function DoctorPatientHistory() {
             const { data, error } = await supabase
                 .from("members")
                 .select("*, membership_categories(name), branches(name)")
-                .or(`phone.eq.${searchTerm},id_number.eq.${searchTerm},member_number.eq.${searchTerm}`)
+                .or(`phone.ilike."%${searchTerm}%",id_number.ilike."%${searchTerm}%",member_number.ilike."%${searchTerm}%",full_name.ilike."%${searchTerm}%"`)
                 .maybeSingle();
 
-            if (error && error.code !== 'PGRST116') {
+            if (error) {
+                if (error.code === 'PGRST116') {
+                    throw new Error("Multiple members found. Please be more specific.");
+                }
                 throw error;
             }
 
@@ -42,7 +45,7 @@ export default function DoctorPatientHistory() {
                 setMember(data);
                 fetchMemberHistory(data.id);
             } else {
-                toast({ title: "Member not found", description: "No member found with that Phone, ID, or Member Number.", variant: "destructive" });
+                toast({ title: "Member not found", description: "No member found matching that criteria.", variant: "destructive" });
             }
         } catch (error: any) {
             toast({ title: "Search failed", description: error.message, variant: "destructive" });

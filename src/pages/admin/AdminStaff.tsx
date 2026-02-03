@@ -90,7 +90,6 @@ export default function AdminStaff() {
       });
 
       // 2. Create the Auth account with metadata
-      // The database trigger 'on_auth_user_created' will handle role and profile creation automatically
       const { data: authData, error: authError } = await authClient.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -114,6 +113,17 @@ export default function AdminStaff() {
 
       const userId = authData.user?.id;
       if (!userId) throw new Error("User creation failed: No ID returned from authentication.");
+
+      // 3. Explicitly insert the role into user_roles table
+      const { error: roleInsertError } = await supabase
+        .from("user_roles")
+        .insert({ user_id: userId, role: formData.role as any }); // Cast to match enum type
+
+      if (roleInsertError) {
+        // If role insertion fails, consider deleting the auth user to prevent orphaned accounts
+        await supabase.auth.admin.deleteUser(userId);
+        throw new Error(`Failed to assign role: ${roleInsertError.message}. User account rolled back.`);
+      }
 
       toast({
         title: "Account Created Successfully",

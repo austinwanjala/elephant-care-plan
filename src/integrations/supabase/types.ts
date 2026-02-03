@@ -14,6 +14,186 @@ export type Database = {
   }
   public: {
     Tables: {
+      bill_items: {
+        Row: {
+          benefit_cost: number
+          bill_id: string
+          branch_compensation: number
+          created_at: string | null
+          id: string
+          notes: string | null
+          profit_loss: number
+          real_cost: number
+          service_id: string
+          tooth_number: string | null
+        }
+        Insert: {
+          benefit_cost: number
+          bill_id: string
+          branch_compensation: number
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          profit_loss: number
+          real_cost: number
+          service_id: string
+          tooth_number?: string | null
+        }
+        Update: {
+          benefit_cost?: number
+          bill_id?: string
+          branch_compensation?: number
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          profit_loss?: number
+          real_cost?: number
+          service_id?: string
+          tooth_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bill_items_bill_id_fkey"
+            columns: ["bill_id"]
+            isOneToOne: false
+            referencedRelation: "bills"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_items_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bills: {
+        Row: {
+          branch_id: string
+          created_at: string | null
+          diagnosis: string | null
+          doctor_id: string | null
+          finalized_at: string | null
+          finalized_by: string | null
+          id: string
+          member_id: string
+          status: string
+          submitted_at: string | null
+          total_benefit_cost: number
+          total_branch_compensation: number
+          total_profit_loss: number
+          total_real_cost: number
+          treatment_notes: string | null
+          updated_at: string | null
+          visit_id: string
+        }
+        Insert: {
+          branch_id: string
+          created_at?: string | null
+          diagnosis?: string | null
+          doctor_id?: string | null
+          finalized_at?: string | null
+          finalized_by?: string | null
+          id?: string
+          member_id: string
+          status?: string
+          submitted_at?: string | null
+          total_benefit_cost?: number
+          total_branch_compensation?: number
+          total_profit_loss?: number
+          total_real_cost?: number
+          treatment_notes?: string | null
+          updated_at?: string | null
+          visit_id: string
+        }
+        Update: {
+          branch_id?: string
+          created_at?: string | null
+          diagnosis?: string | null
+          doctor_id?: string | null
+          finalized_at?: string | null
+          finalized_by?: string | null
+          id?: string
+          member_id?: string
+          status?: string
+          submitted_at?: string | null
+          total_benefit_cost?: number
+          total_branch_compensation?: number
+          total_profit_loss?: number
+          total_real_cost?: number
+          treatment_notes?: string | null
+          updated_at?: string | null
+          visit_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bills_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_visit_id_fkey"
+            columns: ["visit_id"]
+            isOneToOne: false
+            referencedRelation: "member_visits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      branch_directors: {
+        Row: {
+          branch_id: string | null
+          created_at: string | null
+          email: string
+          full_name: string
+          id: string
+          is_active: boolean | null
+          phone: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          branch_id?: string | null
+          created_at?: string | null
+          email: string
+          full_name: string
+          id?: string
+          is_active?: boolean | null
+          phone?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          branch_id?: string | null
+          created_at?: string | null
+          email?: string
+          full_name?: string
+          id?: string
+          is_active?: boolean | null
+          phone?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "branch_directors_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       branch_payments: {
         Row: {
           amount_paid: number
@@ -202,18 +382,354 @@ export type Database = {
           },
         ]
       }
+      dental_chart_records: {
+        Row: {
+          bill_id: string | null
+          created_at: string | null
+          dependant_id: string | null
+          id: string
+          member_id: string
+          notes: string | null
+          service_id: string
+          tooth_number: string
+          treated_at: string | null
+          treated_by: string | null
+        }
+        Insert: {
+          bill_id?: string | null
+          created_at?: string | null
+          dependant_id?: string | null
+          id?: string
+          member_id: string
+          notes?: string | null
+          service_id: string
+          tooth_number: string
+          treated_at?: string | null
+          treated_by?: string | null
+        }
+        Update: {
+          bill_id?: string | null
+          created_at?: string | null
+          dependant_id?: string | null
+          id?: string
+          member_id?: string
+          notes?: string | null
+          service_id?: string
+          tooth_number?: string
+          treated_at?: string | null
+          treated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dental_chart_records_bill_id_fkey"
+            columns: ["bill_id"]
+            isOneToOne: false
+            referencedRelation: "bills"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dental_chart_records_dependant_id_fkey"
+            columns: ["dependant_id"]
+            isOneToOne: false
+            referencedRelation: "dependants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dental_chart_records_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dental_chart_records_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dependants: {
+        Row: {
+          created_at: string | null
+          date_of_birth: string
+          document_number: string
+          document_type: string
+          id: string
+          is_active: boolean | null
+          member_id: string
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          date_of_birth: string
+          document_number: string
+          document_type: string
+          id?: string
+          is_active?: boolean | null
+          member_id: string
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          date_of_birth?: string
+          document_number?: string
+          document_type?: string
+          id?: string
+          is_active?: boolean | null
+          member_id?: string
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dependants_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      doctors: {
+        Row: {
+          branch_id: string | null
+          created_at: string | null
+          email: string
+          full_name: string
+          id: string
+          is_active: boolean | null
+          phone: string | null
+          specialization: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          branch_id?: string | null
+          created_at?: string | null
+          email: string
+          full_name: string
+          id?: string
+          is_active?: boolean | null
+          phone?: string | null
+          specialization?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          branch_id?: string | null
+          created_at?: string | null
+          email?: string
+          full_name?: string
+          id?: string
+          is_active?: boolean | null
+          phone?: string | null
+          specialization?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "doctors_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketer_earnings: {
+        Row: {
+          amount: number
+          created_at: string | null
+          id: string
+          marketer_id: string
+          member_id: string
+          paid_at: string | null
+          payment_id: string | null
+          status: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          id?: string
+          marketer_id: string
+          member_id: string
+          paid_at?: string | null
+          payment_id?: string | null
+          status?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          id?: string
+          marketer_id?: string
+          member_id?: string
+          paid_at?: string | null
+          payment_id?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketer_earnings_marketer_id_fkey"
+            columns: ["marketer_id"]
+            isOneToOne: false
+            referencedRelation: "marketers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketer_earnings_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketer_earnings_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketers: {
+        Row: {
+          commission_type: string
+          commission_value: number
+          created_at: string | null
+          email: string
+          full_name: string
+          id: string
+          is_active: boolean | null
+          marketer_code: string
+          phone: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          commission_type?: string
+          commission_value?: number
+          created_at?: string | null
+          email: string
+          full_name: string
+          id?: string
+          is_active?: boolean | null
+          marketer_code?: string
+          phone?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          commission_type?: string
+          commission_value?: number
+          created_at?: string | null
+          email?: string
+          full_name?: string
+          id?: string
+          is_active?: boolean | null
+          marketer_code?: string
+          phone?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      member_visits: {
+        Row: {
+          biometric_verified: boolean | null
+          biometric_verified_at: string | null
+          branch_id: string
+          check_in_time: string | null
+          check_out_time: string | null
+          created_at: string | null
+          dependant_id: string | null
+          doctor_id: string | null
+          id: string
+          member_id: string
+          notes: string | null
+          receptionist_id: string | null
+          status: string
+          updated_at: string | null
+          visit_date: string
+        }
+        Insert: {
+          biometric_verified?: boolean | null
+          biometric_verified_at?: string | null
+          branch_id: string
+          check_in_time?: string | null
+          check_out_time?: string | null
+          created_at?: string | null
+          dependant_id?: string | null
+          doctor_id?: string | null
+          id?: string
+          member_id: string
+          notes?: string | null
+          receptionist_id?: string | null
+          status?: string
+          updated_at?: string | null
+          visit_date?: string
+        }
+        Update: {
+          biometric_verified?: boolean | null
+          biometric_verified_at?: string | null
+          branch_id?: string
+          check_in_time?: string | null
+          check_out_time?: string | null
+          created_at?: string | null
+          dependant_id?: string | null
+          doctor_id?: string | null
+          id?: string
+          member_id?: string
+          notes?: string | null
+          receptionist_id?: string | null
+          status?: string
+          updated_at?: string | null
+          visit_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_visits_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_visits_dependant_id_fkey"
+            columns: ["dependant_id"]
+            isOneToOne: false
+            referencedRelation: "dependants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_visits_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       members: {
         Row: {
+          age: number | null
           benefit_limit: number | null
           biometric_data: string | null
           branch_id: string | null
           coverage_balance: number | null
           created_at: string
+          data_consent: boolean | null
+          digital_signature: string | null
           email: string
           full_name: string
           id: string
           id_number: string
           is_active: boolean | null
+          marketer_code: string | null
           member_number: string
           membership_category_id: string | null
           next_of_kin_name: string | null
@@ -222,21 +738,26 @@ export type Database = {
           qr_code_data: string | null
           rollover_balance: number | null
           rollover_years: number | null
+          scheme_selected: boolean | null
           total_contributions: number | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          age?: number | null
           benefit_limit?: number | null
           biometric_data?: string | null
           branch_id?: string | null
           coverage_balance?: number | null
           created_at?: string
+          data_consent?: boolean | null
+          digital_signature?: string | null
           email: string
           full_name: string
           id?: string
           id_number: string
           is_active?: boolean | null
+          marketer_code?: string | null
           member_number: string
           membership_category_id?: string | null
           next_of_kin_name?: string | null
@@ -245,21 +766,26 @@ export type Database = {
           qr_code_data?: string | null
           rollover_balance?: number | null
           rollover_years?: number | null
+          scheme_selected?: boolean | null
           total_contributions?: number | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          age?: number | null
           benefit_limit?: number | null
           biometric_data?: string | null
           branch_id?: string | null
           coverage_balance?: number | null
           created_at?: string
+          data_consent?: boolean | null
+          digital_signature?: string | null
           email?: string
           full_name?: string
           id?: string
           id_number?: string
           is_active?: boolean | null
+          marketer_code?: string | null
           member_number?: string
           membership_category_id?: string | null
           next_of_kin_name?: string | null
@@ -268,6 +794,7 @@ export type Database = {
           qr_code_data?: string | null
           rollover_balance?: number | null
           rollover_years?: number | null
+          scheme_selected?: boolean | null
           total_contributions?: number | null
           updated_at?: string
           user_id?: string
@@ -368,6 +895,50 @@ export type Database = {
             columns: ["member_id"]
             isOneToOne: false
             referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      receptionists: {
+        Row: {
+          branch_id: string | null
+          created_at: string | null
+          email: string
+          full_name: string
+          id: string
+          is_active: boolean | null
+          phone: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          branch_id?: string | null
+          created_at?: string | null
+          email: string
+          full_name: string
+          id?: string
+          is_active?: boolean | null
+          phone?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          branch_id?: string | null
+          created_at?: string | null
+          email?: string
+          full_name?: string
+          id?: string
+          is_active?: boolean | null
+          phone?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "receptionists_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
             referencedColumns: ["id"]
           },
         ]

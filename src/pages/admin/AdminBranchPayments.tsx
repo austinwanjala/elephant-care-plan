@@ -85,40 +85,57 @@ export default function AdminBranchPayments() {
 
   const loadData = async (month: number, year: number) => {
     setLoading(true);
-    const [branchesRes, revenueRes, paymentsRes, claimsRes] = await Promise.all([
-      supabase.from("branches").select("id, name, location").eq("is_active", true).order("name"),
-      supabase
-        .from("branch_revenue")
-        .select("branch_id, total_compensation")
-        .gte("date", format(new Date(year, month - 1, 1), "yyyy-MM-dd"))
-        .lt("date", format(new Date(year, month, 1), "yyyy-MM-dd")),
-      supabase
-        .from("branch_payments")
-        .select("*")
-        .eq("period_month", month)
-        .eq("period_year", year)
-        .order("payment_date", { ascending: false }),
-      supabase
-        .from("revenue_claims")
-        .select("*, staff(full_name), branches(name)")
-        .order("created_at", { ascending: false }),
-    ]);
+    try {
+      const [branchesRes, revenueRes, paymentsRes, claimsRes] = await Promise.all([
+        supabase.from("branches").select("id, name, location").eq("is_active", true).order("name"),
+        supabase
+          .from("branch_revenue")
+          .select("branch_id, total_compensation")
+          .gte("date", format(new Date(year, month - 1, 1), "yyyy-MM-dd"))
+          .lt("date", format(new Date(year, month, 1), "yyyy-MM-dd")),
+        supabase
+          .from("branch_payments")
+          .select("*")
+          .eq("period_month", month)
+          .eq("period_year", year)
+          .order("payment_date", { ascending: false }),
+        supabase
+          .from("revenue_claims" as any)
+          .select("*, staff:director_id(full_name), branches:branch_id(name)")
+          .order("created_at", { ascending: false }),
+      ]);
 
-    if (branchesRes.data) setBranches(branchesRes.data);
+      if (branchesRes.error) throw branchesRes.error;
+      if (revenueRes.error) console.error("Revenue error:", revenueRes.error);
+      if (paymentsRes.error) console.error("Payments error:", paymentsRes.error);
+      if (claimsRes.error) throw claimsRes.error;
 
-    if (revenueRes.data) {
-      const summary: Record<string, number> = {};
-      branchesRes.data?.forEach(branch => summary[branch.id] = 0); // Initialize all branches to 0
-      revenueRes.data.forEach((r) => {
-        summary[r.branch_id] = (summary[r.branch_id] || 0) + r.total_compensation;
+      if (branchesRes.data) setBranches(branchesRes.data);
+
+      if (revenueRes.data) {
+        const summary: Record<string, number> = {};
+        branchesRes.data?.forEach(branch => summary[branch.id] = 0);
+        revenueRes.data.forEach((r) => {
+          summary[r.branch_id] = (summary[r.branch_id] || 0) + r.total_compensation;
+        });
+        setRevenueSummaries(summary);
+      }
+
+      if (paymentsRes.data) setPayments(paymentsRes.data);
+
+      console.log("Fetched claims for admin:", claimsRes.data);
+      if (claimsRes.data) setClaims(claimsRes.data);
+
+    } catch (error: any) {
+      console.error("Error loading admin data:", error);
+      toast({
+        title: "Load Error",
+        description: error.message,
+        variant: "destructive"
       });
-      setRevenueSummaries(summary);
+    } finally {
+      setLoading(false);
     }
-
-    if (paymentsRes.data) setPayments(paymentsRes.data);
-    if (claimsRes.data) setClaims(claimsRes.data);
-
-    setLoading(false);
   };
 
   const getOutstandingPayable = (branchId: string) => {

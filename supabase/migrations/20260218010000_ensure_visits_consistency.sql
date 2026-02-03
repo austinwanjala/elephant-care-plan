@@ -177,9 +177,27 @@ BEGIN
             ALTER TABLE public.bills ADD COLUMN is_finalized BOOLEAN DEFAULT FALSE;
         END IF;
 
+        -- Ensure 'receptionist_id' exists
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'bills' AND column_name = 'receptionist_id') THEN
+            ALTER TABLE public.bills ADD COLUMN receptionist_id UUID REFERENCES public.staff(id);
+        END IF;
+
         -- Ensure 'total_benefit_cost' exists
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'bills' AND column_name = 'total_benefit_cost') THEN
             ALTER TABLE public.bills ADD COLUMN total_benefit_cost NUMERIC DEFAULT 0;
+        END IF;
+
+        -- Ensure financial columns exist
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'bills' AND column_name = 'total_branch_compensation') THEN
+            ALTER TABLE public.bills ADD COLUMN total_branch_compensation NUMERIC DEFAULT 0;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'bills' AND column_name = 'total_real_cost') THEN
+            ALTER TABLE public.bills ADD COLUMN total_real_cost NUMERIC DEFAULT 0;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'bills' AND column_name = 'total_profit_loss') THEN
+            ALTER TABLE public.bills ADD COLUMN total_profit_loss NUMERIC DEFAULT 0;
         END IF;
 
         -- Make member_id nullable as it is redundant (linked via visit_id)

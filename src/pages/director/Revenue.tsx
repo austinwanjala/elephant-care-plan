@@ -24,7 +24,8 @@ export default function DirectorRevenue() {
     const [currentYear, setCurrentYear] = useState(getYear(new Date()));
     const [directorBranchId, setDirectorBranchId] = useState<string | null>(null);
     const [staffId, setStaffId] = useState<string | null>(null);
-    const [accumulatedRevenue, setAccumulatedRevenue] = useState(0);
+    const [accumulatedRevenue, setAccumulatedRevenue] = useState(0); // This is the total UNPAID balance (includes pending)
+    const [availableToClaim, setAvailableToClaim] = useState(0); // This is (Total - Paid - Pending)
     const [claims, setClaims] = useState<any[]>([]);
     const [claiming, setClaiming] = useState(false);
     const { toast } = useToast();
@@ -65,26 +66,40 @@ export default function DirectorRevenue() {
     };
 
     const fetchAccumulatedRevenue = async (branchId: string) => {
-        // Calculate accumulated revenue as: (Total Revenue Made from Bills) - (Total Claims Submitted)
-        // This directly tallies total branch compensation made from the services.
+        // DIRECT SUM from visits.branch_compensation
         try {
-            const [billsRes, claimRes] = await Promise.all([
-                (supabase.from("bills" as any))
-                    .select("total_branch_compensation")
-                    .eq("branch_id", branchId),
-                (supabase.from("revenue_claims" as any))
-                    .select("amount")
-                    .eq("branch_id", branchId)
-                    .in("status", ["pending", "paid"])
-            ]);
+            const visitRes = await supabase
+                .from("visits")
+                .select("branch_compensation, status")
+                .eq("branch_id", branchId)
+                .eq("status", "completed");
 
-            if (billsRes.error) throw billsRes.error;
-            if (claimRes.error) throw claimRes.error;
+            if (visitRes.error) throw visitRes.error;
 
-            const totalMade = (billsRes.data as any[] || []).reduce((sum, b) => sum + Number(b.total_branch_compensation), 0);
-            const totalClaimed = (claimRes.data as any[] || []).reduce((sum, c) => sum + Number(c.amount), 0);
+            const totalMade = (visitRes.data as any[] || []).reduce((sum, visit) => {
+                return sum + (Number(visit.branch_compensation) || 0);
+            }, 0);
 
-            setAccumulatedRevenue(Math.max(0, totalMade - totalClaimed));
+            // Fetch claims separately to prevent failure if table doesn't exist yet
+            const { data: claims, error: claimErr } = await (supabase.from("revenue_claims" as any))
+                .select("amount, status")
+                .eq("branch_id", branchId)
+                .in("status", ["pending", "paid"]);
+
+            if (claimErr) {
+                console.warn("Could not fetch revenue_claims (table may be missing):", claimErr);
+                setAccumulatedRevenue(totalMade);
+                setAvailableToClaim(totalMade);
+                return;
+            }
+
+            const totalPaid = (claims || []).filter(c => c.status === 'paid').reduce((sum, c) => sum + Number(c.amount), 0);
+            const totalPending = (claims || []).filter(c => c.status === 'pending').reduce((sum, c) => sum + Number(c.amount), 0);
+
+            console.log(`Accumulated Revenue Debug - Branch: ${branchId}, Total Made: ${totalMade}, Paid: ${totalPaid}, Pending: ${totalPending}`);
+
+            setAccumulatedRevenue(Math.max(0, totalMade - totalPaid));
+            setAvailableToClaim(Math.max(0, totalMade - (totalPaid + totalPending)));
         } catch (error: any) {
             console.error("Error fetching accumulated revenue:", error);
         }
@@ -104,8 +119,8 @@ export default function DirectorRevenue() {
     };
 
     const handleSubmitClaim = async () => {
-        if (accumulatedRevenue <= 0) {
-            toast({ title: "No Revenue", description: "There is no accumulated revenue to claim.", variant: "destructive" });
+        if (availableToClaim <= 0) {
+            toast({ title: "No Available Revenue", description: "All unpaid revenue is already tied to a pending claim.", variant: "destructive" });
             return;
         }
 
@@ -116,7 +131,7 @@ export default function DirectorRevenue() {
                 .insert({
                     branch_id: directorBranchId,
                     director_id: staffId,
-                    amount: accumulatedRevenue,
+                    amount: availableToClaim,
                     status: 'pending'
                 })
                 .select()
@@ -150,24 +165,58 @@ export default function DirectorRevenue() {
 
     const fetchRevenueData = async (branchId: string, month: number, year: number) => {
         setLoading(true);
+        // Calculate the range for the selected month
         const startOfMonthDate = format(new Date(year, month - 1, 1), "yyyy-MM-dd");
-        const endOfMonthDate = format(new Date(year, month, 0), "yyyy-MM-dd"); // Last day of the month
+        const endOfMonthDate = format(new Date(year, month, 0), "yyyy-MM-dd") + "T23:59:59";
 
-        const { data, error } = await supabase
-            .from("branch_revenue")
-            .select("*")
-            .eq("branch_id", branchId)
-            .gte("date", startOfMonthDate)
-            .lte("date", endOfMonthDate)
-            .order("date", { ascending: false });
+        try {
+            const { data, error } = await supabase
+                .from("visits")
+                .select("id, created_at, status, branch_compensation, profit_loss")
+                .eq("branch_id", branchId)
+                .gte("created_at", startOfMonthDate)
+                .lte("created_at", endOfMonthDate)
+                .eq("status", "completed");
 
-        if (error) {
+            if (error) throw error;
+
+            console.log(`Monthly Revenue Data - Count: ${data?.length || 0} for period ${startOfMonthDate} to ${endOfMonthDate}`);
+
+            // Group by date
+            const groupedData: Record<string, BranchRevenueEntry> = {};
+
+            (data || []).forEach(visit => {
+                const dateKey = format(new Date(visit.created_at), "yyyy-MM-dd");
+                const compensation = Number(visit.branch_compensation) || 0;
+                const profitLossValue = Number(visit.profit_loss) || 0;
+
+                if (!groupedData[dateKey]) {
+                    groupedData[dateKey] = {
+                        date: dateKey,
+                        total_compensation: 0,
+                        total_profit_loss: 0,
+                        visit_count: 0
+                    };
+                }
+
+                groupedData[dateKey].total_compensation += compensation;
+                groupedData[dateKey].total_profit_loss += profitLossValue;
+                groupedData[dateKey].visit_count += 1;
+            });
+
+            // Convert to array and sort by date descending
+            const sortedData = Object.values(groupedData).sort((a, b) =>
+                new Date(b.date).getTime() - new Date(a.date).getTime()
+            );
+
+            setRevenueData(sortedData);
+        } catch (error: any) {
+            console.error("Error fetching revenue data:", error);
             toast({ title: "Error fetching revenue data", description: error.message, variant: "destructive" });
             setRevenueData([]);
-        } else {
-            setRevenueData(data || []);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     const getMonthOptions = () => {
@@ -206,9 +255,9 @@ export default function DirectorRevenue() {
                 </div>
             </div>
 
-            <Card className="shadow-sm border-blue-100">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Monthly Summary</CardTitle>
+            <Card className="shadow-lg border-blue-200 overflow-hidden">
+                <CardHeader className="bg-blue-50/50 border-b border-blue-100 flex flex-row items-center justify-between space-y-0 py-4">
+                    <CardTitle className="text-lg font-bold text-blue-900">Financial Summary</CardTitle>
                     <Select
                         value={`${currentYear}-${currentMonth.toString().padStart(2, '0')}`}
                         onValueChange={(value) => {
@@ -217,45 +266,64 @@ export default function DirectorRevenue() {
                             setCurrentMonth(parseInt(monthStr));
                         }}
                     >
-                        <SelectTrigger className="w-[180px]">
+                        <SelectTrigger className="w-[200px] h-10 border-blue-200 shadow-sm bg-white">
                             <SelectValue placeholder="Select month" />
                         </SelectTrigger>
                         <SelectContent>
                             {getMonthOptions().map((date, index) => (
                                 <SelectItem key={index} value={`${getYear(date)}-${(getMonth(date) + 1).toString().padStart(2, '0')}`}>
-                                    {format(date, "MMM yyyy")}
+                                    {format(date, "MMMM yyyy")}
                                 </SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
                 </CardHeader>
-                <CardContent className="grid grid-cols-3 gap-4">
-                    <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="border-2 border-primary/20 bg-primary/5 rounded-xl p-6 text-center shadow-sm">
-                            <DollarSign className="h-8 w-8 text-primary mx-auto mb-2" />
-                            <p className="text-3xl font-bold text-primary">KES {accumulatedRevenue.toLocaleString()}</p>
-                            <p className="text-sm text-muted-foreground font-medium mb-4">Unclaimed Branch Compensation</p>
-                            <Button
-                                className="w-full bg-primary hover:bg-primary/90"
-                                disabled={claiming || accumulatedRevenue <= 0}
-                                onClick={handleSubmitClaim}
-                            >
-                                {claiming ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DollarSign className="mr-2 h-4 w-4" />}
-                                Submit Compensation Claim
-                            </Button>
-                            {accumulatedRevenue === 0 && (
-                                <p className="text-[10px] text-amber-600 mt-3 italic">
-                                    * Note: Only finalized bills from the receptionist portal can be claimed.
-                                    Consultation bills must be approved and finalized to appear here.
-                                </p>
-                            )}
+                <CardContent className="p-0">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-0 divide-x divide-blue-100">
+                        {/* Unpaid Compensation Card */}
+                        <div className="p-10 flex flex-col items-center justify-center bg-white">
+                            <div className="bg-primary/10 p-4 rounded-full mb-4">
+                                <DollarSign className="h-10 w-10 text-primary" />
+                            </div>
+                            <h3 className="text-4xl font-extrabold text-primary mb-1">KES {accumulatedRevenue.toLocaleString()}</h3>
+                            <p className="text-base text-muted-foreground font-semibold mb-6">Unpaid Compensation</p>
+
+                            <div className="w-full max-w-sm">
+                                <Button
+                                    className="w-full h-14 text-lg font-bold shadow-md hover:shadow-lg transition-all"
+                                    disabled={claiming || availableToClaim <= 0}
+                                    onClick={handleSubmitClaim}
+                                >
+                                    {claiming ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CheckCircle2 className="mr-2 h-5 w-5" />}
+                                    {availableToClaim > 0 ? `Submit Claim (KES ${availableToClaim.toLocaleString()})` : 'All Revenue Claimed'}
+                                </Button>
+
+                                {availableToClaim < accumulatedRevenue && accumulatedRevenue > 0 && (
+                                    <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                                        <p className="text-xs text-blue-700 text-center font-medium">
+                                            KES {(accumulatedRevenue - availableToClaim).toLocaleString()} pending approval
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                        <div className="border rounded-xl p-6 text-center bg-blue-50/30">
-                            <CalendarDays className="h-8 w-8 text-blue-600 mx-auto mb-2" />
-                            <p className="text-3xl font-bold text-blue-900">KES {totalMonthlyCompensation.toLocaleString()}</p>
-                            <p className="text-sm text-muted-foreground font-medium">Monthly Branch Compensation ({format(new Date(currentYear, currentMonth - 1), "MMM")})</p>
+
+                        {/* Monthly Summary Card */}
+                        <div className="p-10 flex flex-col items-center justify-center bg-blue-50/20">
+                            <div className="bg-blue-100 p-4 rounded-full mb-4">
+                                <CalendarDays className="h-10 w-10 text-blue-600" />
+                            </div>
+                            <h3 className="text-4xl font-extrabold text-blue-900 mb-1">KES {totalMonthlyCompensation.toLocaleString()}</h3>
+                            <p className="text-base text-muted-foreground font-semibold mb-2 text-center">
+                                Monthly Compensation for {format(new Date(currentYear, currentMonth - 1), "MMMM")}
+                            </p>
+                            <div className="mt-4 flex gap-4">
+                                <Badge variant="secondary" className="px-3 py-1 text-sm bg-blue-100 text-blue-700 border-blue-200">
+                                    {totalMonthlyVisits} Total Visits
+                                </Badge>
+                            </div>
                         </div>
-                    </CardContent>
+                    </div>
                 </CardContent>
             </Card>
 

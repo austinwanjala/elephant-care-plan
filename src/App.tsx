@@ -117,12 +117,12 @@ const App = () => (
             <Route path="members" element={<AdminMembers />} />
             <Route path="branches" element={<AdminBranches />} />
             <Route path="staff" element={<AdminStaff />} />
-            <Route path="claims" element={<AdminClaims />} />
+            {/* <Route path="claims" element={<AdminClaims />} /> Removed as per new requirements */}
             <Route path="visits" element={<AdminVisits />} />
             <Route path="services" element={<AdminServices />} />
             <Route path="branch-payments" element={<AdminBranchPayments />} />
             <Route path="settings" element={<AdminSettings />} />
-            <Route path="membership-categories" element={<AdminMembershipCategories />} /> {/* New route */}
+            <Route path="membership-categories" element={<AdminMembershipCategories />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />

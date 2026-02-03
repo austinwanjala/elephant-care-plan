@@ -11,11 +11,10 @@ interface MemberDetails {
   full_name: string;
   member_number: string;
   membership_categories: { name: string } | null;
-  qr_code_data: string | null;
   is_active: boolean;
   coverage_balance: number;
   benefit_limit: number;
-  id_number: string; // Added ID number
+  id_number: string;
 }
 
 interface InsuranceCardProps {
@@ -28,6 +27,8 @@ export function InsuranceCard({ member }: InsuranceCardProps) {
   const coveragePercentage = member.benefit_limit
     ? (member.coverage_balance / member.benefit_limit) * 100
     : 0;
+
+  const qrCodeData = member.is_active ? `MEMBER-${member.member_number}` : null;
 
   const handleDownloadCard = async () => {
     if (cardRef.current) {
@@ -89,10 +90,10 @@ export function InsuranceCard({ member }: InsuranceCardProps) {
             </Badge>
           )}
 
-          {member.qr_code_data ? (
+          {qrCodeData ? (
             <div className="bg-white rounded-lg p-3 inline-block shadow-md">
               <QRCodeSVG
-                value={member.qr_code_data}
+                value={qrCodeData}
                 size={120}
                 level="H"
                 includeMargin={false}

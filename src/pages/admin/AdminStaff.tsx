@@ -6,62 +6,31 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, Edit, Trash2 } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Plus, MoreHorizontal, Edit, Trash2, UserCog } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { createClient } from "@supabase/supabase-js";
 
-interface Staff {
-  id: string;
-  full_name: string;
-  phone: string | null;
-  email: string;
-  is_active: boolean;
-  branches: { name: string } | null;
-}
-
-interface Branch {
-  id: string;
-  name: string;
-}
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 export default function AdminStaff() {
-  const [staff, setStaff] = useState<Staff[]>([]);
-  const [branches, setBranches] = useState<Branch[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [branches, setBranches] = useState<any[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
     phone: "",
     password: "",
     branchId: "",
+    role: "receptionist",
+    marketerCode: ""
   });
   const { toast } = useToast();
 
@@ -70,118 +39,127 @@ export default function AdminStaff() {
   }, []);
 
   const loadData = async () => {
-    const [staffRes, branchesRes] = await Promise.all([
-      supabase.from("staff").select("*, branches(name)").order("created_at", { ascending: false }),
-      supabase.from("branches").select("id, name").eq("is_active", true),
-    ]);
+    setLoading(true);
+    try {
+      const [staffRes, marketersRes, rolesRes, branchesRes] = await Promise.all([
+        supabase.from("staff").select("*, branches(name)").order("created_at", { ascending: false }),
+        supabase.from("marketers").select("*").order("created_at", { ascending: false }),
+        supabase.from("user_roles").select("user_id, role"),
+        supabase.from("branches").select("id, name").eq("is_active", true),
+      ]);
 
-    if (staffRes.data) setStaff(staffRes.data);
-    if (branchesRes.data) setBranches(branchesRes.data);
+      // Create a role lookup map for efficiency
+      const roleMap: Record<string, string> = {};
+      (rolesRes.data || []).forEach((r: any) => {
+        roleMap[r.user_id] = r.role;
+      });
+
+      const combined = [
+        ...(staffRes.data || []).map((s: any) => ({
+          ...s,
+          displayRole: roleMap[s.user_id] || 'staff',
+          type: 'staff'
+        })),
+        ...(marketersRes.data || []).map((m: any) => ({
+          ...m,
+          displayRole: 'marketer',
+          branches: { name: 'N/A (Marketer)' }, // Marketers don't have a branch
+          type: 'marketer'
+        }))
+      ];
+
+      setUsers(combined);
+      if (branchesRes.data) setBranches(branchesRes.data);
+    } catch (error: any) {
+      toast({ title: "Error loading data", description: error.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleAddStaff = async () => {
+  const handleAddUser = async () => {
     try {
-      // Create auth user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      if (!formData.email || !formData.password || !formData.fullName) {
+        toast({ title: "Validation Error", description: "Email, Password and Full Name are required.", variant: "destructive" });
+        return;
+      }
+
+      // 1. Create a "no-session" client to preserve the Admin's login session
+      const authClient = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+        auth: { persistSession: false }
+      });
+
+      // 2. Create the Auth account with metadata
+      // The database trigger 'on_auth_user_created' will handle role and profile creation automatically
+      const { data: authData, error: authError } = await authClient.auth.signUp({
         email: formData.email,
         password: formData.password,
-        options: { emailRedirectTo: window.location.origin },
+        options: {
+          data: {
+            role: formData.role,
+            full_name: formData.fullName,
+            phone: formData.phone || null,
+            branch_id: formData.branchId || null,
+            marketer_code: formData.marketerCode || null
+          }
+        }
       });
 
-      if (authError) throw authError;
-      if (!authData.user) throw new Error("User creation failed");
+      if (authError) {
+        if (authError.message.toLowerCase().includes("already registered")) {
+          throw new Error("This email is already registered. Please use a different email or manage the existing account.");
+        }
+        throw authError;
+      }
 
-      // Create staff record
-      const { error: staffError } = await supabase.from("staff").insert({
-        user_id: authData.user.id,
-        full_name: formData.fullName,
-        email: formData.email,
-        phone: formData.phone || null,
-        branch_id: formData.branchId || null,
+      const userId = authData.user?.id;
+      if (!userId) throw new Error("User creation failed: No ID returned from authentication.");
+
+      toast({
+        title: "Account Created Successfully",
+        description: `${formData.fullName} has been setup as ${formData.role}.`
       });
 
-      if (staffError) throw staffError;
-
-      // Assign staff role
-      await supabase.from("user_roles").insert({
-        user_id: authData.user.id,
-        role: "staff",
-      });
-
-      toast({ title: "Staff member added successfully" });
       setDialogOpen(false);
-      resetForm();
+      setFormData({ fullName: "", email: "", phone: "", password: "", branchId: "", role: "receptionist", marketerCode: "" });
+
+      // Force refresh to show new user
       loadData();
+
     } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: "Creation failed", description: error.message, variant: "destructive" });
     }
   };
 
-  const handleEditStaff = async () => {
-    if (!selectedStaff) return;
-
+  const handleDelete = async (userId: string, type: string) => {
+    if (!confirm("Are you sure? This will remove the user's access profile.")) return;
     try {
-      const { error } = await supabase
-        .from("staff")
-        .update({
-          full_name: formData.fullName,
-          phone: formData.phone || null,
-          branch_id: formData.branchId || null,
-        })
-        .eq("id", selectedStaff.id);
-
+      // For staff and marketers, we delete their profile which will cascade delete the user_role.
+      // For admin, we might want to just remove the role or deactivate. For simplicity, we'll delete the profile.
+      const table = type === 'marketer' ? 'marketers' : 'staff';
+      const { error } = await supabase.from(table).delete().eq("user_id", userId);
       if (error) throw error;
 
-      toast({ title: "Staff updated successfully" });
-      setEditDialogOpen(false);
+      // Also delete the auth user to fully revoke access
+      const { error: authDeleteError } = await supabase.auth.admin.deleteUser(userId);
+      if (authDeleteError) throw authDeleteError;
+
+      toast({ title: "User account and profile removed successfully" });
       loadData();
     } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: "Error deleting", description: error.message, variant: "destructive" });
     }
   };
 
-  const handleToggleActive = async (staffMember: Staff) => {
+  const handleToggleActive = async (userId: string, type: string, currentStatus: boolean) => {
     try {
-      const { error } = await supabase
-        .from("staff")
-        .update({ is_active: !staffMember.is_active })
-        .eq("id", staffMember.id);
-
+      const table = type === 'marketer' ? 'marketers' : 'staff';
+      const { error } = await supabase.from(table).update({ is_active: !currentStatus }).eq("user_id", userId);
       if (error) throw error;
       loadData();
     } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: "Status toggle failed", description: error.message, variant: "destructive" });
     }
-  };
-
-  const handleDeleteStaff = async (staffId: string) => {
-    if (!confirm("Are you sure you want to delete this staff member?")) return;
-
-    try {
-      const { error } = await supabase.from("staff").delete().eq("id", staffId);
-      if (error) throw error;
-
-      toast({ title: "Staff deleted" });
-      loadData();
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    }
-  };
-
-  const openEditDialog = (staffMember: Staff) => {
-    setSelectedStaff(staffMember);
-    setFormData({
-      fullName: staffMember.full_name,
-      email: staffMember.email,
-      phone: staffMember.phone || "",
-      password: "",
-      branchId: "",
-    });
-    setEditDialogOpen(true);
-  };
-
-  const resetForm = () => {
-    setFormData({ fullName: "", email: "", phone: "", password: "", branchId: "" });
   };
 
   return (
@@ -189,178 +167,141 @@ export default function AdminStaff() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-serif font-bold text-foreground">Staff</h1>
-            <p className="text-muted-foreground">Manage staff members and their branch assignments</p>
+            <h1 className="text-3xl font-serif font-bold text-blue-900">Staff & Management</h1>
+            <p className="text-muted-foreground">Manage Doctors, Receptionists, Directors, and Marketers</p>
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="btn-primary">
-                <Plus className="mr-2 h-4 w-4" /> Add Staff
+              <Button className="bg-blue-600 hover:bg-blue-700">
+                <Plus className="mr-2 h-4 w-4" /> Add New User
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-md">
               <DialogHeader>
-                <DialogTitle className="font-serif">Add Staff Member</DialogTitle>
+                <DialogTitle className="font-serif text-xl">Create Portal Access</DialogTitle>
+                <CardDescription>All fields marked with * are required.</CardDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="space-y-2">
                   <Label>Full Name *</Label>
-                  <Input
-                    value={formData.fullName}
-                    onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                    placeholder="Dr. John Doe"
-                  />
+                  <Input value={formData.fullName} onChange={(e) => setFormData({ ...formData, fullName: e.target.value })} placeholder="John Doe" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Email *</Label>
+                    <Input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="email@example.com" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Password *</Label>
+                    <Input type="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} placeholder="••••••••" />
+                  </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Email *</Label>
-                  <Input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    placeholder="doctor@elephantdental.co.ke"
-                  />
+                  <Label>Phone Number</Label>
+                  <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="0712 345 678" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Password *</Label>
-                  <Input
-                    type="password"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    placeholder="••••••••"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Phone</Label>
-                  <Input
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    placeholder="+254700000000"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Branch</Label>
-                  <Select
-                    value={formData.branchId}
-                    onValueChange={(value) => setFormData({ ...formData, branchId: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select branch" />
-                    </SelectTrigger>
+                  <Label>Target Portal Role *</Label>
+                  <Select value={formData.role} onValueChange={(v) => setFormData({ ...formData, role: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {branches.map((branch) => (
-                        <SelectItem key={branch.id} value={branch.id}>
-                          {branch.name}
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="receptionist">Receptionist</SelectItem>
+                      <SelectItem value="doctor">Doctor</SelectItem>
+                      <SelectItem value="branch_director">Branch Director</SelectItem>
+                      <SelectItem value="marketer">Marketer</SelectItem>
+                      <SelectItem value="admin">Administrator</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <Button onClick={handleAddStaff} className="btn-primary">
-                  Add Staff
+                {formData.role !== 'marketer' && formData.role !== 'admin' && (
+                  <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                    <Label>Assigned Branch</Label>
+                    <Select value={formData.branchId} onValueChange={(v) => setFormData({ ...formData, branchId: v })}>
+                      <SelectTrigger><SelectValue placeholder="Select branch" /></SelectTrigger>
+                      <SelectContent>
+                        {branches.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {formData.role === 'marketer' && (
+                  <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                    <Label>Marketer Referral Code (Optional)</Label>
+                    <Input value={formData.marketerCode} onChange={(e) => setFormData({ ...formData, marketerCode: e.target.value })} placeholder="e.g. AGENT001" />
+                  </div>
+                )}
+                <Button onClick={handleAddUser} className="bg-blue-600 hover:bg-blue-700 mt-2 w-full">
+                  Create Account & Profile
                 </Button>
               </div>
             </DialogContent>
           </Dialog>
         </div>
 
-        <div className="card-elevated overflow-hidden">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Branch</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {staff.map((s) => (
-                  <TableRow key={s.id}>
-                    <TableCell className="font-medium">{s.full_name}</TableCell>
-                    <TableCell>{s.email}</TableCell>
-                    <TableCell>{s.phone || "N/A"}</TableCell>
-                    <TableCell>{s.branches?.name || "N/A"}</TableCell>
+        <Card className="shadow-sm border-blue-50 overflow-hidden">
+          <Table>
+            <TableHeader className="bg-slate-50">
+              <TableRow>
+                <TableHead>User</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Branch / Details</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="w-[80px]"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground">Refreshing staff records...</TableCell></TableRow>
+              ) : users.length === 0 ? (
+                <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground">No staff members found. Create your first portal user above.</TableCell></TableRow>
+              ) : (
+                users.map((u) => (
+                  <TableRow key={u.user_id}>
                     <TableCell>
-                      <Switch
-                        checked={s.is_active}
-                        onCheckedChange={() => handleToggleActive(s)}
-                      />
+                      <div className="font-bold text-slate-900">{u.full_name}</div>
+                      <div className="text-xs text-muted-foreground">{u.email || u.phone}</div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="capitalize bg-blue-50 text-blue-700 border-blue-200">
+                        {u.displayRole.replace('_', ' ')}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-slate-600">
+                      {u.type === 'marketer' ? (
+                        <span className="text-xs font-mono bg-slate-100 px-2 py-1 rounded">Code: {u.code}</span>
+                      ) : (
+                        u.branches?.name || 'Unassigned'
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={u.is_active}
+                          onCheckedChange={() => handleToggleActive(u.user_id, u.type, u.is_active)}
+                        />
+                        <span className={`text-xs font-medium ${u.is_active ? 'text-green-600' : 'text-slate-400'}`}>
+                          {u.is_active ? 'Active' : 'Paused'}
+                        </span>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
+                          <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEditDialog(s)}>
-                            <Edit className="mr-2 h-4 w-4" /> Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={() => handleDeleteStaff(s.id)}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" /> Delete
+                          <DropdownMenuItem className="text-destructive font-medium" onClick={() => handleDelete(u.user_id, u.type)}>
+                            <Trash2 className="mr-2 h-4 w-4" /> Revoke Access
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
-
-        {/* Edit Dialog */}
-        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle className="font-serif">Edit Staff</DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Label>Full Name</Label>
-                <Input
-                  value={formData.fullName}
-                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Phone</Label>
-                <Input
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Branch</Label>
-                <Select
-                  value={formData.branchId}
-                  onValueChange={(value) => setFormData({ ...formData, branchId: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select branch" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {branches.map((branch) => (
-                      <SelectItem key={branch.id} value={branch.id}>
-                        {branch.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button onClick={handleEditStaff} className="btn-primary">
-                Update Staff
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </Card>
       </div>
     </AdminLayout>
   );

@@ -31,9 +31,21 @@ const Login = () => {
         .from("user_roles")
         .select("role")
         .eq("user_id", data.user.id)
-        .single();
+        .maybeSingle();
 
-      const role = roleData?.role as any;
+      const role = roleData?.role;
+
+      if (!role) {
+        toast({
+          title: "Setup Incomplete",
+          description: "Your account is authenticated but has no portal role assigned. Please contact your administrator.",
+          variant: "destructive",
+        });
+        // logout to clear session
+        await supabase.auth.signOut();
+        setLoading(false);
+        return;
+      }
 
       toast({
         title: "Welcome back!",
@@ -43,17 +55,31 @@ const Login = () => {
       if (role === "admin") {
         navigate("/admin");
       } else if (role === "receptionist") {
-        navigate("/reception"); // Will fail if route not exists yet but that's planned
+        navigate("/reception");
       } else if (role === "doctor") {
         navigate("/doctor");
       } else if (role === "branch_director") {
         navigate("/director");
       } else if (role === "marketer") {
         navigate("/marketer");
+      } else if (role === "member") {
+        // For members, check if they have selected a scheme and made initial payment
+        const { data: memberProfile, error: memberProfileError } = await supabase
+          .from("members")
+          .select("is_active")
+          .eq("user_id", data.user.id)
+          .maybeSingle();
+
+        if (memberProfileError) throw memberProfileError;
+
+        if (memberProfile && memberProfile.is_active) {
+          navigate("/dashboard");
+        } else {
+          // If not active, redirect to scheme selection/payment page
+          navigate("/dashboard/scheme-selection");
+        }
       } else {
-        // Default to dashboard for members
-        // Check if member is active? No, let dashboard handle that state
-        navigate("/dashboard");
+        navigate("/"); // Fallback to home if role is unknown
       }
     } catch (error: any) {
       toast({

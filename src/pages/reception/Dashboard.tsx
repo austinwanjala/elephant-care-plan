@@ -1,42 +1,69 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { UserPlus, Clock, CheckCircle, Search } from "lucide-react";
+import { UserPlus, Clock, CheckCircle, Search, Receipt } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-// @ts-ignore
 import { supabase } from "@/integrations/supabase/client";
 
 export default function ReceptionDashboard() {
     const navigate = useNavigate();
     const [stats, setStats] = useState({
         todayVisits: 0,
-        activeVisits: 0,
+        withDoctorVisits: 0,
         pendingBills: 0
     });
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         fetchStats();
     }, []);
 
     const fetchStats = async () => {
-        // Placeholder for fetching stats
-        // We can query 'visits' table filter by today and status
+        setLoading(true);
         const today = new Date().toISOString().split('T')[0];
 
-        // @ts-ignore
-        const { count: todayCount } = await supabase.from('visits').select('*', { count: 'exact', head: true }).gte('created_at', today);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            navigate("/login");
+            return;
+        }
 
-        // @ts-ignore
-        const { count: activeCount } = await supabase.from('visits').select('*', { count: 'exact', head: true }).neq('status', 'completed').gte('created_at', today);
+        // Get receptionist's branch_id
+        const { data: staffData, error: staffError } = await supabase
+            .from("staff")
+            .select("branch_id")
+            .eq("user_id", user.id)
+            .maybeSingle();
 
-        // @ts-ignore
-        const { count: billCount } = await supabase.from('visits').select('*', { count: 'exact', head: true }).eq('status', 'billed');
+        if (staffError || !staffData?.branch_id) {
+            // Handle error or no branch assigned
+            console.error("Receptionist's branch not found or error:", staffError);
+            setLoading(false);
+            return;
+        }
+
+        const branchId = staffData.branch_id;
+
+        const { count: todayCount } = await supabase.from('visits').select('*', { count: 'exact', head: true })
+            .eq('branch_id', branchId)
+            .gte('created_at', today);
+
+        const { count: withDoctorCount } = await supabase.from('visits').select('*', { count: 'exact', head: true })
+            .eq('branch_id', branchId)
+            .eq('status', 'with_doctor')
+            .gte('created_at', today);
+
+        const { count: billedCount } = await supabase.from('visits').select('*', { count: 'exact', head: true })
+            .eq('branch_id', branchId)
+            .eq('status', 'billed')
+            .gte('created_at', today);
 
         setStats({
             todayVisits: todayCount || 0,
-            activeVisits: activeCount || 0,
-            pendingBills: billCount || 0
+            withDoctorVisits: withDoctorCount || 0,
+            pendingBills: billedCount || 0
         });
+        setLoading(false);
     };
 
     return (
@@ -61,22 +88,22 @@ export default function ReceptionDashboard() {
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Active In-Clinic</CardTitle>
+                        <CardTitle className="text-sm font-medium">With Doctor</CardTitle>
                         <Clock className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{stats.activeVisits}</div>
+                        <div className="text-2xl font-bold">{stats.withDoctorVisits}</div>
                         <p className="text-xs text-muted-foreground">Currently being attended</p>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Pending Billing</CardTitle>
-                        <CheckCircle className="h-4 w-4 text-muted-foreground" />
+                        <Receipt className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{stats.pendingBills}</div>
-                        <p className="text-xs text-muted-foreground">Waiting for payment/clearance</p>
+                        <p className="text-xs text-muted-foreground">Waiting for finalization</p>
                     </CardContent>
                 </Card>
             </div>
@@ -91,9 +118,9 @@ export default function ReceptionDashboard() {
                             <Search className="h-6 w-6" />
                             Search Member / Check Balance
                         </Button>
-                        <Button variant="outline" className="h-24 flex flex-col gap-2" onClick={() => navigate("/reception/register-visit")}>
-                            <UserPlus className="h-6 w-6" />
-                            Walk-in Registration
+                        <Button variant="outline" className="h-24 flex flex-col gap-2" onClick={() => navigate("/reception/billing")}>
+                            <Receipt className="h-6 w-6" />
+                            Finalize Bills
                         </Button>
                     </CardContent>
                 </Card>

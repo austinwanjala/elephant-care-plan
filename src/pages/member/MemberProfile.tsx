@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Loader2, User, Phone, Mail, CreditCard } from "lucide-react";
-import { InsuranceCard } from "@/components/member/InsuranceCard"; // New import
+import { Loader2, User, Phone, Mail, CreditCard, Cake } from "lucide-react"; // Added Cake icon for age
+import { InsuranceCard } from "@/components/member/InsuranceCard";
 
 interface MemberProfile {
   id: string;
@@ -12,11 +12,12 @@ interface MemberProfile {
   email: string;
   phone: string;
   id_number: string;
+  age: number | null; // Added age
   coverage_balance: number | null;
   benefit_limit: number | null;
   total_contributions: number | null;
   qr_code_data: string | null;
-  is_active: boolean; // Added is_active
+  is_active: boolean;
   membership_categories: { name: string; level: string } | null;
 }
 
@@ -61,8 +62,8 @@ export default function MemberProfile() {
     );
   }
 
-  const coveragePercent = profile.benefit_limit 
-    ? ((profile.coverage_balance || 0) / profile.benefit_limit) * 100 
+  const coveragePercent = profile.benefit_limit
+    ? ((profile.coverage_balance || 0) / profile.benefit_limit) * 100
     : 0;
 
   return (
@@ -84,7 +85,7 @@ export default function MemberProfile() {
               is_active: profile.is_active,
               coverage_balance: profile.coverage_balance || 0,
               benefit_limit: profile.benefit_limit || 0,
-              id_number: profile.id_number, // Pass id_number
+              id_number: profile.id_number,
             }} />
           </div>
         )}
@@ -141,6 +142,13 @@ export default function MemberProfile() {
             <div>
               <p className="text-sm text-muted-foreground">ID Number</p>
               <p>{profile.id_number}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Cake className="h-5 w-5 text-muted-foreground" />
+            <div>
+              <p className="text-sm text-muted-foreground">Age</p>
+              <p>{profile.age || "N/A"}</p>
             </div>
           </div>
         </CardContent>

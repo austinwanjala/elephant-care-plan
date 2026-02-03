@@ -1,10 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { QRCodeSVG } from "qrcode.react";
 import {
   CreditCard,
   Shield,
@@ -13,15 +11,8 @@ import {
   FileText,
   AlertCircle,
   DollarSign,
+  Users, // Added for dependants
 } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -33,8 +24,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { InsuranceCard } from "@/components/member/InsuranceCard"; // New import
+import { InsuranceCard } from "@/components/member/InsuranceCard";
 
 interface Member {
   id: string;
@@ -45,10 +35,10 @@ interface Member {
   coverage_balance: number;
   total_contributions: number;
   benefit_limit: number;
-  qr_code_data: string | null; // Can be null if not active
-  is_active: boolean; // Added is_active
+  qr_code_data: string | null;
+  is_active: boolean;
   membership_categories: { name: string; benefit_amount: number } | null;
-  id_number: string; // Added id_number
+  id_number: string;
 }
 
 interface Visit {
@@ -69,9 +59,21 @@ interface Payment {
   payment_date: string;
 }
 
-const Dashboard = () => {
+interface Dependant {
+  id: string;
+  full_name: string;
+  relationship: string;
+  identification_number: string;
+}
+
+const MemberDashboard = () => {
   const [member, setMember] = useState<Member | null>(null);
-  const [dependants, setDependants] = useState<any[]>([]);
+  const [dependants, setDependants] = useState<Dependant[]>([]);
+  const [visits, setVisits] = useState<Visit[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
   useEffect(() => {
     loadMemberData();
@@ -96,7 +98,6 @@ const Dashboard = () => {
   };
 
   const fetchMemberProfile = async (userId: string) => {
-    // @ts-ignore
     const { data, error } = await supabase
       .from("members")
       .select("*, membership_categories(name, benefit_amount)")
@@ -117,17 +118,14 @@ const Dashboard = () => {
   };
 
   const fetchDependants = async (userId: string) => {
-    // @ts-ignore
     const { data: memberData } = await supabase.from("members").select("id").eq("user_id", userId).single();
     if (memberData) {
-      // @ts-ignore
       const { data } = await supabase.from("dependants").select("*").eq("member_id", memberData.id);
       if (data) setDependants(data);
     }
   }
 
   const fetchVisits = async (userId: string) => {
-    // @ts-ignore
     const { data: memberData } = await supabase
       .from("members")
       .select("id")
@@ -230,9 +228,9 @@ const Dashboard = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Link to="/dashboard/pay">
+            <Link to="/dashboard/scheme-selection">
               <Button size="lg" className="btn-primary mt-4">
-                <DollarSign className="mr-2 h-5 w-5" /> Make First Payment
+                <DollarSign className="mr-2 h-5 w-5" /> Select Scheme & Pay
               </Button>
             </Link>
           </CardContent>
@@ -316,11 +314,14 @@ const Dashboard = () => {
 
             {/* Dependants Card */}
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
-                  <Shield className="h-5 w-5 text-primary" />
+                  <Users className="h-5 w-5 text-primary" />
                   Dependants
                 </CardTitle>
+                <Link to="/dashboard/dependants">
+                  <Button variant="outline" size="sm">Manage</Button>
+                </Link>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -446,4 +447,4 @@ const Dashboard = () => {
   );
 };
 
-export default Dashboard;
+export default MemberDashboard;

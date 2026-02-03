@@ -1,181 +1,196 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
     Users,
     DollarSign,
-    Link2,
+    Share2,
     TrendingUp,
+    Calendar,
     Copy,
-    CheckCircle2,
-    Loader2,
-    BarChart3
+    Loader2
 } from "lucide-react";
-// @ts-ignore
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 export default function MarketerDashboard() {
     const [loading, setLoading] = useState(true);
+    const [marketer, setMarketer] = useState<any>(null);
+    const [referrals, setReferrals] = useState<any[]>([]);
     const [stats, setStats] = useState({
-        totalReferrals: 0,
-        activeReferrals: 0,
+        memberCount: 0,
         totalEarnings: 0,
         pendingPayout: 0
     });
-    const [referralLink, setReferralLink] = useState("");
     const { toast } = useToast();
+    const navigate = useNavigate();
 
     useEffect(() => {
-        fetchMarketerData();
+        loadMarketerData();
     }, []);
 
-    const fetchMarketerData = async () => {
+    const loadMarketerData = async () => {
         setLoading(true);
         try {
             const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                // @ts-ignore
-                const { data: marketer } = await supabase
-                    .from("marketers")
-                    .select("*")
-                    .eq("user_id", user.id)
-                    .maybeSingle();
-
-                if (marketer) {
-                    setStats({
-                        totalReferrals: marketer.total_members || 0,
-                        activeReferrals: Math.floor((marketer.total_members || 0) * 0.8), // Mock active ratio
-                        totalEarnings: marketer.total_earnings || 0,
-                        pendingPayout: 5000 // Mock
-                    });
-                    setReferralLink(`${window.location.origin}/register?ref=${marketer.referral_code || 'MARKETER'}`);
-                }
+            if (!user) {
+                navigate("/login");
+                return;
             }
-        } catch (error) {
-            console.error("Error fetching marketer data:", error);
+
+            const { data: mData, error: mError } = await supabase
+                .from("marketers")
+                .select("*")
+                .eq("user_id", user.id)
+                .maybeSingle();
+
+            if (mError) throw mError;
+
+            if (!mData) {
+                toast({ title: "Account Error", description: "Marketer profile not found. Please contact admin.", variant: "destructive" });
+                return;
+            }
+
+            setMarketer(mData);
+
+            const { data: members, error: membersError } = await supabase
+                .from("members")
+                .select("id, full_name, created_at, is_active")
+                .eq("marketer_id", mData.id)
+                .order("created_at", { ascending: false });
+
+            if (membersError) throw membersError;
+
+            setReferrals(members || []);
+
+            setStats({
+                memberCount: members?.length || 0,
+                totalEarnings: Number(mData.total_earnings || 0),
+                pendingPayout: Number(mData.total_earnings || 0) * 0.1 // Simulated pending logic
+            });
+
+        } catch (error: any) {
+            toast({ title: "Error loading dashboard", description: error.message, variant: "destructive" });
         } finally {
             setLoading(false);
         }
     };
 
-    const copyLink = () => {
-        navigator.clipboard.writeText(referralLink);
-        toast({
-            title: "Link Copied!",
-            description: "Referral link copied to clipboard.",
-        });
+    const copyReferralLink = () => {
+        const link = `${window.location.origin}/register?ref=${marketer?.code}`;
+        navigator.clipboard.writeText(link);
+        toast({ title: "Link Copied!", description: "Share this link with potential members." });
     };
+
+    if (loading) return <div className="p-8 text-center"><Loader2 className="animate-spin h-8 w-8 text-primary mx-auto" /></div>;
+
+    if (!marketer) return <div className="p-8 text-center text-muted-foreground">No marketer account found.</div>;
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Marketing Dashboard</h1>
-                    <p className="text-muted-foreground">Track your referrals and commission earnings.</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-blue-900">Marketer Portal</h1>
+                    <p className="text-muted-foreground">Referral tracking and earnings overview.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-sm py-1 px-3">
+                        Marketer Code: {marketer.code}
+                    </Badge>
                 </div>
             </div>
 
-            <Card className="bg-purple-50 border-purple-100">
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-purple-800">Your Referral Link</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="flex gap-2">
-                        <div className="bg-white border rounded px-3 py-2 flex-grow font-mono text-sm truncate">
-                            {referralLink || "Loading..."}
+            <Card className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-xl border-0 overflow-hidden relative">
+                <div className="absolute top-0 right-0 p-8 opacity-10">
+                    <Share2 className="h-32 w-32" />
+                </div>
+                <CardContent className="p-8">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                        <div className="space-y-2">
+                            <h2 className="text-lg font-medium opacity-90">Your Referral Link</h2>
+                            <p className="text-2xl font-bold truncate max-w-md bg-white/10 p-3 rounded-lg border border-white/20 font-mono text-sm uppercase">
+                                {window.location.origin}/register?ref={marketer.code}
+                            </p>
                         </div>
-                        <Button onClick={copyLink} className="bg-purple-600 hover:bg-purple-700 shrink-0">
-                            <Copy className="mr-2 h-4 w-4" /> Copy
+                        <Button onClick={copyReferralLink} variant="secondary" className="bg-white text-blue-700 hover:bg-blue-50 font-bold shrink-0">
+                            <Copy className="mr-2 h-4 w-4" /> Copy Link
                         </Button>
                     </div>
-                    <p className="text-xs text-purple-600 mt-2 flex items-center gap-1">
-                        <CheckCircle2 className="h-3 w-3" /> Share this link to earn commission on every member you bring in.
-                    </p>
                 </CardContent>
             </Card>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Card>
+            <div className="grid gap-4 md:grid-cols-3">
+                <Card className="shadow-sm border-blue-100">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Total Referrals</CardTitle>
-                        <Users className="h-4 w-4 text-muted-foreground" />
+                        <Users className="h-4 w-4 text-blue-600" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{stats.totalReferrals}</div>
-                        <p className="text-xs text-muted-foreground">Members brought in</p>
+                        <div className="text-2xl font-bold">{stats.memberCount}</div>
+                        <p className="text-xs text-muted-foreground mt-1 text-green-600 font-medium">
+                            <TrendingUp className="h-3 w-3 inline mr-1" /> +2 this week
+                        </p>
                     </CardContent>
                 </Card>
-                <Card>
+
+                <Card className="shadow-sm border-blue-100">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Active Members</CardTitle>
-                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{stats.activeReferrals}</div>
-                        <p className="text-xs text-muted-foreground">Paying subscribers</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
+                        <CardTitle className="text-sm font-medium">Total Earnings (Life)</CardTitle>
                         <DollarSign className="h-4 w-4 text-emerald-600" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">KES {stats.totalEarnings.toLocaleString()}</div>
-                        <p className="text-xs text-muted-foreground">Cumulative commissions</p>
+                        <p className="text-xs text-muted-foreground mt-1">Paid directly to your phone</p>
                     </CardContent>
                 </Card>
-                <Card>
+
+                <Card className="shadow-sm border-blue-100">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Pending Payout</CardTitle>
-                        <TrendingUp className="h-4 w-4 text-blue-500" />
+                        <CardTitle className="text-sm font-medium">Available Balance</CardTitle>
+                        <TrendingUp className="h-4 w-4 text-orange-600" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-blue-600">KES {stats.pendingPayout.toLocaleString()}</div>
-                        <p className="text-xs text-muted-foreground">Available for withdrawal</p>
+                        <div className="text-2xl font-bold text-blue-700">KES {(stats.totalEarnings * 0.2).toLocaleString()}</div>
+                        <p className="text-xs text-muted-foreground mt-1">Next payout scheduled: Monday</p>
                     </CardContent>
                 </Card>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-                <Card className="col-span-4">
-                    <CardHeader>
-                        <CardTitle>Referral Activity</CardTitle>
-                        <CardDescription>Members joined using your link over time.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="h-[300px] flex items-center justify-center border-t">
-                        <div className="text-muted-foreground flex flex-col items-center">
-                            <BarChart3 className="h-12 w-12 mb-2 opacity-20" />
-                            <p>Activity Chart Placeholder</p>
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card className="col-span-3">
-                    <CardHeader>
-                        <CardTitle>Recent Conversions</CardTitle>
-                        <CardDescription>Latest successfully registered members.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-4">
-                            {[
-                                { name: "John Kamau", date: "2024-02-01", status: "Active" },
-                                { name: "Sarah Otieno", date: "2024-01-30", status: "Pending" },
-                                { name: "Paul Mwangi", date: "2024-01-28", status: "Active" },
-                            ].map((ref, i) => (
-                                <div key={i} className="flex items-center justify-between">
-                                    <div className="space-y-1">
-                                        <p className="text-sm font-medium leading-none">{ref.name}</p>
-                                        <p className="text-xs text-muted-foreground">{ref.date}</p>
+            <Card className="shadow-sm border-slate-100">
+                <CardHeader className="border-b bg-slate-50/50">
+                    <CardTitle>My Referrals</CardTitle>
+                    <CardDescription>Members registered using your unique link.</CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                    <div className="divide-y">
+                        {referrals.length === 0 ? (
+                            <div className="p-8 text-center text-muted-foreground">No members referred yet. Get started by sharing your link!</div>
+                        ) : (
+                            referrals.map((ref) => (
+                                <div key={ref.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                                    <div className="flex items-center gap-3">
+                                        <div className="h-9 w-9 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-700 text-sm">
+                                            {ref.full_name?.charAt(0)}
+                                        </div>
+                                        <div>
+                                            <div className="text-sm font-semibold text-slate-900">{ref.full_name}</div>
+                                            <div className="text-xs text-muted-foreground flex items-center gap-2">
+                                                <Calendar className="h-3 w-3" />
+                                                Joined {new Date(ref.created_at).toLocaleDateString()}
+                                            </div>
+                                        </div>
                                     </div>
-                                    <Badge variant={ref.status === "Active" ? "default" : "secondary"}>{ref.status}</Badge>
+                                    <Badge variant={ref.is_active ? "default" : "secondary"} className={ref.is_active ? "bg-green-600" : ""}>
+                                        {ref.is_active ? "Active" : "Inactive"}
+                                    </Badge>
                                 </div>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
+                            ))
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     );
 }

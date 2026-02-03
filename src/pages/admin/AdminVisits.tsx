@@ -13,18 +13,24 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { History, Loader2 } from "lucide-react";
 import { format } from "date-fns";
+import { Badge } from "@/components/ui/badge";
 
 interface Visit {
   id: string;
   created_at: string;
+  status: string; // New field
+  diagnosis: string | null; // New field
+  treatment_notes: string | null; // New field
   benefit_deducted: number;
   branch_compensation: number;
   profit_loss: number;
-  notes: string | null;
+  notes: string | null; // Old notes field, might be repurposed or removed
   members: { full_name: string; member_number: string } | null;
-  services: { name: string } | null;
+  services: { name: string } | null; // This will be from bill_items now, not directly on visit
   branches: { name: string } | null;
-  staff: { full_name: string } | null;
+  receptionist: { full_name: string } | null; // New relation
+  doctor: { full_name: string } | null; // New relation
+  bills: { total_benefit_cost: number; total_branch_compensation: number; total_profit_loss: number; bill_items: { service_name: string }[] }[] | null; // New relation
 }
 
 export default function AdminVisits() {
@@ -40,7 +46,7 @@ export default function AdminVisits() {
     setLoading(true);
     const { data, error } = await supabase
       .from("visits")
-      .select("*, members(full_name, member_number), services(name), branches(name), staff(full_name)")
+      .select("*, members(full_name, member_number), branches(name), receptionist:receptionist_id(full_name), doctor:doctor_id(full_name), bills(total_benefit_cost, total_branch_compensation, total_profit_loss, bill_items(service_name))")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -53,6 +59,23 @@ export default function AdminVisits() {
       setVisits(data || []);
     }
     setLoading(false);
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "registered":
+        return <Badge variant="secondary">Registered</Badge>;
+      case "with_doctor":
+        return <Badge className="bg-blue-500/10 text-blue-600">With Doctor</Badge>;
+      case "billed":
+        return <Badge className="bg-orange-500/10 text-orange-600">Billed</Badge>;
+      case "completed":
+        return <Badge className="bg-success">Completed</Badge>;
+      case "cancelled":
+        return <Badge variant="destructive">Cancelled</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
   };
 
   if (loading) {
@@ -86,8 +109,11 @@ export default function AdminVisits() {
                     <TableHead>Date</TableHead>
                     <TableHead>Member</TableHead>
                     <TableHead>Branch</TableHead>
-                    <TableHead>Service</TableHead>
-                    <TableHead>Staff</TableHead>
+                    <TableHead>Doctor</TableHead>
+                    <TableHead>Receptionist</TableHead>
+                    <TableHead>Services</TableHead>
+                    <TableHead>Diagnosis</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Benefit Deducted</TableHead>
                     <TableHead>Branch Comp.</TableHead>
                     <TableHead>Profit/Loss</TableHead>
@@ -96,38 +122,49 @@ export default function AdminVisits() {
                 <TableBody>
                   {visits.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
                         No visits recorded yet.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    visits.map((visit) => (
-                      <TableRow key={visit.id}>
-                        <TableCell>
-                          {format(new Date(visit.created_at), "MMM d, yyyy HH:mm")}
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{visit.members?.full_name}</p>
-                            <p className="text-xs text-muted-foreground font-mono">
-                              {visit.members?.member_number}
-                            </p>
-                          </div>
-                        </TableCell>
-                        <TableCell>{visit.branches?.name || "N/A"}</TableCell>
-                        <TableCell>{visit.services?.name || "N/A"}</TableCell>
-                        <TableCell>{visit.staff?.full_name || "N/A"}</TableCell>
-                        <TableCell className="text-destructive">
-                          -KES {visit.benefit_deducted.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-success">
-                          +KES {visit.branch_compensation.toLocaleString()}
-                        </TableCell>
-                        <TableCell className={visit.profit_loss >= 0 ? "text-success" : "text-destructive"}>
-                          KES {visit.profit_loss.toLocaleString()}
-                        </TableCell>
-                      </TableRow>
-                    ))
+                    visits.map((visit) => {
+                      const bill = visit.bills?.[0];
+                      const servicesList = bill?.bill_items?.map(item => item.service_name).join(", ") || "N/A";
+                      const benefitDeducted = bill?.total_benefit_cost || 0;
+                      const branchCompensation = bill?.total_branch_compensation || 0;
+                      const profitLoss = bill?.total_profit_loss || 0;
+
+                      return (
+                        <TableRow key={visit.id}>
+                          <TableCell>
+                            {format(new Date(visit.created_at), "MMM d, yyyy HH:mm")}
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <p className="font-medium">{visit.members?.full_name}</p>
+                              <p className="text-xs text-muted-foreground font-mono">
+                                {visit.members?.member_number}
+                              </p>
+                            </div>
+                          </TableCell>
+                          <TableCell>{visit.branches?.name || "N/A"}</TableCell>
+                          <TableCell>{visit.doctor?.full_name || "N/A"}</TableCell>
+                          <TableCell>{visit.receptionist?.full_name || "N/A"}</TableCell>
+                          <TableCell className="max-w-[150px] truncate">{servicesList}</TableCell>
+                          <TableCell className="max-w-[150px] truncate">{visit.diagnosis || "N/A"}</TableCell>
+                          <TableCell>{getStatusBadge(visit.status || "unknown")}</TableCell>
+                          <TableCell className="text-destructive">
+                            -KES {benefitDeducted.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-success">
+                            +KES {branchCompensation.toLocaleString()}
+                          </TableCell>
+                          <TableCell className={profitLoss >= 0 ? "text-success" : "text-destructive"}>
+                            KES {profitLoss.toLocaleString()}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>

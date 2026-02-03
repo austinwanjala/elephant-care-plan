@@ -35,7 +35,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Search, Plus, MoreHorizontal, Edit, Trash2, Fingerprint } from "lucide-react";
-import { BiometricCapture } from "@/components/BiometricCapture"; // Import BiometricCapture
+import { BiometricCapture } from "@/components/BiometricCapture";
+import { createClient } from "@supabase/supabase-js";
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 interface Member {
   id: string;
@@ -44,6 +48,7 @@ interface Member {
   phone: string;
   email: string;
   id_number: string;
+  age: number | null; // Added age
   coverage_balance: number;
   total_contributions: number;
   benefit_limit: number;
@@ -81,6 +86,7 @@ export default function AdminMembers() {
     email: "",
     phone: "",
     idNumber: "",
+    age: "", // Added age
     password: "",
     branchId: "",
     categoryId: "",
@@ -110,48 +116,46 @@ export default function AdminMembers() {
 
   const handleRegisterMember = async () => {
     try {
-      const category = categories.find((c) => c.id === formData.categoryId);
-      if (!category) throw new Error("Please select a membership category");
+      if (!formData.email || !formData.password || !formData.fullName || !formData.phone || !formData.idNumber || !formData.age) {
+        toast({ title: "Validation Error", description: "All fields marked with * are required.", variant: "destructive" });
+        return;
+      }
 
-      // Create auth user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      // Create a "no-session" client to preserve the Admin's login session
+      const authClient = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+        auth: { persistSession: false }
+      });
+
+      // Create the Auth account with metadata
+      const { data: authData, error: authError } = await authClient.auth.signUp({
         email: formData.email,
         password: formData.password,
-        options: { emailRedirectTo: window.location.origin },
+        options: {
+          data: {
+            role: 'member',
+            full_name: formData.fullName,
+            phone: formData.phone,
+            id_number: formData.idNumber,
+            age: parseInt(formData.age),
+            branch_id: formData.branchId || null,
+            // membership_category_id and initial coverage will be set by member on first login
+          }
+        }
       });
 
-      if (authError) throw authError;
+      if (authError) {
+        if (authError.message.toLowerCase().includes("already registered")) {
+          throw new Error("This email is already registered. Please use a different email or manage the existing account.");
+        }
+        throw authError;
+      }
       if (!authData.user) throw new Error("User creation failed");
 
-      // Calculate total payment and benefit
-      const totalPayment = category.payment_amount + category.registration_fee + category.management_fee;
+      // The handle_new_user trigger will create the member profile and user_role.
+      // We can optionally add next_of_kin details here if needed, but for now,
+      // the member profile is created with basic info.
 
-      // Create member profile
-      const { error: memberError } = await supabase.from("members").insert({
-        user_id: authData.user.id,
-        member_number: "TEMP",
-        full_name: formData.fullName,
-        phone: formData.phone,
-        id_number: formData.idNumber,
-        email: formData.email,
-        next_of_kin_name: formData.nextOfKinName || null,
-        next_of_kin_phone: formData.nextOfKinPhone || null,
-        branch_id: formData.branchId || null,
-        membership_category_id: formData.categoryId,
-        benefit_limit: category.benefit_amount,
-        coverage_balance: category.benefit_amount,
-        total_contributions: totalPayment,
-      });
-
-      if (memberError) throw memberError;
-
-      // Assign member role
-      await supabase.from("user_roles").insert({
-        user_id: authData.user.id,
-        role: "member",
-      });
-
-      toast({ title: "Member registered successfully" });
+      toast({ title: "Member registered successfully", description: "Member can now log in to select scheme and make payment." });
       setDialogOpen(false);
       resetForm();
       loadData();
@@ -170,8 +174,9 @@ export default function AdminMembers() {
           full_name: formData.fullName,
           phone: formData.phone,
           id_number: formData.idNumber,
+          age: parseInt(formData.age),
           branch_id: formData.branchId || null,
-          membership_category_id: formData.categoryId || null,
+          // membership_category_id is managed by member now
           next_of_kin_name: formData.nextOfKinName || null,
           next_of_kin_phone: formData.nextOfKinPhone || null,
         })
@@ -231,11 +236,12 @@ export default function AdminMembers() {
       email: member.email,
       phone: member.phone,
       idNumber: member.id_number,
-      password: "",
+      age: member.age?.toString() || "",
+      password: "", // Password not editable here
       branchId: member.branches ? branches.find(b => b.name === member.branches?.name)?.id || "" : "",
-      categoryId: "",
-      nextOfKinName: "",
-      nextOfKinPhone: "",
+      categoryId: member.membership_categories?.id || "", // Pre-fill category if exists
+      nextOfKinName: "", // Not currently stored in member table directly
+      nextOfKinPhone: "", // Not currently stored in member table directly
     });
     setEditDialogOpen(true);
   };
@@ -246,6 +252,7 @@ export default function AdminMembers() {
       email: "",
       phone: "",
       idNumber: "",
+      age: "",
       password: "",
       branchId: "",
       categoryId: "",
@@ -258,7 +265,8 @@ export default function AdminMembers() {
     (m) =>
       m.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       m.member_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.phone.includes(searchTerm)
+      m.phone.includes(searchTerm) ||
+      m.id_number.includes(searchTerm)
   );
 
   return (
@@ -278,7 +286,7 @@ export default function AdminMembers() {
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="font-serif">Register New Member</DialogTitle>
-                <DialogDescription>Enter member details and select membership category</DialogDescription>
+                <DialogDescription>Enter member details. Membership scheme selection and initial payment will be done by the member after login.</DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid md:grid-cols-2 gap-4">
@@ -288,6 +296,7 @@ export default function AdminMembers() {
                       value={formData.fullName}
                       onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                       placeholder="John Doe"
+                      required
                     />
                   </div>
                   <div className="space-y-2">
@@ -297,6 +306,7 @@ export default function AdminMembers() {
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       placeholder="john@example.com"
+                      required
                     />
                   </div>
                   <div className="space-y-2">
@@ -305,6 +315,7 @@ export default function AdminMembers() {
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                       placeholder="0712345678"
+                      required
                     />
                   </div>
                   <div className="space-y-2">
@@ -313,6 +324,17 @@ export default function AdminMembers() {
                       value={formData.idNumber}
                       onChange={(e) => setFormData({ ...formData, idNumber: e.target.value })}
                       placeholder="12345678"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Age *</Label>
+                    <Input
+                      type="number"
+                      value={formData.age}
+                      onChange={(e) => setFormData({ ...formData, age: e.target.value })}
+                      placeholder="30"
+                      required
                     />
                   </div>
                   <div className="space-y-2">
@@ -322,10 +344,11 @@ export default function AdminMembers() {
                       value={formData.password}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                       placeholder="••••••••"
+                      required
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Branch</Label>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Branch (Optional)</Label>
                     <Select
                       value={formData.branchId}
                       onValueChange={(value) => setFormData({ ...formData, branchId: value })}
@@ -342,73 +365,7 @@ export default function AdminMembers() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <Label>Membership Category *</Label>
-                    <Select
-                      value={formData.categoryId}
-                      onValueChange={(value) => setFormData({ ...formData, categoryId: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map((cat) => (
-                          <SelectItem key={cat.id} value={cat.id}>
-                            {cat.name} - Pay KES {cat.payment_amount.toLocaleString()} → Benefit KES {cat.benefit_amount.toLocaleString()}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Next of Kin Name</Label>
-                    <Input
-                      value={formData.nextOfKinName}
-                      onChange={(e) => setFormData({ ...formData, nextOfKinName: e.target.value })}
-                      placeholder="Jane Doe"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Next of Kin Phone</Label>
-                    <Input
-                      value={formData.nextOfKinPhone}
-                      onChange={(e) => setFormData({ ...formData, nextOfKinPhone: e.target.value })}
-                      placeholder="0712345678"
-                    />
-                  </div>
                 </div>
-                {formData.categoryId && (
-                  <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-                    {(() => {
-                      const cat = categories.find((c) => c.id === formData.categoryId);
-                      if (!cat) return null;
-                      return (
-                        <>
-                          <div className="flex justify-between text-sm">
-                            <span>Membership Payment:</span>
-                            <span>KES {cat.payment_amount.toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span>Registration Fee:</span>
-                            <span>KES {cat.registration_fee.toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span>Management Fee:</span>
-                            <span>KES {cat.management_fee.toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between font-semibold border-t pt-2">
-                            <span>Total to Pay:</span>
-                            <span>KES {(cat.payment_amount + cat.registration_fee + cat.management_fee).toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between font-semibold text-success">
-                            <span>Benefit Coverage:</span>
-                            <span>KES {cat.benefit_amount.toLocaleString()}</span>
-                          </div>
-                        </>
-                      );
-                    })()}
-                  </div>
-                )}
                 <Button onClick={handleRegisterMember} className="btn-primary">
                   Register Member
                 </Button>
@@ -421,7 +378,7 @@ export default function AdminMembers() {
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by name, member number, or phone..."
+              placeholder="Search by name, member number, phone, or ID..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-9"
@@ -437,6 +394,8 @@ export default function AdminMembers() {
                   <TableHead>Member #</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Phone</TableHead>
+                  <TableHead>ID Number</TableHead>
+                  <TableHead>Age</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>Branch</TableHead>
                   <TableHead>Coverage</TableHead>
@@ -451,6 +410,8 @@ export default function AdminMembers() {
                     <TableCell className="font-mono">{member.member_number}</TableCell>
                     <TableCell className="font-medium">{member.full_name}</TableCell>
                     <TableCell>{member.phone}</TableCell>
+                    <TableCell>{member.id_number}</TableCell>
+                    <TableCell>{member.age || "N/A"}</TableCell>
                     <TableCell>{member.membership_categories?.name || "N/A"}</TableCell>
                     <TableCell>{member.branches?.name || "N/A"}</TableCell>
                     <TableCell className="text-success">
@@ -527,6 +488,14 @@ export default function AdminMembers() {
                 <Input
                   value={formData.idNumber}
                   onChange={(e) => setFormData({ ...formData, idNumber: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Age</Label>
+                <Input
+                  type="number"
+                  value={formData.age}
+                  onChange={(e) => setFormData({ ...formData, age: e.target.value })}
                 />
               </div>
               <div className="space-y-2">

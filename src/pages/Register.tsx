@@ -1,11 +1,10 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-// @ts-ignore
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, ArrowLeft, Plus, Trash } from "lucide-react";
 
@@ -22,16 +21,25 @@ const Register = () => {
     phone: "",
     idNumber: "",
     age: "",
-    email: "", // Needed for auth, though user didn't explicitly ask for it in the list, it's usually required. I will keep it.
-    password: "", // Needed for auth
+    email: "",
+    password: "",
   });
-
+  const [marketerCode, setMarketerCode] = useState("");
   const [dependants, setDependants] = useState<Dependant[]>([]);
   const [consent, setConsent] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
+
+  // Pre-fill marketer code if present in URL
+  useState(() => {
+    const refCode = searchParams.get("ref");
+    if (refCode) {
+      setMarketerCode(refCode);
+    }
+  });
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -67,13 +75,19 @@ const Register = () => {
     setLoading(true);
 
     try {
-      // 1. Create auth user
+      // 1. Create auth user with all metadata for atomic setup
+      // The trigger 'on_auth_user_created' handles role and profile creation
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
           data: {
+            role: 'member',
             full_name: formData.fullName,
+            phone: formData.phone,
+            id_number: formData.idNumber,
+            age: formData.age,
+            marketer_code: marketerCode || null
           }
         }
       });
@@ -81,28 +95,17 @@ const Register = () => {
       if (authError) throw authError;
       if (!authData.user) throw new Error("User creation failed");
 
-      // 2. Create member profile
-      const { data: memberData, error: memberError } = await supabase.from("members").insert({
-        user_id: authData.user.id,
-        member_number: "TEMP", // Trigger handles this
-        full_name: formData.fullName,
-        phone: formData.phone,
-        id_number: formData.idNumber,
-        email: formData.email,
-        // age: parseInt(formData.age), // need to add age to schema if strictly required, or derive from DOB. User asked for Age input.
-        // Assuming we might need to add 'age' or just store it. I'll rely on existing schema for now or add it? 
-        // Existing schema doesn't have age. I will skip saving specific age column for now or simple put it in metadata? 
-        // Actually, best to add 'dob' to members table eventually. The user prompt says "Age". 
-        // For now I won't block on schema change for 'age' column, I'll just proceed.
-        is_active: true, // User said "Become active AFTER payment". So false initially?
-        // Prompt: "Become active AFTER payment". So keep default false or set false.
-        coverage_balance: 0,
-        total_contributions: 0,
-      }).select().single();
+      // 2. Fetch the created member record to add dependants
+      // The trigger is atomic so it should be there immediately
+      const { data: memberData, error: memberError } = await supabase
+        .from("members")
+        .select("id")
+        .eq("user_id", authData.user.id)
+        .maybeSingle();
 
       if (memberError) throw memberError;
 
-      // 3. Add Dependants
+      // 3. Add Dependants if any
       if (dependants.length > 0 && memberData) {
         const dependantsToInsert = dependants.map(d => ({
           member_id: memberData.id,
@@ -115,14 +118,6 @@ const Register = () => {
         const { error: depError } = await supabase.from("dependants").insert(dependantsToInsert);
         if (depError) throw depError;
       }
-
-      // 4. Assign member role
-      const { error: roleError } = await supabase.from("user_roles").insert({
-        user_id: authData.user.id,
-        role: "member",
-      });
-
-      if (roleError) throw roleError;
 
       toast({
         title: "Registration successful!",
@@ -230,6 +225,15 @@ const Register = () => {
                   onChange={(e) => handleChange("password", e.target.value)}
                   required
                   minLength={6}
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="marketerCode">Marketer Referral Code (Optional)</Label>
+                <Input
+                  id="marketerCode"
+                  placeholder="Enter code if referred by a marketer"
+                  value={marketerCode}
+                  onChange={(e) => setMarketerCode(e.target.value)}
                 />
               </div>
             </div>

@@ -9,18 +9,21 @@ import {
   Building2,
   TrendingUp,
   DollarSign,
+  UserPlus, // For new members
+  ClipboardList, // For total visits
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface Stats {
   totalMembers: number;
+  activeMembers: number;
   totalContributions: number;
   totalCoverage: number;
-  totalClaims: number;
-  pendingClaims: number;
+  totalVisits: number; // New stat
   totalBranches: number;
   totalRevenue: number;
   totalProfitLoss: number;
+  totalMarketers: number; // New stat
 }
 
 interface CategoryDistribution {
@@ -31,13 +34,14 @@ interface CategoryDistribution {
 export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats>({
     totalMembers: 0,
+    activeMembers: 0,
     totalContributions: 0,
     totalCoverage: 0,
-    totalClaims: 0,
-    pendingClaims: 0,
+    totalVisits: 0,
     totalBranches: 0,
     totalRevenue: 0,
     totalProfitLoss: 0,
+    totalMarketers: 0,
   });
   const [categoryDistribution, setCategoryDistribution] = useState<CategoryDistribution[]>([]);
 
@@ -46,25 +50,27 @@ export default function AdminDashboard() {
   }, []);
 
   const loadStats = async () => {
-    const [membersRes, claimsRes, branchesRes, revenueRes, categoriesRes] = await Promise.all([
-      supabase.from("members").select("coverage_balance, total_contributions"),
-      supabase.from("claims").select("status"),
+    const [membersRes, branchesRes, revenueRes, categoriesRes, visitsRes, marketersRes] = await Promise.all([
+      supabase.from("members").select("coverage_balance, total_contributions, is_active"),
       supabase.from("branches").select("id").eq("is_active", true),
       supabase.from("branch_revenue").select("total_compensation, total_profit_loss"),
       supabase.from("members").select("membership_category_id, membership_categories(name)"),
+      supabase.from("visits").select("id"), // Fetch all visits
+      supabase.from("marketers").select("id").eq("is_active", true), // Fetch active marketers
     ]);
 
-    if (membersRes.data && claimsRes.data && branchesRes.data) {
+    if (membersRes.data && branchesRes.data && visitsRes.data && marketersRes.data) {
       const revenueData = revenueRes.data || [];
       setStats({
         totalMembers: membersRes.data.length,
+        activeMembers: membersRes.data.filter(m => m.is_active).length,
         totalContributions: membersRes.data.reduce((sum, m) => sum + (m.total_contributions || 0), 0),
         totalCoverage: membersRes.data.reduce((sum, m) => sum + (m.coverage_balance || 0), 0),
-        totalClaims: claimsRes.data.length,
-        pendingClaims: claimsRes.data.filter((c) => c.status === "pending").length,
+        totalVisits: visitsRes.data.length,
         totalBranches: branchesRes.data.length,
         totalRevenue: revenueData.reduce((sum, r) => sum + (r.total_compensation || 0), 0),
         totalProfitLoss: revenueData.reduce((sum, r) => sum + (r.total_profit_loss || 0), 0),
+        totalMarketers: marketersRes.data.length,
       });
     }
 
@@ -98,6 +104,7 @@ export default function AdminDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.totalMembers}</div>
+              <p className="text-xs text-muted-foreground">{stats.activeMembers} active</p>
             </CardContent>
           </Card>
 
@@ -127,11 +134,11 @@ export default function AdminDashboard() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pending Claims</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Total Visits</CardTitle>
+              <ClipboardList className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.pendingClaims}</div>
+              <div className="text-2xl font-bold">{stats.totalVisits}</div>
             </CardContent>
           </Card>
 
@@ -147,7 +154,7 @@ export default function AdminDashboard() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Branch Revenue</CardTitle>
+              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -171,11 +178,11 @@ export default function AdminDashboard() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Claims</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Active Marketers</CardTitle>
+              <UserPlus className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalClaims}</div>
+              <div className="text-2xl font-bold">{stats.totalMarketers}</div>
             </CardContent>
           </Card>
         </div>

@@ -14,6 +14,108 @@ export type Database = {
   }
   public: {
     Tables: {
+      bill_items: {
+        Row: {
+          benefit_cost: number
+          bill_id: string
+          branch_compensation: number
+          created_at: string
+          id: string
+          real_cost: number
+          service_id: string
+          service_name: string
+        }
+        Insert: {
+          benefit_cost: number
+          bill_id: string
+          branch_compensation: number
+          created_at?: string
+          id?: string
+          real_cost: number
+          service_id: string
+          service_name: string
+        }
+        Update: {
+          benefit_cost?: number
+          bill_id?: string
+          branch_compensation?: number
+          created_at?: string
+          id?: string
+          real_cost?: number
+          service_id?: string
+          service_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bill_items_bill_id_fkey"
+            columns: ["bill_id"]
+            isOneToOne: false
+            referencedRelation: "bills"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_items_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bills: {
+        Row: {
+          created_at: string
+          finalized_at: string | null
+          id: string
+          is_finalized: boolean | null
+          receptionist_id: string | null
+          total_benefit_cost: number
+          total_branch_compensation: number
+          total_profit_loss: number
+          total_real_cost: number
+          visit_id: string
+        }
+        Insert: {
+          created_at?: string
+          finalized_at?: string | null
+          id?: string
+          is_finalized?: boolean | null
+          receptionist_id?: string | null
+          total_benefit_cost: number
+          total_branch_compensation: number
+          total_profit_loss: number
+          total_real_cost: number
+          visit_id: string
+        }
+        Update: {
+          created_at?: string
+          finalized_at?: string | null
+          id?: string
+          is_finalized?: boolean | null
+          receptionist_id?: string | null
+          total_benefit_cost?: number
+          total_branch_compensation?: number
+          total_profit_loss?: number
+          total_real_cost?: number
+          visit_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bills_receptionist_id_fkey"
+            columns: ["receptionist_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_visit_id_fkey"
+            columns: ["visit_id"]
+            isOneToOne: true
+            referencedRelation: "visits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       branch_payments: {
         Row: {
           amount_paid: number
@@ -202,8 +304,139 @@ export type Database = {
           },
         ]
       }
+      dental_records: {
+        Row: {
+          created_at: string
+          id: string
+          member_id: string
+          notes: string | null
+          status: string
+          tooth_number: number
+          updated_at: string
+          visit_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          member_id: string
+          notes?: string | null
+          status: string
+          tooth_number: number
+          updated_at?: string
+          visit_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          member_id?: string
+          notes?: string | null
+          status?: string
+          tooth_number?: number
+          updated_at?: string
+          visit_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dental_records_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dental_records_visit_id_fkey"
+            columns: ["visit_id"]
+            isOneToOne: false
+            referencedRelation: "visits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dependants: {
+        Row: {
+          created_at: string
+          dob: string
+          full_name: string
+          id: string
+          identification_number: string
+          member_id: string
+          relationship: string
+        }
+        Insert: {
+          created_at?: string
+          dob: string
+          full_name: string
+          id?: string
+          identification_number: string
+          member_id: string
+          relationship: string
+        }
+        Update: {
+          created_at?: string
+          dob?: string
+          full_name?: string
+          id?: string
+          identification_number?: string
+          member_id?: string
+          relationship?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dependants_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketers: {
+        Row: {
+          code: string
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          is_active: boolean | null
+          phone: string | null
+          total_earnings: number | null
+          user_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          email: string
+          full_name: string
+          id?: string
+          is_active?: boolean | null
+          phone?: string | null
+          total_earnings?: number | null
+          user_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          email?: string
+          full_name?: string
+          id?: string
+          is_active?: boolean | null
+          phone?: string | null
+          total_earnings?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketers_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       members: {
         Row: {
+          age: number | null
           benefit_limit: number | null
           biometric_data: string | null
           branch_id: string | null
@@ -216,10 +449,10 @@ export type Database = {
           is_active: boolean | null
           member_number: string
           membership_category_id: string | null
+          marketer_id: string | null
           next_of_kin_name: string | null
           next_of_kin_phone: string | null
           phone: string
-          qr_code_data: string | null
           rollover_balance: number | null
           rollover_years: number | null
           total_contributions: number | null
@@ -227,6 +460,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          age?: number | null
           benefit_limit?: number | null
           biometric_data?: string | null
           branch_id?: string | null
@@ -239,10 +473,10 @@ export type Database = {
           is_active?: boolean | null
           member_number: string
           membership_category_id?: string | null
+          marketer_id?: string | null
           next_of_kin_name?: string | null
           next_of_kin_phone?: string | null
           phone: string
-          qr_code_data?: string | null
           rollover_balance?: number | null
           rollover_years?: number | null
           total_contributions?: number | null
@@ -250,6 +484,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          age?: number | null
           benefit_limit?: number | null
           biometric_data?: string | null
           branch_id?: string | null
@@ -262,10 +497,10 @@ export type Database = {
           is_active?: boolean | null
           member_number?: string
           membership_category_id?: string | null
+          marketer_id?: string | null
           next_of_kin_name?: string | null
           next_of_kin_phone?: string | null
           phone?: string
-          qr_code_data?: string | null
           rollover_balance?: number | null
           rollover_years?: number | null
           total_contributions?: number | null
@@ -281,10 +516,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "members_marketer_id_fkey"
+            columns: ["marketer_id"]
+            isOneToOne: false
+            referencedRelation: "marketers"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "members_membership_category_id_fkey"
             columns: ["membership_category_id"]
             isOneToOne: false
             referencedRelation: "membership_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -489,6 +738,13 @@ export type Database = {
             referencedRelation: "branches"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "staff_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
         ]
       }
       user_roles: {
@@ -512,39 +768,57 @@ export type Database = {
       visits: {
         Row: {
           benefit_deducted: number
+          biometrics_verified: boolean | null
           branch_compensation: number
           branch_id: string
           created_at: string
+          diagnosis: string | null
+          doctor_id: string | null
           id: string
           member_id: string
           notes: string | null
           profit_loss: number
+          receptionist_id: string | null
           service_id: string
           staff_id: string | null
+          status: string | null
+          treatment_notes: string | null
         }
         Insert: {
           benefit_deducted: number
+          biometrics_verified?: boolean | null
           branch_compensation: number
           branch_id: string
           created_at?: string
+          diagnosis?: string | null
+          doctor_id?: string | null
           id?: string
           member_id: string
           notes?: string | null
           profit_loss: number
+          receptionist_id?: string | null
           service_id: string
           staff_id?: string | null
+          status?: string | null
+          treatment_notes?: string | null
         }
         Update: {
           benefit_deducted?: number
+          biometrics_verified?: boolean | null
           branch_compensation?: number
           branch_id?: string
           created_at?: string
+          diagnosis?: string | null
+          doctor_id?: string | null
           id?: string
           member_id?: string
           notes?: string | null
           profit_loss?: number
+          receptionist_id?: string | null
           service_id?: string
           staff_id?: string | null
+          status?: string | null
+          treatment_notes?: string | null
         }
         Relationships: [
           {
@@ -555,10 +829,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "visits_doctor_id_fkey"
+            columns: ["doctor_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "visits_member_id_fkey"
             columns: ["member_id"]
             isOneToOne: false
             referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visits_receptionist_id_fkey"
+            columns: ["receptionist_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
             referencedColumns: ["id"]
           },
           {
@@ -583,6 +871,10 @@ export type Database = {
     }
     Functions: {
       apply_yearly_rollover: { Args: never; Returns: undefined }
+      finalize_bill: {
+        Args: { _bill_id: string; _receptionist_id: string }
+        Returns: undefined
+      }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
@@ -596,7 +888,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "staff" | "member"
+      app_role: "admin" | "staff" | "member" | "receptionist" | "doctor" | "branch_director" | "marketer"
       approval_type: "all_branches" | "pre_approved_only"
       claim_status: "pending" | "approved" | "rejected" | "completed"
       membership_level:
@@ -734,7 +1026,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "staff", "member"],
+      app_role: ["admin", "staff", "member", "receptionist", "doctor", "branch_director", "marketer"],
       approval_type: ["all_branches", "pre_approved_only"],
       claim_status: ["pending", "approved", "rejected", "completed"],
       membership_level: [

@@ -3,11 +3,9 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, Send, ArrowLeft } from "lucide-react";
-// @ts-ignore
+import { Loader2, Save, Send, ArrowLeft, Trash2, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { DentalChart } from "@/components/doctor/DentalChart";
 
@@ -18,22 +16,45 @@ export default function Consultation() {
 
     const [visit, setVisit] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
     const [selectedTeeth, setSelectedTeeth] = useState<number[]>([]);
     const [toothStatus, setToothStatus] = useState<Record<number, string>>({});
-    const [notes, setNotes] = useState("");
+    const [diagnosis, setDiagnosis] = useState(""); // Renamed from notes to diagnosis
+    const [treatmentNotes, setTreatmentNotes] = useState(""); // New field for doctor's notes
     const [services, setServices] = useState<any[]>([]);
-    const [selectedService, setSelectedService] = useState<string>("");
+    const [selectedServices, setSelectedServices] = useState<any[]>([]);
+    const [doctorId, setDoctorId] = useState<string | null>(null);
 
     useEffect(() => {
         if (visitId) {
+            fetchDoctorInfo();
             loadVisitData();
             loadServices();
         }
     }, [visitId]);
 
+    const fetchDoctorInfo = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            navigate("/login");
+            return;
+        }
+        const { data: staffData, error: staffError } = await supabase
+            .from("staff")
+            .select("id")
+            .eq("user_id", user.id)
+            .maybeSingle();
+
+        if (staffError || !staffData) {
+            toast({ title: "Error", description: "Could not retrieve doctor profile.", variant: "destructive" });
+            navigate("/doctor");
+            return;
+        }
+        setDoctorId(staffData.id);
+    };
+
     const loadVisitData = async () => {
         setLoading(true);
-        // @ts-ignore
         const { data, error } = await supabase
             .from("visits")
             .select("*, members(*)")
@@ -45,28 +66,29 @@ export default function Consultation() {
             navigate("/doctor");
         } else {
             setVisit(data);
-            // Load existing dental records if any
-            // @ts-ignore
-            const { data: records } = await supabase.from("dental_records").select("tooth_number, status, notes").eq("member_id", data.member_id);
+            // Load existing dental records
+            const { data: records } = await supabase.from("dental_records").select("tooth_number, status").eq("member_id", data.member_id);
             if (records) {
                 const statuses: any = {};
                 records.forEach((r: any) => statuses[r.tooth_number] = r.status);
                 setToothStatus(statuses);
             }
-            // If notes exist in visit, load them
-            if (data.notes) setNotes(data.notes);
+            if (data.diagnosis) setDiagnosis(data.diagnosis);
+            if (data.treatment_notes) setTreatmentNotes(data.treatment_notes);
 
-            // Update status to in_progress if it was registered
-            if (data.status === 'registered') {
-                // @ts-ignore
-                await supabase.from("visits").update({ status: 'in_progress' }).eq("id", visitId);
+            // If status is 'registered', update to 'with_doctor'
+            if (data.status === 'registered' && doctorId) {
+                const { error: updateStatusError } = await supabase
+                    .from("visits")
+                    .update({ status: 'with_doctor', doctor_id: doctorId })
+                    .eq("id", visitId);
+                if (updateStatusError) console.error("Error updating visit status:", updateStatusError);
             }
         }
         setLoading(false);
     };
 
     const loadServices = async () => {
-        // @ts-ignore
         const { data } = await supabase.from("services").select("*").eq("is_active", true);
         if (data) setServices(data);
     };
@@ -85,92 +107,134 @@ export default function Consultation() {
             newStatus[id] = status;
         });
         setToothStatus(newStatus);
-        setSelectedTeeth([]); // clear selection
+        setSelectedTeeth([]);
         toast({ title: "Chart Updated", description: `${selectedTeeth.length} teeth marked as ${status}` });
     };
 
-    const handleSaveNotes = async () => {
-        // @ts-ignore
-        const { error } = await supabase.from("visits").update({ notes }).eq("id", visitId);
-        if (error) toast({ title: "Error saving notes", variant: "destructive" });
-        else toast({ title: "Notes saved" });
+    const addService = (serviceId: string) => {
+        const service = services.find(s => s.id === serviceId);
+        if (service && !selectedServices.find(s => s.id === serviceId)) {
+            setSelectedServices([...selectedServices, service]);
+        }
     };
 
-    const handleFinalize = async () => {
-        if (!selectedService) {
-            toast({ title: "Select Service", description: "multiselect a service performed.", variant: "destructive" });
-            return;
-        }
+    const removeService = (serviceId: string) => {
+        setSelectedServices(selectedServices.filter(s => s.id !== serviceId));
+    };
 
-        setLoading(true);
+    const handleSaveDraft = async () => {
+        if (!visitId) return;
+        setSubmitting(true);
         try {
-            const service = services.find(s => s.id === selectedService);
+            const { error } = await supabase.from("visits").update({
+                diagnosis: diagnosis,
+                treatment_notes: treatmentNotes,
+            }).eq("id", visitId);
 
-            // 1. Save Dental Records
-            const recordsToInsert = Object.entries(toothStatus).map(([tooth_id, status]) => ({
+            if (error) throw error;
+
+            // Save dental records
+            const recordsToUpsert = Object.entries(toothStatus).map(([tooth_number, status]) => ({
                 member_id: visit.member_id,
                 visit_id: visitId,
-                tooth_number: parseInt(tooth_id),
-                status,
+                tooth_number: parseInt(tooth_number),
+                status: status,
                 notes: `Updated in visit ${visitId}`
             }));
 
-            if (recordsToInsert.length > 0) {
-                // @ts-ignore
-                await supabase.from("dental_records").upsert(recordsToInsert, { onConflict: 'member_id,tooth_number' });
+            if (recordsToUpsert.length > 0) {
+                const { error: dentalError } = await supabase.from("dental_records").upsert(recordsToUpsert, { onConflict: 'member_id,tooth_number' });
+                if (dentalError) throw dentalError;
             }
 
-            // 2. Generate Bill (Simple: 1 service per visit for now)
-            // Ensure we don't double bill
+            toast({ title: "Draft Saved", description: "Clinical notes and dental chart changes saved." });
+        } catch (error: any) {
+            toast({ title: "Error saving draft", description: error.message, variant: "destructive" });
+        } finally {
+            setSubmitting(false);
+        }
+    };
 
-            // @ts-ignore
+    const handleFinalize = async () => {
+        if (!visitId || !doctorId) return;
+        if (selectedServices.length === 0) {
+            toast({ title: "Select Services", description: "Please add at least one service.", variant: "destructive" });
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            // 1. Save Dental Records (if any changes were made)
+            const recordsToUpsert = Object.entries(toothStatus).map(([tooth_number, status]) => ({
+                member_id: visit.member_id,
+                visit_id: visitId,
+                tooth_number: parseInt(tooth_number),
+                status: status,
+                notes: `Updated in visit ${visitId}`
+            }));
+
+            if (recordsToUpsert.length > 0) {
+                const { error: dentalError } = await supabase.from("dental_records").upsert(recordsToUpsert, { onConflict: 'member_id,tooth_number' });
+                if (dentalError) throw dentalError;
+            }
+
+            // 2. Calculate Bill Totals
+            const totalBenefit = selectedServices.reduce((acc, s) => acc + Number(s.benefit_cost), 0);
+            const totalCompensation = selectedServices.reduce((acc, s) => acc + Number(s.branch_compensation), 0);
+            const totalReal = selectedServices.reduce((acc, s) => acc + Number(s.real_cost), 0);
+            const totalProfitLoss = totalBenefit - totalCompensation; // Profit/Loss is benefit - compensation
+
+            // 3. Create Bill
             const { data: bill, error: billError } = await supabase.from("bills").insert({
                 visit_id: visitId,
-                member_id: visit.member_id,
-                total_amount: service.base_price,
-                insurance_covered: Math.min(service.base_price, visit.members?.coverage_balance || 0),
-                payable_amount: Math.max(0, service.base_price - (visit.members?.coverage_balance || 0)),
-                status: 'pending'
+                total_benefit_cost: totalBenefit,
+                total_branch_compensation: totalCompensation,
+                total_real_cost: totalReal,
+                total_profit_loss: totalProfitLoss,
+                is_finalized: false, // Receptionist finalizes
             }).select().single();
 
             if (billError) throw billError;
 
-            // 3. Update Visit to Billed (Wait for reception payment)
-            // @ts-ignore
-            const { error: visitError } = await supabase.from("visits").update({
-                status: 'billed',
-                service_id: selectedService,
-                benefit_deducted: Math.min(service.base_price, visit.members?.coverage_balance || 0)
+            // 4. Add Bill Items
+            const itemsToInsert = selectedServices.map(s => ({
+                bill_id: bill.id,
+                service_id: s.id,
+                service_name: s.name,
+                benefit_cost: s.benefit_cost,
+                branch_compensation: s.branch_compensation,
+                real_cost: s.real_cost
+            }));
+
+            const { error: itemsError } = await supabase.from("bill_items").insert(itemsToInsert);
+            if (itemsError) throw itemsError;
+
+            // 5. Update Visit Status and Doctor Notes
+            const { error: visitUpdateError } = await supabase.from("visits").update({
+                status: 'billed', // Change status to 'billed'
+                diagnosis: diagnosis,
+                treatment_notes: treatmentNotes,
+                doctor_id: doctorId,
+                // These fields are now derived from the bill, so set to 0 or remove from visits table
+                benefit_deducted: 0,
+                branch_compensation: 0,
+                profit_loss: 0,
+                service_id: '00000000-0000-0000-0000-000000000000' // Placeholder, as services are now in bill_items
             }).eq("id", visitId);
 
-            if (visitError) throw visitError;
+            if (visitUpdateError) throw visitUpdateError;
 
-            // 4. Update member balance (Deduct benefit)
-            if (visit.members?.coverage_balance && visit.members.coverage_balance > 0) {
-                // @ts-ignore
-                await supabase.rpc('deduct_member_balance', {
-                    p_member_id: visit.member_id,
-                    p_amount: Math.min(service.base_price, visit.members.coverage_balance)
-                });
-                // Note: Need to implement this RPC or do it client side (unsafe but quick for now, prefer RPC)
-                // For now, client side update for speed in prototype
-                // @ts-ignore
-                await supabase.from("members").update({
-                    coverage_balance: Math.max(0, visit.members.coverage_balance - service.base_price)
-                }).eq("id", visit.member_id);
-            }
-
-            toast({ title: "Consultation Completed", description: "Bill generated and sent to reception." });
+            toast({ title: "Consultation Completed", description: "Bill generated and sent to reception for finalization." });
             navigate("/doctor");
 
         } catch (error: any) {
             toast({ title: "Failed to finalize", description: error.message, variant: "destructive" });
         } finally {
-            setLoading(false);
+            setSubmitting(false);
         }
     };
 
-    if (loading || !visit) return <div className="p-8"><Loader2 className="animate-spin h-8 w-8 text-primary mx-auto" /></div>;
+    if (loading || !visit || !doctorId) return <div className="p-8 text-center"><Loader2 className="animate-spin h-8 w-8 text-primary mx-auto" /></div>;
 
     return (
         <div className="space-y-6 max-w-7xl mx-auto">
@@ -180,17 +244,16 @@ export default function Consultation() {
                 </Button>
                 <div>
                     <h1 className="text-2xl font-bold">Consultation - {visit.members.full_name}</h1>
-                    <p className="text-muted-foreground">Visit #{visitId?.slice(0, 8)} • {visit.members.age} yrs • {visit.members.gender || 'N/A'}</p>
+                    <p className="text-muted-foreground">Visit #{visitId?.slice(0, 8)} • ID: {visit.members.id_number}</p>
                 </div>
             </div>
 
             <div className="grid lg:grid-cols-3 gap-6">
-                {/* Main Chart Area */}
                 <div className="lg:col-span-2 space-y-6">
                     <Card>
                         <CardHeader>
                             <CardTitle>Dental Chart</CardTitle>
-                            <CardDescription>Select teeth to update status.</CardDescription>
+                            <CardDescription>Select teeth to update clinical status.</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <DentalChart
@@ -198,12 +261,12 @@ export default function Consultation() {
                                 selectedTeeth={selectedTeeth}
                                 toothStatus={toothStatus}
                             />
-
                             {selectedTeeth.length > 0 && (
-                                <div className="mt-4 p-4 border rounded bg-slate-50 flex gap-2 justify-center animate-in fade-in slide-in-from-bottom-2">
+                                <div className="mt-4 p-4 border rounded bg-primary/5 flex gap-2 justify-center flex-wrap">
                                     <Button size="sm" variant="destructive" onClick={() => handleStatusUpdate('decay')}>Mark Decay</Button>
                                     <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={() => handleStatusUpdate('planned')}>Plan Treatment</Button>
                                     <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleStatusUpdate('completed')}>Mark Completed</Button>
+                                    <Button size="sm" variant="outline" onClick={() => handleStatusUpdate('healthy')}>Mark Healthy</Button>
                                 </div>
                             )}
                         </CardContent>
@@ -211,74 +274,121 @@ export default function Consultation() {
 
                     <Card>
                         <CardHeader>
-                            <CardTitle>Diagnosis & Notes</CardTitle>
+                            <CardTitle>Clinical Notes & Diagnosis</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <Textarea
-                                placeholder="Enter clinical notes, diagnosis, and observations..."
-                                className="min-h-[150px]"
-                                value={notes}
-                                onChange={(e) => setNotes(e.target.value)}
-                            />
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="diagnosis">Diagnosis</Label>
+                                    <Textarea
+                                        id="diagnosis"
+                                        placeholder="Enter diagnosis..."
+                                        className="min-h-[80px]"
+                                        value={diagnosis}
+                                        onChange={(e) => setDiagnosis(e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="treatmentNotes">Treatment Notes</Label>
+                                    <Textarea
+                                        id="treatmentNotes"
+                                        placeholder="Enter treatment notes..."
+                                        className="min-h-[120px]"
+                                        value={treatmentNotes}
+                                        onChange={(e) => setTreatmentNotes(e.target.value)}
+                                    />
+                                </div>
+                            </div>
                             <div className="flex justify-end mt-2">
-                                <Button variant="ghost" size="sm" onClick={handleSaveNotes}>
-                                    <Save className="mr-2 h-4 w-4" /> Save Notes
+                                <Button variant="ghost" size="sm" onClick={handleSaveDraft} disabled={submitting}>
+                                    {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Save Draft
                                 </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Services Provided</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="flex gap-2">
+                                <select
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                    onChange={(e) => addService(e.target.value)}
+                                    defaultValue=""
+                                >
+                                    <option value="" disabled>Select a service to add...</option>
+                                    {services.map(s => (
+                                        <option key={s.id} value={s.id}>{s.name} (Benefit: KES {s.benefit_cost.toLocaleString()})</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="border rounded-md divide-y">
+                                {selectedServices.length === 0 ? (
+                                    <div className="p-4 text-center text-muted-foreground">No services selected yet.</div>
+                                ) : (
+                                    selectedServices.map(s => (
+                                        <div key={s.id} className="p-4 flex justify-between items-center bg-white">
+                                            <div>
+                                                <div className="font-semibold">{s.name}</div>
+                                                <div className="text-xs text-muted-foreground">
+                                                    Benefit: KES {s.benefit_cost.toLocaleString()} | Comp: KES {s.branch_compensation.toLocaleString()} | Real: KES {s.real_cost.toLocaleString()}
+                                                </div>
+                                            </div>
+                                            <Button variant="ghost" size="icon" onClick={() => removeService(s.id)}>
+                                                <Trash2 className="h-4 w-4 text-destructive" />
+                                            </Button>
+                                        </div>
+                                    ))
+                                )}
                             </div>
                         </CardContent>
                     </Card>
                 </div>
 
-                {/* Side Panel */}
                 <div className="space-y-6">
                     <Card>
                         <CardHeader>
-                            <CardTitle>Patient Info</CardTitle>
+                            <CardTitle>Patient Eligibility</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4 text-sm">
-                            <div>
-                                <Label className="text-muted-foreground">Member Number</Label>
-                                <p className="font-medium">{visit.members.member_number}</p>
+                            <div className="flex justify-between items-center">
+                                <span className="text-muted-foreground">Member Number</span>
+                                <span className="font-medium">{visit.members.member_number}</span>
                             </div>
-                            <div>
-                                <Label className="text-muted-foreground">Coverage Balance</Label>
-                                <p className="font-medium text-green-600">KES {visit.members.coverage_balance?.toLocaleString()}</p>
+                            <div className="flex justify-between items-center">
+                                <span className="text-muted-foreground">Coverage Balance</span>
+                                <span className="font-bold text-green-600">KES {visit.members.coverage_balance?.toLocaleString()}</span>
                             </div>
-                            <div>
-                                <Label className="text-muted-foreground">Medical History</Label>
-                                <p>No major alerts.</p>
+                            <div className="pt-2 border-t">
+                                <Label>Billing Summary</Label>
+                                <div className="mt-2 space-y-1">
+                                    <div className="flex justify-between">
+                                        <span>Total Benefit Cost:</span>
+                                        <span>KES {selectedServices.reduce((acc, s) => acc + Number(s.benefit_cost), 0).toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex justify-between font-bold text-primary">
+                                        <span>Estimated Coverage Deduction:</span>
+                                        <span>KES {Math.min(selectedServices.reduce((acc, s) => acc + Number(s.benefit_cost), 0), visit.members.coverage_balance || 0).toLocaleString()}</span>
+                                    </div>
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
 
-                    <Card className="border-primary/20 bg-primary/5">
-                        <CardHeader>
-                            <CardTitle>Finalize Visit</CardTitle>
-                            <CardDescription>Select service and generate bill.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="space-y-2">
-                                <Label>Service Performed</Label>
-                                <Select value={selectedService} onValueChange={setSelectedService}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select Service" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {services.map(s => (
-                                            <SelectItem key={s.id} value={s.id}>
-                                                {s.name} - KES {s.base_price}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <Button className="w-full btn-primary" onClick={handleFinalize} disabled={loading}>
-                                {loading ? <Loader2 className="animate-spin mr-2" /> : <Send className="mr-2 h-4 w-4" />}
-                                Generate Bill
-                            </Button>
-                        </CardContent>
-                    </Card>
+                    <Button
+                        className="w-full h-12 text-lg font-bold shadow-lg bg-green-600 hover:bg-green-700"
+                        onClick={handleFinalize}
+                        disabled={submitting || selectedServices.length === 0}
+                    >
+                        {submitting ? <Loader2 className="animate-spin mr-2" /> : <Send className="mr-2 h-5 w-5" />}
+                        Submit Consultation
+                    </Button>
+                    <p className="text-center text-xs text-muted-foreground">
+                        Bill will be sent to Reception for finalization and deduction.
+                    </p>
                 </div>
             </div>
         </div>

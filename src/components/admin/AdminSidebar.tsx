@@ -3,13 +3,13 @@ import {
   Users,
   Building2,
   UserCog,
-  FileText,
+  FileText, // Removed for claims
   Stethoscope,
   LayoutDashboard,
   LogOut,
   Settings,
   History,
-  DollarSign, // Added DollarSign icon for payments
+  DollarSign,
 } from "lucide-react";
 import {
   Sidebar,
@@ -32,10 +32,10 @@ const menuItems = [
   { title: "Members", url: "/admin/members", icon: Users },
   { title: "Branches", url: "/admin/branches", icon: Building2 },
   { title: "Staff", url: "/admin/staff", icon: UserCog },
-  { title: "Claims", url: "/admin/claims", icon: FileText },
+  // { title: "Claims", url: "/admin/claims", icon: FileText }, // Removed
   { title: "Visits", url: "/admin/visits", icon: History },
   { title: "Services", url: "/admin/services", icon: Stethoscope },
-  { title: "Branch Payments", url: "/admin/branch-payments", icon: DollarSign }, // New item
+  { title: "Branch Payments", url: "/admin/branch-payments", icon: DollarSign },
   { title: "Settings", url: "/admin/settings", icon: Settings },
 ];
 

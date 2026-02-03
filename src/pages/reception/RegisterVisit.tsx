@@ -1,14 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Search, UserCheck, UserX, Fingerprint, ArrowRight, Loader2, CheckCircle } from "lucide-react";
-// @ts-ignore
+import { Search, UserCheck, UserX, Fingerprint, ArrowRight, Loader2, CheckCircle, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+import { BiometricCapture } from "@/components/BiometricCapture"; // Import the BiometricCapture component
 
 export default function RegisterVisit() {
     const [searchTerm, setSearchTerm] = useState("");
@@ -16,8 +16,36 @@ export default function RegisterVisit() {
     const [member, setMember] = useState<any>(null);
     const [biometricsVerified, setBiometricsVerified] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [receptionistId, setReceptionistId] = useState<string | null>(null);
+    const [receptionistBranchId, setReceptionistBranchId] = useState<string | null>(null);
     const { toast } = useToast();
     const navigate = useNavigate();
+
+    useEffect(() => {
+        fetchReceptionistInfo();
+    }, []);
+
+    const fetchReceptionistInfo = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            navigate("/login");
+            return;
+        }
+
+        const { data: staffData, error: staffError } = await supabase
+            .from("staff")
+            .select("id, branch_id")
+            .eq("user_id", user.id)
+            .maybeSingle();
+
+        if (staffError || !staffData) {
+            toast({ title: "Error", description: "Could not retrieve receptionist profile.", variant: "destructive" });
+            navigate("/reception");
+            return;
+        }
+        setReceptionistId(staffData.id);
+        setReceptionistBranchId(staffData.branch_id);
+    };
 
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -27,20 +55,25 @@ export default function RegisterVisit() {
         setBiometricsVerified(false);
 
         try {
-            // Search by phone or ID
-            // @ts-ignore
             const { data, error } = await supabase
                 .from("members")
                 .select("*, membership_categories(name)")
                 .or(`phone.eq.${searchTerm},id_number.eq.${searchTerm}`)
                 .single();
 
-            if (error && error.code !== 'PGRST116') {
+            if (error && error.code !== 'PGRST116') { // PGRST116 is "No rows found"
                 throw error;
             }
 
             if (data) {
                 setMember(data);
+                // If member has biometric data, enable verification
+                if (data.biometric_data) {
+                    setBiometricsVerified(false); // Reset for new verification
+                } else {
+                    setBiometricsVerified(true); // No biometric data to verify, proceed
+                    toast({ title: "No Biometric Data", description: "Member has no registered biometric data. Proceeding without biometric verification.", variant: "default" });
+                }
             } else {
                 toast({ title: "Member not found", description: "No member found with that Phone or ID.", variant: "destructive" });
             }
@@ -51,43 +84,36 @@ export default function RegisterVisit() {
         }
     };
 
-    const handleBiometricAuth = async () => {
-        // Mock biometric authentication
-        setLoading(true);
-        setTimeout(() => {
-            setBiometricsVerified(true);
-            setLoading(false);
-            toast({ title: "Biometrics Verified", description: "Identity confirmed successfully.", className: "bg-green-500 text-white" });
-        }, 1500);
+    const handleBiometricVerificationComplete = (success: boolean) => {
+        setBiometricsVerified(success);
+        if (!success) {
+            toast({ title: "Biometric Verification Failed", description: "Please try again or proceed manually if allowed.", variant: "destructive" });
+        }
     };
 
     const handleRegisterVisit = async () => {
-        if (!member) return;
+        if (!member || !receptionistId || !receptionistBranchId) return;
         if (!biometricsVerified) {
             toast({ title: "Biometrics required", description: "Please verify identity first.", variant: "destructive" });
+            return;
+        }
+        if (!member.is_active) {
+            toast({ title: "Inactive Member", description: "Member is inactive. Advise payment before service.", variant: "destructive" });
             return;
         }
 
         setLoading(true);
         try {
-            // Get current user (receptionist)
-            const { data: { user } } = await supabase.auth.getUser();
-
-            // Get a default branch (for now, pick the first active branch or user's branch logic if implemented)
-            // In real app, receptionist belongs to a branch. For now we fetch one.
-            // @ts-ignore
-            const { data: branch } = await supabase.from('branches').select('id').limit(1).single();
-
-            if (!branch) throw new Error("No active branch found system-wide.");
-
-            // Create Visit
-            // @ts-ignore
             const { error } = await supabase.from('visits').insert({
                 member_id: member.id,
-                branch_id: branch.id,
-                receptionist_id: user?.id,
-                status: 'registered',
-                biometrics_verified: true
+                branch_id: receptionistBranchId,
+                receptionist_id: receptionistId,
+                status: 'registered', // Initial status
+                biometrics_verified: biometricsVerified,
+                benefit_deducted: 0, // Initial values
+                branch_compensation: 0,
+                profit_loss: 0,
+                service_id: '00000000-0000-0000-0000-000000000000' // Placeholder, will be updated by doctor
             });
 
             if (error) throw error;
@@ -103,7 +129,14 @@ export default function RegisterVisit() {
 
     return (
         <div className="max-w-2xl mx-auto space-y-6">
-            <h1 className="text-3xl font-bold tracking-tight">Register New Visit</h1>
+            <div className="flex items-center gap-4 mb-6">
+                <Link to="/reception">
+                    <Button variant="ghost" size="icon">
+                        <ArrowLeft className="h-5 w-5" />
+                    </Button>
+                </Link>
+                <h1 className="text-3xl font-bold tracking-tight">Register New Visit</h1>
+            </div>
 
             <Card>
                 <CardHeader>
@@ -167,31 +200,27 @@ export default function RegisterVisit() {
 
                         {member.is_active && (
                             <div className="space-y-4 pt-4 border-t">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <div className={`p-2 rounded-full ${biometricsVerified ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'}`}>
-                                            <Fingerprint className="h-6 w-6" />
-                                        </div>
+                                {member.biometric_data ? (
+                                    <BiometricCapture
+                                        mode="verify"
+                                        userId={member.id}
+                                        credentialId={member.biometric_data}
+                                        onVerificationComplete={handleBiometricVerificationComplete}
+                                    />
+                                ) : (
+                                    <div className="p-4 border rounded-lg bg-yellow-50/20 text-yellow-700 flex items-center gap-3">
+                                        <Fingerprint className="h-6 w-6 shrink-0" />
                                         <div>
-                                            <p className="font-medium">Biometric Verification</p>
-                                            <p className="text-xs text-muted-foreground">Required to proceed</p>
+                                            <p className="font-medium">No Biometric Data Registered</p>
+                                            <p className="text-xs">Proceeding without biometric verification. Consider capturing biometrics for this member in Admin portal.</p>
                                         </div>
                                     </div>
-                                    {!biometricsVerified ? (
-                                        <Button onClick={handleBiometricAuth} disabled={loading}>
-                                            {loading ? <Loader2 className="animate-spin h-4 w-4" /> : "Verify Identity"}
-                                        </Button>
-                                    ) : (
-                                        <Badge className="bg-green-500 hover:bg-green-600">
-                                            <CheckCircle className="h-3 w-3 mr-1" /> Verified
-                                        </Badge>
-                                    )}
-                                </div>
+                                )}
 
                                 <Button
                                     className="w-full btn-primary"
                                     size="lg"
-                                    disabled={!biometricsVerified || loading}
+                                    disabled={!biometricsVerified || loading || !receptionistId || !receptionistBranchId}
                                     onClick={handleRegisterVisit}
                                 >
                                     {loading ? <Loader2 className="animate-spin mr-2" /> : <UserCheck className="mr-2 h-5 w-5" />}

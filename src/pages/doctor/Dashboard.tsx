@@ -5,30 +5,51 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Users, ClipboardList, Clock, ArrowRight } from "lucide-react";
-// @ts-ignore
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 
 export default function DoctorDashboard() {
     const [visits, setVisits] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [doctorId, setDoctorId] = useState<string | null>(null);
+    const [doctorBranchId, setDoctorBranchId] = useState<string | null>(null);
     const { toast } = useToast();
     const navigate = useNavigate();
 
     useEffect(() => {
-        fetchVisits();
+        fetchDoctorInfoAndVisits();
     }, []);
 
-    const fetchVisits = async () => {
+    const fetchDoctorInfoAndVisits = async () => {
         setLoading(true);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            navigate("/login");
+            return;
+        }
+
+        const { data: staffData, error: staffError } = await supabase
+            .from("staff")
+            .select("id, branch_id")
+            .eq("user_id", user.id)
+            .maybeSingle();
+
+        if (staffError || !staffData?.id || !staffData?.branch_id) {
+            toast({ title: "Error", description: "Could not retrieve doctor profile or branch.", variant: "destructive" });
+            setLoading(false);
+            return;
+        }
+
+        setDoctorId(staffData.id);
+        setDoctorBranchId(staffData.branch_id);
+
         const today = new Date().toISOString().split('T')[0];
 
-        // Fetch visits that are 'registered' (waiting) or 'in_progress'
-        // @ts-ignore
         const { data, error } = await supabase
             .from("visits")
             .select("*, members(full_name, member_number, age, gender)")
-            .or('status.eq.registered,status.eq.in_progress')
+            .eq('branch_id', staffData.branch_id) // Filter by doctor's branch
+            .or('status.eq.registered,status.eq.with_doctor') // Only show registered or with_doctor
             .gte('created_at', today)
             .order('created_at', { ascending: true });
 
@@ -40,12 +61,24 @@ export default function DoctorDashboard() {
         setLoading(false);
     };
 
-    const handleStartConsultation = (visitId: string) => {
+    const handleStartConsultation = async (visitId: string, currentStatus: string) => {
+        if (currentStatus === 'registered') {
+            // Update visit status to 'with_doctor'
+            const { error } = await supabase
+                .from("visits")
+                .update({ status: 'with_doctor', doctor_id: doctorId })
+                .eq("id", visitId);
+
+            if (error) {
+                toast({ title: "Error starting consultation", description: error.message, variant: "destructive" });
+                return;
+            }
+        }
         navigate(`/doctor/consultation/${visitId}`);
     };
 
     const waitingCount = visits.filter(v => v.status === 'registered').length;
-    const inProgressCount = visits.filter(v => v.status === 'in_progress').length;
+    const inProgressCount = visits.filter(v => v.status === 'with_doctor').length;
 
     return (
         <div className="space-y-6">
@@ -82,7 +115,7 @@ export default function DoctorDashboard() {
             <Card>
                 <CardHeader>
                     <CardTitle>Patient Queue</CardTitle>
-                    <CardDescription>Today's appointments and walk-ins.</CardDescription>
+                    <CardDescription>Today's appointments and walk-ins for your branch.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Table>
@@ -122,13 +155,13 @@ export default function DoctorDashboard() {
                                         </TableCell>
                                         <TableCell>{visit.members?.member_number}</TableCell>
                                         <TableCell>
-                                            <Badge variant={visit.status === 'in_progress' ? 'default' : 'secondary'}>
-                                                {visit.status === 'in_progress' ? 'In Progress' : 'Waiting'}
+                                            <Badge variant={visit.status === 'with_doctor' ? 'default' : 'secondary'}>
+                                                {visit.status === 'with_doctor' ? 'In Progress' : 'Waiting'}
                                             </Badge>
                                         </TableCell>
                                         <TableCell>
-                                            <Button size="sm" onClick={() => handleStartConsultation(visit.id)}>
-                                                {visit.status === 'in_progress' ? 'Continue' : 'Start Consultation'}
+                                            <Button size="sm" onClick={() => handleStartConsultation(visit.id, visit.status)}>
+                                                {visit.status === 'with_doctor' ? 'Continue' : 'Start Consultation'}
                                                 <ArrowRight className="ml-2 h-4 w-4" />
                                             </Button>
                                         </TableCell>

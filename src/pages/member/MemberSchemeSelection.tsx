@@ -72,13 +72,12 @@ const MemberSchemeSelection = () => {
         description: "Please contact support.",
         variant: "destructive",
       });
-      navigate("/dashboard"); // Should not happen if user is logged in
+      navigate("/dashboard");
       return;
     }
 
     setMember(memberData);
 
-    // If member is already active, redirect to dashboard
     if (memberData.is_active) {
       navigate("/dashboard");
       return;
@@ -117,21 +116,22 @@ const MemberSchemeSelection = () => {
     setSubmitting(true);
 
     try {
+      const principalAmount = selectedCategory.payment_amount;
       const totalPayment = selectedCategory.payment_amount + selectedCategory.registration_fee + selectedCategory.management_fee;
       const benefitToAdd = selectedCategory.benefit_amount;
 
-      const qrCodeValue = `MEMBER-${member.member_number}`; // Generate QR code data
+      const qrCodeValue = `MEMBER-${member.member_number}`;
 
-      // 1. Update member's coverage, contributions, activate, and set category
+      // 1. Update member's coverage, contributions (principal only), activate, and set category
       const { error: updateError } = await supabase
         .from("members")
         .update({
           coverage_balance: (member.coverage_balance || 0) + benefitToAdd,
-          total_contributions: (member.total_contributions || 0) + totalPayment,
+          total_contributions: (member.total_contributions || 0) + principalAmount, // Only principal amount
           is_active: true,
           qr_code_data: qrCodeValue,
           membership_category_id: selectedCategory.id,
-          benefit_limit: selectedCategory.benefit_amount, // Set initial benefit limit
+          benefit_limit: benefitToAdd, // Benefit limit is the doubled amount
         })
         .eq("id", member.id);
 
@@ -151,10 +151,10 @@ const MemberSchemeSelection = () => {
 
       toast({
         title: "Payment Successful!",
-        description: `KES ${totalPayment.toLocaleString()} received. KES ${benefitToAdd.toLocaleString()} added to your coverage.`,
+        description: `KES ${totalPayment.toLocaleString()} received. KES ${benefitToAdd.toLocaleString()} added to your coverage. KES ${principalAmount.toLocaleString()} added to your contributions.`,
       });
 
-      navigate("/dashboard"); // Redirect to dashboard after successful payment
+      navigate("/dashboard");
     } catch (error: any) {
       toast({
         title: "Payment Failed",

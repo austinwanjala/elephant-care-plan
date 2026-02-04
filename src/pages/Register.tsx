@@ -1,15 +1,28 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ArrowLeft, UserPlus } from "lucide-react";
+import { Loader2, ArrowLeft, UserPlus, Search } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 const Register = () => {
-  const [searchParams] = useSearchParams();
   const [formData, setFormData] = useState({
     fullName: "",
     phone: "",
@@ -17,40 +30,42 @@ const Register = () => {
     age: "",
     email: "",
     password: "",
-    marketerCode: searchParams.get("ref") || "",
   });
+  const [referralSource, setReferralSource] = useState<string>("");
+  const [selectedMarketer, setSelectedMarketer] = useState<{ id: string; full_name: string; code: string } | null>(null);
+  const [marketers, setMarketers] = useState<any[]>([]);
+  const [isMarketerModalOpen, setIsMarketerModalOpen] = useState(false);
+  const [marketerSearch, setMarketerSearch] = useState("");
+  
   const [consents, setConsents] = useState({
     processing: false,
     sharing: false,
     signature: false,
   });
   const [loading, setLoading] = useState(false);
-  const [marketerName, setMarketerName] = useState<string | null>(null);
 
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Check if marketer code is valid
   useEffect(() => {
-    const checkMarketer = async () => {
-      if (formData.marketerCode) {
-        const { data, error } = await supabase
-          .from("marketers")
-          .select("full_name")
-          .eq("code", formData.marketerCode.toUpperCase())
-          .maybeSingle();
-        
-        if (data) {
-          setMarketerName(data.full_name);
-        } else {
-          setMarketerName(null);
-        }
-      } else {
-        setMarketerName(null);
-      }
-    };
-    checkMarketer();
-  }, [formData.marketerCode]);
+    if (referralSource === "marketer") {
+      fetchMarketers();
+      setIsMarketerModalOpen(true);
+    } else {
+      setSelectedMarketer(null);
+    }
+  }, [referralSource]);
+
+  const fetchMarketers = async () => {
+    const { data, error } = await supabase
+      .from("marketers")
+      .select("id, full_name, code")
+      .eq("is_active", true);
+    
+    if (!error && data) {
+      setMarketers(data);
+    }
+  };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,6 +79,15 @@ const Register = () => {
       return;
     }
 
+    if (referralSource === "marketer" && !selectedMarketer) {
+      toast({
+        title: "Marketer required",
+        description: "Please select a marketer from the list.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -72,18 +96,7 @@ const Register = () => {
         throw new Error("Please enter a valid age.");
       }
 
-      // Find marketer ID if code is provided
-      let marketerId = null;
-      if (formData.marketerCode) {
-        const { data: mData } = await supabase
-          .from("marketers")
-          .select("id")
-          .eq("code", formData.marketerCode.toUpperCase())
-          .maybeSingle();
-        marketerId = mData?.id || null;
-      }
-
-      const { error: authError } = await supabase.auth.signUp({
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
@@ -93,15 +106,15 @@ const Register = () => {
             phone: formData.phone,
             id_number: formData.idNumber,
             age: ageInt,
-            marketer_id: marketerId,
-            marketer_code: formData.marketerCode.toUpperCase() || null
+            marketer_id: selectedMarketer?.id || null,
+            marketer_code: selectedMarketer?.code || null
           }
         }
       });
 
       if (authError) throw authError;
 
-      // Send Welcome SMS via Edge Function
+      // Send Welcome SMS
       try {
         await supabase.functions.invoke('send-sms', {
           body: {
@@ -115,11 +128,12 @@ const Register = () => {
       }
 
       toast({
-        title: "Registration successful!",
-        description: "Your account has been created. Please login to select your membership scheme.",
+        title: "Account created!",
+        description: "Now, let's add your dependants.",
       });
       
-      navigate("/login");
+      // Redirect to dependants step
+      navigate("/register/dependants");
     } catch (error: any) {
       toast({
         title: "Registration failed",
@@ -130,6 +144,11 @@ const Register = () => {
       setLoading(false);
     }
   };
+
+  const filteredMarketers = marketers.filter(m => 
+    m.full_name.toLowerCase().includes(marketerSearch.toLowerCase()) ||
+    m.code.toLowerCase().includes(marketerSearch.toLowerCase())
+  );
 
   return (
     <div className="min-h-screen bg-background py-8 px-4">
@@ -148,7 +167,7 @@ const Register = () => {
           </div>
 
           <h1 className="text-3xl font-serif font-bold text-foreground mb-2">Member Registration</h1>
-          <p className="text-muted-foreground mb-8">Create your account to access dental coverage and manage your health investment.</p>
+          <p className="text-muted-foreground mb-8">Create your account to access dental coverage.</p>
 
           <form onSubmit={handleRegister} className="space-y-6">
             <div className="grid md:grid-cols-2 gap-6">
@@ -229,21 +248,23 @@ const Register = () => {
               </div>
 
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="marketerCode">Referral Code (Optional)</Label>
-                <div className="relative">
-                  <Input
-                    id="marketerCode"
-                    placeholder="e.g. AGENT001"
-                    value={formData.marketerCode}
-                    onChange={(e) => setFormData({ ...formData, marketerCode: e.target.value })}
-                    className="input-field uppercase"
-                  />
-                  {marketerName && (
-                    <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                      <UserPlus className="h-3 w-3" /> Referred by {marketerName}
-                    </p>
-                  )}
-                </div>
+                <Label>How did you hear about us?</Label>
+                <Select value={referralSource} onValueChange={setReferralSource}>
+                  <SelectTrigger className="input-field">
+                    <SelectValue placeholder="Select an option" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="social_media">Social Media</SelectItem>
+                    <SelectItem value="friend">Friend or Family</SelectItem>
+                    <SelectItem value="marketer">Marketer / Agent</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+                {selectedMarketer && (
+                  <p className="text-sm text-green-600 mt-2 flex items-center gap-1">
+                    <UserPlus className="h-4 w-4" /> Selected Marketer: <strong>{selectedMarketer.full_name} ({selectedMarketer.code})</strong>
+                  </p>
+                )}
               </div>
             </div>
 
@@ -254,8 +275,8 @@ const Register = () => {
                   checked={consents.processing}
                   onCheckedChange={(checked) => setConsents({ ...consents, processing: !!checked })}
                 />
-                <Label htmlFor="processing" className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                  I consent to the processing of my personal data for membership administration as per the <Link to="/privacy-policy" className="text-primary hover:underline">Privacy Policy</Link>.
+                <Label htmlFor="processing" className="text-sm leading-none">
+                  I consent to the processing of my personal data as per the <Link to="/privacy-policy" className="text-primary hover:underline">Privacy Policy</Link>.
                 </Label>
               </div>
 
@@ -265,8 +286,8 @@ const Register = () => {
                   checked={consents.sharing}
                   onCheckedChange={(checked) => setConsents({ ...consents, sharing: !!checked })}
                 />
-                <Label htmlFor="sharing" className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                  I authorize Elephant Dental to share my medical information with its affiliated branches as outlined in the <Link to="/terms-of-service" className="text-primary hover:underline">Terms of Service</Link>.
+                <Label htmlFor="sharing" className="text-sm leading-none">
+                  I authorize data sharing with affiliated branches as per the <Link to="/terms-of-service" className="text-primary hover:underline">Terms of Service</Link>.
                 </Label>
               </div>
 
@@ -276,32 +297,60 @@ const Register = () => {
                   checked={consents.signature}
                   onCheckedChange={(checked) => setConsents({ ...consents, signature: !!checked })}
                 />
-                <Label htmlFor="signature" className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                  I acknowledge that checking this box constitutes my digital signature and agreement to the <Link to="/terms-of-service" className="text-primary hover:underline">Terms of Service</Link>.
+                <Label htmlFor="signature" className="text-sm leading-none">
+                  I agree to the <Link to="/terms-of-service" className="text-primary hover:underline">Terms of Service</Link>.
                 </Label>
               </div>
             </div>
 
             <Button type="submit" className="w-full btn-primary py-6 text-lg" disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Creating Account...
-                </>
-              ) : (
-                "Register Member"
-              )}
+              {loading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : "Register Member"}
             </Button>
           </form>
-
-          <p className="text-center text-muted-foreground mt-6">
-            Already have an account?{" "}
-            <Link to="/login" className="text-primary hover:underline font-medium">
-              Sign in here
-            </Link>
-          </p>
         </div>
       </div>
+
+      <Dialog open={isMarketerModalOpen} onOpenChange={setIsMarketerModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Select Marketer</DialogTitle>
+            <DialogDescription>Please choose the marketer who referred you.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search by name or code..." 
+                className="pl-9"
+                value={marketerSearch}
+                onChange={(e) => setMarketerSearch(e.target.value)}
+              />
+            </div>
+            <div className="max-h-[300px] overflow-y-auto border rounded-md divide-y">
+              {filteredMarketers.length === 0 ? (
+                <p className="p-4 text-center text-muted-foreground">No marketers found.</p>
+              ) : (
+                filteredMarketers.map((m) => (
+                  <div 
+                    key={m.id} 
+                    className="p-3 hover:bg-muted cursor-pointer flex justify-between items-center"
+                    onClick={() => {
+                      setSelectedMarketer(m);
+                      setIsMarketerModalOpen(false);
+                    }}
+                  >
+                    <div>
+                      <p className="font-medium">{m.full_name}</p>
+                      <p className="text-xs text-muted-foreground">{m.code}</p>
+                    </div>
+                    <Button size="sm" variant="ghost">Select</Button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

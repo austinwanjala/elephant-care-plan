@@ -10,6 +10,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, Link } from "react-router-dom";
 import { BiometricCapture } from "@/components/BiometricCapture";
 
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+
 export default function RegisterVisit() {
     const [searchTerm, setSearchTerm] = useState("");
     const [searching, setSearching] = useState(false);
@@ -18,12 +26,20 @@ export default function RegisterVisit() {
     const [loading, setLoading] = useState(false);
     const [receptionistId, setReceptionistId] = useState<string | null>(null);
     const [receptionistBranchId, setReceptionistBranchId] = useState<string | null>(null);
+    const [doctors, setDoctors] = useState<any[]>([]);
+    const [selectedDoctorId, setSelectedDoctorId] = useState<string>("");
     const { toast } = useToast();
     const navigate = useNavigate();
 
     useEffect(() => {
         fetchReceptionistInfo();
     }, []);
+
+    useEffect(() => {
+        if (receptionistBranchId) {
+            fetchDoctors();
+        }
+    }, [receptionistBranchId]);
 
     const fetchReceptionistInfo = async () => {
         const { data: { user } } = await supabase.auth.getUser();
@@ -47,6 +63,42 @@ export default function RegisterVisit() {
         setReceptionistBranchId(staffData.branch_id);
     };
 
+    const fetchDoctors = async () => {
+        try {
+            // 1. Get all active staff in this branch
+            const { data: branchStaff, error: staffError } = await supabase
+                .from("staff")
+                .select("id, full_name, user_id")
+                .eq("branch_id", receptionistBranchId)
+                .eq("is_active", true);
+
+            if (staffError) throw staffError;
+
+            if (!branchStaff || branchStaff.length === 0) {
+                setDoctors([]);
+                return;
+            }
+
+            // 2. Filter these staff to check who has the 'doctor' role
+            const staffUserIds = branchStaff.map(s => s.user_id);
+            const { data: doctorRoles, error: roleError } = await supabase
+                .from("user_roles")
+                .select("user_id")
+                .eq("role", "doctor")
+                .in("user_id", staffUserIds);
+
+            if (roleError) throw roleError;
+
+            const doctorUserIdSet = new Set(doctorRoles?.map(r => r.user_id));
+            const doctorsList = branchStaff.filter(s => doctorUserIdSet.has(s.user_id));
+
+            setDoctors(doctorsList);
+        } catch (error: any) {
+            console.error("Error fetching doctors:", error);
+            toast({ title: "Error", description: "Failed to load doctors list.", variant: "destructive" });
+        }
+    };
+
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
         const term = searchTerm.trim();
@@ -58,7 +110,6 @@ export default function RegisterVisit() {
 
         try {
             // Use ilike with wildcards and double quotes for all fields to handle spaces and partial matches
-            // This is the most robust way to search across multiple text columns in Supabase/Postgrest
             const { data, error } = await supabase
                 .from("members")
                 .select("*, membership_categories(name)")
@@ -115,6 +166,7 @@ export default function RegisterVisit() {
                 branch_id: receptionistBranchId,
                 receptionist_id: receptionistId,
                 status: 'registered',
+                doctor_id: selectedDoctorId || null, // Assign doctor if selected
                 biometrics_verified: biometricsVerified,
                 benefit_deducted: 0,
                 branch_compensation: 0,
@@ -221,6 +273,21 @@ export default function RegisterVisit() {
                                         </div>
                                     </div>
                                 )}
+
+                                <div className="space-y-2">
+                                    <Label>Assign Doctor (Optional)</Label>
+                                    <Select value={selectedDoctorId} onValueChange={setSelectedDoctorId}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select a doctor..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {doctors.map((doc) => (
+                                                <SelectItem key={doc.id} value={doc.id}>{doc.full_name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <p className="text-xs text-muted-foreground">If not selected, the first available doctor will pick it up.</p>
+                                </div>
 
                                 <Button
                                     className="w-full btn-primary"

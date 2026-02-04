@@ -8,16 +8,30 @@ import {
   TrendingUp,
   TrendingDown,
   DollarSign,
-  UserPlus,
-  ClipboardList,
-  Activity,
   ArrowUpRight,
   ArrowDownRight,
   Calendar,
+  AlertCircle,
+  CheckCircle,
+  Activity
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  Legend
+} from "recharts";
 
 interface Stats {
   totalMembers: number;
@@ -36,6 +50,12 @@ interface CategoryDistribution {
   name: string;
   count: number;
   color: string;
+}
+
+interface ChartData {
+  month: string;
+  revenue: number;
+  visits: number;
 }
 
 const categoryColors = [
@@ -62,10 +82,15 @@ export default function AdminDashboard() {
   });
   const [categoryDistribution, setCategoryDistribution] = useState<CategoryDistribution[]>([]);
   const [recentMembers, setRecentMembers] = useState<any[]>([]);
+  const [chartData, setChartData] = useState<ChartData[]>([]);
+  const [pendingClaims, setPendingClaims] = useState<any[]>([]);
+  const navigate = useNavigate();
 
   useEffect(() => {
     loadStats();
     loadRecentMembers();
+    loadChartData();
+    loadPendingClaims();
   }, []);
 
   const loadStats = async () => {
@@ -122,6 +147,67 @@ export default function AdminDashboard() {
       .order("created_at", { ascending: false })
       .limit(5);
     setRecentMembers(data || []);
+  };
+
+  const loadChartData = async () => {
+    // Fetch last 6 months of data
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
+    sixMonthsAgo.setDate(1); // Start of that month
+
+    // Fetch Revenue
+    const { data: revenueData } = await supabase
+      .from("branch_revenue")
+      .select("date, total_compensation")
+      .gte("date", sixMonthsAgo.toISOString().split('T')[0]);
+
+    // Fetch Visits
+    const { data: visitData } = await supabase
+      .from("visits")
+      .select("created_at")
+      .gte("created_at", sixMonthsAgo.toISOString());
+
+    // Aggregate by Month
+    const months: Record<string, { revenue: number; visits: number }> = {};
+
+    // Initialize last 6 months
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(sixMonthsAgo);
+      d.setMonth(d.getMonth() + i);
+      const key = d.toLocaleString('default', { month: 'short', year: '2-digit' }); // e.g., "Jan 24"
+      months[key] = { revenue: 0, visits: 0 };
+    }
+
+    revenueData?.forEach((r: any) => {
+      const date = new Date(r.date);
+      const key = date.toLocaleString('default', { month: 'short', year: '2-digit' });
+      if (months[key]) months[key].revenue += Number(r.total_compensation);
+    });
+
+    visitData?.forEach((v: any) => {
+      const date = new Date(v.created_at);
+      const key = date.toLocaleString('default', { month: 'short', year: '2-digit' });
+      if (months[key]) months[key].visits += 1;
+    });
+
+    const formattedData = Object.entries(months).map(([month, data]) => ({
+      month,
+      revenue: data.revenue,
+      visits: data.visits
+    }));
+
+    setChartData(formattedData);
+  };
+
+  const loadPendingClaims = async () => {
+    const { data } = await supabase
+      .from("revenue_claims")
+      .select("id, amount, created_at, branches(name), staff:director_id(full_name)")
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(5);
+
+    setPendingClaims(data || []);
   };
 
   const formatCurrency = (amount: number) => {
@@ -209,34 +295,30 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        <Card className={`relative overflow-hidden border-0 shadow-md ${
-          stats.totalProfitLoss >= 0 
-            ? 'bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-950 dark:to-green-900/50' 
-            : 'bg-gradient-to-br from-red-50 to-red-100/50 dark:from-red-950 dark:to-red-900/50'
-        }`}>
+        <Card className={`relative overflow-hidden border-0 shadow-md ${stats.totalProfitLoss >= 0
+          ? 'bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-950 dark:to-green-900/50'
+          : 'bg-gradient-to-br from-red-50 to-red-100/50 dark:from-red-950 dark:to-red-900/50'
+          }`}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className={`text-sm font-medium ${
-              stats.totalProfitLoss >= 0 ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'
-            }`}>
+            <CardTitle className={`text-sm font-medium ${stats.totalProfitLoss >= 0 ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'
+              }`}>
               Net Profit/Loss
             </CardTitle>
-            <div className={`h-9 w-9 rounded-full flex items-center justify-center ${
-              stats.totalProfitLoss >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'
-            }`}>
-              {stats.totalProfitLoss >= 0 
+            <div className={`h-9 w-9 rounded-full flex items-center justify-center ${stats.totalProfitLoss >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'
+              }`}>
+              {stats.totalProfitLoss >= 0
                 ? <TrendingUp className="h-4 w-4 text-green-600" />
                 : <TrendingDown className="h-4 w-4 text-red-600" />
               }
             </div>
           </CardHeader>
           <CardContent>
-            <div className={`text-3xl font-bold ${
-              stats.totalProfitLoss >= 0 ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'
-            }`}>
+            <div className={`text-3xl font-bold ${stats.totalProfitLoss >= 0 ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'
+              }`}>
               {formatCurrency(Math.abs(stats.totalProfitLoss))}
             </div>
             <div className="flex items-center gap-1 mt-2">
-              {stats.totalProfitLoss >= 0 
+              {stats.totalProfitLoss >= 0
                 ? <ArrowUpRight className="h-3 w-3 text-green-600" />
                 : <ArrowDownRight className="h-3 w-3 text-red-600" />
               }
@@ -248,60 +330,78 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="shadow-sm hover:shadow-md transition-shadow">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
-                <ClipboardList className="h-5 w-5 text-orange-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{stats.totalVisits}</p>
-                <p className="text-xs text-muted-foreground">Total Visits</p>
-              </div>
+      <div className="grid lg:grid-cols-3 gap-6">
+        {/* Revenue Trend Chart */}
+        <Card className="lg:col-span-2 shadow-md">
+          <CardHeader>
+            <CardTitle>Trend Analytics</CardTitle>
+            <CardDescription>Revenue and Visit trends over last 6 months</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                  <XAxis dataKey="month" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis yAxisId="left" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value / 1000}k`} />
+                  <YAxis yAxisId="right" orientation="right" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    formatter={(value: any, name: any) => [name === 'revenue' ? `KES ${value.toLocaleString()}` : value, name === 'revenue' ? 'Revenue' : 'Visits']}
+                  />
+                  <Legend />
+                  <Line yAxisId="left" type="monotone" dataKey="revenue" stroke="#2563eb" strokeWidth={2} name="Total Revenue" activeDot={{ r: 8 }} />
+                  <Line yAxisId="right" type="monotone" dataKey="visits" stroke="#10b981" strokeWidth={2} name="Total Visits" />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm hover:shadow-md transition-shadow">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center">
-                <Building2 className="h-5 w-5 text-cyan-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{stats.totalBranches}</p>
-                <p className="text-xs text-muted-foreground">Active Branches</p>
-              </div>
+        {/* Pending Claims Card */}
+        <Card className="shadow-md">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Pending Claims</CardTitle>
+              <CardDescription>Branch claims requiring approval</CardDescription>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm hover:shadow-md transition-shadow">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-pink-100 dark:bg-pink-900/30 flex items-center justify-center">
-                <DollarSign className="h-5 w-5 text-pink-600" />
+            <Badge variant="secondary" className="bg-orange-100 text-orange-700">
+              {pendingClaims.length} Pending
+            </Badge>
+          </CardHeader>
+          <CardContent>
+            {pendingClaims.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
+                <CheckCircle className="h-12 w-12 mb-3 text-green-500/50" />
+                <p>All cleared!</p>
+                <p className="text-sm">No pending claims found.</p>
               </div>
-              <div>
-                <p className="text-2xl font-bold">{formatCurrency(stats.totalRevenue)}</p>
-                <p className="text-xs text-muted-foreground">Total Revenue</p>
+            ) : (
+              <div className="space-y-4">
+                {pendingClaims.map((claim) => (
+                  <div key={claim.id} className="flex items-center justify-between p-3 border rounded-lg bg-card hover:bg-muted/50 transition-colors">
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">{claim.branches?.name || 'Unknown Branch'}</p>
+                      <p className="text-xs text-muted-foreground">
+                        By {claim.staff?.full_name?.split(' ')[0]} • {new Date(claim.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-primary">
+                        KES {claim.amount?.toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+                <Button
+                  variant="outline"
+                  className="w-full mt-2"
+                  onClick={() => navigate('/admin/branch-payments')}
+                >
+                  View All Claims
+                </Button>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm hover:shadow-md transition-shadow">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
-                <UserPlus className="h-5 w-5 text-indigo-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{stats.totalMarketers}</p>
-                <p className="text-xs text-muted-foreground">Active Marketers</p>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -329,8 +429,8 @@ export default function AdminDashboard() {
                       </div>
                       <span className="text-sm text-muted-foreground">{cat.count} members</span>
                     </div>
-                    <Progress 
-                      value={stats.totalMembers > 0 ? (cat.count / stats.totalMembers) * 100 : 0} 
+                    <Progress
+                      value={stats.totalMembers > 0 ? (cat.count / stats.totalMembers) * 100 : 0}
                       className="h-2"
                     />
                   </div>

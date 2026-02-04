@@ -44,9 +44,17 @@ export default function AdminVisits() {
 
   const loadVisits = async () => {
     setLoading(true);
+    // Updated query to include aliased joins for doctor and receptionist names
     const { data, error } = await (supabase as any)
       .from("visits")
-      .select("*, members(full_name, member_number), branches(name), bills(total_benefit_cost, total_branch_compensation, total_profit_loss, bill_items(service_name))")
+      .select(`
+        *, 
+        members(full_name, member_number), 
+        branches(name), 
+        doctor:doctor_id(full_name), 
+        receptionist:receptionist_id(full_name), 
+        bills(total_benefit_cost, total_branch_compensation, total_profit_loss, bill_items(service_name))
+      `)
       .order("created_at", { ascending: false });
 
     if (error) {

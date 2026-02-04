@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-
 import { supabase } from "@/integrations/supabase/client";
 import {
   Users,
@@ -37,13 +36,6 @@ interface CategoryDistribution {
   name: string;
   count: number;
   color: string;
-}
-
-interface RecentActivity {
-  id: string;
-  type: 'member' | 'visit' | 'payment';
-  description: string;
-  timestamp: string;
 }
 
 const categoryColors = [
@@ -139,37 +131,7 @@ export default function AdminDashboard() {
   };
 
   return (
-<<<<<<< HEAD
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-serif font-bold text-foreground">Admin Dashboard</h1>
-        <p className="text-muted-foreground">Overview of your dental insurance system</p>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Members</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalMembers}</div>
-            <p className="text-xs text-muted-foreground">{stats.activeMembers} active</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Contributions</CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              KES {(stats.totalContributions / 1000).toFixed(0)}K
-=======
     <div className="space-y-8">
-      {/* Header Section */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
@@ -187,9 +149,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Quick Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Members */}
         <Card className="relative overflow-hidden border-0 shadow-md bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950 dark:to-blue-900/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-blue-700 dark:text-blue-300">Total Members</CardTitle>
@@ -215,7 +175,6 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        {/* Total Contributions */}
         <Card className="relative overflow-hidden border-0 shadow-md bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950 dark:to-emerald-900/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Total Contributions</CardTitle>
@@ -233,7 +192,6 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        {/* Active Coverage */}
         <Card className="relative overflow-hidden border-0 shadow-md bg-gradient-to-br from-violet-50 to-violet-100/50 dark:from-violet-950 dark:to-violet-900/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-violet-700 dark:text-violet-300">Active Coverage</CardTitle>
@@ -251,7 +209,6 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        {/* Profit/Loss */}
         <Card className={`relative overflow-hidden border-0 shadow-md ${
           stats.totalProfitLoss >= 0 
             ? 'bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-950 dark:to-green-900/50' 
@@ -286,104 +243,11 @@ export default function AdminDashboard() {
               <span className={`text-xs ${stats.totalProfitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 {stats.totalProfitLoss >= 0 ? 'Profitable' : 'Loss'}
               </span>
->>>>>>> 9ce1b7bf4df1d33d0fb034d895010586efa5354c
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Coverage</CardTitle>
-            <Shield className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              KES {(stats.totalCoverage / 1000).toFixed(0)}K
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Visits</CardTitle>
-            <ClipboardList className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalVisits}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Branches</CardTitle>
-            <Building2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalBranches}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              KES {(stats.totalRevenue / 1000).toFixed(0)}K
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Profit/Loss</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${stats.totalProfitLoss >= 0 ? "text-success" : "text-destructive"}`}>
-              KES {(stats.totalProfitLoss / 1000).toFixed(0)}K
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Marketers</CardTitle>
-            <UserPlus className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalMarketers}</div>
           </CardContent>
         </Card>
       </div>
 
-<<<<<<< HEAD
-      {/* Membership Distribution */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-serif">Membership Distribution</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {categoryDistribution.map((cat) => (
-              <div key={cat.name} className="text-center p-4 bg-muted/50 rounded-lg">
-                <p className="text-2xl font-bold text-primary">{cat.count}</p>
-                <p className="text-sm text-muted-foreground">{cat.name}</p>
-              </div>
-            ))}
-            {categoryDistribution.length === 0 && (
-              <p className="text-muted-foreground col-span-full text-center py-8">
-                No members registered yet
-              </p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-
-=======
-      {/* Secondary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="shadow-sm hover:shadow-md transition-shadow">
           <CardContent className="pt-6">
@@ -442,9 +306,7 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-      {/* Bottom Section */}
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* Membership Distribution */}
         <Card className="shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg">Membership Distribution</CardTitle>
@@ -478,7 +340,6 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        {/* Recent Members */}
         <Card className="shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg">Recent Members</CardTitle>
@@ -514,6 +375,5 @@ export default function AdminDashboard() {
         </Card>
       </div>
     </div>
->>>>>>> 9ce1b7bf4df1d33d0fb034d895010586efa5354c
   );
 }

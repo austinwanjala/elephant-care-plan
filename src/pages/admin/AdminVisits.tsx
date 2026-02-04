@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -28,10 +27,6 @@ interface Visit {
   profit_loss: number;
   notes: string | null;
   members: { full_name: string; member_number: string } | null;
-<<<<<<< HEAD
-
-=======
->>>>>>> 9ce1b7bf4df1d33d0fb034d895010586efa5354c
   branches: { name: string } | null;
   receptionist: { full_name: string } | null;
   doctor: { full_name: string } | null;
@@ -114,7 +109,6 @@ export default function AdminVisits() {
 
   return (
     <div className="space-y-6">
-
       <div className="flex flex-col sm:flex-row justify-between gap-4">
         <div>
           <h1 className="text-3xl font-serif font-bold text-foreground">All Visits</h1>

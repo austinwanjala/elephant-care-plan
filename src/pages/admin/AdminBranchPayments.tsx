@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -26,17 +25,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DollarSign, CheckCircle, Loader2, History, ClipboardList, CheckCircle2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format, getMonth, getYear, subMonths, addMonths } from "date-fns";
+import { format, getMonth, getYear, subMonths } from "date-fns";
 
 interface Branch {
   id: string;
   name: string;
   location: string;
-}
-
-interface BranchRevenueSummary {
-  branch_id: string;
-  total_compensation: number;
 }
 
 interface BranchPayment {
@@ -72,7 +66,7 @@ export default function AdminBranchPayments() {
   const [loading, setLoading] = useState(true);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [selectedClaim, setSelectedClaim] = useState<RevenueClaim | null>(null);
-  const [currentMonth, setCurrentMonth] = useState(getMonth(new Date()) + 1); // 1-indexed
+  const [currentMonth, setCurrentMonth] = useState(getMonth(new Date()) + 1);
   const [currentYear, setCurrentYear] = useState(getYear(new Date()));
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentNotes, setPaymentNotes] = useState("");
@@ -99,48 +93,27 @@ export default function AdminBranchPayments() {
           .eq("period_month", month)
           .eq("period_year", year)
           .order("payment_date", { ascending: false }),
-<<<<<<< HEAD
         (supabase as any)
-          .from("revenue_claims" as any)
-          .select("*, staff:director_id(full_name), branches:branch_id(name)")
-=======
-        supabase
           .from("revenue_claims")
-          .select("*")
->>>>>>> 9ce1b7bf4df1d33d0fb034d895010586efa5354c
+          .select("*, staff:director_id(full_name), branches:branch_id(name)")
           .order("created_at", { ascending: false }),
       ]);
 
       if (branchesRes.error) throw branchesRes.error;
-      if (revenueRes.error) console.error("Revenue error:", revenueRes.error);
-      if (paymentsRes.error) console.error("Payments error:", paymentsRes.error);
 
       if (branchesRes.data) setBranches(branchesRes.data);
 
       if (revenueRes.data) {
         const summary: Record<string, number> = {};
         branchesRes.data?.forEach(branch => summary[branch.id] = 0);
-        revenueRes.data.forEach((r) => {
+        revenueRes.data.forEach((r: any) => {
           summary[r.branch_id] = (summary[r.branch_id] || 0) + r.total_compensation;
         });
         setRevenueSummaries(summary);
       }
 
       if (paymentsRes.data) setPayments(paymentsRes.data);
-
-<<<<<<< HEAD
-      console.log("Fetched claims for admin:", claimsRes.data);
       if (claimsRes.data) setClaims(claimsRes.data as any);
-=======
-      // Fetch claims with branch names separately
-      if (!claimsRes.error && claimsRes.data) {
-        const claimsWithNames = claimsRes.data.map(claim => ({
-          ...claim,
-          branch_name: branchesRes.data?.find(b => b.id === claim.branch_id)?.name
-        }));
-        setClaims(claimsWithNames as any);
-      }
->>>>>>> 9ce1b7bf4df1d33d0fb034d895010586efa5354c
 
     } catch (error: any) {
       console.error("Error loading admin data:", error);
@@ -152,14 +125,6 @@ export default function AdminBranchPayments() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const getOutstandingPayable = (branchId: string) => {
-    const totalRevenue = revenueSummaries[branchId] || 0;
-    const totalPaid = payments
-      .filter((p) => p.branch_id === branchId && p.period_month === currentMonth && p.period_year === currentYear)
-      .reduce((sum, p) => sum + p.amount_paid, 0);
-    return totalRevenue - totalPaid;
   };
 
   const handleMarkAsPaid = (claim: RevenueClaim) => {
@@ -186,7 +151,6 @@ export default function AdminBranchPayments() {
 
       const { data: adminStaff } = await supabase.from("staff").select("id").eq("user_id", user.id).single();
 
-      // Update the claim status
       const { error: claimError } = await (supabase as any)
         .from("revenue_claims")
         .update({
@@ -225,12 +189,11 @@ export default function AdminBranchPayments() {
   const getMonthOptions = () => {
     const options = [];
     let date = new Date();
-    // Go back 12 months from current month
     for (let i = 0; i < 12; i++) {
       options.push(date);
       date = subMonths(date, 1);
     }
-    return options.reverse(); // Show most recent first
+    return options.reverse();
   };
 
   if (loading) {
@@ -238,13 +201,11 @@ export default function AdminBranchPayments() {
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
-
     );
   }
 
   return (
     <div className="space-y-6">
-
       <div className="flex flex-col sm:flex-row justify-between gap-4">
         <div>
           <h1 className="text-3xl font-serif font-bold text-foreground">Branch Payments</h1>
@@ -422,7 +383,6 @@ export default function AdminBranchPayments() {
         </TabsContent>
       </Tabs>
 
-      {/* Payment Dialog */}
       <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
         <DialogContent>
           <DialogHeader>

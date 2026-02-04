@@ -7,7 +7,6 @@ import {
     Users,
     DollarSign,
     Share2,
-    TrendingUp,
     Calendar,
     Copy,
     Loader2,
@@ -38,12 +37,8 @@ export default function MarketerDashboard() {
         setLoading(true);
         try {
             const { data: { user } } = await supabase.auth.getUser();
-            if (!user) {
-                // Redirect handled by layout or route protection usually
-                return;
-            }
+            if (!user) return;
 
-            // 1. Get Marketer Profile
             const { data: mData, error: mError } = await supabase
                 .from("marketers")
                 .select("*")
@@ -57,7 +52,6 @@ export default function MarketerDashboard() {
             }
             setMarketer(mData);
 
-            // 2. Get Commission Config
             const { data: configData } = await (supabase as any)
                 .from("marketer_commission_config")
                 .select("commission_per_referral")
@@ -67,7 +61,6 @@ export default function MarketerDashboard() {
 
             const rate = configData?.commission_per_referral || 0;
 
-            // 3. Get Referrals
             const { data: members, error: membersError } = await supabase
                 .from("members")
                 .select("id, full_name, created_at, is_active")
@@ -78,12 +71,9 @@ export default function MarketerDashboard() {
 
             setReferrals(members || []);
 
-<<<<<<< HEAD
-            // 4. Calculate Stats
             const activeCount = members?.filter((m: any) => m.is_active).length || 0;
             const lifeEarnings = activeCount * rate;
 
-            // 5. Get Claims History for payouts
             const { data: claims } = await (supabase as any)
                 .from("marketer_claims")
                 .select("amount, status")
@@ -92,8 +82,6 @@ export default function MarketerDashboard() {
             const totalPaid = claims?.filter((c: any) => c.status === 'paid').reduce((sum: number, c: any) => sum + c.amount, 0) || 0;
             const pendingClaims = claims?.filter((c: any) => c.status === 'pending').reduce((sum: number, c: any) => sum + c.amount, 0) || 0;
 
-            // Claimable = LifeEarnings - Paid - Pending
-            // Ensure we don't show negative if something is out of sync
             const claimable = Math.max(0, lifeEarnings - totalPaid - pendingClaims);
 
             setStats({
@@ -103,26 +91,6 @@ export default function MarketerDashboard() {
                 claimable,
                 pendingClaims,
                 commissionRate: rate
-=======
-            // Calculate total earnings from commissions
-            const { data: commissionsData } = await (supabase as any)
-                .from("marketer_commissions")
-                .select("amount, status")
-                .eq("marketer_id", mData.id);
-
-            const totalEarnings = (commissionsData || [])
-                .filter((c: any) => c.status === 'paid')
-                .reduce((sum: number, c: any) => sum + Number(c.amount || 0), 0);
-
-            const pendingEarnings = (commissionsData || [])
-                .filter((c: any) => c.status === 'unclaimed' || c.status === 'claimed')
-                .reduce((sum: number, c: any) => sum + Number(c.amount || 0), 0);
-
-            setStats({
-                memberCount: members?.length || 0,
-                totalEarnings: totalEarnings,
-                pendingPayout: pendingEarnings
->>>>>>> 9ce1b7bf4df1d33d0fb034d895010586efa5354c
             });
 
         } catch (error: any) {

@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ArrowLeft, UserPlus, Search, Plus, Trash, Users } from "lucide-react";
+import { Loader2, ArrowLeft, UserPlus, Search, Plus, Trash, Users, CreditCard } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -20,8 +20,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface Dependant {
   fullName: string;
@@ -44,6 +44,7 @@ const Register = () => {
   const [selectedMarketer, setSelectedMarketer] = useState<{ id: string; full_name: string; code: string } | null>(null);
   const [marketers, setMarketers] = useState<any[]>([]);
   const [isMarketerModalOpen, setIsMarketerModalOpen] = useState(false);
+  const [isDependantModalOpen, setIsDependantModalOpen] = useState(false);
   const [marketerSearch, setMarketerSearch] = useState("");
   const [loadingMarketers, setLoadingMarketers] = useState(false);
   
@@ -108,6 +109,7 @@ const Register = () => {
     }
     setDependants([...dependants, newDep]);
     setNewDep({ fullName: "", relationship: "", dob: "", idNumber: "" });
+    setIsDependantModalOpen(false);
   };
 
   const removeDependant = (index: number) => {
@@ -287,27 +289,20 @@ const Register = () => {
 
             {/* Dependants Section */}
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold border-b pb-2">Add Dependants (Optional)</h3>
-              <p className="text-sm text-muted-foreground">You can add up to 5 family members to share your coverage.</p>
-              
-              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end bg-muted/30 p-4 rounded-lg border">
-                <div className="space-y-1">
-                  <Label className="text-xs">Full Name</Label>
-                  <Input value={newDep.fullName} onChange={e => setNewDep({...newDep, fullName: e.target.value})} placeholder="Name" />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Relationship</Label>
-                  <Input value={newDep.relationship} onChange={e => setNewDep({...newDep, relationship: e.target.value})} placeholder="e.g. Child" />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Date of Birth</Label>
-                  <Input type="date" value={newDep.dob} onChange={e => setNewDep({...newDep, dob: e.target.value})} />
-                </div>
-                <Button type="button" variant="outline" onClick={addDependant} className="w-full">
-                  <Plus className="h-4 w-4 mr-1" /> Add
+              <div className="flex items-center justify-between border-b pb-2">
+                <h3 className="text-lg font-semibold">Add Dependants (Optional)</h3>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setIsDependantModalOpen(true)}
+                  disabled={dependants.length >= 5}
+                >
+                  <Plus className="h-4 w-4 mr-1" /> Add Dependant
                 </Button>
               </div>
-
+              <p className="text-sm text-muted-foreground">You can add up to 5 family members to share your coverage.</p>
+              
               {dependants.length > 0 && (
                 <div className="grid gap-2 mt-4">
                   {dependants.map((dep, idx) => (
@@ -316,7 +311,7 @@ const Register = () => {
                         <Users className="h-4 w-4 text-primary" />
                         <div>
                           <p className="text-sm font-medium">{dep.fullName}</p>
-                          <p className="text-xs text-muted-foreground">{dep.relationship} • {dep.dob}</p>
+                          <p className="text-xs text-muted-foreground">{dep.relationship} • {dep.dob} • ID: {dep.idNumber || 'N/A'}</p>
                         </div>
                       </div>
                       <Button type="button" variant="ghost" size="icon" onClick={() => removeDependant(idx)}>
@@ -402,6 +397,58 @@ const Register = () => {
               )}
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dependant Modal */}
+      <Dialog open={isDependantModalOpen} onOpenChange={setIsDependantModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Dependant</DialogTitle>
+            <DialogDescription>Enter the details of your family member.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Full Name</Label>
+              <Input 
+                placeholder="Dependant's Name" 
+                value={newDep.fullName}
+                onChange={(e) => setNewDep({ ...newDep, fullName: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Relationship</Label>
+              <Input 
+                placeholder="e.g. Child, Spouse" 
+                value={newDep.relationship}
+                onChange={(e) => setNewDep({ ...newDep, relationship: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Date of Birth</Label>
+              <Input 
+                type="date" 
+                value={newDep.dob}
+                onChange={(e) => setNewDep({ ...newDep, dob: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Birth Cert / Student ID Number</Label>
+              <div className="relative">
+                <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  placeholder="ID or Certificate Number" 
+                  className="pl-9"
+                  value={newDep.idNumber}
+                  onChange={(e) => setNewDep({ ...newDep, idNumber: e.target.value })}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDependantModalOpen(false)}>Cancel</Button>
+            <Button onClick={addDependant}>Add Dependant</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

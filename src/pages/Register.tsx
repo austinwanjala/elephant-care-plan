@@ -1,14 +1,15 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft, UserPlus } from "lucide-react";
 
 const Register = () => {
+  const [searchParams] = useSearchParams();
   const [formData, setFormData] = useState({
     fullName: "",
     phone: "",
@@ -16,6 +17,7 @@ const Register = () => {
     age: "",
     email: "",
     password: "",
+    marketerCode: searchParams.get("ref") || "",
   });
   const [consents, setConsents] = useState({
     processing: false,
@@ -23,9 +25,32 @@ const Register = () => {
     signature: false,
   });
   const [loading, setLoading] = useState(false);
+  const [marketerName, setMarketerName] = useState<string | null>(null);
 
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Check if marketer code is valid
+  useEffect(() => {
+    const checkMarketer = async () => {
+      if (formData.marketerCode) {
+        const { data, error } = await supabase
+          .from("marketers")
+          .select("full_name")
+          .eq("code", formData.marketerCode.toUpperCase())
+          .maybeSingle();
+        
+        if (data) {
+          setMarketerName(data.full_name);
+        } else {
+          setMarketerName(null);
+        }
+      } else {
+        setMarketerName(null);
+      }
+    };
+    checkMarketer();
+  }, [formData.marketerCode]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,6 +72,17 @@ const Register = () => {
         throw new Error("Please enter a valid age.");
       }
 
+      // Find marketer ID if code is provided
+      let marketerId = null;
+      if (formData.marketerCode) {
+        const { data: mData } = await supabase
+          .from("marketers")
+          .select("id")
+          .eq("code", formData.marketerCode.toUpperCase())
+          .maybeSingle();
+        marketerId = mData?.id || null;
+      }
+
       const { error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -57,6 +93,8 @@ const Register = () => {
             phone: formData.phone,
             id_number: formData.idNumber,
             age: ageInt,
+            marketer_id: marketerId,
+            marketer_code: formData.marketerCode.toUpperCase() || null
           }
         }
       });
@@ -189,6 +227,24 @@ const Register = () => {
                   className="input-field"
                 />
               </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="marketerCode">Referral Code (Optional)</Label>
+                <div className="relative">
+                  <Input
+                    id="marketerCode"
+                    placeholder="e.g. AGENT001"
+                    value={formData.marketerCode}
+                    onChange={(e) => setFormData({ ...formData, marketerCode: e.target.value })}
+                    className="input-field uppercase"
+                  />
+                  {marketerName && (
+                    <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                      <UserPlus className="h-3 w-3" /> Referred by {marketerName}
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
 
             <div className="space-y-4 pt-6 border-t border-border">
@@ -199,7 +255,7 @@ const Register = () => {
                   onCheckedChange={(checked) => setConsents({ ...consents, processing: !!checked })}
                 />
                 <Label htmlFor="processing" className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                  I consent to the processing of my personal data for membership administration.
+                  I consent to the processing of my personal data for membership administration as per the <Link to="/privacy-policy" className="text-primary hover:underline">Privacy Policy</Link>.
                 </Label>
               </div>
 
@@ -210,7 +266,7 @@ const Register = () => {
                   onCheckedChange={(checked) => setConsents({ ...consents, sharing: !!checked })}
                 />
                 <Label htmlFor="sharing" className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                  I authorize Elephant Dental to share my medical information with its affiliated branches.
+                  I authorize Elephant Dental to share my medical information with its affiliated branches as outlined in the <Link to="/terms-of-service" className="text-primary hover:underline">Terms of Service</Link>.
                 </Label>
               </div>
 
@@ -221,7 +277,7 @@ const Register = () => {
                   onCheckedChange={(checked) => setConsents({ ...consents, signature: !!checked })}
                 />
                 <Label htmlFor="signature" className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                  I acknowledge that checking this box constitutes my digital signature.
+                  I acknowledge that checking this box constitutes my digital signature and agreement to the <Link to="/terms-of-service" className="text-primary hover:underline">Terms of Service</Link>.
                 </Label>
               </div>
             </div>

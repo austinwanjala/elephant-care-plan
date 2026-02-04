@@ -7,58 +7,59 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import NotFound from "./pages/NotFound";
+import TermsOfService from "./pages/TermsOfService";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 
 // Admin pages
-import { AdminLayout } from "./components/admin/AdminLayout"; // Ensure AdminLayout is imported
+import { AdminLayout } from "./components/admin/AdminLayout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminMembers from "./pages/admin/AdminMembers";
 import AdminBranches from "./pages/admin/AdminBranches";
 import AdminStaff from "./pages/admin/AdminStaff";
-// import AdminClaims from "./pages/admin/AdminClaims"; // Removed
 import AdminServices from "./pages/admin/AdminServices";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminVisits from "./pages/admin/AdminVisits";
 import AdminBranchPayments from "./pages/admin/AdminBranchPayments";
-import AdminMembershipCategories from "./pages/admin/AdminMembershipCategories"; // New Admin page
-import AdminMarketerClaims from "./pages/admin/AdminMarketerClaims"; // Marketer commission claims
-import AdminCommissionSettings from "./pages/admin/AdminCommissionSettings"; // Marketer commission settings
+import AdminMembershipCategories from "./pages/admin/AdminMembershipCategories";
+import AdminMarketerClaims from "./pages/admin/AdminMarketerClaims";
+import AdminCommissionSettings from "./pages/admin/AdminCommissionSettings";
 
 // Reception pages
 import { ReceptionLayout } from "./components/reception/ReceptionLayout";
 import ReceptionDashboard from "./pages/reception/Dashboard";
 import RegisterVisit from "./pages/reception/RegisterVisit";
 import ReceptionBilling from "./pages/reception/Billing";
-import ReceptionSearchMember from "./pages/reception/SearchMember"; // New Receptionist page
-import ReceptionAddMember from "./pages/reception/AddMember"; // New Receptionist page
+import ReceptionSearchMember from "./pages/reception/SearchMember";
+import ReceptionAddMember from "./pages/reception/AddMember";
 
 // Doctor pages
 import { DoctorLayout } from "./components/doctor/DoctorLayout";
 import DoctorDashboard from "./pages/doctor/Dashboard";
 import Consultation from "./pages/doctor/Consultation";
-import DoctorPatientHistory from "./pages/doctor/PatientHistory"; // New Doctor page
+import DoctorPatientHistory from "./pages/doctor/PatientHistory";
 
 // Branch Director pages
 import { DirectorLayout } from "./components/director/DirectorLayout";
 import DirectorDashboard from "./pages/director/Dashboard";
-import DirectorRevenue from "./pages/director/Revenue"; // New Director page
-import DirectorPerformance from "./pages/director/Performance"; // New Director page
-import DirectorReports from "./pages/director/Reports"; // New Director page
+import DirectorRevenue from "./pages/director/Revenue";
+import DirectorPerformance from "./pages/director/Performance";
+import DirectorReports from "./pages/director/Reports";
 
 // Marketer pages
 import { MarketerLayout } from "./components/marketer/MarketerLayout";
 import MarketerDashboard from "./pages/marketer/Dashboard";
-import MarketerReferrals from "./pages/marketer/Referrals"; // New Marketer page
-import MarketerEarnings from "./pages/marketer/Earnings"; // New Marketer page
-import MarketerLinks from "./pages/marketer/Links"; // New Marketer page
+import MarketerReferrals from "./pages/marketer/Referrals";
+import MarketerEarnings from "./pages/marketer/Earnings";
+import MarketerLinks from "./pages/marketer/Links";
 
 // Member pages
 import { MemberLayout } from "./components/member/MemberLayout";
-import MemberDashboard from "./pages/member/MemberDashboard"; // Renamed from Dashboard to MemberDashboard
+import MemberDashboard from "./pages/member/MemberDashboard";
 import MemberPayments from "./pages/member/MemberPayments";
 import MemberVisits from "./pages/member/MemberVisits";
 import MemberProfile from "./pages/member/MemberProfile";
-import MemberSchemeSelection from "./pages/member/MemberSchemeSelection"; // New Member page
-import MemberDependants from "./pages/member/MemberDependants"; // New Member page
+import MemberSchemeSelection from "./pages/member/MemberSchemeSelection";
+import MemberDependants from "./pages/member/MemberDependants";
 
 const queryClient = new QueryClient();
 
@@ -72,6 +73,8 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/terms-of-service" element={<TermsOfService />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
 
           {/* Member Routes */}
           <Route path="/dashboard" element={<MemberLayout />}>
@@ -121,7 +124,6 @@ const App = () => (
             <Route path="members" element={<AdminMembers />} />
             <Route path="branches" element={<AdminBranches />} />
             <Route path="staff" element={<AdminStaff />} />
-            {/* <Route path="claims" element={<AdminClaims />} /> Removed as per new requirements */}
             <Route path="visits" element={<AdminVisits />} />
             <Route path="services" element={<AdminServices />} />
             <Route path="branch-payments" element={<AdminBranchPayments />} />

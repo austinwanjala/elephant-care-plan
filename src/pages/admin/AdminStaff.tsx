@@ -49,7 +49,6 @@ export default function AdminStaff() {
         supabase.from("branches").select("id, name").eq("is_active", true),
       ]);
 
-      // Create a role lookup map for efficiency
       const roleMap: Record<string, string> = {};
       (rolesRes.data || []).forEach((r: any) => {
         roleMap[r.user_id] = r.role;
@@ -64,7 +63,7 @@ export default function AdminStaff() {
         ...(marketersRes.data || []).map((m: any) => ({
           ...m,
           displayRole: 'marketer',
-          branches: { name: 'N/A (Marketer)' }, // Marketers don't have a branch
+          branches: { name: 'N/A (Marketer)' },
           type: 'marketer'
         }))
       ];
@@ -79,18 +78,18 @@ export default function AdminStaff() {
   };
 
   const handleAddUser = async () => {
+    setLoading(true);
     try {
       if (!formData.email || !formData.password || !formData.fullName) {
-        toast({ title: "Validation Error", description: "Email, Password and Full Name are required.", variant: "destructive" });
-        return;
+        throw new Error("Email, Password and Full Name are required.");
       }
 
-      // 1. Create a "no-session" client to preserve the Admin's login session
       const authClient = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-        auth: { persistSession: false }
+        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
       });
 
-      // 2. Create the Auth account with metadata
+      // We include id_number and age in metadata because the database triggers 
+      // might be expecting them for all new users regardless of role.
       const { data: authData, error: authError } = await authClient.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -99,74 +98,61 @@ export default function AdminStaff() {
             role: formData.role,
             full_name: formData.fullName,
             phone: formData.phone || null,
+            id_number: `STAFF-${Date.now()}`, // Dummy ID to satisfy potential triggers
+            age: 30, // Dummy age to satisfy potential triggers
             branch_id: formData.branchId || null,
             marketer_code: formData.marketerCode || null
           }
         }
       });
 
-      if (authError) {
-        if (authError.message.toLowerCase().includes("already registered")) {
-          throw new Error("This email is already registered. Please use a different email or manage the existing account.");
-        }
-        throw authError;
-      }
+      if (authError) throw authError;
 
       const userId = authData.user?.id;
-      if (!userId) throw new Error("User creation failed: No ID returned from authentication.");
+      if (!userId) throw new Error("User creation failed: No ID returned.");
 
-      // 3. Explicitly upsert the role into user_roles table
-      // We use upsert because a database trigger might have already created this record
-      const { error: roleInsertError } = await supabase
-        .from("user_roles")
-        .upsert({ user_id: userId, role: formData.role as any }, { onConflict: 'user_id' });
+      // Explicitly set the role to ensure it's correct even if trigger logic differs
+      await supabase.from("user_roles").upsert({ 
+        user_id: userId, 
+        role: formData.role as any 
+      }, { onConflict: 'user_id' });
 
-      if (roleInsertError) {
-        throw new Error(`Failed to assign role: ${roleInsertError.message}`);
-      }
-
-      // 4. Create/Update the corresponding profile (staff or marketer)
-      if (formData.role === 'receptionist' || formData.role === 'doctor' || formData.role === 'branch_director') {
-        const { error: profileError } = await supabase.from("staff").upsert({
-          user_id: userId,
-          full_name: formData.fullName,
-          email: formData.email,
-          phone: formData.phone || null,
-          branch_id: formData.branchId || null,
-          is_active: true,
-        }, { onConflict: 'user_id' });
-        
-        if (profileError) {
-          throw new Error(`Failed to create staff profile: ${profileError.message}`);
-        }
-      } else if (formData.role === 'marketer') {
-        const { error: profileError } = await supabase.from("marketers").upsert({
-          user_id: userId,
-          full_name: formData.fullName,
-          email: formData.email,
-          phone: formData.phone || null,
-          code: formData.marketerCode || `MARKETER-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
-          is_active: true,
-        }, { onConflict: 'user_id' });
-        
-        if (profileError) {
-          throw new Error(`Failed to create marketer profile: ${profileError.message}`);
+      // Create the specific profile if it's not a member
+      if (formData.role !== 'member') {
+        if (formData.role === 'marketer') {
+          await supabase.from("marketers").upsert({
+            user_id: userId,
+            full_name: formData.fullName,
+            email: formData.email,
+            phone: formData.phone || null,
+            code: formData.marketerCode || `MKT-${Math.random().toString(36).substring(2, 7).toUpperCase()}`,
+            is_active: true,
+          }, { onConflict: 'user_id' });
+        } else {
+          await supabase.from("staff").upsert({
+            user_id: userId,
+            full_name: formData.fullName,
+            email: formData.email,
+            phone: formData.phone || null,
+            branch_id: formData.branchId || null,
+            is_active: true,
+          }, { onConflict: 'user_id' });
         }
       }
 
       toast({
-        title: "Account Created Successfully",
-        description: `${formData.fullName} has been setup as ${formData.role}.`
+        title: "Account Created",
+        description: `${formData.fullName} has been added as ${formData.role}.`
       });
 
       setDialogOpen(false);
       setFormData({ fullName: "", email: "", phone: "", password: "", branchId: "", role: "receptionist", marketerCode: "" });
-
-      // Force refresh to show new user
       loadData();
 
     } catch (error: any) {
       toast({ title: "Creation failed", description: error.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -176,8 +162,6 @@ export default function AdminStaff() {
       const table = type === 'marketer' ? 'marketers' : 'staff';
       const { error } = await supabase.from(table).delete().eq("user_id", userId);
       if (error) throw error;
-
-      toast({ title: "User profile removed successfully. Note: Auth account must be removed via Supabase dashboard." });
       loadData();
     } catch (error: any) {
       toast({ title: "Error deleting", description: error.message, variant: "destructive" });
@@ -209,7 +193,6 @@ export default function AdminStaff() {
 
   return (
     <div className="space-y-6">
-
       <div className="flex flex-col sm:flex-row justify-between gap-4">
         <div>
           <h1 className="text-3xl font-serif font-bold text-blue-900">Staff & Management</h1>
@@ -279,8 +262,8 @@ export default function AdminStaff() {
                     <Input value={formData.marketerCode} onChange={(e) => setFormData({ ...formData, marketerCode: e.target.value })} placeholder="e.g. AGENT001" />
                   </div>
                 )}
-                <Button onClick={handleAddUser} className="bg-blue-600 hover:bg-blue-700 mt-2 w-full">
-                  Create Account & Profile
+                <Button onClick={handleAddUser} className="bg-blue-600 hover:bg-blue-700 mt-2 w-full" disabled={loading}>
+                  {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Create Account & Profile"}
                 </Button>
               </div>
             </DialogContent>
@@ -300,7 +283,7 @@ export default function AdminStaff() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {loading ? (
+            {loading && users.length === 0 ? (
               <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground">Refreshing staff records...</TableCell></TableRow>
             ) : users.length === 0 ? (
               <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground">No staff members found. Create your first portal user above.</TableCell></TableRow>

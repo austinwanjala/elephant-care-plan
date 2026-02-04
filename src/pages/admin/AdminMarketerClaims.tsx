@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, CheckCircle2, XCircle, DollarSign } from "lucide-react";
+import { Loader2, CheckCircle2, DollarSign } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 
@@ -56,7 +56,7 @@ export default function AdminMarketerClaims() {
 
     const loadClaims = async () => {
         setLoading(true);
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
             .from("marketer_claims")
             .select("*, marketers(full_name, code, email)")
             .order("created_at", { ascending: false });

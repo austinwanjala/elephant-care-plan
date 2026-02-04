@@ -14,10 +14,6 @@ interface MarketerInfo {
     code: string;
 }
 
-interface CommissionConfig {
-    commission_per_referral: number;
-}
-
 interface Claim {
     id: string;
     amount: number;
@@ -45,57 +41,44 @@ export default function MarketerEarnings() {
     const fetchMarketerData = async () => {
         setLoading(true);
         const { data: { user } } = await supabase.auth.getUser();
-
-        console.log("🔍 Current user:", user?.email, "ID:", user?.id);
-
         if (!user) {
             navigate("/login");
             return;
         }
 
-        // Fetch marketer profile
         const { data: mData, error: mError } = await supabase
             .from("marketers")
             .select("id, code")
             .eq("user_id", user.id)
             .maybeSingle();
 
-        console.log("🔍 Marketer query result:", { mData, mError });
-
         if (mError || !mData) {
-            console.error("❌ Marketer profile error:", mError);
-            console.error("❌ Current user email:", user.email);
-            console.error("❌ User ID:", user.id);
-            toast({
-                title: "Account Error",
-                description: `Marketer profile not found for ${user.email}. Please contact admin.`,
-                variant: "destructive"
-            });
+            toast({ title: "Account Error", description: "Marketer profile not found. Please contact admin.", variant: "destructive" });
             navigate("/marketer");
             return;
         }
         setMarketer(mData);
 
-        // Fetch commission config (using 'as any' to bypass TypeScript until types are regenerated)
+        // Fetch commission config
         const { data: configData } = await (supabase as any)
             .from("marketer_commission_config")
             .select("commission_per_referral")
-            .single();
+            .maybeSingle();
 
         if (configData) {
             setCommissionRate(configData.commission_per_referral);
         }
 
         // Fetch active referrals count
-        const { data: referralsData, count } = await supabase
+        const { count } = await supabase
             .from("members")
-            .select("id", { count: 'exact', head: false })
+            .select("id", { count: 'exact', head: true })
             .eq("marketer_id", mData.id)
             .eq("is_active", true);
 
         setActiveReferrals(count || 0);
 
-        // Fetch claims history (using 'as any' to bypass TypeScript until types are regenerated)
+        // Fetch claims history
         const { data: claimsData } = await (supabase as any)
             .from("marketer_claims")
             .select("*")
@@ -126,7 +109,7 @@ export default function MarketerEarnings() {
             if (error) throw error;
 
             toast({ title: "Claim Submitted", description: `Your claim for KES ${claimableAmount.toLocaleString()} has been submitted for approval.` });
-            fetchMarketerData(); // Refresh data
+            fetchMarketerData();
         } catch (error: any) {
             toast({ title: "Claim Failed", description: error.message, variant: "destructive" });
         } finally {
@@ -148,9 +131,9 @@ export default function MarketerEarnings() {
 
     // Calculate earnings
     const totalEarned = activeReferrals * commissionRate;
-    const totalClaimed = claims.filter(c => c.status === 'paid').reduce((sum, c) => sum + c.amount, 0);
+    const totalPaid = claims.filter(c => c.status === 'paid').reduce((sum, c) => sum + c.amount, 0);
     const pendingClaims = claims.filter(c => c.status === 'pending').reduce((sum, c) => sum + c.amount, 0);
-    const claimableAmount = Math.max(0, totalEarned - totalClaimed - pendingClaims);
+    const claimableAmount = Math.max(0, totalEarned - totalPaid - pendingClaims);
 
     return (
         <div className="space-y-6">
@@ -186,7 +169,7 @@ export default function MarketerEarnings() {
                         <DollarSign className="h-4 w-4 text-emerald-600" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">KES {totalClaimed.toLocaleString()}</div>
+                        <div className="text-2xl font-bold">KES {totalPaid.toLocaleString()}</div>
                         <p className="text-xs text-muted-foreground mt-1">Lifetime earnings received</p>
                     </CardContent>
                 </Card>
@@ -205,7 +188,6 @@ export default function MarketerEarnings() {
                 </Card>
             </div>
 
-            {/* Submit Claim Card */}
             <Card className="shadow-lg border-primary/20">
                 <CardHeader>
                     <CardTitle>Submit Commission Claim</CardTitle>
@@ -237,7 +219,6 @@ export default function MarketerEarnings() {
                 </CardContent>
             </Card>
 
-            {/* Claims History */}
             <Card className="shadow-sm border-slate-100">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">

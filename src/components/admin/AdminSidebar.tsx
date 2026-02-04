@@ -3,13 +3,13 @@ import {
   Users,
   Building2,
   UserCog,
-  // FileText, // Removed for claims
   Stethoscope,
   LayoutDashboard,
   LogOut,
   Settings,
   History,
   DollarSign,
+  ClipboardList,
 } from "lucide-react";
 import {
   Sidebar,
@@ -32,15 +32,16 @@ const menuItems = [
   { title: "Members", url: "/admin/members", icon: Users },
   { title: "Branches", url: "/admin/branches", icon: Building2 },
   { title: "Staff", url: "/admin/staff", icon: UserCog },
-  // { title: "Claims", url: "/admin/claims", icon: FileText }, // Removed
   { title: "Visits", url: "/admin/visits", icon: History },
   { title: "Services", url: "/admin/services", icon: Stethoscope },
   { title: "Branch Payments", url: "/admin/branch-payments", icon: DollarSign },
+  { title: "Marketer Claims", url: "/admin/marketer-claims", icon: ClipboardList },
 ];
 
 const settingsMenuItems = [
   { title: "General Settings", url: "/admin/settings", icon: Settings },
   { title: "Membership Categories", url: "/admin/membership-categories", icon: Users },
+  { title: "Commission Rates", url: "/admin/commission-settings", icon: DollarSign },
 ];
 
 export function AdminSidebar() {

@@ -28,16 +28,20 @@ export default function AdminCommissionSettings() {
 
     const loadConfig = async () => {
         setLoading(true);
+        // Using 'as any' for custom tables not yet in types
         const { data, error } = await (supabase as any)
             .from("marketer_commission_config")
             .select("*")
-            .single();
+            .maybeSingle();
 
         if (error) {
             toast({ title: "Error loading config", description: error.message, variant: "destructive" });
         } else if (data) {
             setConfig(data);
             setCommissionRate(data.commission_per_referral.toString());
+        } else {
+            // Default if no config exists
+            setCommissionRate("0");
         }
         setLoading(false);
     };
@@ -56,14 +60,26 @@ export default function AdminCommissionSettings() {
 
             const { data: adminStaff } = await supabase.from("staff").select("id").eq("user_id", user.id).single();
 
-            const { error } = await (supabase as any)
-                .from("marketer_commission_config")
-                .update({
-                    commission_per_referral: rate,
-                    updated_at: new Date().toISOString(),
-                    updated_by: adminStaff?.id
-                })
-                .eq("id", config?.id || "");
+            let error;
+            if (config?.id) {
+                const { error: updateError } = await (supabase as any)
+                    .from("marketer_commission_config")
+                    .update({
+                        commission_per_referral: rate,
+                        updated_at: new Date().toISOString(),
+                        updated_by: adminStaff?.id
+                    })
+                    .eq("id", config.id);
+                error = updateError;
+            } else {
+                const { error: insertError } = await (supabase as any)
+                    .from("marketer_commission_config")
+                    .insert({
+                        commission_per_referral: rate,
+                        updated_by: adminStaff?.id
+                    });
+                error = insertError;
+            }
 
             if (error) throw error;
 
@@ -119,7 +135,7 @@ export default function AdminCommissionSettings() {
                                 type="number"
                                 value={commissionRate}
                                 onChange={(e) => setCommissionRate(e.target.value)}
-                                placeholder="e.g., 50"
+                                placeholder="e.g., 500"
                                 min="0"
                                 step="1"
                             />

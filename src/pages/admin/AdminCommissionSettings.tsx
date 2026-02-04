@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,12 +27,9 @@ export default function AdminCommissionSettings() {
 
     const loadConfig = async () => {
         setLoading(true);
-        // Using 'as any' for custom tables not yet in types
         const { data, error } = await (supabase as any)
             .from("marketer_commission_config")
             .select("*")
-            .order("updated_at", { ascending: false })
-            .limit(1)
             .maybeSingle();
 
         if (error) {
@@ -42,7 +38,6 @@ export default function AdminCommissionSettings() {
             setConfig(data);
             setCommissionRate(data.commission_per_referral.toString());
         } else {
-            // Default if no config exists
             setCommissionRate("0");
         }
         setLoading(false);

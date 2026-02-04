@@ -45,6 +45,7 @@ const Register = () => {
   const [marketers, setMarketers] = useState<any[]>([]);
   const [isMarketerModalOpen, setIsMarketerModalOpen] = useState(false);
   const [marketerSearch, setMarketerSearch] = useState("");
+  const [loadingMarketers, setLoadingMarketers] = useState(false);
   
   const [dependants, setDependants] = useState<Dependant[]>([]);
   const [newDep, setNewDep] = useState<Dependant>({
@@ -64,24 +65,32 @@ const Register = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchMarketers();
-  }, []);
-
   const fetchMarketers = async () => {
-    const { data, error } = await supabase
-      .from("marketers")
-      .select("id, full_name, code")
-      .eq("is_active", true);
-    
-    if (!error && data) {
-      setMarketers(data);
+    setLoadingMarketers(true);
+    try {
+      const { data, error } = await supabase
+        .from("marketers")
+        .select("id, full_name, code")
+        .eq("is_active", true);
+      
+      if (error) throw error;
+      setMarketers(data || []);
+    } catch (err: any) {
+      console.error("Error fetching marketers:", err);
+      toast({
+        title: "Error",
+        description: "Could not load marketer list. Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingMarketers(false);
     }
   };
 
   const handleReferralChange = (value: string) => {
     setReferralSource(value);
     if (value === "marketer") {
+      fetchMarketers();
       setIsMarketerModalOpen(true);
     } else {
       setSelectedMarketer(null);
@@ -152,7 +161,7 @@ const Register = () => {
       if (authError) throw authError;
       if (!authData.user) throw new Error("Registration failed. Please try again.");
 
-      // 2. Insert dependants (The member profile is created via DB trigger)
+      // 2. Insert dependants
       if (dependants.length > 0) {
         const depsToInsert = dependants.map(d => ({
           member_id: authData.user!.id,
@@ -366,7 +375,12 @@ const Register = () => {
               />
             </div>
             <div className="max-h-[300px] overflow-y-auto border rounded-md divide-y">
-              {filteredMarketers.length === 0 ? (
+              {loadingMarketers ? (
+                <div className="p-8 text-center">
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
+                  <p className="text-sm text-muted-foreground mt-2">Loading marketers...</p>
+                </div>
+              ) : filteredMarketers.length === 0 ? (
                 <p className="p-4 text-center text-muted-foreground">No active marketers found.</p>
               ) : (
                 filteredMarketers.map((m) => (

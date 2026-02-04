@@ -110,7 +110,7 @@ export default function RegisterVisit() {
 
         setLoading(true);
         try {
-            const { error } = await supabase.from('visits').insert({
+            const { error } = await supabase.from('visits').insert([{
                 member_id: member.id,
                 branch_id: receptionistBranchId,
                 receptionist_id: receptionistId,
@@ -119,7 +119,7 @@ export default function RegisterVisit() {
                 benefit_deducted: 0,
                 branch_compensation: 0,
                 profit_loss: 0
-            });
+            }]);
 
             if (error) throw error;
 

@@ -65,10 +65,24 @@ export default function MarketerDashboard() {
 
             setReferrals(members || []);
 
+            // Calculate total earnings from commissions
+            const { data: commissionsData } = await (supabase as any)
+                .from("marketer_commissions")
+                .select("amount, status")
+                .eq("marketer_id", mData.id);
+
+            const totalEarnings = (commissionsData || [])
+                .filter((c: any) => c.status === 'paid')
+                .reduce((sum: number, c: any) => sum + Number(c.amount || 0), 0);
+
+            const pendingEarnings = (commissionsData || [])
+                .filter((c: any) => c.status === 'unclaimed' || c.status === 'claimed')
+                .reduce((sum: number, c: any) => sum + Number(c.amount || 0), 0);
+
             setStats({
                 memberCount: members?.length || 0,
-                totalEarnings: Number(mData.total_earnings || 0),
-                pendingPayout: Number(mData.total_earnings || 0) * 0.1 // Simulated pending logic
+                totalEarnings: totalEarnings,
+                pendingPayout: pendingEarnings
             });
 
         } catch (error: any) {

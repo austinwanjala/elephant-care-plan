@@ -56,7 +56,7 @@ export default function AdminMarketerClaims() {
 
     const loadClaims = async () => {
         setLoading(true);
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
             .from("marketer_claims")
             .select("*, marketers(full_name, code, email)")
             .order("created_at", { ascending: false });

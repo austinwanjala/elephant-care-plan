@@ -78,6 +78,19 @@ const Register = () => {
 
       if (authError) throw authError;
 
+      // Send Welcome SMS
+      try {
+        await supabase.functions.invoke('send-sms', {
+          body: {
+            type: 'welcome',
+            phone: formData.phone,
+            data: { name: formData.fullName }
+          }
+        });
+      } catch (smsErr) {
+        console.error("Failed to send welcome SMS:", smsErr);
+      }
+
       toast({ title: "Registration successful!", description: "Please login to select your scheme." });
       navigate("/login");
     } catch (error: any) {

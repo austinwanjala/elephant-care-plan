@@ -12,6 +12,7 @@ import {
   AlertCircle,
   DollarSign,
   Users,
+  RefreshCw,
 } from "lucide-react";
 import {
   Table,
@@ -253,11 +254,14 @@ const MemberDashboard = () => {
                 <div className="text-2xl font-bold text-success">
                   KES {member?.coverage_balance?.toLocaleString() || 0}
                 </div>
-                {member.is_active ? (
+                <div className="flex flex-col items-end gap-2">
                   <Badge className="bg-success">Covered</Badge>
-                ) : (
-                  <Badge variant="destructive">Uncovered</Badge>
-                )}
+                  <Link to="/dashboard/scheme-selection">
+                    <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1">
+                      <RefreshCw className="h-3 w-3" /> Renew / Upgrade
+                    </Button>
+                  </Link>
+                </div>
               </div>
               <div className="mt-2">
                 <Progress value={coveragePercentage} className="h-2" />

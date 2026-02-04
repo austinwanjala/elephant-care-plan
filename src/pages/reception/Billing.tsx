@@ -48,7 +48,7 @@ export default function ReceptionBilling() {
         setLoading(true);
         const { data, error } = await supabase
             .from("visits")
-            .select("*, members(id, full_name, member_number, coverage_balance), bills(*, bill_items(*))")
+            .select("*, members(id, full_name, phone, member_number, coverage_balance), bills(*, bill_items(*))")
             .eq("status", "billed")
             .order("updated_at", { ascending: false });
 
@@ -77,12 +77,12 @@ export default function ReceptionBilling() {
         setLoadingHistory(false);
     };
 
-    const handleFinalizeBill = async (visitId: string, billId: string) => {
+    const handleFinalizeBill = async (visit: any, billId: string) => {
         if (!receptionistId) {
             toast({ title: "Error", description: "Receptionist ID not found.", variant: "destructive" });
             return;
         }
-        setProcessingId(visitId);
+        setProcessingId(visit.id);
         try {
             const { error } = await supabase.rpc('finalize_bill', {
                 _bill_id: billId,
@@ -90,6 +90,25 @@ export default function ReceptionBilling() {
             });
 
             if (error) throw error;
+
+            // Send Billing Completion SMS
+            try {
+                const bill = visit.bills?.[0];
+                const newBalance = (visit.members?.coverage_balance || 0) - (bill?.total_benefit_cost || 0);
+                
+                await supabase.functions.invoke('send-sms', {
+                    body: {
+                        type: 'billing_completion',
+                        phone: visit.members?.phone,
+                        data: { 
+                            benefit_cost: bill?.total_benefit_cost, 
+                            balance: Math.max(0, newBalance) 
+                        }
+                    }
+                });
+            } catch (smsErr) {
+                console.error("Failed to send billing SMS:", smsErr);
+            }
 
             toast({ title: "Bill Finalized", description: "Coverage deducted and visit completed." });
             fetchBilledVisits();
@@ -337,7 +356,7 @@ export default function ReceptionBilling() {
                                                                 <DialogFooter>
                                                                     <Button
                                                                         className="w-full bg-blue-600 hover:bg-blue-700 h-12 text-lg"
-                                                                        onClick={() => handleFinalizeBill(visit.id, bill?.id)}
+                                                                        onClick={() => handleFinalizeBill(visit, bill?.id)}
                                                                         disabled={processingId === visit.id || biometricsVerified !== visit.id}
                                                                     >
                                                                         {processingId === visit.id ? <Loader2 className="animate-spin mr-2 h-5 w-5" /> : <Check className="mr-2 h-5 w-5" />}

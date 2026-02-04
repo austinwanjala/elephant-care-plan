@@ -11,6 +11,7 @@ import { Loader2, ArrowLeft, CheckCircle, DollarSign } from "lucide-react";
 interface MemberInfo {
   id: string;
   full_name: string;
+  phone: string;
   coverage_balance: number;
   total_contributions: number;
   benefit_limit: number;
@@ -53,7 +54,7 @@ const MemberSchemeSelection = () => {
 
     const { data: memberData, error: memberError } = await supabase
       .from("members")
-      .select("id, full_name, coverage_balance, total_contributions, benefit_limit, membership_category_id, is_active, member_number")
+      .select("id, full_name, phone, coverage_balance, total_contributions, benefit_limit, membership_category_id, is_active, member_number")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -78,11 +79,6 @@ const MemberSchemeSelection = () => {
     }
 
     setMember(memberData);
-
-    if (memberData.is_active) {
-      navigate("/dashboard");
-      return;
-    }
 
     const { data: categoriesData, error: categoriesError } = await supabase
       .from("membership_categories")
@@ -124,23 +120,19 @@ const MemberSchemeSelection = () => {
       const qrCodeValue = `MEMBER-${member.member_number}`;
 
       // 1. Update member's activation status and category info
-      // We remove manual updates to coverage_balance and total_contributions 
-      // as these are handled by database triggers on the payments table.
       const { error: updateError } = await supabase
         .from("members")
         .update({
           is_active: true,
           qr_code_data: qrCodeValue,
           membership_category_id: selectedCategory.id,
-          benefit_limit: benefitToAdd, // Set the initial benefit limit
+          benefit_limit: (member.benefit_limit || 0) + benefitToAdd, // Add to existing limit if renewing
         })
         .eq("id", member.id);
 
       if (updateError) throw updateError;
 
       // 2. Record the payment
-      // The database trigger will automatically update members.coverage_balance 
-      // and members.total_contributions based on this record.
       const { error: paymentError } = await supabase.from("payments").insert({
         member_id: member.id,
         amount: totalPayment,
@@ -152,9 +144,25 @@ const MemberSchemeSelection = () => {
 
       if (paymentError) throw paymentError;
 
+      // 3. Send Payment Confirmation SMS
+      try {
+        await supabase.functions.invoke('send-sms', {
+          body: {
+            type: 'payment_confirmation',
+            phone: member.phone,
+            data: { 
+              level: selectedCategory.name, 
+              benefit_amount: benefitToAdd 
+            }
+          }
+        });
+      } catch (smsErr) {
+        console.error("Failed to send payment SMS:", smsErr);
+      }
+
       toast({
         title: "Payment Successful!",
-        description: `KES ${totalPayment.toLocaleString()} received. Your coverage has been activated.`,
+        description: `KES ${totalPayment.toLocaleString()} received. Your coverage has been activated/renewed.`,
       });
 
       navigate("/dashboard");
@@ -192,18 +200,18 @@ const MemberSchemeSelection = () => {
 
   return (
     <div className="max-w-xl mx-auto py-8 px-4">
-      <Link to="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-8">
+      <Link to="/dashboard" className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-8">
         <ArrowLeft className="h-4 w-4" />
-        Back to Home
+        Back to Dashboard
       </Link>
 
       <Card className="card-elevated p-8">
         <CardHeader className="px-0 pt-0">
           <CardTitle className="text-3xl font-serif font-bold text-foreground mb-2">
-            Select Your Membership Scheme
+            {member.is_active ? "Renew or Upgrade Coverage" : "Select Your Membership Scheme"}
           </CardTitle>
           <CardDescription className="text-muted-foreground">
-            Choose a scheme level and make your first payment to activate your dental coverage.
+            Choose a scheme level and make a payment to activate or top up your dental coverage.
           </CardDescription>
         </CardHeader>
         <CardContent className="px-0 pb-0">
@@ -281,7 +289,7 @@ const MemberSchemeSelection = () => {
                   ) : (
                     <>
                       <CheckCircle className="mr-2 h-4 w-4" />
-                      Simulate Payment
+                      {member.is_active ? "Renew Coverage" : "Simulate Payment"}
                     </>
                   )}
                 </Button>

@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@supabase/supabase-js";
 import { Loader2, Plus } from "lucide-react";
+import { supabase as mainSupabase } from "@/integrations/supabase/client";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -48,6 +49,19 @@ export default function AddMember() {
             });
 
             if (authError) throw authError;
+
+            // Send Welcome SMS
+            try {
+                await mainSupabase.functions.invoke('send-sms', {
+                    body: {
+                        type: 'welcome',
+                        phone: formData.phone,
+                        data: { name: formData.fullName }
+                    }
+                });
+            } catch (smsErr) {
+                console.error("Failed to send welcome SMS:", smsErr);
+            }
 
             toast({
                 title: "Member Registered",

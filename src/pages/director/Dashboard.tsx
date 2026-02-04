@@ -94,11 +94,11 @@ export default function DirectorDashboard() {
         let totalServicesCount = 0;
 
         completedVisits.forEach(visit => {
-            const bill = visit.bills?.[0];
+            const bill = (visit.bills as any)?.[0];
             if (bill) {
                 totalRevenue += Number(bill.total_branch_compensation);
                 totalProfitLoss += Number(bill.total_profit_loss);
-                totalServicesCount += (bill.bill_items?.length || 0);
+                totalServicesCount += 1; // Count each visit as a service
             }
         });
 

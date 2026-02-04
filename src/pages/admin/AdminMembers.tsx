@@ -240,7 +240,7 @@ export default function AdminMembers() {
       age: member.age?.toString() || "",
       password: "", // Password not editable here
       branchId: member.branches ? branches.find(b => b.name === member.branches?.name)?.id || "" : "",
-      categoryId: member.membership_categories?.id || "", // Pre-fill category if exists
+      categoryId: "", // Category is managed by member
       nextOfKinName: "", // Not currently stored in member table directly
       nextOfKinPhone: "", // Not currently stored in member table directly
     });

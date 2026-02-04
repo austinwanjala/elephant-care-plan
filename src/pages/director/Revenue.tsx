@@ -78,8 +78,8 @@ export default function DirectorRevenue() {
 
             const totalMade = (bills || []).reduce((sum, b) => sum + (Number(b.total_branch_compensation) || 0), 0);
 
-            const { data: claimsData, error: claimErr } = await supabase
-                .from("revenue_claims" as any)
+            const { data: claimsData, error: claimErr } = await (supabase as any)
+                .from("revenue_claims")
                 .select("amount, status")
                 .eq("branch_id", branchId)
                 .in("status", ["pending", "paid"]);
@@ -90,8 +90,8 @@ export default function DirectorRevenue() {
                 return;
             }
 
-            const totalPaid = (claimsData || []).filter(c => c.status === 'paid').reduce((sum, c) => sum + Number(c.amount), 0);
-            const totalPending = (claimsData || []).filter(c => c.status === 'pending').reduce((sum, c) => sum + Number(c.amount), 0);
+            const totalPaid = (claimsData || []).filter((c: any) => c.status === 'paid').reduce((sum: number, c: any) => sum + Number(c.amount), 0);
+            const totalPending = (claimsData || []).filter((c: any) => c.status === 'pending').reduce((sum: number, c: any) => sum + Number(c.amount), 0);
 
             setAccumulatedRevenue(Math.max(0, totalMade - totalPaid));
             setAvailableToClaim(Math.max(0, totalMade - (totalPaid + totalPending)));
@@ -101,8 +101,8 @@ export default function DirectorRevenue() {
     };
 
     const fetchClaims = async (branchId: string) => {
-        const { data, error } = await supabase
-            .from("revenue_claims" as any)
+        const { data, error } = await (supabase as any)
+            .from("revenue_claims")
             .select("*")
             .eq("branch_id", branchId)
             .order("created_at", { ascending: false });
@@ -118,8 +118,8 @@ export default function DirectorRevenue() {
 
         setClaiming(true);
         try {
-            const { error: claimError } = await supabase
-                .from("revenue_claims" as any)
+            const { error: claimError } = await (supabase as any)
+                .from("revenue_claims")
                 .insert({
                     branch_id: directorBranchId,
                     director_id: staffId,

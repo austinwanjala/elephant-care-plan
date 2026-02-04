@@ -11,6 +11,7 @@ interface MemberDetails {
   full_name: string;
   member_number: string;
   membership_categories: { name: string } | null;
+  qr_code_data?: string | null;
   is_active: boolean;
   coverage_balance: number;
   benefit_limit: number;
@@ -28,7 +29,7 @@ export function InsuranceCard({ member }: InsuranceCardProps) {
     ? (member.coverage_balance / member.benefit_limit) * 100
     : 0;
 
-  const qrCodeData = member.is_active ? `MEMBER-${member.member_number}` : null;
+  const qrCodeData = member.qr_code_data || (member.is_active ? `MEMBER-${member.member_number}` : null);
 
   const handleDownloadCard = async () => {
     if (cardRef.current) {

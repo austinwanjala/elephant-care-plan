@@ -78,6 +78,7 @@ export default function MarketerDashboard() {
 
             setReferrals(members || []);
 
+<<<<<<< HEAD
             // 4. Calculate Stats
             const activeCount = members?.filter((m: any) => m.is_active).length || 0;
             const lifeEarnings = activeCount * rate;
@@ -102,6 +103,26 @@ export default function MarketerDashboard() {
                 claimable,
                 pendingClaims,
                 commissionRate: rate
+=======
+            // Calculate total earnings from commissions
+            const { data: commissionsData } = await (supabase as any)
+                .from("marketer_commissions")
+                .select("amount, status")
+                .eq("marketer_id", mData.id);
+
+            const totalEarnings = (commissionsData || [])
+                .filter((c: any) => c.status === 'paid')
+                .reduce((sum: number, c: any) => sum + Number(c.amount || 0), 0);
+
+            const pendingEarnings = (commissionsData || [])
+                .filter((c: any) => c.status === 'unclaimed' || c.status === 'claimed')
+                .reduce((sum: number, c: any) => sum + Number(c.amount || 0), 0);
+
+            setStats({
+                memberCount: members?.length || 0,
+                totalEarnings: totalEarnings,
+                pendingPayout: pendingEarnings
+>>>>>>> 9ce1b7bf4df1d33d0fb034d895010586efa5354c
             });
 
         } catch (error: any) {

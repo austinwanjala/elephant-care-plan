@@ -12,11 +12,11 @@ interface MemberProfile {
   email: string;
   phone: string;
   id_number: string;
-  age: number | null; // Added age
+  age: number | null;
   coverage_balance: number | null;
   benefit_limit: number | null;
   total_contributions: number | null;
-  qr_code_data: string | null;
+  qr_code_data?: string | null;
   is_active: boolean;
   membership_categories: { name: string; level: string } | null;
   marketers: { full_name: string; code: string } | null;
@@ -82,7 +82,7 @@ export default function MemberProfile() {
               full_name: profile.full_name,
               member_number: profile.member_number,
               membership_categories: profile.membership_categories,
-              qr_code_data: profile.qr_code_data,
+              qr_code_data: profile.qr_code_data || null,
               is_active: profile.is_active,
               coverage_balance: profile.coverage_balance || 0,
               benefit_limit: profile.benefit_limit || 0,

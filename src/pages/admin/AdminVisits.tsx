@@ -20,19 +20,22 @@ import { exportToCsv } from "@/utils/csvExport";
 interface Visit {
   id: string;
   created_at: string;
-  status: string; // New field
-  diagnosis: string | null; // New field
-  treatment_notes: string | null; // New field
+  status: string;
+  diagnosis: string | null;
+  treatment_notes: string | null;
   benefit_deducted: number;
   branch_compensation: number;
   profit_loss: number;
-  notes: string | null; // Old notes field, might be repurposed or removed
+  notes: string | null;
   members: { full_name: string; member_number: string } | null;
+<<<<<<< HEAD
 
+=======
+>>>>>>> 9ce1b7bf4df1d33d0fb034d895010586efa5354c
   branches: { name: string } | null;
-  receptionist: { full_name: string } | null; // New relation
-  doctor: { full_name: string } | null; // New relation
-  bills: { total_benefit_cost: number; total_branch_compensation: number; total_profit_loss: number; bill_items: { service_name: string }[] }[] | null; // New relation
+  receptionist: { full_name: string } | null;
+  doctor: { full_name: string } | null;
+  bills: { total_benefit_cost: number; total_branch_compensation: number; total_profit_loss: number; bill_items: { service_name: string }[] }[] | null;
 }
 
 export default function AdminVisits() {
@@ -48,7 +51,7 @@ export default function AdminVisits() {
     setLoading(true);
     const { data, error } = await (supabase as any)
       .from("visits")
-      .select("*, members(full_name, member_number), branches(name), receptionist:receptionist_id(full_name), doctor:doctor_id(full_name), bills(total_benefit_cost, total_branch_compensation, total_profit_loss, bill_items(service_name))")
+      .select("*, members(full_name, member_number), branches(name), bills(total_benefit_cost, total_branch_compensation, total_profit_loss, bill_items(service_name))")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -58,7 +61,7 @@ export default function AdminVisits() {
         variant: "destructive",
       });
     } else {
-      setVisits(data || []);
+      setVisits((data || []) as any);
     }
     setLoading(false);
   };

@@ -172,50 +172,25 @@ const Register = () => {
         if (depError) console.error("Error adding dependants:", depError);
       }
 
-      // 3. Generate and Send OTP
-      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-
-      const { error: otpError } = await supabase
-        .from("otp_verifications")
-        .insert({ phone: formData.phone, code: otpCode });
-
-      if (otpError) throw otpError;
-
+      // 3. Send Welcome SMS (Optional)
       try {
-        const { data: smsResponse, error: invokeError } = await supabase.functions.invoke('send-sms', {
+        await supabase.functions.invoke('send-sms', {
           body: {
-            type: 'otp',
+            type: 'welcome',
             phone: formData.phone,
-            email: formData.email, // Pass email for dual delivery
-            data: { code: otpCode }
+            data: { name: formData.fullName }
           }
         });
-
-        if (invokeError) throw invokeError;
-
-        if (smsResponse && !smsResponse.sms?.success) {
-          console.warn("SMS Provider Error:", smsResponse.sms?.message);
-          toast({
-            title: "SMS Warning",
-            description: `SMS failed: ${smsResponse.sms?.message || "Unknown error"}. Please check your email or ask admin.`,
-            variant: "destructive" // Or "warning" if available, but usually destructive for errors
-          });
-        }
-      } catch (smsErr: any) {
-        console.error("Failed to send OTP notification:", smsErr);
-        toast({
-          title: "Notification Error",
-          description: "Failed to connect to notification service. Code generated but not sent.",
-          variant: "destructive"
-        });
+      } catch (smsErr) {
+        console.error("Failed to send Welcome SMS:", smsErr);
       }
 
       toast({
-        title: "Verification Code Sent",
-        description: "Please enter the code sent to your phone or email to complete registration.",
+        title: "Registration Successful",
+        description: "Your account has been created. Please log in.",
       });
 
-      navigate(`/verify-otp?phone=${encodeURIComponent(formData.phone)}`);
+      navigate("/login");
     } catch (error: any) {
       toast({
         title: "Registration failed",

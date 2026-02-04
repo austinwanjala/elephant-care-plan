@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -7,7 +6,7 @@ const corsHeaders = {
 };
 
 interface SmsPayload {
-    type: 'welcome' | 'payment_confirmation' | 'billing_completion' | 'low_balance' | 'payment_failed';
+    type: 'welcome' | 'payment_confirmation' | 'billing_completion' | 'low_balance' | 'payment_failed' | 'otp';
     phone: string;
     data: any;
 }
@@ -28,19 +27,19 @@ serve(async (req) => {
         let message = "";
 
         switch (type) {
+            case 'otp':
+                message = `Your Elephant Dental verification code is: ${data.code}. Valid for 10 minutes.`;
+                break;
             case 'welcome':
-                message = `Hello ${data.name}, welcome to our Hospital Prepaid Medical Scheme. Your account has been created successfully. Please log in to choose your scheme and complete payment to activate your benefits.`;
+                message = `Hello ${data.name}, welcome to Elephant Dental. Your account has been created successfully. Please log in to choose your scheme and complete payment.`;
                 break;
             case 'payment_confirmation':
-                // Expected data: { level: string, benefit_amount: number }
                 message = `Payment received. Your scheme is now active with coverage of Ksh ${data.benefit_amount}.`;
                 break;
             case 'billing_completion':
-                // Expected data: { benefit_cost: number, balance: number }
                 message = `Your visit has been processed. Ksh ${data.benefit_cost} has been deducted from your coverage. Remaining balance: Ksh ${data.balance}.`;
                 break;
             case 'low_balance':
-                // Expected data: { balance: number }
                 message = `Your prepaid scheme balance is low (Ksh ${data.balance}). Please top up or renew to continue enjoying services.`;
                 break;
             case 'payment_failed':
@@ -72,13 +71,10 @@ serve(async (req) => {
             });
 
             const result = await response.json();
-            console.log("Africa's Talking Response:", result);
-
             return new Response(JSON.stringify({ success: true, provider: "africastalking", data: result }), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
         } else {
-            console.log("[MOCK SMS] Africa's Talking credentials not set.");
             return new Response(JSON.stringify({ success: true, mocked: true, message }), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
             });

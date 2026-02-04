@@ -78,11 +78,6 @@ const Register = () => {
       setMarketers(data || []);
     } catch (err: any) {
       console.error("Error fetching marketers:", err);
-      toast({
-        title: "Error",
-        description: "Could not load marketer list. Please try again later.",
-        variant: "destructive",
-      });
     } finally {
       setLoadingMarketers(false);
     }
@@ -177,25 +172,33 @@ const Register = () => {
         if (depError) console.error("Error adding dependants:", depError);
       }
 
-      // 3. Send Welcome SMS
+      // 3. Generate and Send OTP
+      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+      
+      const { error: otpError } = await supabase
+        .from("otp_verifications")
+        .insert({ phone: formData.phone, code: otpCode });
+
+      if (otpError) throw otpError;
+
       try {
         await supabase.functions.invoke('send-sms', {
           body: {
-            type: 'welcome',
+            type: 'otp',
             phone: formData.phone,
-            data: { name: formData.fullName }
+            data: { code: otpCode }
           }
         });
       } catch (smsErr) {
-        console.error("Failed to send welcome SMS:", smsErr);
+        console.error("Failed to send OTP SMS:", smsErr);
       }
 
       toast({
-        title: "Account created!",
-        description: "Welcome to Elephant Dental. Please login to activate your coverage.",
+        title: "Verification Code Sent",
+        description: "Please enter the code sent to your phone to complete registration.",
       });
       
-      navigate("/login");
+      navigate(`/verify-otp?phone=${encodeURIComponent(formData.phone)}`);
     } catch (error: any) {
       toast({
         title: "Registration failed",

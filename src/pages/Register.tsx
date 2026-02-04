@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ArrowLeft, UserPlus, Search } from "lucide-react";
+import { Loader2, ArrowLeft, UserPlus, Search, Plus, Trash, Users } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -21,6 +21,14 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+interface Dependant {
+  fullName: string;
+  relationship: string;
+  dob: string;
+  idNumber: string;
+}
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -31,12 +39,21 @@ const Register = () => {
     email: "",
     password: "",
   });
+  
   const [referralSource, setReferralSource] = useState<string>("");
   const [selectedMarketer, setSelectedMarketer] = useState<{ id: string; full_name: string; code: string } | null>(null);
   const [marketers, setMarketers] = useState<any[]>([]);
   const [isMarketerModalOpen, setIsMarketerModalOpen] = useState(false);
   const [marketerSearch, setMarketerSearch] = useState("");
   
+  const [dependants, setDependants] = useState<Dependant[]>([]);
+  const [newDep, setNewDep] = useState<Dependant>({
+    fullName: "",
+    relationship: "",
+    dob: "",
+    idNumber: "",
+  });
+
   const [consents, setConsents] = useState({
     processing: false,
     sharing: false,
@@ -48,13 +65,8 @@ const Register = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (referralSource === "marketer") {
-      fetchMarketers();
-      setIsMarketerModalOpen(true);
-    } else {
-      setSelectedMarketer(null);
-    }
-  }, [referralSource]);
+    fetchMarketers();
+  }, []);
 
   const fetchMarketers = async () => {
     const { data, error } = await supabase
@@ -65,6 +77,32 @@ const Register = () => {
     if (!error && data) {
       setMarketers(data);
     }
+  };
+
+  const handleReferralChange = (value: string) => {
+    setReferralSource(value);
+    if (value === "marketer") {
+      setIsMarketerModalOpen(true);
+    } else {
+      setSelectedMarketer(null);
+    }
+  };
+
+  const addDependant = () => {
+    if (!newDep.fullName || !newDep.relationship || !newDep.dob) {
+      toast({ title: "Missing Info", description: "Please fill in all dependant details.", variant: "destructive" });
+      return;
+    }
+    if (dependants.length >= 5) {
+      toast({ title: "Limit Reached", description: "Maximum 5 dependants allowed.", variant: "destructive" });
+      return;
+    }
+    setDependants([...dependants, newDep]);
+    setNewDep({ fullName: "", relationship: "", dob: "", idNumber: "" });
+  };
+
+  const removeDependant = (index: number) => {
+    setDependants(dependants.filter((_, i) => i !== index));
   };
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -92,10 +130,9 @@ const Register = () => {
 
     try {
       const ageInt = parseInt(formData.age);
-      if (isNaN(ageInt)) {
-        throw new Error("Please enter a valid age.");
-      }
+      if (isNaN(ageInt)) throw new Error("Please enter a valid age.");
 
+      // 1. Sign up the user
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -113,8 +150,23 @@ const Register = () => {
       });
 
       if (authError) throw authError;
+      if (!authData.user) throw new Error("Registration failed. Please try again.");
 
-      // Send Welcome SMS
+      // 2. Insert dependants (The member profile is created via DB trigger)
+      if (dependants.length > 0) {
+        const depsToInsert = dependants.map(d => ({
+          member_id: authData.user!.id,
+          full_name: d.fullName,
+          relationship: d.relationship,
+          dob: d.dob,
+          id_number: d.idNumber
+        }));
+
+        const { error: depError } = await supabase.from("dependants").insert(depsToInsert);
+        if (depError) console.error("Error adding dependants:", depError);
+      }
+
+      // 3. Send Welcome SMS
       try {
         await supabase.functions.invoke('send-sms', {
           body: {
@@ -129,11 +181,10 @@ const Register = () => {
 
       toast({
         title: "Account created!",
-        description: "Now, let's add your dependants.",
+        description: "Welcome to Elephant Dental. Please login to activate your coverage.",
       });
       
-      // Redirect to dependants step
-      navigate("/register/dependants");
+      navigate("/login");
     } catch (error: any) {
       toast({
         title: "Registration failed",
@@ -152,7 +203,7 @@ const Register = () => {
 
   return (
     <div className="min-h-screen bg-background py-8 px-4">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         <Link to="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-8">
           <ArrowLeft className="h-4 w-4" />
           Back to home
@@ -167,89 +218,46 @@ const Register = () => {
           </div>
 
           <h1 className="text-3xl font-serif font-bold text-foreground mb-2">Member Registration</h1>
-          <p className="text-muted-foreground mb-8">Create your account to access dental coverage.</p>
+          <p className="text-muted-foreground mb-8">Join the Elephant Care Plan today.</p>
 
-          <form onSubmit={handleRegister} className="space-y-6">
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="fullName">Full Name</Label>
-                <Input
-                  id="fullName"
-                  placeholder="John Doe"
-                  value={formData.fullName}
-                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                  required
-                  className="input-field"
-                />
+          <form onSubmit={handleRegister} className="space-y-8">
+            {/* Personal Details */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold border-b pb-2">Personal Details</h3>
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="fullName">Full Name</Label>
+                  <Input id="fullName" placeholder="John Doe" value={formData.fullName} onChange={(e) => setFormData({ ...formData, fullName: e.target.value })} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <Input id="phone" placeholder="0712 345 678" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="idNumber">National ID / Passport</Label>
+                  <Input id="idNumber" placeholder="12345678" value={formData.idNumber} onChange={(e) => setFormData({ ...formData, idNumber: e.target.value })} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="age">Age</Label>
+                  <Input id="age" type="number" placeholder="25" value={formData.age} onChange={(e) => setFormData({ ...formData, age: e.target.value })} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input id="email" type="email" placeholder="john@example.com" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input id="password" type="password" placeholder="••••••••" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} required minLength={6} />
+                </div>
               </div>
+            </div>
 
+            {/* Referral Section */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold border-b pb-2">Referral Information</h3>
               <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
-                <Input
-                  id="phone"
-                  placeholder="0712 345 678"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  required
-                  className="input-field"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="idNumber">National ID / Passport Number</Label>
-                <Input
-                  id="idNumber"
-                  placeholder="12345678"
-                  value={formData.idNumber}
-                  onChange={(e) => setFormData({ ...formData, idNumber: e.target.value })}
-                  required
-                  className="input-field"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="age">Age</Label>
-                <Input
-                  id="age"
-                  type="number"
-                  placeholder="25"
-                  value={formData.age}
-                  onChange={(e) => setFormData({ ...formData, age: e.target.value })}
-                  required
-                  className="input-field"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="john@example.com"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  required
-                  className="input-field"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  required
-                  minLength={6}
-                  className="input-field"
-                />
-              </div>
-
-              <div className="space-y-2 md:col-span-2">
                 <Label>How did you hear about us?</Label>
-                <Select value={referralSource} onValueChange={setReferralSource}>
+                <Select value={referralSource} onValueChange={handleReferralChange}>
                   <SelectTrigger className="input-field">
                     <SelectValue placeholder="Select an option" />
                   </SelectTrigger>
@@ -262,41 +270,71 @@ const Register = () => {
                 </Select>
                 {selectedMarketer && (
                   <p className="text-sm text-green-600 mt-2 flex items-center gap-1">
-                    <UserPlus className="h-4 w-4" /> Selected Marketer: <strong>{selectedMarketer.full_name} ({selectedMarketer.code})</strong>
+                    <UserPlus className="h-4 w-4" /> Referred by: <strong>{selectedMarketer.full_name} ({selectedMarketer.code})</strong>
                   </p>
                 )}
               </div>
             </div>
 
+            {/* Dependants Section */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold border-b pb-2">Add Dependants (Optional)</h3>
+              <p className="text-sm text-muted-foreground">You can add up to 5 family members to share your coverage.</p>
+              
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end bg-muted/30 p-4 rounded-lg border">
+                <div className="space-y-1">
+                  <Label className="text-xs">Full Name</Label>
+                  <Input value={newDep.fullName} onChange={e => setNewDep({...newDep, fullName: e.target.value})} placeholder="Name" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Relationship</Label>
+                  <Input value={newDep.relationship} onChange={e => setNewDep({...newDep, relationship: e.target.value})} placeholder="e.g. Child" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Date of Birth</Label>
+                  <Input type="date" value={newDep.dob} onChange={e => setNewDep({...newDep, dob: e.target.value})} />
+                </div>
+                <Button type="button" variant="outline" onClick={addDependant} className="w-full">
+                  <Plus className="h-4 w-4 mr-1" /> Add
+                </Button>
+              </div>
+
+              {dependants.length > 0 && (
+                <div className="grid gap-2 mt-4">
+                  {dependants.map((dep, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3 bg-white border rounded-md shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <Users className="h-4 w-4 text-primary" />
+                        <div>
+                          <p className="text-sm font-medium">{dep.fullName}</p>
+                          <p className="text-xs text-muted-foreground">{dep.relationship} • {dep.dob}</p>
+                        </div>
+                      </div>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => removeDependant(idx)}>
+                        <Trash className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Consents */}
             <div className="space-y-4 pt-6 border-t border-border">
               <div className="flex items-start space-x-3">
-                <Checkbox 
-                  id="processing" 
-                  checked={consents.processing}
-                  onCheckedChange={(checked) => setConsents({ ...consents, processing: !!checked })}
-                />
+                <Checkbox id="processing" checked={consents.processing} onCheckedChange={(checked) => setConsents({ ...consents, processing: !!checked })} />
                 <Label htmlFor="processing" className="text-sm leading-none">
                   I consent to the processing of my personal data as per the <Link to="/privacy-policy" className="text-primary hover:underline">Privacy Policy</Link>.
                 </Label>
               </div>
-
               <div className="flex items-start space-x-3">
-                <Checkbox 
-                  id="sharing" 
-                  checked={consents.sharing}
-                  onCheckedChange={(checked) => setConsents({ ...consents, sharing: !!checked })}
-                />
+                <Checkbox id="sharing" checked={consents.sharing} onCheckedChange={(checked) => setConsents({ ...consents, sharing: !!checked })} />
                 <Label htmlFor="sharing" className="text-sm leading-none">
                   I authorize data sharing with affiliated branches as per the <Link to="/terms-of-service" className="text-primary hover:underline">Terms of Service</Link>.
                 </Label>
               </div>
-
               <div className="flex items-start space-x-3">
-                <Checkbox 
-                  id="signature" 
-                  checked={consents.signature}
-                  onCheckedChange={(checked) => setConsents({ ...consents, signature: !!checked })}
-                />
+                <Checkbox id="signature" checked={consents.signature} onCheckedChange={(checked) => setConsents({ ...consents, signature: !!checked })} />
                 <Label htmlFor="signature" className="text-sm leading-none">
                   I agree to the <Link to="/terms-of-service" className="text-primary hover:underline">Terms of Service</Link>.
                 </Label>
@@ -304,17 +342,18 @@ const Register = () => {
             </div>
 
             <Button type="submit" className="w-full btn-primary py-6 text-lg" disabled={loading}>
-              {loading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : "Register Member"}
+              {loading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : "Complete Registration"}
             </Button>
           </form>
         </div>
       </div>
 
+      {/* Marketer Selection Modal */}
       <Dialog open={isMarketerModalOpen} onOpenChange={setIsMarketerModalOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Select Marketer</DialogTitle>
-            <DialogDescription>Please choose the marketer who referred you.</DialogDescription>
+            <DialogDescription>Choose the agent who referred you to Elephant Dental.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="relative">
@@ -328,7 +367,7 @@ const Register = () => {
             </div>
             <div className="max-h-[300px] overflow-y-auto border rounded-md divide-y">
               {filteredMarketers.length === 0 ? (
-                <p className="p-4 text-center text-muted-foreground">No marketers found.</p>
+                <p className="p-4 text-center text-muted-foreground">No active marketers found.</p>
               ) : (
                 filteredMarketers.map((m) => (
                   <div 

@@ -186,16 +186,17 @@ const Register = () => {
           body: {
             type: 'otp',
             phone: formData.phone,
+            email: formData.email, // Pass email for dual delivery
             data: { code: otpCode }
           }
         });
       } catch (smsErr) {
-        console.error("Failed to send OTP SMS:", smsErr);
+        console.error("Failed to send OTP notification:", smsErr);
       }
 
       toast({
         title: "Verification Code Sent",
-        description: "Please enter the code sent to your phone to complete registration.",
+        description: "Please enter the code sent to your phone or email to complete registration.",
       });
       
       navigate(`/verify-otp?phone=${encodeURIComponent(formData.phone)}`);

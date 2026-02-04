@@ -29,6 +29,7 @@ import ReceptionDashboard from "./pages/reception/Dashboard";
 import RegisterVisit from "./pages/reception/RegisterVisit";
 import ReceptionBilling from "./pages/reception/Billing";
 import ReceptionSearchMember from "./pages/reception/SearchMember"; // New Receptionist page
+import ReceptionAddMember from "./pages/reception/AddMember"; // New Receptionist page
 
 // Doctor pages
 import { DoctorLayout } from "./components/doctor/DoctorLayout";
@@ -86,6 +87,7 @@ const App = () => (
           <Route path="/reception" element={<ReceptionLayout />}>
             <Route index element={<ReceptionDashboard />} />
             <Route path="register-visit" element={<RegisterVisit />} />
+            <Route path="add-member" element={<ReceptionAddMember />} />
             <Route path="billing" element={<ReceptionBilling />} />
             <Route path="search" element={<ReceptionSearchMember />} />
           </Route>

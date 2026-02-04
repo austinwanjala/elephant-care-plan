@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 const menuItems = [
     { title: "Dashboard", url: "/reception", icon: LayoutDashboard },
     { title: "Register Visit", url: "/reception/register-visit", icon: UserPlus },
+    { title: "Add Member", url: "/reception/add-member", icon: UserPlus }, // New Add Member item
     { title: "Search Member", url: "/reception/search", icon: Search }, // New item
     { title: "Billing & Claims", url: "/reception/billing", icon: Receipt },
 ];

@@ -171,6 +171,9 @@ const Register = () => {
         if (depError) throw depError;
       }
 
+      // Welcome SMS is now handled by Database Trigger on 'members' table insert
+
+
       toast({
         title: "Registration successful!",
         description: "Please login to select your scheme and make payment.",

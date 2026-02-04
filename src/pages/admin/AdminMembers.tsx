@@ -122,12 +122,12 @@ export default function AdminMembers() {
         return;
       }
 
-      // 1. Create Auth account
+      // 1. Create Auth account using metadata for trigger
       const authClient = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
         auth: { persistSession: false }
       });
 
-      const { data: authData, error: authError } = await authClient.auth.signUp({
+      const { error: authError } = await authClient.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
@@ -148,38 +148,8 @@ export default function AdminMembers() {
         }
         throw authError;
       }
-      
-      const userId = authData.user?.id;
-      if (!userId) throw new Error("User creation failed: No ID returned.");
 
-      // 2. Explicitly assign role
-      const { error: roleError } = await supabase
-        .from("user_roles")
-        .insert({ user_id: userId, role: 'member' });
-
-      if (roleError) throw roleError;
-
-      // 3. Explicitly create profile
-      const { error: profileError } = await supabase
-        .from("members")
-        .insert({
-          user_id: userId,
-          full_name: formData.fullName,
-          email: formData.email,
-          phone: formData.phone,
-          id_number: formData.idNumber,
-          age: parseInt(formData.age),
-          branch_id: formData.branchId || null,
-          member_number: `ED${Math.floor(100000 + Math.random() * 900000)}`,
-          is_active: false,
-          coverage_balance: 0,
-          total_contributions: 0,
-          benefit_limit: 0
-        });
-
-      if (profileError) throw profileError;
-
-      toast({ title: "Member registered successfully", description: "Member can now log in to select scheme and make payment." });
+      toast({ title: "Member registered successfully", description: "The system is setting up their profile. They can now log in." });
       setDialogOpen(false);
       resetForm();
       loadData();

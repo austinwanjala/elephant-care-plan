@@ -39,7 +39,7 @@ const Register = () => {
     email: "",
     password: "",
   });
-  
+
   const [referralSource, setReferralSource] = useState<string>("");
   const [selectedMarketer, setSelectedMarketer] = useState<{ id: string; full_name: string; code: string } | null>(null);
   const [marketers, setMarketers] = useState<any[]>([]);
@@ -47,7 +47,7 @@ const Register = () => {
   const [isDependantModalOpen, setIsDependantModalOpen] = useState(false);
   const [marketerSearch, setMarketerSearch] = useState("");
   const [loadingMarketers, setLoadingMarketers] = useState(false);
-  
+
   const [dependants, setDependants] = useState<Dependant[]>([]);
   const [newDep, setNewDep] = useState<Dependant>({
     fullName: "",
@@ -73,7 +73,7 @@ const Register = () => {
         .from("marketers")
         .select("id, full_name, code")
         .eq("is_active", true);
-      
+
       if (error) throw error;
       setMarketers(data || []);
     } catch (err: any) {
@@ -174,7 +174,7 @@ const Register = () => {
 
       // 3. Generate and Send OTP
       const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-      
+
       const { error: otpError } = await supabase
         .from("otp_verifications")
         .insert({ phone: formData.phone, code: otpCode });
@@ -182,7 +182,7 @@ const Register = () => {
       if (otpError) throw otpError;
 
       try {
-        await supabase.functions.invoke('send-sms', {
+        const { data: smsResponse, error: invokeError } = await supabase.functions.invoke('send-sms', {
           body: {
             type: 'otp',
             phone: formData.phone,
@@ -190,15 +190,31 @@ const Register = () => {
             data: { code: otpCode }
           }
         });
-      } catch (smsErr) {
+
+        if (invokeError) throw invokeError;
+
+        if (smsResponse && !smsResponse.sms?.success) {
+          console.warn("SMS Provider Error:", smsResponse.sms?.message);
+          toast({
+            title: "SMS Warning",
+            description: `SMS failed: ${smsResponse.sms?.message || "Unknown error"}. Please check your email or ask admin.`,
+            variant: "destructive" // Or "warning" if available, but usually destructive for errors
+          });
+        }
+      } catch (smsErr: any) {
         console.error("Failed to send OTP notification:", smsErr);
+        toast({
+          title: "Notification Error",
+          description: "Failed to connect to notification service. Code generated but not sent.",
+          variant: "destructive"
+        });
       }
 
       toast({
         title: "Verification Code Sent",
         description: "Please enter the code sent to your phone or email to complete registration.",
       });
-      
+
       navigate(`/verify-otp?phone=${encodeURIComponent(formData.phone)}`);
     } catch (error: any) {
       toast({
@@ -211,7 +227,7 @@ const Register = () => {
     }
   };
 
-  const filteredMarketers = marketers.filter(m => 
+  const filteredMarketers = marketers.filter(m =>
     m.full_name.toLowerCase().includes(marketerSearch.toLowerCase()) ||
     m.code.toLowerCase().includes(marketerSearch.toLowerCase())
   );
@@ -295,10 +311,10 @@ const Register = () => {
             <div className="space-y-4">
               <div className="flex items-center justify-between border-b pb-2">
                 <h3 className="text-lg font-semibold">Add Dependants (Optional)</h3>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => setIsDependantModalOpen(true)}
                   disabled={dependants.length >= 5}
                 >
@@ -306,7 +322,7 @@ const Register = () => {
                 </Button>
               </div>
               <p className="text-sm text-muted-foreground">You can add up to 5 family members to share your coverage.</p>
-              
+
               {dependants.length > 0 && (
                 <div className="grid gap-2 mt-4">
                   {dependants.map((dep, idx) => (
@@ -366,8 +382,8 @@ const Register = () => {
           <div className="space-y-4 py-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input 
-                placeholder="Search by name or code..." 
+              <Input
+                placeholder="Search by name or code..."
                 className="pl-9"
                 value={marketerSearch}
                 onChange={(e) => setMarketerSearch(e.target.value)}
@@ -383,8 +399,8 @@ const Register = () => {
                 <p className="p-4 text-center text-muted-foreground">No active marketers found.</p>
               ) : (
                 filteredMarketers.map((m) => (
-                  <div 
-                    key={m.id} 
+                  <div
+                    key={m.id}
                     className="p-3 hover:bg-muted cursor-pointer flex justify-between items-center"
                     onClick={() => {
                       setSelectedMarketer(m);
@@ -414,24 +430,24 @@ const Register = () => {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Full Name</Label>
-              <Input 
-                placeholder="Dependant's Name" 
+              <Input
+                placeholder="Dependant's Name"
                 value={newDep.fullName}
                 onChange={(e) => setNewDep({ ...newDep, fullName: e.target.value })}
               />
             </div>
             <div className="space-y-2">
               <Label>Relationship</Label>
-              <Input 
-                placeholder="e.g. Child, Spouse" 
+              <Input
+                placeholder="e.g. Child, Spouse"
                 value={newDep.relationship}
                 onChange={(e) => setNewDep({ ...newDep, relationship: e.target.value })}
               />
             </div>
             <div className="space-y-2">
               <Label>Date of Birth</Label>
-              <Input 
-                type="date" 
+              <Input
+                type="date"
                 value={newDep.dob}
                 onChange={(e) => setNewDep({ ...newDep, dob: e.target.value })}
               />
@@ -440,8 +456,8 @@ const Register = () => {
               <Label>Birth Cert / Student ID Number</Label>
               <div className="relative">
                 <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input 
-                  placeholder="ID or Certificate Number" 
+                <Input
+                  placeholder="ID or Certificate Number"
                   className="pl-9"
                   value={newDep.idNumber}
                   onChange={(e) => setNewDep({ ...newDep, idNumber: e.target.value })}

@@ -19,7 +19,7 @@ const VerifyOtp = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  
+
   const phone = new URLSearchParams(location.search).get("phone");
 
   useEffect(() => {
@@ -74,16 +74,27 @@ const VerifyOtp = () => {
     setResending(true);
     try {
       const newCode = Math.floor(100000 + Math.random() * 900000).toString();
-      
+
       const { error: dbError } = await supabase
         .from("otp_verifications")
         .insert({ phone, code: newCode });
 
       if (dbError) throw dbError;
 
-      await supabase.functions.invoke('send-sms', {
+      const { data: smsResponse, error: invokeError } = await supabase.functions.invoke('send-sms', {
         body: { type: 'otp', phone, data: { code: newCode } }
       });
+
+      if (invokeError) throw invokeError;
+
+      if (smsResponse && !smsResponse.sms?.success) {
+        console.warn("SMS Provider Error:", smsResponse.sms?.message);
+        toast({
+          title: "SMS Delivery Issue",
+          description: `Could not send SMS: ${smsResponse.sms?.message}.`,
+          variant: "destructive"
+        });
+      }
 
       toast({
         title: "Code Resent",
@@ -139,8 +150,8 @@ const VerifyOtp = () => {
         <div className="pt-4">
           <p className="text-sm text-muted-foreground">
             Didn't receive the code?{" "}
-            <button 
-              onClick={handleResend} 
+            <button
+              onClick={handleResend}
               disabled={resending}
               className="text-primary font-semibold hover:underline disabled:opacity-50"
             >

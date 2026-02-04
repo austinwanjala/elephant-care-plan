@@ -76,7 +76,14 @@ serve(async (req) => {
                 formData.append('to', formattedPhone);
                 formData.append('message', message);
 
-                const response = await fetch('https://api.africastalking.com/version1/messaging', {
+                const isSandbox = AT_USERNAME.toLowerCase() === 'sandbox';
+                const atUrl = isSandbox
+                    ? 'https://api.sandbox.africastalking.com/version1/messaging'
+                    : 'https://api.africastalking.com/version1/messaging';
+
+                console.log(`[send-sms] Using Africa's Talking Env: ${isSandbox ? 'SANDBOX' : 'LIVE'}`);
+
+                const response = await fetch(atUrl, {
                     method: 'POST',
                     headers: {
                         'apiKey': AT_API_KEY,
@@ -121,11 +128,11 @@ serve(async (req) => {
             }
         }
 
-        return new Response(JSON.stringify({ 
-            success: true, 
-            sms: smsResult, 
+        return new Response(JSON.stringify({
+            success: true,
+            sms: smsResult,
             email: emailResult,
-            debug_message: message 
+            debug_message: message
         }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
         });

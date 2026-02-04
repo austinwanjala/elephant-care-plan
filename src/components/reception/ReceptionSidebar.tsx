@@ -1,4 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { useSidebar, Sidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { UserPlus, Fingerprint, Receipt, LogOut, LayoutDashboard, Search } from "lucide-react";
@@ -27,6 +28,24 @@ export function ReceptionSidebar() {
         return location.pathname.startsWith(path);
     }
 
+    const [pendingBillsCount, setPendingBillsCount] = useState(0);
+
+    useEffect(() => {
+        const fetchPendingBills = async () => {
+            const { count } = await (supabase as any)
+                .from('bills')
+                .select('*', { count: 'exact', head: true })
+                .eq('status', 'pending'); // Assuming 'pending' status for unpaid bills
+            setPendingBillsCount(count || 0);
+        };
+
+        fetchPendingBills();
+
+        // Polling every 30s
+        const interval = setInterval(fetchPendingBills, 30000);
+        return () => clearInterval(interval);
+    }, []);
+
     return (
         <Sidebar collapsible="icon" className="border-r border-border">
             <SidebarHeader className="p-4 border-b border-border">
@@ -53,10 +72,17 @@ export function ReceptionSidebar() {
                                     <a
                                         href={item.url}
                                         onClick={(e) => { e.preventDefault(); navigate(item.url); }}
-                                        className="flex items-center gap-3"
+                                        className="flex items-center gap-3 justify-between"
                                     >
-                                        <item.icon className="h-5 w-5" />
-                                        <span>{item.title}</span>
+                                        <div className="flex items-center gap-3">
+                                            <item.icon className="h-5 w-5" />
+                                            <span>{item.title}</span>
+                                        </div>
+                                        {item.title === "Billing & Claims" && pendingBillsCount > 0 && (
+                                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white">
+                                                {pendingBillsCount}
+                                            </span>
+                                        )}
                                     </a>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>

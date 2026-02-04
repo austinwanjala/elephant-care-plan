@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { AdminLayout } from "@/components/admin/AdminLayout";
+
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,6 +32,8 @@ export default function AdminCommissionSettings() {
         const { data, error } = await (supabase as any)
             .from("marketer_commission_config")
             .select("*")
+            .order("updated_at", { ascending: false })
+            .limit(1)
             .maybeSingle();
 
         if (error) {
@@ -94,88 +96,84 @@ export default function AdminCommissionSettings() {
 
     if (loading) {
         return (
-            <AdminLayout>
-                <div className="flex items-center justify-center min-h-[400px]">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-            </AdminLayout>
+            <div className="flex items-center justify-center min-h-[400px]">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
         );
     }
 
     return (
-        <AdminLayout>
-            <div className="space-y-6">
-                <div className="flex items-center gap-4 mb-6">
-                    <Link to="/admin/settings">
-                        <Button variant="ghost" size="icon">
-                            <ArrowLeft className="h-5 w-5" />
-                        </Button>
-                    </Link>
-                    <div>
-                        <h1 className="text-3xl font-serif font-bold text-foreground">Marketer Commission Settings</h1>
-                        <p className="text-muted-foreground">Configure commission rates for marketer referrals</p>
-                    </div>
+        <div className="space-y-6">
+            <div className="flex items-center gap-4 mb-6">
+                <Link to="/admin/settings">
+                    <Button variant="ghost" size="icon">
+                        <ArrowLeft className="h-5 w-5" />
+                    </Button>
+                </Link>
+                <div>
+                    <h1 className="text-3xl font-serif font-bold text-foreground">Marketer Commission Settings</h1>
+                    <p className="text-muted-foreground">Configure commission rates for marketer referrals</p>
                 </div>
-
-                <Card className="max-w-2xl">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <DollarSign className="h-5 w-5 text-primary" />
-                            Commission Rate Configuration
-                        </CardTitle>
-                        <CardDescription>
-                            Set the commission amount paid to marketers for each active referral.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        <div className="space-y-2">
-                            <Label htmlFor="commissionRate">Commission Per Active Referral (KES)</Label>
-                            <Input
-                                id="commissionRate"
-                                type="number"
-                                value={commissionRate}
-                                onChange={(e) => setCommissionRate(e.target.value)}
-                                placeholder="e.g., 500"
-                                min="0"
-                                step="1"
-                            />
-                            <p className="text-sm text-muted-foreground">
-                                Marketers will earn this amount for each member they refer who has an active membership.
-                            </p>
-                        </div>
-
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                            <h4 className="font-semibold text-blue-900 mb-2">How It Works</h4>
-                            <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
-                                <li>Marketers earn commission for each <strong>active</strong> member they refer</li>
-                                <li>Commission is calculated as: Active Referrals × Rate</li>
-                                <li>Marketers can submit claims which require admin approval</li>
-                                <li>Once paid, the amount is deducted from their claimable balance</li>
-                            </ul>
-                        </div>
-
-                        {config && (
-                            <div className="text-sm text-muted-foreground">
-                                Last updated: {new Date(config.updated_at).toLocaleString()}
-                            </div>
-                        )}
-
-                        <Button onClick={handleSave} disabled={saving} className="btn-primary">
-                            {saving ? (
-                                <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Saving...
-                                </>
-                            ) : (
-                                <>
-                                    <Save className="mr-2 h-4 w-4" />
-                                    Save Settings
-                                </>
-                            )}
-                        </Button>
-                    </CardContent>
-                </Card>
             </div>
-        </AdminLayout>
+
+            <Card className="max-w-2xl">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <DollarSign className="h-5 w-5 text-primary" />
+                        Commission Rate Configuration
+                    </CardTitle>
+                    <CardDescription>
+                        Set the commission amount paid to marketers for each active referral.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div className="space-y-2">
+                        <Label htmlFor="commissionRate">Commission Per Active Referral (KES)</Label>
+                        <Input
+                            id="commissionRate"
+                            type="number"
+                            value={commissionRate}
+                            onChange={(e) => setCommissionRate(e.target.value)}
+                            placeholder="e.g., 500"
+                            min="0"
+                            step="1"
+                        />
+                        <p className="text-sm text-muted-foreground">
+                            Marketers will earn this amount for each member they refer who has an active membership.
+                        </p>
+                    </div>
+
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <h4 className="font-semibold text-blue-900 mb-2">How It Works</h4>
+                        <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+                            <li>Marketers earn commission for each <strong>active</strong> member they refer</li>
+                            <li>Commission is calculated as: Active Referrals × Rate</li>
+                            <li>Marketers can submit claims which require admin approval</li>
+                            <li>Once paid, the amount is deducted from their claimable balance</li>
+                        </ul>
+                    </div>
+
+                    {config && (
+                        <div className="text-sm text-muted-foreground">
+                            Last updated: {new Date(config.updated_at).toLocaleString()}
+                        </div>
+                    )}
+
+                    <Button onClick={handleSave} disabled={saving} className="btn-primary">
+                        {saving ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Saving...
+                            </>
+                        ) : (
+                            <>
+                                <Save className="mr-2 h-4 w-4" />
+                                Save Settings
+                            </>
+                        )}
+                    </Button>
+                </CardContent>
+            </Card>
+        </div>
     );
 }

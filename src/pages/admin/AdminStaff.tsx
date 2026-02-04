@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { AdminLayout } from "@/components/admin/AdminLayout";
+
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -10,10 +10,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, Edit, Trash2, UserCog } from "lucide-react";
+import { Plus, MoreHorizontal, Edit, Trash2, UserCog, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@supabase/supabase-js";
+import { exportToCsv } from "@/utils/csvExport";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -203,14 +204,30 @@ export default function AdminStaff() {
     }
   };
 
+  const handleExport = () => {
+    const dataToExport = users.map(u => ({
+      "Full Name": u.full_name,
+      "Email": u.email || "",
+      "Phone": u.phone || "",
+      "Role": u.displayRole.replace('_', ' '),
+      "Branch/Code": u.type === 'marketer' ? `Code: ${u.code}` : (u.branches?.name || 'Unassigned'),
+      "Status": u.is_active ? "Active" : "Paused"
+    }));
+    exportToCsv("staff_export.csv", dataToExport);
+  };
+
   return (
-    <AdminLayout>
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-serif font-bold text-blue-900">Staff & Management</h1>
-            <p className="text-muted-foreground">Manage Doctors, Receptionists, Directors, and Marketers</p>
-          </div>
+    <div className="space-y-6">
+
+      <div className="flex flex-col sm:flex-row justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-serif font-bold text-blue-900">Staff & Management</h1>
+          <p className="text-muted-foreground">Manage Doctors, Receptionists, Directors, and Marketers</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExport}>
+            <Download className="mr-2 h-4 w-4" /> Export CSV
+          </Button>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button className="bg-blue-600 hover:bg-blue-700">
@@ -278,72 +295,72 @@ export default function AdminStaff() {
             </DialogContent>
           </Dialog>
         </div>
-
-        <Card className="shadow-sm border-blue-50 overflow-hidden">
-          <Table>
-            <TableHeader className="bg-slate-50">
-              <TableRow>
-                <TableHead>User</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Branch / Details</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-[80px]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground">Refreshing staff records...</TableCell></TableRow>
-              ) : users.length === 0 ? (
-                <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground">No staff members found. Create your first portal user above.</TableCell></TableRow>
-              ) : (
-                users.map((u) => (
-                  <TableRow key={u.user_id}>
-                    <TableCell>
-                      <div className="font-bold text-slate-900">{u.full_name}</div>
-                      <div className="text-xs text-muted-foreground">{u.email || u.phone}</div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="capitalize bg-blue-50 text-blue-700 border-blue-200">
-                        {u.displayRole.replace('_', ' ')}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-slate-600">
-                      {u.type === 'marketer' ? (
-                        <span className="text-xs font-mono bg-slate-100 px-2 py-1 rounded">Code: {u.code}</span>
-                      ) : (
-                        u.branches?.name || 'Unassigned'
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          checked={u.is_active}
-                          onCheckedChange={() => handleToggleActive(u.user_id, u.type, u.is_active)}
-                        />
-                        <span className={`text-xs font-medium ${u.is_active ? 'text-green-600' : 'text-slate-400'}`}>
-                          {u.is_active ? 'Active' : 'Paused'}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem className="text-destructive font-medium" onClick={() => handleDelete(u.user_id, u.type)}>
-                            <Trash2 className="mr-2 h-4 w-4" /> Revoke Access
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </Card>
       </div>
-    </AdminLayout>
+
+      <Card className="shadow-sm border-blue-50 overflow-hidden">
+        <Table>
+          <TableHeader className="bg-slate-50">
+            <TableRow>
+              <TableHead>User</TableHead>
+              <TableHead>Role</TableHead>
+              <TableHead>Branch / Details</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="w-[80px]"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground">Refreshing staff records...</TableCell></TableRow>
+            ) : users.length === 0 ? (
+              <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground">No staff members found. Create your first portal user above.</TableCell></TableRow>
+            ) : (
+              users.map((u) => (
+                <TableRow key={u.user_id}>
+                  <TableCell>
+                    <div className="font-bold text-slate-900">{u.full_name}</div>
+                    <div className="text-xs text-muted-foreground">{u.email || u.phone}</div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="capitalize bg-blue-50 text-blue-700 border-blue-200">
+                      {u.displayRole.replace('_', ' ')}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-sm text-slate-600">
+                    {u.type === 'marketer' ? (
+                      <span className="text-xs font-mono bg-slate-100 px-2 py-1 rounded">Code: {u.code}</span>
+                    ) : (
+                      u.branches?.name || 'Unassigned'
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={u.is_active}
+                        onCheckedChange={() => handleToggleActive(u.user_id, u.type, u.is_active)}
+                      />
+                      <span className={`text-xs font-medium ${u.is_active ? 'text-green-600' : 'text-slate-400'}`}>
+                        {u.is_active ? 'Active' : 'Paused'}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem className="text-destructive font-medium" onClick={() => handleDelete(u.user_id, u.type)}>
+                          <Trash2 className="mr-2 h-4 w-4" /> Revoke Access
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </Card>
+    </div>
   );
 }

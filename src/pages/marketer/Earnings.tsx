@@ -63,6 +63,8 @@ export default function MarketerEarnings() {
         const { data: configData } = await (supabase as any)
             .from("marketer_commission_config")
             .select("commission_per_referral")
+            .order("updated_at", { ascending: false })
+            .limit(1)
             .maybeSingle();
 
         if (configData) {

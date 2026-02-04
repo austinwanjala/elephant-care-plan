@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { AdminLayout } from "@/components/admin/AdminLayout";
+
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -169,119 +169,34 @@ export default function AdminMembershipCategories() {
   };
 
   return (
-    <AdminLayout>
-      <div className="space-y-6">
-        <div className="flex items-center gap-4 mb-6">
-          <Link to="/admin/settings">
-            <Button variant="ghost" size="icon"><ArrowLeft className="h-5 w-5" /></Button>
-          </Link>
-          <div>
-            <h1 className="text-3xl font-serif font-bold text-foreground">Membership Categories</h1>
-            <p className="text-muted-foreground">Define and manage different membership levels and their benefits.</p>
-          </div>
-        </div>
+    <div className="space-y-6">
 
-        <div className="flex justify-end">
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="btn-primary"><Plus className="mr-2 h-4 w-4" /> Add Category</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader><DialogTitle className="font-serif">Add New Membership Category</DialogTitle></DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="space-y-2">
-                  <Label>Category Name *</Label>
-                  <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="e.g., Basic Plan" required />
-                </div>
-                <div className="space-y-2">
-                  <Label>Level *</Label>
-                  <Select value={formData.level} onValueChange={(value) => setFormData({ ...formData, level: value })} required>
-                    <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>
-                    <SelectContent>
-                      {["level_1", "level_2", "level_3", "level_4", "level_5", "level_6"].map((level) => (
-                        <SelectItem key={level} value={level}>{level.replace('_', ' ').toUpperCase()}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Payment Amount (KES) *</Label>
-                    <Input type="number" value={formData.paymentAmount} onChange={(e) => setFormData({ ...formData, paymentAmount: e.target.value })} placeholder="0" required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Benefit Amount (KES) *</Label>
-                    <Input type="number" value={formData.benefitAmount} onChange={(e) => setFormData({ ...formData, benefitAmount: e.target.value })} placeholder="0" required />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Registration Fee (KES) *</Label>
-                    <Input type="number" value={formData.registrationFee} onChange={(e) => setFormData({ ...formData, registrationFee: e.target.value })} placeholder="0" required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Management Fee (KES) *</Label>
-                    <Input type="number" value={formData.managementFee} onChange={(e) => setFormData({ ...formData, managementFee: e.target.value })} placeholder="0" required />
-                  </div>
-                </div>
-                <Button onClick={handleAddCategory} className="btn-primary">Add Category</Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+      <div className="flex items-center gap-4 mb-6">
+        <Link to="/admin/settings">
+          <Button variant="ghost" size="icon"><ArrowLeft className="h-5 w-5" /></Button>
+        </Link>
+        <div>
+          <h1 className="text-3xl font-serif font-bold text-foreground">Membership Categories</h1>
+          <p className="text-muted-foreground">Define and manage different membership levels and their benefits.</p>
         </div>
+      </div>
 
-        <div className="card-elevated overflow-hidden">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Level</TableHead>
-                  <TableHead>Payment</TableHead>
-                  <TableHead>Benefit</TableHead>
-                  <TableHead>Reg. Fee</TableHead>
-                  <TableHead>Mgmt. Fee</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {categories.map((category) => (
-                  <TableRow key={category.id}>
-                    <TableCell className="font-medium">{category.name}</TableCell>
-                    <TableCell><Badge variant="outline" className="capitalize">{category.level.replace('_', ' ')}</Badge></TableCell>
-                    <TableCell>KES {category.payment_amount.toLocaleString()}</TableCell>
-                    <TableCell className="text-success">KES {category.benefit_amount.toLocaleString()}</TableCell>
-                    <TableCell>KES {category.registration_fee.toLocaleString()}</TableCell>
-                    <TableCell>KES {category.management_fee.toLocaleString()}</TableCell>
-                    <TableCell><Switch checked={category.is_active} onCheckedChange={() => handleToggleActive(category)} /></TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEditDialog(category)}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
-
-        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+      <div className="flex justify-end">
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="btn-primary"><Plus className="mr-2 h-4 w-4" /> Add Category</Button>
+          </DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle className="font-serif">Edit Membership Category</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle className="font-serif">Add New Membership Category</DialogTitle></DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="space-y-2">
-                <Label>Category Name</Label>
-                <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
+                <Label>Category Name *</Label>
+                <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="e.g., Basic Plan" required />
               </div>
               <div className="space-y-2">
-                <Label>Level</Label>
-                <Select value={formData.level} onValueChange={(value) => setFormData({ ...formData, level: value })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Label>Level *</Label>
+                <Select value={formData.level} onValueChange={(value) => setFormData({ ...formData, level: value })} required>
+                  <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>
                   <SelectContent>
                     {["level_1", "level_2", "level_3", "level_4", "level_5", "level_6"].map((level) => (
                       <SelectItem key={level} value={level}>{level.replace('_', ' ').toUpperCase()}</SelectItem>
@@ -291,29 +206,113 @@ export default function AdminMembershipCategories() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Payment Amount (KES)</Label>
-                  <Input type="number" value={formData.paymentAmount} onChange={(e) => setFormData({ ...formData, paymentAmount: e.target.value })} />
+                  <Label>Payment Amount (KES) *</Label>
+                  <Input type="number" value={formData.paymentAmount} onChange={(e) => setFormData({ ...formData, paymentAmount: e.target.value })} placeholder="0" required />
                 </div>
                 <div className="space-y-2">
-                  <Label>Benefit Amount (KES)</Label>
-                  <Input type="number" value={formData.benefitAmount} onChange={(e) => setFormData({ ...formData, benefitAmount: e.target.value })} />
+                  <Label>Benefit Amount (KES) *</Label>
+                  <Input type="number" value={formData.benefitAmount} onChange={(e) => setFormData({ ...formData, benefitAmount: e.target.value })} placeholder="0" required />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Registration Fee (KES)</Label>
-                  <Input type="number" value={formData.registrationFee} onChange={(e) => setFormData({ ...formData, registrationFee: e.target.value })} />
+                  <Label>Registration Fee (KES) *</Label>
+                  <Input type="number" value={formData.registrationFee} onChange={(e) => setFormData({ ...formData, registrationFee: e.target.value })} placeholder="0" required />
                 </div>
                 <div className="space-y-2">
-                  <Label>Management Fee (KES)</Label>
-                  <Input type="number" value={formData.managementFee} onChange={(e) => setFormData({ ...formData, managementFee: e.target.value })} />
+                  <Label>Management Fee (KES) *</Label>
+                  <Input type="number" value={formData.managementFee} onChange={(e) => setFormData({ ...formData, managementFee: e.target.value })} placeholder="0" required />
                 </div>
               </div>
-              <Button onClick={handleEditCategory} className="btn-primary">Update Category</Button>
+              <Button onClick={handleAddCategory} className="btn-primary">Add Category</Button>
             </div>
           </DialogContent>
         </Dialog>
       </div>
-    </AdminLayout>
+
+      <div className="card-elevated overflow-hidden">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Level</TableHead>
+                <TableHead>Payment</TableHead>
+                <TableHead>Benefit</TableHead>
+                <TableHead>Reg. Fee</TableHead>
+                <TableHead>Mgmt. Fee</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {categories.map((category) => (
+                <TableRow key={category.id}>
+                  <TableCell className="font-medium">{category.name}</TableCell>
+                  <TableCell><Badge variant="outline" className="capitalize">{category.level.replace('_', ' ')}</Badge></TableCell>
+                  <TableCell>KES {category.payment_amount.toLocaleString()}</TableCell>
+                  <TableCell className="text-success">KES {category.benefit_amount.toLocaleString()}</TableCell>
+                  <TableCell>KES {category.registration_fee.toLocaleString()}</TableCell>
+                  <TableCell>KES {category.management_fee.toLocaleString()}</TableCell>
+                  <TableCell><Switch checked={category.is_active} onCheckedChange={() => handleToggleActive(category)} /></TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => openEditDialog(category)}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle className="font-serif">Edit Membership Category</DialogTitle></DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label>Category Name</Label>
+              <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Level</Label>
+              <Select value={formData.level} onValueChange={(value) => setFormData({ ...formData, level: value })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {["level_1", "level_2", "level_3", "level_4", "level_5", "level_6"].map((level) => (
+                    <SelectItem key={level} value={level}>{level.replace('_', ' ').toUpperCase()}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Payment Amount (KES)</Label>
+                <Input type="number" value={formData.paymentAmount} onChange={(e) => setFormData({ ...formData, paymentAmount: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Benefit Amount (KES)</Label>
+                <Input type="number" value={formData.benefitAmount} onChange={(e) => setFormData({ ...formData, benefitAmount: e.target.value })} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Registration Fee (KES)</Label>
+                <Input type="number" value={formData.registrationFee} onChange={(e) => setFormData({ ...formData, registrationFee: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Management Fee (KES)</Label>
+                <Input type="number" value={formData.managementFee} onChange={(e) => setFormData({ ...formData, managementFee: e.target.value })} />
+              </div>
+            </div>
+            <Button onClick={handleEditCategory} className="btn-primary">Update Category</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

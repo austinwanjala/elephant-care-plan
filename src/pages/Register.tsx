@@ -35,7 +35,11 @@ const Register = () => {
   const [availableMarketers, setAvailableMarketers] = useState<Marketer[]>([]);
   const [selectedMarketerId, setSelectedMarketerId] = useState<string | null>(null);
   const [dependants, setDependants] = useState<Dependant[]>([]);
-  const [consent, setConsent] = useState(false);
+  const [consents, setConsents] = useState({
+    processing: false,
+    sharing: false,
+    signature: false
+  });
   const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
@@ -94,8 +98,8 @@ const Register = () => {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!consent) {
-      toast({ title: "Please accept the data usage consent", variant: "destructive" });
+    if (!consents.processing || !consents.sharing || !consents.signature) {
+      toast({ title: "Please accept all data usage consents", variant: "destructive" });
       return;
     }
 
@@ -275,7 +279,7 @@ const Register = () => {
                   minLength={6}
                 />
               </div>
-              
+
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="referralSource">How did you hear about us?</Label>
                 <Select
@@ -386,11 +390,61 @@ const Register = () => {
               ))}
             </div>
 
-            <div className="flex items-center space-x-2 pt-4">
-              <Checkbox id="consent" checked={consent} onCheckedChange={(checked) => setConsent(checked as boolean)} />
-              <Label htmlFor="consent" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                I agree to the data usage policy and use my name "{formData.fullName}" as a digital signature.
-              </Label>
+            <div className="space-y-4 pt-6 pb-4">
+              <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Consent & Data Privacy</h3>
+              <div className="bg-muted/30 p-4 rounded-lg border border-border space-y-4 text-sm">
+                <p className="text-muted-foreground text-xs leading-relaxed">
+                  Elephant Dental Care Plan ("the Plan") is committed to protecting your privacy and personal data in accordance with the Data Protection Act of Kenya. Please review and consent to the following terms to proceed.
+                </p>
+
+                <div className="flex items-start space-x-3">
+                  <Checkbox
+                    id="consent_processing"
+                    checked={consents.processing}
+                    onCheckedChange={(checked) => setConsents(prev => ({ ...prev, processing: checked as boolean }))}
+                  />
+                  <div className="grid gap-1.5 leading-none">
+                    <Label htmlFor="consent_processing" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                      Data Processing Consent
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      I consent to the collection and processing of my personal and medical data by Elephant Dental for the purpose of administering my membership, processing claims, and facilitating medical services.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start space-x-3">
+                  <Checkbox
+                    id="consent_sharing"
+                    checked={consents.sharing}
+                    onCheckedChange={(checked) => setConsents(prev => ({ ...prev, sharing: checked as boolean }))}
+                  />
+                  <div className="grid gap-1.5 leading-none">
+                    <Label htmlFor="consent_sharing" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                      Data Sharing
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      I authorize Elephant Dental to share my relevant medical and membership information with affiliated branches, healthcare providers, and insurance partners strictly for service delivery and coverage verification.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start space-x-3">
+                  <Checkbox
+                    id="consent_signature"
+                    checked={consents.signature}
+                    onCheckedChange={(checked) => setConsents(prev => ({ ...prev, signature: checked as boolean }))}
+                  />
+                  <div className="grid gap-1.5 leading-none">
+                    <Label htmlFor="consent_signature" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                      Digital Signature
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      I acknowledge that checking these boxes constitutes my digital signature and legal agreement to these terms, confirming that the information provided is accurate.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <Button type="submit" className="w-full btn-primary" disabled={loading}>

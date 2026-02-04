@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { AdminLayout } from "@/components/admin/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -34,9 +33,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Search, Plus, MoreHorizontal, Edit, Trash2, Fingerprint } from "lucide-react";
+import { Search, Plus, MoreHorizontal, Edit, Trash2, Fingerprint, Download } from "lucide-react";
 import { BiometricCapture } from "@/components/BiometricCapture";
 import { createClient } from "@supabase/supabase-js";
+import { exportToCsv } from "@/utils/csvExport";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -48,14 +48,15 @@ interface Member {
   phone: string;
   email: string;
   id_number: string;
-  age: number | null; // Added age
+  age: number | null;
   coverage_balance: number;
   total_contributions: number;
   benefit_limit: number;
   is_active: boolean;
   biometric_data: string | null;
   branches: { name: string } | null;
-  membership_categories: { name: string; payment_amount: number; benefit_amount: number } | null;
+  membership_categories: { id: string; name: string; payment_amount: number; benefit_amount: number } | null;
+  created_at: string;
 }
 
 interface MembershipCategory {
@@ -86,7 +87,7 @@ export default function AdminMembers() {
     email: "",
     phone: "",
     idNumber: "",
-    age: "", // Added age
+    age: "",
     password: "",
     branchId: "",
     categoryId: "",
@@ -103,13 +104,13 @@ export default function AdminMembers() {
     const [membersRes, categoriesRes, branchesRes] = await Promise.all([
       supabase
         .from("members")
-        .select("*, branches(name), membership_categories(name, payment_amount, benefit_amount)")
+        .select("*, branches(name), membership_categories(id, name, payment_amount, benefit_amount)")
         .order("created_at", { ascending: false }),
       supabase.from("membership_categories").select("*").eq("is_active", true),
       supabase.from("branches").select("id, name").eq("is_active", true),
     ]);
 
-    if (membersRes.data) setMembers(membersRes.data);
+    if (membersRes.data) setMembers(membersRes.data as any);
     if (categoriesRes.data) setCategories(categoriesRes.data);
     if (branchesRes.data) setBranches(branchesRes.data);
   };
@@ -269,14 +270,35 @@ export default function AdminMembers() {
       m.id_number.includes(searchTerm)
   );
 
+  const handleExport = () => {
+    const dataToExport = filteredMembers.map(m => ({
+      "Member Number": m.member_number,
+      "Full Name": m.full_name,
+      "Phone": m.phone || "",
+      "ID Number": m.id_number || "",
+      "Age": m.age || "",
+      "Category": m.membership_categories?.name || "N/A",
+      "Branch": m.branches?.name || "N/A",
+      "Coverage Balance": m.coverage_balance,
+      "Biometric Captured": m.biometric_data ? "Yes" : "No",
+      "Status": m.is_active ? "Active" : "Inactive",
+      "Joined Date": new Date(m.created_at).toLocaleDateString()
+    }));
+    exportToCsv("members_export.csv", dataToExport);
+  };
+
   return (
-    <AdminLayout>
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-serif font-bold text-foreground">Members</h1>
-            <p className="text-muted-foreground">Manage member registrations and profiles</p>
-          </div>
+    <div className="space-y-6">
+
+      <div className="flex flex-col sm:flex-row justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-serif font-bold text-foreground">Members</h1>
+          <p className="text-muted-foreground">Manage member registrations and profiles</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExport}>
+            <Download className="mr-2 h-4 w-4" /> Export CSV
+          </Button>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button className="btn-primary">
@@ -373,178 +395,178 @@ export default function AdminMembers() {
             </DialogContent>
           </Dialog>
         </div>
-
-        <div className="flex gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by name, member number, phone, or ID..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-        </div>
-
-        <div className="card-elevated overflow-hidden">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Member #</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>ID Number</TableHead>
-                  <TableHead>Age</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Branch</TableHead>
-                  <TableHead>Coverage</TableHead>
-                  <TableHead>Biometric</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredMembers.map((member) => (
-                  <TableRow key={member.id}>
-                    <TableCell className="font-mono">{member.member_number}</TableCell>
-                    <TableCell className="font-medium">{member.full_name}</TableCell>
-                    <TableCell>{member.phone}</TableCell>
-                    <TableCell>{member.id_number}</TableCell>
-                    <TableCell>{member.age || "N/A"}</TableCell>
-                    <TableCell>{member.membership_categories?.name || "N/A"}</TableCell>
-                    <TableCell>{member.branches?.name || "N/A"}</TableCell>
-                    <TableCell className="text-success">
-                      KES {member.coverage_balance.toLocaleString()}
-                    </TableCell>
-                    <TableCell>
-                      {member.biometric_data ? (
-                        <span className="text-success text-xs">✓ Captured</span>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">Not set</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${member.is_active ? "badge-success" : "badge-error"}`}>
-                        {member.is_active ? "Active" : "Inactive"}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEditDialog(member)}>
-                            <Edit className="mr-2 h-4 w-4" /> Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => {
-                            setSelectedMember(member);
-                            setBiometricDialogOpen(true);
-                          }}>
-                            <Fingerprint className="mr-2 h-4 w-4" /> Capture Biometric
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={() => handleDeleteMember(member.id)}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" /> Deactivate
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
-
-        {/* Edit Dialog */}
-        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle className="font-serif">Edit Member</DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Label>Full Name</Label>
-                <Input
-                  value={formData.fullName}
-                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Phone</Label>
-                <Input
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>ID Number</Label>
-                <Input
-                  value={formData.idNumber}
-                  onChange={(e) => setFormData({ ...formData, idNumber: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Age</Label>
-                <Input
-                  type="number"
-                  value={formData.age}
-                  onChange={(e) => setFormData({ ...formData, age: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Branch</Label>
-                <Select
-                  value={formData.branchId}
-                  onValueChange={(value) => setFormData({ ...formData, branchId: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select branch" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {branches.map((branch) => (
-                      <SelectItem key={branch.id} value={branch.id}>
-                        {branch.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button onClick={handleEditMember} className="btn-primary">
-                Update Member
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Biometric Dialog */}
-        <Dialog open={biometricDialogOpen} onOpenChange={setBiometricDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle className="font-serif">Capture Biometric Data</DialogTitle>
-              <DialogDescription>
-                Capture fingerprint or facial recognition for {selectedMember?.full_name}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="py-4 space-y-6">
-              {selectedMember && (
-                <BiometricCapture
-                  mode="register"
-                  userId={selectedMember.id}
-                  userName={selectedMember.full_name}
-                  onCaptureComplete={handleBiometricCaptureComplete}
-                />
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
       </div>
-    </AdminLayout>
+
+      <div className="flex gap-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by name, member number, phone, or ID..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+      </div>
+
+      <div className="card-elevated overflow-hidden">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Member #</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead>ID Number</TableHead>
+                <TableHead>Age</TableHead>
+                <TableHead>Category</TableHead>
+                <TableHead>Branch</TableHead>
+                <TableHead>Coverage</TableHead>
+                <TableHead>Biometric</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredMembers.map((member) => (
+                <TableRow key={member.id}>
+                  <TableCell className="font-mono">{member.member_number}</TableCell>
+                  <TableCell className="font-medium">{member.full_name}</TableCell>
+                  <TableCell>{member.phone}</TableCell>
+                  <TableCell>{member.id_number}</TableCell>
+                  <TableCell>{member.age || "N/A"}</TableCell>
+                  <TableCell>{member.membership_categories?.name || "N/A"}</TableCell>
+                  <TableCell>{member.branches?.name || "N/A"}</TableCell>
+                  <TableCell className="text-success">
+                    KES {member.coverage_balance.toLocaleString()}
+                  </TableCell>
+                  <TableCell>
+                    {member.biometric_data ? (
+                      <span className="text-success text-xs">✓ Captured</span>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">Not set</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${member.is_active ? "badge-success" : "badge-error"}`}>
+                      {member.is_active ? "Active" : "Inactive"}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => openEditDialog(member)}>
+                          <Edit className="mr-2 h-4 w-4" /> Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => {
+                          setSelectedMember(member);
+                          setBiometricDialogOpen(true);
+                        }}>
+                          <Fingerprint className="mr-2 h-4 w-4" /> Capture Biometric
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onClick={() => handleDeleteMember(member.id)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" /> Deactivate
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+
+      {/* Edit Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="font-serif">Edit Member</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label>Full Name</Label>
+              <Input
+                value={formData.fullName}
+                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Phone</Label>
+              <Input
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>ID Number</Label>
+              <Input
+                value={formData.idNumber}
+                onChange={(e) => setFormData({ ...formData, idNumber: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Age</Label>
+              <Input
+                type="number"
+                value={formData.age}
+                onChange={(e) => setFormData({ ...formData, age: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Branch</Label>
+              <Select
+                value={formData.branchId}
+                onValueChange={(value) => setFormData({ ...formData, branchId: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select branch" />
+                </SelectTrigger>
+                <SelectContent>
+                  {branches.map((branch) => (
+                    <SelectItem key={branch.id} value={branch.id}>
+                      {branch.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={handleEditMember} className="btn-primary">
+              Update Member
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Biometric Dialog */}
+      <Dialog open={biometricDialogOpen} onOpenChange={setBiometricDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="font-serif">Capture Biometric Data</DialogTitle>
+            <DialogDescription>
+              Capture fingerprint or facial recognition for {selectedMember?.full_name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-6">
+            {selectedMember && (
+              <BiometricCapture
+                mode="register"
+                userId={selectedMember.id}
+                userName={selectedMember.full_name}
+                onCaptureComplete={handleBiometricCaptureComplete}
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

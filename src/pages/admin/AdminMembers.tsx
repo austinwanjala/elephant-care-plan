@@ -122,12 +122,11 @@ export default function AdminMembers() {
         return;
       }
 
-      // Create a "no-session" client to preserve the Admin's login session
+      // 1. Create Auth account
       const authClient = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
         auth: { persistSession: false }
       });
 
-      // Create the Auth account with metadata
       const { data: authData, error: authError } = await authClient.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -139,22 +138,46 @@ export default function AdminMembers() {
             id_number: formData.idNumber,
             age: parseInt(formData.age),
             branch_id: formData.branchId || null,
-            // membership_category_id and initial coverage will be set by member on first login
           }
         }
       });
 
       if (authError) {
         if (authError.message.toLowerCase().includes("already registered")) {
-          throw new Error("This email is already registered. Please use a different email or manage the existing account.");
+          throw new Error("This email is already registered.");
         }
         throw authError;
       }
-      if (!authData.user) throw new Error("User creation failed");
+      
+      const userId = authData.user?.id;
+      if (!userId) throw new Error("User creation failed: No ID returned.");
 
-      // The handle_new_user trigger will create the member profile and user_role.
-      // We can optionally add next_of_kin details here if needed, but for now,
-      // the member profile is created with basic info.
+      // 2. Explicitly assign role
+      const { error: roleError } = await supabase
+        .from("user_roles")
+        .insert({ user_id: userId, role: 'member' });
+
+      if (roleError) throw roleError;
+
+      // 3. Explicitly create profile
+      const { error: profileError } = await supabase
+        .from("members")
+        .insert({
+          user_id: userId,
+          full_name: formData.fullName,
+          email: formData.email,
+          phone: formData.phone,
+          id_number: formData.idNumber,
+          age: parseInt(formData.age),
+          branch_id: formData.branchId || null,
+          member_number: `ED${Math.floor(100000 + Math.random() * 900000)}`,
+          is_active: false,
+          coverage_balance: 0,
+          total_contributions: 0,
+          benefit_limit: 0
+        });
+
+      if (profileError) throw profileError;
 
       toast({ title: "Member registered successfully", description: "Member can now log in to select scheme and make payment." });
       setDialogOpen(false);
@@ -177,7 +200,6 @@ export default function AdminMembers() {
           id_number: formData.idNumber,
           age: parseInt(formData.age),
           branch_id: formData.branchId || null,
-          // membership_category_id is managed by member now
           next_of_kin_name: formData.nextOfKinName || null,
           next_of_kin_phone: formData.nextOfKinPhone || null,
         })
@@ -224,7 +246,7 @@ export default function AdminMembers() {
 
       toast({ title: "Biometric data captured successfully" });
       setBiometricDialogOpen(false);
-      loadData(); // Reload data to show updated biometric status
+      loadData(); 
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
@@ -238,11 +260,11 @@ export default function AdminMembers() {
       phone: member.phone,
       idNumber: member.id_number,
       age: member.age?.toString() || "",
-      password: "", // Password not editable here
+      password: "", 
       branchId: member.branches ? branches.find(b => b.name === member.branches?.name)?.id || "" : "",
-      categoryId: "", // Category is managed by member
-      nextOfKinName: "", // Not currently stored in member table directly
-      nextOfKinPhone: "", // Not currently stored in member table directly
+      categoryId: "", 
+      nextOfKinName: "", 
+      nextOfKinPhone: "", 
     });
     setEditDialogOpen(true);
   };

@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@supabase/supabase-js";
 import { Loader2, Plus } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 // Initialize a separate client for auth to avoid session switching
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -33,12 +34,11 @@ export default function AddMember() {
                 return;
             }
 
-            // Create a "no-session" client to preserve the Receptionist's login session
+            // 1. Create the Auth account using a "no-session" client
             const authClient = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
                 auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
             });
 
-            // Create the Auth account with metadata
             const { data: authData, error: authError } = await authClient.auth.signUp({
                 email: formData.email,
                 password: formData.password,
@@ -49,8 +49,6 @@ export default function AddMember() {
                         phone: formData.phone,
                         id_number: formData.idNumber,
                         age: parseInt(formData.age),
-                        // Receptionists don't assign branches or categories immediately; 
-                        // these are handled by the member or later admin processes.
                     }
                 }
             });
@@ -61,7 +59,35 @@ export default function AddMember() {
                 }
                 throw authError;
             }
-            if (!authData.user) throw new Error("User creation failed");
+            
+            const userId = authData.user?.id;
+            if (!userId) throw new Error("User creation failed: No ID returned.");
+
+            // 2. Explicitly assign the 'member' role in user_roles table
+            const { error: roleError } = await supabase
+                .from("user_roles")
+                .insert({ user_id: userId, role: 'member' });
+
+            if (roleError) throw roleError;
+
+            // 3. Explicitly create the member profile
+            const { error: profileError } = await supabase
+                .from("members")
+                .insert({
+                    user_id: userId,
+                    full_name: formData.fullName,
+                    email: formData.email,
+                    phone: formData.phone,
+                    id_number: formData.idNumber,
+                    age: parseInt(formData.age),
+                    member_number: `ED${Math.floor(100000 + Math.random() * 900000)}`,
+                    is_active: false,
+                    coverage_balance: 0,
+                    total_contributions: 0,
+                    benefit_limit: 0
+                });
+
+            if (profileError) throw profileError;
 
             toast({
                 title: "Member Registered",

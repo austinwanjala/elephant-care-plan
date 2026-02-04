@@ -100,15 +100,14 @@ export default function AdminBranchPayments() {
           .eq("period_year", year)
           .order("payment_date", { ascending: false }),
         supabase
-          .from("revenue_claims" as any)
-          .select("*, staff:director_id(full_name), branches:branch_id(name)")
+          .from("revenue_claims")
+          .select("*")
           .order("created_at", { ascending: false }),
       ]);
 
       if (branchesRes.error) throw branchesRes.error;
       if (revenueRes.error) console.error("Revenue error:", revenueRes.error);
       if (paymentsRes.error) console.error("Payments error:", paymentsRes.error);
-      if (claimsRes.error) throw claimsRes.error;
 
       if (branchesRes.data) setBranches(branchesRes.data);
 
@@ -123,8 +122,14 @@ export default function AdminBranchPayments() {
 
       if (paymentsRes.data) setPayments(paymentsRes.data);
 
-      console.log("Fetched claims for admin:", claimsRes.data);
-      if (claimsRes.data) setClaims(claimsRes.data);
+      // Fetch claims with branch names separately
+      if (!claimsRes.error && claimsRes.data) {
+        const claimsWithNames = claimsRes.data.map(claim => ({
+          ...claim,
+          branch_name: branchesRes.data?.find(b => b.id === claim.branch_id)?.name
+        }));
+        setClaims(claimsWithNames as any);
+      }
 
     } catch (error: any) {
       console.error("Error loading admin data:", error);
@@ -171,7 +176,7 @@ export default function AdminBranchPayments() {
       const { data: adminStaff } = await supabase.from("staff").select("id").eq("user_id", user.id).single();
 
       // Update the claim status
-      const { error: claimError } = await supabase
+      const { error: claimError } = await (supabase as any)
         .from("revenue_claims")
         .update({
           status: 'paid',

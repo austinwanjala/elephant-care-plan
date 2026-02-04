@@ -35,7 +35,7 @@ interface Member {
   coverage_balance: number;
   total_contributions: number;
   benefit_limit: number;
-  qr_code_data: string | null;
+  qr_code_data?: string | null;
   is_active: boolean;
   membership_categories: { name: string; benefit_amount: number } | null;
   id_number: string;
@@ -310,7 +310,7 @@ const MemberDashboard = () => {
               full_name: member.full_name,
               member_number: member.member_number,
               membership_categories: member.membership_categories,
-              qr_code_data: member.qr_code_data,
+              qr_code_data: member.qr_code_data || null,
               is_active: member.is_active,
               coverage_balance: member.coverage_balance || 0,
               benefit_limit: member.benefit_limit || 0,

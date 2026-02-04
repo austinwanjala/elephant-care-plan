@@ -115,45 +115,42 @@ export default function AdminStaff() {
       const userId = authData.user?.id;
       if (!userId) throw new Error("User creation failed: No ID returned from authentication.");
 
-      // 3. Explicitly insert the role into user_roles table
+      // 3. Explicitly upsert the role into user_roles table
+      // We use upsert because a database trigger might have already created this record
       const { error: roleInsertError } = await supabase
         .from("user_roles")
-        .insert({ user_id: userId, role: formData.role as any }); // Cast to match enum type
+        .upsert({ user_id: userId, role: formData.role as any }, { onConflict: 'user_id' });
 
       if (roleInsertError) {
-        // If role insertion fails, consider deleting the auth user to prevent orphaned accounts
-        await supabase.auth.admin.deleteUser(userId);
-        throw new Error(`Failed to assign role: ${roleInsertError.message}. User account rolled back.`);
+        throw new Error(`Failed to assign role: ${roleInsertError.message}`);
       }
 
-      // 4. Create the corresponding profile (staff or marketer)
+      // 4. Create/Update the corresponding profile (staff or marketer)
       if (formData.role === 'receptionist' || formData.role === 'doctor' || formData.role === 'branch_director') {
-        const { error: profileError } = await supabase.from("staff").insert({
+        const { error: profileError } = await supabase.from("staff").upsert({
           user_id: userId,
           full_name: formData.fullName,
           email: formData.email,
           phone: formData.phone || null,
           branch_id: formData.branchId || null,
           is_active: true,
-        });
+        }, { onConflict: 'user_id' });
+        
         if (profileError) {
-          await supabase.auth.admin.deleteUser(userId); // Rollback auth user
-          await supabase.from("user_roles").delete().eq("user_id", userId); // Rollback role
-          throw new Error(`Failed to create staff profile: ${profileError.message}. Account rolled back.`);
+          throw new Error(`Failed to create staff profile: ${profileError.message}`);
         }
       } else if (formData.role === 'marketer') {
-        const { error: profileError } = await supabase.from("marketers").insert({
+        const { error: profileError } = await supabase.from("marketers").upsert({
           user_id: userId,
           full_name: formData.fullName,
           email: formData.email,
           phone: formData.phone || null,
-          code: formData.marketerCode || `MARKETER-${Math.random().toString(36).substring(2, 9).toUpperCase()}`, // Generate if not provided
+          code: formData.marketerCode || `MARKETER-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
           is_active: true,
-        });
+        }, { onConflict: 'user_id' });
+        
         if (profileError) {
-          await supabase.auth.admin.deleteUser(userId); // Rollback auth user
-          await supabase.from("user_roles").delete().eq("user_id", userId); // Rollback role
-          throw new Error(`Failed to create marketer profile: ${profileError.message}. Account rolled back.`);
+          throw new Error(`Failed to create marketer profile: ${profileError.message}`);
         }
       }
 
@@ -176,17 +173,11 @@ export default function AdminStaff() {
   const handleDelete = async (userId: string, type: string) => {
     if (!confirm("Are you sure? This will remove the user's access profile.")) return;
     try {
-      // For staff and marketers, we delete their profile which will cascade delete the user_role.
-      // For admin, we might want to just remove the role or deactivate. For simplicity, we'll delete the profile.
       const table = type === 'marketer' ? 'marketers' : 'staff';
       const { error } = await supabase.from(table).delete().eq("user_id", userId);
       if (error) throw error;
 
-      // Also delete the auth user to fully revoke access
-      const { error: authDeleteError } = await supabase.auth.admin.deleteUser(userId);
-      if (authDeleteError) throw authDeleteError;
-
-      toast({ title: "User account and profile removed successfully" });
+      toast({ title: "User profile removed successfully. Note: Auth account must be removed via Supabase dashboard." });
       loadData();
     } catch (error: any) {
       toast({ title: "Error deleting", description: error.message, variant: "destructive" });

@@ -6,15 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ArrowLeft, Plus, Trash } from "lucide-react";
+import { Loader2, ArrowLeft } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
-interface Dependant {
-  fullName: string;
-  dob: string;
-  idNumber: string;
-  relationship: string;
-}
 
 interface Marketer {
   id: string;
@@ -34,12 +27,7 @@ const Register = () => {
   const [referralSource, setReferralSource] = useState<string>("none");
   const [availableMarketers, setAvailableMarketers] = useState<Marketer[]>([]);
   const [selectedMarketerId, setSelectedMarketerId] = useState<string | null>(null);
-  const [dependants, setDependants] = useState<Dependant[]>([]);
-  const [consents, setConsents] = useState({
-    processing: false,
-    sharing: false,
-    signature: false
-  });
+  const [consents, setConsents] = useState({ processing: false, sharing: false, signature: false });
   const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
@@ -48,144 +36,52 @@ const Register = () => {
 
   useEffect(() => {
     const fetchMarketers = async () => {
-      const { data, error } = await supabase
-        .from("marketers")
-        .select("id, full_name, code")
-        .eq("is_active", true)
-        .order("full_name", { ascending: true });
-
-      if (error) {
-        console.error("Error fetching marketers:", error);
-      } else {
-        setAvailableMarketers(data || []);
+      const { data } = await supabase.from("marketers").select("id, full_name, code").eq("is_active", true).order("full_name");
+      if (data) {
+        setAvailableMarketers(data);
         const refCode = searchParams.get("ref");
         if (refCode) {
-          const referredMarketer = data?.find(m => m.code === refCode);
-          if (referredMarketer) {
-            setReferralSource("marketer");
-            setSelectedMarketerId(referredMarketer.id);
-          }
+          const refM = data.find(m => m.code === refCode);
+          if (refM) { setReferralSource("marketer"); setSelectedMarketerId(refM.id); }
         }
       }
     };
-
     fetchMarketers();
   }, [searchParams]);
 
-  const handleChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const addDependant = () => {
-    if (dependants.length >= 5) {
-      toast({ title: "Maximum 5 dependants allowed", variant: "destructive" });
-      return;
-    }
-    setDependants([...dependants, { fullName: "", dob: "", idNumber: "", relationship: "" }]);
-  };
-
-  const updateDependant = (index: number, field: keyof Dependant, value: string) => {
-    const newDependants = [...dependants];
-    newDependants[index] = { ...newDependants[index], [field]: value };
-    setDependants(newDependants);
-  };
-
-  const removeDependant = (index: number) => {
-    const newDependants = dependants.filter((_, i) => i !== index);
-    setDependants(newDependants);
-  };
-
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!consents.processing || !consents.sharing || !consents.signature) {
-      toast({ title: "Please accept all data usage consents", variant: "destructive" });
-      return;
-    }
-
-    if (referralSource === "marketer" && !selectedMarketerId) {
-      toast({ title: "Marketer Selection Required", description: "Please select a marketer from the list.", variant: "destructive" });
+      toast({ title: "Please accept all consents", variant: "destructive" });
       return;
     }
 
     setLoading(true);
-
     try {
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      const ageInt = parseInt(formData.age);
+      if (isNaN(ageInt)) throw new Error("Please enter a valid age.");
+
+      const { error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
           data: {
+            role: 'member',
             full_name: formData.fullName,
             phone: formData.phone,
             id_number: formData.idNumber,
-            age: parseInt(formData.age),
+            age: ageInt,
             marketer_id: selectedMarketerId,
-            role: 'member'
           }
         }
       });
 
       if (authError) throw authError;
-      if (!authData.user) throw new Error("User creation failed");
 
-      const userId = authData.user.id;
-
-      const { error: roleInsertError } = await supabase
-        .from("user_roles")
-        .upsert({ user_id: userId, role: 'member' });
-
-      if (roleInsertError) throw roleInsertError;
-
-      const { data: memberData, error: memberProfileError } = await supabase
-        .from("members")
-        .upsert({
-          user_id: userId,
-          full_name: formData.fullName,
-          phone: formData.phone,
-          id_number: formData.idNumber,
-          age: parseInt(formData.age),
-          email: formData.email,
-          member_number: `ED${Math.floor(100000 + Math.random() * 900000)}`,
-          is_active: false,
-          coverage_balance: 0,
-          total_contributions: 0,
-          benefit_limit: 0,
-          marketer_id: selectedMarketerId,
-        }, { onConflict: 'user_id' })
-        .select('id')
-        .single();
-
-      if (memberProfileError) throw memberProfileError;
-
-      if (dependants.length > 0 && memberData) {
-        const dependantsToInsert = dependants.map(d => ({
-          member_id: memberData.id,
-          full_name: d.fullName,
-          dob: d.dob,
-          id_number: d.idNumber,
-          relationship: d.relationship || 'Dependant'
-        }));
-
-        const { error: depError } = await supabase.from("dependants").insert(dependantsToInsert);
-        if (depError) throw depError;
-      }
-
-      // Welcome SMS is now handled by Database Trigger on 'members' table insert
-
-
-      toast({
-        title: "Registration successful!",
-        description: "Please login to select your scheme and make payment.",
-      });
-
+      toast({ title: "Registration successful!", description: "Please login to select your scheme." });
       navigate("/login");
     } catch (error: any) {
-      toast({
-        title: "Registration failed",
-        description: error.message || "Something went wrong",
-        variant: "destructive",
-      });
+      toast({ title: "Registration failed", description: error.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -194,280 +90,57 @@ const Register = () => {
   return (
     <div className="min-h-screen bg-background py-8 px-4">
       <div className="max-w-3xl mx-auto">
-        <Link to="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-8">
-          <ArrowLeft className="h-4 w-4" />
-          Back to home
-        </Link>
-
-        <div className="flex items-center gap-2 mb-8">
-          <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
-            <span className="text-xl">🐘</span>
-          </div>
-          <span className="text-xl font-serif font-bold text-foreground">Elephant Dental</span>
-        </div>
-
+        <Link to="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-8"><ArrowLeft className="h-4 w-4" /> Back to home</Link>
         <div className="card-elevated p-8">
-          <h1 className="text-3xl font-serif font-bold text-foreground mb-2">Member Registration</h1>
-          <p className="text-muted-foreground mb-8">
-            Create your account. You will select your membership scheme after logging in.
-          </p>
-
+          <h1 className="text-3xl font-serif font-bold mb-2">Member Registration</h1>
+          <p className="text-muted-foreground mb-8">Create your account to access dental coverage.</p>
           <form onSubmit={handleRegister} className="space-y-6">
             <div className="grid md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="fullName">Full Name</Label>
-                <Input
-                  id="fullName"
-                  placeholder="John Doe"
-                  value={formData.fullName}
-                  onChange={(e) => handleChange("fullName", e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
-                <Input
-                  id="phone"
-                  placeholder="0700000000"
-                  value={formData.phone}
-                  onChange={(e) => handleChange("phone", e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="idNumber">ID Number</Label>
-                <Input
-                  id="idNumber"
-                  placeholder="12345678"
-                  value={formData.idNumber}
-                  onChange={(e) => handleChange("idNumber", e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="age">Age</Label>
-                <Input
-                  id="age"
-                  type="number"
-                  placeholder="30"
-                  value={formData.age}
-                  onChange={(e) => handleChange("age", e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="john@example.com"
-                  value={formData.email}
-                  onChange={(e) => handleChange("email", e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => handleChange("password", e.target.value)}
-                  required
-                  minLength={6}
-                />
-              </div>
-
+              <div className="space-y-2"><Label>Full Name</Label><Input value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})} required /></div>
+              <div className="space-y-2"><Label>Phone Number</Label><Input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} required /></div>
+              <div className="space-y-2"><Label>ID Number</Label><Input value={formData.idNumber} onChange={e => setFormData({...formData, idNumber: e.target.value})} required /></div>
+              <div className="space-y-2"><Label>Age</Label><Input type="number" value={formData.age} onChange={e => setFormData({...formData, age: e.target.value})} required /></div>
+              <div className="space-y-2"><Label>Email</Label><Input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} required /></div>
+              <div className="space-y-2"><Label>Password</Label><Input type="password" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} required minLength={6} /></div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="referralSource">How did you hear about us?</Label>
-                <Select
-                  value={referralSource}
-                  onValueChange={(value) => {
-                    setReferralSource(value);
-                    if (value !== "marketer") {
-                      setSelectedMarketerId(null);
-                    }
-                  }}
-                >
-                  <SelectTrigger id="referralSource">
-                    <SelectValue placeholder="Select an option" />
-                  </SelectTrigger>
+                <Label>How did you hear about us?</Label>
+                <Select value={referralSource} onValueChange={v => { setReferralSource(v); if (v !== "marketer") setSelectedMarketerId(null); }}>
+                  <SelectTrigger><SelectValue placeholder="Select an option" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">None</SelectItem>
                     <SelectItem value="marketer">Marketer</SelectItem>
                     <SelectItem value="friend">Friend/Family</SelectItem>
-                    <SelectItem value="social">Social Media</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-
               {referralSource === "marketer" && (
-                <div className="space-y-2 md:col-span-2 animate-in fade-in slide-in-from-top-2">
-                  <Label htmlFor="marketerSelect">Select Marketer</Label>
-                  <Select
-                    value={selectedMarketerId || ""}
-                    onValueChange={(value) => setSelectedMarketerId(value)}
-                    required
-                  >
-                    <SelectTrigger id="marketerSelect">
-                      <SelectValue placeholder="Choose a marketer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableMarketers.map((marketer) => (
-                        <SelectItem key={marketer.id} value={marketer.id}>
-                          {marketer.full_name} ({marketer.code})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Select Marketer</Label>
+                  <Select value={selectedMarketerId || ""} onValueChange={v => setSelectedMarketerId(v)} required>
+                    <SelectTrigger><SelectValue placeholder="Choose a marketer" /></SelectTrigger>
+                    <SelectContent>{availableMarketers.map(m => <SelectItem key={m.id} value={m.id}>{m.full_name} ({m.code})</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
               )}
             </div>
-
-            <div className="space-y-4 pt-4 border-t">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold">Dependants (Max 5)</h3>
-                <Button type="button" variant="outline" size="sm" onClick={addDependant}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Dependant
-                </Button>
+            <div className="space-y-4 pt-6 border-t">
+              <div className="flex items-start space-x-3">
+                <Checkbox id="c1" checked={consents.processing} onCheckedChange={v => setConsents({...consents, processing: !!v})} />
+                <Label htmlFor="c1" className="text-xs">I consent to data processing for membership administration.</Label>
               </div>
-
-              {dependants.map((dep, index) => (
-                <div key={index} className="bg-secondary/20 p-4 rounded-lg space-y-4 relative">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute top-2 right-2 text-destructive hover:text-destructive/90"
-                    onClick={() => removeDependant(index)}
-                  >
-                    <Trash className="h-4 w-4" />
-                  </Button>
-
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Dependant Name</Label>
-                      <Input
-                        value={dep.fullName}
-                        onChange={(e) => updateDependant(index, "fullName", e.target.value)}
-                        placeholder="Name"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Date of Birth</Label>
-                      <Input
-                        type="date"
-                        value={dep.dob}
-                        onChange={(e) => updateDependant(index, "dob", e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Birth Cert / Student ID</Label>
-                      <Input
-                        value={dep.idNumber}
-                        onChange={(e) => updateDependant(index, "idNumber", e.target.value)}
-                        placeholder="ID Number"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Relationship</Label>
-                      <Input
-                        value={dep.relationship}
-                        onChange={(e) => updateDependant(index, "relationship", e.target.value)}
-                        placeholder="e.g. Child, Spouse"
-                        required
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="space-y-4 pt-6 pb-4">
-              <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Consent & Data Privacy</h3>
-              <div className="bg-muted/30 p-4 rounded-lg border border-border space-y-4 text-sm">
-                <p className="text-muted-foreground text-xs leading-relaxed">
-                  Elephant Dental Care Plan ("the Plan") is committed to protecting your privacy and personal data in accordance with the Data Protection Act of Kenya. Please review and consent to the following terms to proceed.
-                </p>
-
-                <div className="flex items-start space-x-3">
-                  <Checkbox
-                    id="consent_processing"
-                    checked={consents.processing}
-                    onCheckedChange={(checked) => setConsents(prev => ({ ...prev, processing: checked as boolean }))}
-                  />
-                  <div className="grid gap-1.5 leading-none">
-                    <Label htmlFor="consent_processing" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                      Data Processing Consent
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                      I consent to the collection and processing of my personal and medical data by Elephant Dental for the purpose of administering my membership, processing claims, and facilitating medical services.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-3">
-                  <Checkbox
-                    id="consent_sharing"
-                    checked={consents.sharing}
-                    onCheckedChange={(checked) => setConsents(prev => ({ ...prev, sharing: checked as boolean }))}
-                  />
-                  <div className="grid gap-1.5 leading-none">
-                    <Label htmlFor="consent_sharing" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                      Data Sharing
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                      I authorize Elephant Dental to share my relevant medical and membership information with affiliated branches, healthcare providers, and insurance partners strictly for service delivery and coverage verification.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-3">
-                  <Checkbox
-                    id="consent_signature"
-                    checked={consents.signature}
-                    onCheckedChange={(checked) => setConsents(prev => ({ ...prev, signature: checked as boolean }))}
-                  />
-                  <div className="grid gap-1.5 leading-none">
-                    <Label htmlFor="consent_signature" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                      Digital Signature
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                      I acknowledge that checking these boxes constitutes my digital signature and legal agreement to these terms, confirming that the information provided is accurate.
-                    </p>
-                  </div>
-                </div>
+              <div className="flex items-start space-x-3">
+                <Checkbox id="c2" checked={consents.sharing} onCheckedChange={v => setConsents({...consents, sharing: !!v})} />
+                <Label htmlFor="c2" className="text-xs">I authorize sharing medical info with affiliated branches.</Label>
+              </div>
+              <div className="flex items-start space-x-3">
+                <Checkbox id="c3" checked={consents.signature} onCheckedChange={v => setConsents({...consents, signature: !!v})} />
+                <Label htmlFor="c3" className="text-xs">I acknowledge this as my digital signature.</Label>
               </div>
             </div>
-
             <Button type="submit" className="w-full btn-primary" disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating Account...
-                </>
-              ) : (
-                "Register Member"
-              )}
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Register Member"}
             </Button>
           </form>
-
-          <p className="text-center text-muted-foreground mt-6">
-            Already have an account?{" "}
-            <Link to="/login" className="text-primary hover:underline font-medium">
-              Sign in
-            </Link>
-          </p>
         </div>
       </div>
     </div>

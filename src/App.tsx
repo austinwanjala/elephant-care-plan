@@ -49,7 +49,7 @@ import MarketerLinks from "./pages/marketer/Links";
 
 // Member pages
 import { MemberLayout } from "./components/member/MemberLayout";
-import MemberDashboard from "./pages/member/Dashboard";
+import MemberDashboard from "./pages/member/MemberDashboard";
 import MemberPayments from "./pages/member/MemberPayments";
 import MemberVisits from "./pages/member/MemberVisits";
 import MemberProfile from "./pages/member/MemberProfile";

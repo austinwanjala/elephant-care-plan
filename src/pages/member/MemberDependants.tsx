@@ -13,7 +13,7 @@ interface Dependant {
   id: string;
   full_name: string;
   dob: string;
-  identification_number: string;
+  id_number: string;
   relationship: string;
 }
 
@@ -102,7 +102,7 @@ const MemberDependants = () => {
         member_id: memberId,
         full_name: newDependant.fullName,
         dob: newDependant.dob,
-        identification_number: newDependant.idNumber,
+        id_number: newDependant.idNumber,
         relationship: newDependant.relationship,
       });
 
@@ -111,7 +111,7 @@ const MemberDependants = () => {
       toast({ title: "Dependant Added", description: `${newDependant.fullName} has been added.` });
       setDialogOpen(false);
       setNewDependant({ fullName: "", dob: "", idNumber: "", relationship: "" });
-      fetchDependants(); // Refresh list
+      fetchDependants();
     } catch (error: any) {
       toast({ title: "Error adding dependant", description: error.message, variant: "destructive" });
     } finally {
@@ -127,7 +127,7 @@ const MemberDependants = () => {
       if (error) throw error;
 
       toast({ title: "Dependant Removed", description: "Dependant has been successfully removed." });
-      fetchDependants(); // Refresh list
+      fetchDependants();
     } catch (error: any) {
       toast({ title: "Error removing dependant", description: error.message, variant: "destructive" });
     }
@@ -137,14 +137,6 @@ const MemberDependants = () => {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!memberId) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-muted-foreground">Could not load member details. Please try again later.</p>
       </div>
     );
   }
@@ -241,19 +233,19 @@ const MemberDependants = () => {
                 <Card key={dep.id} className="flex items-center justify-between p-4">
                   <div className="flex items-center gap-4">
                     <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                      {(dep.full_name || "?").charAt(0)}
+                      {dep.full_name.charAt(0)}
                     </div>
                     <div>
-                      <p className="font-semibold">{dep.full_name || "Unknown Name"}</p>
-                      <p className="text-sm text-muted-foreground">{dep.relationship || "Dependant"}</p>
+                      <p className="font-semibold">{dep.full_name}</p>
+                      <p className="text-sm text-muted-foreground">{dep.relationship}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-sm text-muted-foreground flex items-center gap-1">
-                      <CalendarDays className="h-4 w-4" /> {dep.dob || "N/A"}
+                      <CalendarDays className="h-4 w-4" /> {dep.dob}
                     </div>
                     <div className="text-sm text-muted-foreground flex items-center gap-1">
-                      <CreditCard className="h-4 w-4" /> {dep.identification_number || "N/A"}
+                      <CreditCard className="h-4 w-4" /> {dep.id_number}
                     </div>
                     <Button variant="ghost" size="icon" onClick={() => handleDeleteDependant(dep.id)}>
                       <Trash className="h-4 w-4 text-destructive" />

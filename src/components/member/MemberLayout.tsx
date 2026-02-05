@@ -26,24 +26,60 @@ export function MemberLayout({ children }: MemberLayoutProps) {
   }, []);
 
   const checkAuth = async () => {
+    setLoading(true); // Ensure loading starts
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       navigate("/login");
+      setLoading(false); // IMPORTANT: Set loading to false here
       return;
     }
 
     // First check if user has a role
-    const { data: roleData } = await supabase
+    const { data: roleData, error: roleError } = await supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", user.id)
       .maybeSingle();
 
-    // If user is staff (not member or admin), redirect to staff portal
-    if (roleData?.role === "staff") {
-      navigate("/staff");
+    if (roleError) {
+      toast({
+        title: "Error fetching role",
+        description: roleError.message,
+        variant: "destructive",
+      });
+      navigate("/");
+      setLoading(false);
       return;
     }
+
+    // If user is staff (not member or admin), redirect to staff portal
+    if (roleData?.role === "staff") {
+      navigate("/staff"); // Assuming /staff is a valid route for generic staff
+      setLoading(false);
+      return;
+    }
+    // Also check for other specific roles that are not 'member' or 'admin'
+    if (roleData?.role === "receptionist") {
+        navigate("/reception");
+        setLoading(false);
+        return;
+    }
+    if (roleData?.role === "doctor") {
+        navigate("/doctor");
+        setLoading(false);
+        return;
+    }
+    if (roleData?.role === "branch_director") {
+        navigate("/director");
+        setLoading(false);
+        return;
+    }
+    if (roleData?.role === "marketer") {
+        navigate("/marketer");
+        setLoading(false);
+        return;
+    }
+
 
     // Check if user exists in members table (primary authorization)
     const { data: memberDetails, error: memberError } = await supabase
@@ -70,6 +106,7 @@ export function MemberLayout({ children }: MemberLayoutProps) {
         variant: "destructive",
       });
       navigate("/");
+      setLoading(false);
       return;
     }
 

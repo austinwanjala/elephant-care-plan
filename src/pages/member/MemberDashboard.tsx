@@ -12,6 +12,7 @@ import {
   AlertCircle,
   DollarSign,
   Users,
+  RefreshCw,
 } from "lucide-react";
 import {
   Table,
@@ -35,18 +36,20 @@ interface Member {
   coverage_balance: number;
   total_contributions: number;
   benefit_limit: number;
+  qr_code_data?: string | null;
   is_active: boolean;
   membership_categories: { name: string; benefit_amount: number } | null;
   id_number: string;
+  marketers?: { full_name: string; code: string } | null;
 }
 
 interface Visit {
   id: string;
-  benefit_deducted: number;
   created_at: string;
   notes: string | null;
   services: { name: string } | null;
   branches: { name: string } | null;
+  bills: { total_benefit_cost: number }[] | null;
 }
 
 interface Payment {
@@ -62,7 +65,7 @@ interface Dependant {
   id: string;
   full_name: string;
   relationship: string;
-  identification_number: string;
+  id_number: string;
 }
 
 const MemberDashboard = () => {
@@ -99,7 +102,7 @@ const MemberDashboard = () => {
   const fetchMemberProfile = async (userId: string) => {
     const { data, error } = await supabase
       .from("members")
-      .select("*, membership_categories(name, benefit_amount)")
+      .select("*, membership_categories(name, benefit_amount), marketers(full_name, code)")
       .eq("user_id", userId)
       .single();
 
@@ -134,7 +137,7 @@ const MemberDashboard = () => {
     if (memberData) {
       const { data, error } = await supabase
         .from("visits")
-        .select("*, services(name), branches(name)")
+        .select("*, services(name), branches(name), bills(total_benefit_cost)")
         .eq("member_id", memberData.id)
         .order("created_at", { ascending: false });
 
@@ -212,7 +215,6 @@ const MemberDashboard = () => {
     );
   }
 
-  // If member is not active, show a prompt to make payment
   if (!member.is_active) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -241,7 +243,6 @@ const MemberDashboard = () => {
   return (
     <div className="bg-background">
       <main className="container mx-auto px-4 py-8">
-        {/* Stats Cards */}
         <div className="grid md:grid-cols-3 gap-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -253,11 +254,14 @@ const MemberDashboard = () => {
                 <div className="text-2xl font-bold text-success">
                   KES {member?.coverage_balance?.toLocaleString() || 0}
                 </div>
-                {member.is_active ? (
+                <div className="flex flex-col items-end gap-2">
                   <Badge className="bg-success">Covered</Badge>
-                ) : (
-                  <Badge variant="destructive">Uncovered</Badge>
-                )}
+                  <Link to="/dashboard/scheme-selection">
+                    <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1">
+                      <RefreshCw className="h-3 w-3" /> Renew / Upgrade
+                    </Button>
+                  </Link>
+                </div>
               </div>
               <div className="mt-2">
                 <Progress value={coveragePercentage} className="h-2" />
@@ -277,9 +281,16 @@ const MemberDashboard = () => {
               <div className="text-2xl font-bold">
                 {member?.membership_categories?.name || "N/A"}
               </div>
-              <p className="text-xs text-muted-foreground">
-                Total Contributions: KES {member?.total_contributions?.toLocaleString() || 0}
-              </p>
+              <div className="flex flex-col gap-1 mt-1">
+                <p className="text-xs text-muted-foreground">
+                  Total Contributions: KES {member?.total_contributions?.toLocaleString() || 0}
+                </p>
+                {member?.marketers && (
+                  <p className="text-xs font-medium text-primary">
+                    Referred by: {member.marketers.full_name} ({member.marketers.code})
+                  </p>
+                )}
+              </div>
             </CardContent>
           </Card>
 
@@ -298,19 +309,18 @@ const MemberDashboard = () => {
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Insurance Card */}
           <div className="lg:col-span-1 space-y-8">
             {member && <InsuranceCard member={{
               full_name: member.full_name,
               member_number: member.member_number,
               membership_categories: member.membership_categories,
+              qr_code_data: member.qr_code_data || null,
               is_active: member.is_active,
               coverage_balance: member.coverage_balance || 0,
               benefit_limit: member.benefit_limit || 0,
               id_number: member.id_number,
             }} />}
 
-            {/* Dependants Card */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
@@ -329,10 +339,10 @@ const MemberDashboard = () => {
                     dependants.map((dep, idx) => (
                       <div key={idx} className="flex justify-between items-center border-b pb-2 last:border-0 last:pb-0">
                         <div>
-                          <p className="font-medium">{dep.full_name || "Unknown Name"}</p>
-                          <p className="text-xs text-muted-foreground">{dep.relationship || "Dependant"}</p>
+                          <p className="font-medium">{dep.full_name}</p>
+                          <p className="text-xs text-muted-foreground">{dep.relationship}</p>
                         </div>
-                        <Badge variant="outline">{dep.identification_number || "N/A"}</Badge>
+                        <Badge variant="outline">{dep.id_number}</Badge>
                       </div>
                     ))
                   )}
@@ -341,9 +351,7 @@ const MemberDashboard = () => {
             </Card>
           </div>
 
-          {/* History Tables */}
           <div className="lg:col-span-2 space-y-8">
-            {/* Service History */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -378,7 +386,7 @@ const MemberDashboard = () => {
                             <TableCell>{visit.services?.name || "N/A"}</TableCell>
                             <TableCell>{visit.branches?.name || "N/A"}</TableCell>
                             <TableCell className="text-destructive">
-                              -KES {visit.benefit_deducted?.toLocaleString()}
+                              -KES {visit.bills?.[0]?.total_benefit_cost?.toLocaleString() || 0}
                             </TableCell>
                           </TableRow>
                         ))
@@ -389,7 +397,6 @@ const MemberDashboard = () => {
               </CardContent>
             </Card>
 
-            {/* Payment History */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">

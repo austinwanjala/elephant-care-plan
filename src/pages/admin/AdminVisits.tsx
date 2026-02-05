@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { AdminLayout } from "@/components/admin/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -11,26 +11,26 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { History, Loader2 } from "lucide-react";
+import { History, Loader2, Download } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
+import { exportToCsv } from "@/utils/csvExport";
 
 interface Visit {
   id: string;
   created_at: string;
-  status: string; // New field
-  diagnosis: string | null; // New field
-  treatment_notes: string | null; // New field
+  status: string;
+  diagnosis: string | null;
+  treatment_notes: string | null;
   benefit_deducted: number;
   branch_compensation: number;
   profit_loss: number;
-  notes: string | null; // Old notes field, might be repurposed or removed
+  notes: string | null;
   members: { full_name: string; member_number: string } | null;
-  services: { name: string } | null; // This will be from bill_items now, not directly on visit
   branches: { name: string } | null;
-  receptionist: { full_name: string } | null; // New relation
-  doctor: { full_name: string } | null; // New relation
-  bills: { total_benefit_cost: number; total_branch_compensation: number; total_profit_loss: number; bill_items: { service_name: string }[] }[] | null; // New relation
+  receptionist: { full_name: string } | null;
+  doctor: { full_name: string } | null;
+  bills: { total_benefit_cost: number; total_branch_compensation: number; total_profit_loss: number; bill_items: { service_name: string }[] }[] | null;
 }
 
 export default function AdminVisits() {
@@ -44,9 +44,17 @@ export default function AdminVisits() {
 
   const loadVisits = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    // Updated query to include aliased joins for doctor and receptionist names
+    const { data, error } = await (supabase as any)
       .from("visits")
-      .select("*, members(full_name, member_number), branches(name), receptionist:receptionist_id(full_name), doctor:doctor_id(full_name), bills(total_benefit_cost, total_branch_compensation, total_profit_loss, bill_items(service_name))")
+      .select(`
+        *, 
+        members(full_name, member_number), 
+        branches(name), 
+        doctor:doctor_id(full_name), 
+        receptionist:receptionist_id(full_name), 
+        bills(total_benefit_cost, total_branch_compensation, total_profit_loss, bill_items(service_name))
+      `)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -56,7 +64,7 @@ export default function AdminVisits() {
         variant: "destructive",
       });
     } else {
-      setVisits(data || []);
+      setVisits((data || []) as any);
     }
     setLoading(false);
   };
@@ -78,6 +86,27 @@ export default function AdminVisits() {
     }
   };
 
+  const handleExport = () => {
+    const dataToExport = visits.map(v => {
+      const bill = v.bills?.[0];
+      return {
+        "Date": format(new Date(v.created_at), "yyyy-MM-dd HH:mm"),
+        "Member Name": v.members?.full_name || "N/A",
+        "Member Number": v.members?.member_number || "N/A",
+        "Branch": v.branches?.name || "N/A",
+        "Doctor": v.doctor?.full_name || "N/A",
+        "Receptionist": v.receptionist?.full_name || "N/A",
+        "Services": bill?.bill_items?.map((item: any) => item.service_name).join(", ") || "N/A",
+        "Diagnosis": v.diagnosis || "N/A",
+        "Status": v.status,
+        "Benefit Deducted": bill?.total_benefit_cost || 0,
+        "Branch Compensation": bill?.total_branch_compensation || 0,
+        "Profit/Loss": bill?.total_profit_loss || 0
+      };
+    });
+    exportToCsv("visits_export.csv", dataToExport);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -86,12 +115,18 @@ export default function AdminVisits() {
     );
   }
 
-
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-serif font-bold text-foreground">All Visits</h1>
-        <p className="text-muted-foreground">Comprehensive record of all processed dental services</p>
+      <div className="flex flex-col sm:flex-row justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-serif font-bold text-foreground">All Visits</h1>
+          <p className="text-muted-foreground">Comprehensive record of all processed dental services</p>
+        </div>
+        <div>
+          <Button variant="outline" onClick={handleExport}>
+            <Download className="mr-2 h-4 w-4" /> Export CSV
+          </Button>
+        </div>
       </div>
 
       <Card className="card-elevated overflow-hidden">

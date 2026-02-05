@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { AdminLayout } from "@/components/admin/AdminLayout";
+
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -35,8 +35,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, Edit, Settings, Shield } from "lucide-react";
+import { Plus, MoreHorizontal, Edit, Settings, Shield, Download } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { exportToCsv } from "@/utils/csvExport";
 
 interface Service {
   id: string;
@@ -204,6 +205,8 @@ export default function AdminServices() {
     setPreapprovalDialogOpen(true);
   };
 
+
+
   const resetForm = () => {
     setFormData({
       name: "",
@@ -214,6 +217,19 @@ export default function AdminServices() {
     });
   };
 
+  const handleExport = () => {
+    const dataToExport = services.map(s => ({
+      "Procedure Name": s.name,
+      "Real Cost": s.real_cost,
+      "Branch Compensation": s.branch_compensation,
+      "Benefit Cost": s.benefit_cost,
+      "Profit/Loss": s.profit_loss,
+      "Approval": s.approval_type === "all_branches" ? "All Branches" : "Pre-Approved Only",
+      "Active": s.is_active ? "Yes" : "No"
+    }));
+    exportToCsv("services_export.csv", dataToExport);
+  };
+
   const getApprovalBadge = (type: string) => {
     if (type === "all_branches") {
       return <Badge className="bg-success">All Branches</Badge>;
@@ -222,94 +238,99 @@ export default function AdminServices() {
   };
 
   return (
-
     <div className="space-y-6">
+
       <div className="flex flex-col sm:flex-row justify-between gap-4">
         <div>
           <h1 className="text-3xl font-serif font-bold text-foreground">Services</h1>
           <p className="text-muted-foreground">Manage dental services and pricing</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="btn-primary">
-              <Plus className="mr-2 h-4 w-4" /> Add Service
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle className="font-serif">Add New Service</DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Label>Procedure Name *</Label>
-                <Input
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g., Tooth Extraction"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExport}>
+            <Download className="mr-2 h-4 w-4" /> Export CSV
+          </Button>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="btn-primary">
+                <Plus className="mr-2 h-4 w-4" /> Add Service
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="font-serif">Add New Service</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
                 <div className="space-y-2">
-                  <Label>Real Cost (KES) *</Label>
+                  <Label>Procedure Name *</Label>
                   <Input
-                    type="number"
-                    value={formData.realCost}
-                    onChange={(e) => setFormData({ ...formData, realCost: e.target.value })}
-                    placeholder="0"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="e.g., Tooth Extraction"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Branch Compensation (KES) *</Label>
-                  <Input
-                    type="number"
-                    value={formData.branchCompensation}
-                    onChange={(e) => setFormData({ ...formData, branchCompensation: e.target.value })}
-                    placeholder="0"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Benefit Cost (KES) *</Label>
-                <Input
-                  type="number"
-                  value={formData.benefitCost}
-                  onChange={(e) => setFormData({ ...formData, benefitCost: e.target.value })}
-                  placeholder="0"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Approval Type</Label>
-                <Select
-                  value={formData.approvalType}
-                  onValueChange={(value: "all_branches" | "pre_approved_only") =>
-                    setFormData({ ...formData, approvalType: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all_branches">All Branches</SelectItem>
-                    <SelectItem value="pre_approved_only">Pre-Approved Only</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              {formData.realCost && formData.branchCompensation && formData.benefitCost && (
-                <div className="bg-muted/50 rounded-lg p-4">
-                  <div className="flex justify-between text-sm">
-                    <span>Profit/Loss:</span>
-                    <span className={parseFloat(formData.benefitCost) - parseFloat(formData.branchCompensation) >= 0 ? "text-success" : "text-destructive"}>
-                      KES {(parseFloat(formData.benefitCost) - parseFloat(formData.branchCompensation)).toLocaleString()}
-                    </span>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Real Cost (KES) *</Label>
+                    <Input
+                      type="number"
+                      value={formData.realCost}
+                      onChange={(e) => setFormData({ ...formData, realCost: e.target.value })}
+                      placeholder="0"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Branch Compensation (KES) *</Label>
+                    <Input
+                      type="number"
+                      value={formData.branchCompensation}
+                      onChange={(e) => setFormData({ ...formData, branchCompensation: e.target.value })}
+                      placeholder="0"
+                    />
                   </div>
                 </div>
-              )}
-              <Button onClick={handleAddService} className="btn-primary">
-                Add Service
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+                <div className="space-y-2">
+                  <Label>Benefit Cost (KES) *</Label>
+                  <Input
+                    type="number"
+                    value={formData.benefitCost}
+                    onChange={(e) => setFormData({ ...formData, benefitCost: e.target.value })}
+                    placeholder="0"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Approval Type</Label>
+                  <Select
+                    value={formData.approvalType}
+                    onValueChange={(value: "all_branches" | "pre_approved_only") =>
+                      setFormData({ ...formData, approvalType: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all_branches">All Branches</SelectItem>
+                      <SelectItem value="pre_approved_only">Pre-Approved Only</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {formData.realCost && formData.branchCompensation && formData.benefitCost && (
+                  <div className="bg-muted/50 rounded-lg p-4">
+                    <div className="flex justify-between text-sm">
+                      <span>Profit/Loss:</span>
+                      <span className={parseFloat(formData.benefitCost) - parseFloat(formData.branchCompensation) >= 0 ? "text-success" : "text-destructive"}>
+                        KES {(parseFloat(formData.benefitCost) - parseFloat(formData.branchCompensation)).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                <Button onClick={handleAddService} className="btn-primary">
+                  Add Service
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <div className="card-elevated overflow-hidden">

@@ -48,8 +48,9 @@ export default function DoctorDashboard() {
         const { data, error } = await supabase
             .from("visits")
             .select("*, members(full_name, member_number, age)")
-            .eq('branch_id', staffData.branch_id) // Filter by doctor's branch
-            .or('status.eq.registered,status.eq.with_doctor') // Only show registered or with_doctor
+            .eq('branch_id', staffData.branch_id)
+            .or(`doctor_id.eq.${staffData.id},doctor_id.is.null`) // Show assigned to me OR unassigned in branch
+            .or('status.eq.registered,status.eq.with_doctor')
             .gte('created_at', today)
             .order('created_at', { ascending: true });
 

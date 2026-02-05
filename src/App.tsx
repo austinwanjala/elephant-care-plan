@@ -6,10 +6,9 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import NotFound from "./pages/NotFound";
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
-import VerifyOtp from "./pages/VerifyOtp";
-import NotFound from "./pages/NotFound";
 
 // Admin pages
 import { AdminLayout } from "./components/admin/AdminLayout";
@@ -21,7 +20,9 @@ import AdminServices from "./pages/admin/AdminServices";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminVisits from "./pages/admin/AdminVisits";
 import AdminBranchPayments from "./pages/admin/AdminBranchPayments";
-import AdminMarketerPayments from "./pages/admin/AdminMarketerPayments";
+import AdminMembershipCategories from "./pages/admin/AdminMembershipCategories";
+import AdminMarketerClaims from "./pages/admin/AdminMarketerClaims";
+import AdminCommissionSettings from "./pages/admin/AdminCommissionSettings";
 
 // Reception pages
 import { ReceptionLayout } from "./components/reception/ReceptionLayout";
@@ -29,6 +30,7 @@ import ReceptionDashboard from "./pages/reception/Dashboard";
 import RegisterVisit from "./pages/reception/RegisterVisit";
 import ReceptionBilling from "./pages/reception/Billing";
 import ReceptionSearchMember from "./pages/reception/SearchMember";
+import ReceptionAddMember from "./pages/reception/AddMember";
 
 // Doctor pages
 import { DoctorLayout } from "./components/doctor/DoctorLayout";
@@ -73,7 +75,6 @@ const App = () => (
           <Route path="/register" element={<Register />} />
           <Route path="/terms-of-service" element={<TermsOfService />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-          <Route path="/verify-otp" element={<VerifyOtp />} />
 
           {/* Member Routes */}
           <Route path="/dashboard" element={<MemberLayout />}>
@@ -89,6 +90,7 @@ const App = () => (
           <Route path="/reception" element={<ReceptionLayout />}>
             <Route index element={<ReceptionDashboard />} />
             <Route path="register-visit" element={<RegisterVisit />} />
+            <Route path="add-member" element={<ReceptionAddMember />} />
             <Route path="billing" element={<ReceptionBilling />} />
             <Route path="search" element={<ReceptionSearchMember />} />
           </Route>
@@ -125,8 +127,10 @@ const App = () => (
             <Route path="visits" element={<AdminVisits />} />
             <Route path="services" element={<AdminServices />} />
             <Route path="branch-payments" element={<AdminBranchPayments />} />
-            <Route path="marketer-payments" element={<AdminMarketerPayments />} />
+            <Route path="marketer-claims" element={<AdminMarketerClaims />} />
+            <Route path="commission-settings" element={<AdminCommissionSettings />} />
             <Route path="settings" element={<AdminSettings />} />
+            <Route path="membership-categories" element={<AdminMembershipCategories />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />

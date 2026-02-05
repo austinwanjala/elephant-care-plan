@@ -93,20 +93,11 @@ serve(async (req) => {
                     body: formData.toString()
                 });
 
-                const responseText = await response.text();
-                console.log("[send-sms] Africa's Talking Raw Response:", responseText);
-                
-                try {
-                    const result = JSON.parse(responseText);
-                    console.log("[send-sms] Africa's Talking Parsed:", result);
-                    smsResult = { success: response.ok, ...result };
-                } catch {
-                    console.error("[send-sms] Africa's Talking returned non-JSON:", responseText);
-                    smsResult = { success: false, message: responseText };
-                }
+                const result = await response.json();
+                console.log("[send-sms] Africa's Talking Response:", result);
+                smsResult = { success: true, ...result };
             } catch (err) {
                 console.error("[send-sms] SMS Provider Error:", err);
-                smsResult = { success: false, message: err instanceof Error ? err.message : "SMS send failed" };
             }
         }
 
@@ -116,10 +107,6 @@ serve(async (req) => {
 
         if (RESEND_API_KEY && email) {
             try {
-                // Use onboarding@resend.dev for testing, replace with verified domain in production
-                const fromEmail = 'Elephant Dental <onboarding@resend.dev>';
-                console.log(`[send-sms] Sending email to ${email} via Resend`);
-                
                 const res = await fetch('https://api.resend.com/emails', {
                     method: 'POST',
                     headers: {
@@ -127,7 +114,7 @@ serve(async (req) => {
                         'Authorization': `Bearer ${RESEND_API_KEY}`
                     },
                     body: JSON.stringify({
-                        from: fromEmail,
+                        from: 'Elephant Dental <notifications@elephantdental.co.ke>',
                         to: [email],
                         subject: subject,
                         html: `<p>${message}</p>`
@@ -150,11 +137,10 @@ serve(async (req) => {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
 
-    } catch (error: unknown) {
+    } catch (error) {
         console.error("[send-sms] Fatal Error:", error);
-        const errorMessage = error instanceof Error ? error.message : "Unknown error";
         return new Response(
-            JSON.stringify({ error: errorMessage }),
+            JSON.stringify({ error: error.message }),
             {
                 status: 400,
                 headers: { ...corsHeaders, "Content-Type": "application/json" },

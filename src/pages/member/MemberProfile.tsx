@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Loader2, User, Phone, Mail, CreditCard, Cake } from "lucide-react"; // Added Cake icon for age
+import { Loader2, User, Phone, Mail, CreditCard, Cake, Users } from "lucide-react"; // Added Cake icon for age and Users for marketer
 import { InsuranceCard } from "@/components/member/InsuranceCard";
 
 interface MemberProfile {
@@ -12,13 +12,14 @@ interface MemberProfile {
   email: string;
   phone: string;
   id_number: string;
-  age: number | null; // Added age
+  age: number | null;
   coverage_balance: number | null;
   benefit_limit: number | null;
   total_contributions: number | null;
-  qr_code_data: string | null;
+  qr_code_data?: string | null;
   is_active: boolean;
   membership_categories: { name: string; level: string } | null;
+  marketers: { full_name: string; code: string } | null;
 }
 
 export default function MemberProfile() {
@@ -35,7 +36,7 @@ export default function MemberProfile() {
 
     const { data } = await supabase
       .from("members")
-      .select("*, membership_categories(name, level)")
+      .select("*, membership_categories(name, level), marketers(full_name, code)")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -81,7 +82,7 @@ export default function MemberProfile() {
               full_name: profile.full_name,
               member_number: profile.member_number,
               membership_categories: profile.membership_categories,
-              qr_code_data: profile.qr_code_data,
+              qr_code_data: profile.qr_code_data || null,
               is_active: profile.is_active,
               coverage_balance: profile.coverage_balance || 0,
               benefit_limit: profile.benefit_limit || 0,
@@ -151,6 +152,17 @@ export default function MemberProfile() {
               <p>{profile.age || "N/A"}</p>
             </div>
           </div>
+          {profile.marketers && (
+            <div className="flex items-center gap-3 border-t sm:border-t-0 sm:border-l sm:pl-4 pt-4 sm:pt-0 sm:col-span-2">
+              <Users className="h-5 w-5 text-primary" />
+              <div>
+                <p className="text-sm text-muted-foreground">Referred By</p>
+                <p className="font-medium text-primary">
+                  {profile.marketers.full_name} ({profile.marketers.code})
+                </p>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

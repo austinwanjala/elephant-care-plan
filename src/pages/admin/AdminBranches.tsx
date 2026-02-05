@@ -26,8 +26,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, Edit, Trash2, CheckCircle, XCircle } from "lucide-react";
+import { Plus, MoreHorizontal, Edit, Trash2, CheckCircle, XCircle, Download } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { exportToCsv } from "@/utils/csvExport";
 
 interface Branch {
   id: string;
@@ -36,7 +37,7 @@ interface Branch {
   phone: string | null;
   email: string | null;
   is_active: boolean;
-  is_globally_preapproved_for_services: boolean | null; // Added this field
+  is_globally_preapproved_for_services: boolean | null;
 }
 
 interface BranchRevenue {
@@ -56,7 +57,7 @@ export default function AdminBranches() {
     location: "",
     phone: "",
     email: "",
-    isGloballyPreapprovedForServices: false, // Added to form data
+    isGloballyPreapprovedForServices: false,
   });
   const { toast } = useToast();
 
@@ -91,7 +92,7 @@ export default function AdminBranches() {
         location: formData.location,
         phone: formData.phone || null,
         email: formData.email || null,
-        is_globally_preapproved_for_services: formData.isGloballyPreapprovedForServices, // Save new field
+        is_globally_preapproved_for_services: formData.isGloballyPreapprovedForServices,
       });
 
       if (error) throw error;
@@ -116,7 +117,7 @@ export default function AdminBranches() {
           location: formData.location,
           phone: formData.phone || null,
           email: formData.email || null,
-          is_globally_preapproved_for_services: formData.isGloballyPreapprovedForServices, // Update new field
+          is_globally_preapproved_for_services: formData.isGloballyPreapprovedForServices,
         })
         .eq("id", selectedBranch.id);
 
@@ -165,7 +166,7 @@ export default function AdminBranches() {
       location: branch.location,
       phone: branch.phone || "",
       email: branch.email || "",
-      isGloballyPreapprovedForServices: branch.is_globally_preapproved_for_services || false, // Populate new field
+      isGloballyPreapprovedForServices: branch.is_globally_preapproved_for_services || false,
     });
     setEditDialogOpen(true);
   };
@@ -174,73 +175,92 @@ export default function AdminBranches() {
     setFormData({ name: "", location: "", phone: "", email: "", isGloballyPreapprovedForServices: false });
   };
 
+  const handleExport = () => {
+    const dataToExport = branches.map(b => ({
+      "Branch Name": b.name,
+      "Location": b.location,
+      "Phone": b.phone || "",
+      "Email": b.email || "",
+      "Revenue": revenue[b.id]?.total_compensation || 0,
+      "Visits": revenue[b.id]?.visit_count || 0,
+      "Status": b.is_active ? "Active" : "Inactive",
+      "Global Pre-approval": b.is_globally_preapproved_for_services ? "Yes" : "No"
+    }));
+    exportToCsv("branches_export.csv", dataToExport);
+  };
 
   return (
     <div className="space-y-6">
+
       <div className="flex flex-col sm:flex-row justify-between gap-4">
         <div>
           <h1 className="text-3xl font-serif font-bold text-foreground">Branches</h1>
           <p className="text-muted-foreground">Manage hospital branches and locations</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="btn-primary">
-              <Plus className="mr-2 h-4 w-4" /> Add Branch
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle className="font-serif">Add New Branch</DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Label>Branch Name *</Label>
-                <Input
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Westlands Branch"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Location *</Label>
-                <Input
-                  value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  placeholder="Westlands, Nairobi"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Phone</Label>
-                <Input
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="+254700000000"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Email</Label>
-                <Input
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="branch@elephantdental.co.ke"
-                />
-              </div>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="globally-preapproved"
-                  checked={formData.isGloballyPreapprovedForServices}
-                  onCheckedChange={(checked) =>
-                    setFormData({ ...formData, isGloballyPreapprovedForServices: checked })
-                  }
-                />
-                <Label htmlFor="globally-preapproved">Globally Pre-approved for Services</Label>
-              </div>
-              <Button onClick={handleAddBranch} className="btn-primary">
-                Add Branch
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExport}>
+            <Download className="mr-2 h-4 w-4" /> Export CSV
+          </Button>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="btn-primary">
+                <Plus className="mr-2 h-4 w-4" /> Add Branch
               </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="font-serif">Add New Branch</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                  <Label>Branch Name *</Label>
+                  <Input
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="Westlands Branch"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Location *</Label>
+                  <Input
+                    value={formData.location}
+                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                    placeholder="Westlands, Nairobi"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Phone</Label>
+                  <Input
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    placeholder="+254700000000"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <Input
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="branch@elephantdental.co.ke"
+                  />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="globally-preapproved"
+                    checked={formData.isGloballyPreapprovedForServices}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, isGloballyPreapprovedForServices: checked })
+                    }
+                  />
+                  <Label htmlFor="globally-preapproved">Globally Pre-approved for Services</Label>
+                </div>
+                <Button onClick={handleAddBranch} className="btn-primary">
+                  Add Branch
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <div className="card-elevated overflow-hidden">
@@ -255,7 +275,7 @@ export default function AdminBranches() {
                 <TableHead>Revenue</TableHead>
                 <TableHead>Visits</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Global Pre-approval</TableHead> {/* New column */}
+                <TableHead>Global Pre-approval</TableHead>
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>

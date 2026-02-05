@@ -21,17 +21,23 @@ export default function Consultation() {
     const [toothStatus, setToothStatus] = useState<Record<number, string>>({});
     const [diagnosis, setDiagnosis] = useState(""); // Renamed from notes to diagnosis
     const [treatmentNotes, setTreatmentNotes] = useState(""); // New field for doctor's notes
-    const [services, setServices] = useState<any[]>([]);
+    const [availableServices, setAvailableServices] = useState<any[]>([]); // Renamed from services to availableServices
     const [selectedServices, setSelectedServices] = useState<any[]>([]);
     const [doctorId, setDoctorId] = useState<string | null>(null);
+    const [doctorBranchId, setDoctorBranchId] = useState<string | null>(null); // Store doctor's branch ID
 
     useEffect(() => {
         if (visitId) {
             fetchDoctorInfo();
-            loadVisitData();
-            loadServices();
         }
     }, [visitId]);
+
+    useEffect(() => {
+        if (doctorId && doctorBranchId) {
+            loadVisitData();
+            loadServices(doctorBranchId); // Pass branch ID to load services
+        }
+    }, [doctorId, doctorBranchId]);
 
     const fetchDoctorInfo = async () => {
         const { data: { user } } = await supabase.auth.getUser();
@@ -41,7 +47,7 @@ export default function Consultation() {
         }
         const { data: staffData, error: staffError } = await supabase
             .from("staff")
-            .select("id")
+            .select("id, branch_id")
             .eq("user_id", user.id)
             .maybeSingle();
 
@@ -51,6 +57,7 @@ export default function Consultation() {
             return;
         }
         setDoctorId(staffData.id);
+        setDoctorBranchId(staffData.branch_id);
     };
 
     const loadVisitData = async () => {
@@ -88,9 +95,41 @@ export default function Consultation() {
         setLoading(false);
     };
 
-    const loadServices = async () => {
-        const { data } = await supabase.from("services").select("*").eq("is_active", true);
-        if (data) setServices(data);
+    const loadServices = async (branchId: string) => {
+        const { data: servicesData, error: servicesError } = await supabase
+            .from("services")
+            .select("*, service_preapprovals(branch_id)")
+            .eq("is_active", true);
+
+        if (servicesError) {
+            toast({ title: "Error loading services", description: servicesError.message, variant: "destructive" });
+            return;
+        }
+
+        const { data: branchData, error: branchError } = await supabase
+            .from("branches")
+            .select("is_globally_preapproved_for_services")
+            .eq("id", branchId)
+            .single();
+
+        if (branchError) {
+            toast({ title: "Error loading branch info", description: branchError.message, variant: "destructive" });
+            return;
+        }
+
+        const filteredServices = servicesData?.filter(service => {
+            if (service.approval_type === 'all_branches') {
+                return true;
+            }
+            // If service is 'pre_approved_only'
+            if (branchData?.is_globally_preapproved_for_services) {
+                return true; // Branch is globally pre-approved for all services
+            }
+            // Check if the specific branch is pre-approved for this service
+            return service.service_preapprovals.some((preapproval: any) => preapproval.branch_id === branchId);
+        }) || [];
+
+        setAvailableServices(filteredServices);
     };
 
     const handleToothClick = (toothId: number) => {
@@ -112,7 +151,7 @@ export default function Consultation() {
     };
 
     const addService = (serviceId: string) => {
-        const service = services.find(s => s.id === serviceId);
+        const service = availableServices.find(s => s.id === serviceId);
         if (service && !selectedServices.find(s => s.id === serviceId)) {
             setSelectedServices([...selectedServices, service]);
         }
@@ -187,6 +226,7 @@ export default function Consultation() {
             // 3. Create Bill
             const { data: bill, error: billError } = await supabase.from("bills").insert({
                 visit_id: visitId,
+                branch_id: doctorBranchId,
                 total_benefit_cost: totalBenefit,
                 total_branch_compensation: totalCompensation,
                 total_real_cost: totalReal,
@@ -218,8 +258,7 @@ export default function Consultation() {
                 // These fields are now derived from the bill, so set to 0 or remove from visits table
                 benefit_deducted: 0,
                 branch_compensation: 0,
-                profit_loss: 0,
-                service_id: null // Set to null as services are now in bill_items
+                profit_loss: 0
             }).eq("id", visitId);
 
             if (visitUpdateError) throw visitUpdateError;
@@ -234,7 +273,7 @@ export default function Consultation() {
         }
     };
 
-    if (loading || !visit || !doctorId) return <div className="p-8 text-center"><Loader2 className="animate-spin h-8 w-8 text-primary mx-auto" /></div>;
+    if (loading || !visit || !doctorId || !doctorBranchId) return <div className="p-8 text-center"><Loader2 className="animate-spin h-8 w-8 text-primary mx-auto" /></div>;
 
     return (
         <div className="space-y-6 max-w-7xl mx-auto">
@@ -319,7 +358,7 @@ export default function Consultation() {
                                     defaultValue=""
                                 >
                                     <option value="" disabled>Select a service to add...</option>
-                                    {services.map(s => (
+                                    {availableServices.map(s => (
                                         <option key={s.id} value={s.id}>{s.name} (Benefit: KES {s.benefit_cost.toLocaleString()})</option>
                                     ))}
                                 </select>

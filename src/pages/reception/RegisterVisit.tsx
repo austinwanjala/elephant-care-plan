@@ -10,11 +10,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, Link } from "react-router-dom";
 import { BiometricCapture } from "@/components/BiometricCapture";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Dependant {
     id: string;
     full_name: string;
     relationship: string;
+}
+
+interface Service {
+    id: string;
+    name: string;
 }
 
 export default function RegisterVisit() {
@@ -28,12 +34,30 @@ export default function RegisterVisit() {
     const [loading, setLoading] = useState(false);
     const [receptionistId, setReceptionistId] = useState<string | null>(null);
     const [receptionistBranchId, setReceptionistBranchId] = useState<string | null>(null);
+    const [services, setServices] = useState<Service[]>([]);
+    const [selectedServiceId, setSelectedServiceId] = useState<string>("");
     const { toast } = useToast();
     const navigate = useNavigate();
 
     useEffect(() => {
         fetchReceptionistInfo();
+        fetchServices();
     }, []);
+
+    const fetchServices = async () => {
+        const { data, error } = await supabase
+            .from("services")
+            .select("id, name")
+            .eq("is_active", true)
+            .order("name");
+
+        if (data) {
+            setServices(data);
+            if (data.length > 0) {
+                // Optional: Default to first service or specific one if needed
+            }
+        }
+    };
 
     const fetchReceptionistInfo = async () => {
         const { data: { user } } = await supabase.auth.getUser();
@@ -144,6 +168,10 @@ export default function RegisterVisit() {
             toast({ title: "Inactive Member", description: "Member is inactive.", variant: "destructive" });
             return;
         }
+        if (!selectedServiceId) {
+            toast({ title: "Service Required", description: "Please select a service for this visit.", variant: "destructive" });
+            return;
+        }
 
         setLoading(true);
         try {
@@ -160,7 +188,7 @@ export default function RegisterVisit() {
                 benefit_deducted: 0,
                 branch_compensation: 0,
                 profit_loss: 0,
-                service_id: '00000000-0000-0000-0000-000000000000'
+                service_id: selectedServiceId
             });
 
             if (error) throw error;
@@ -270,6 +298,23 @@ export default function RegisterVisit() {
                                     </div>
                                 ))}
                             </RadioGroup>
+                        </div>
+
+                        {/* Service Selection */}
+                        <div className="space-y-3 pt-4 border-t">
+                            <Label className="text-base font-semibold">Select Service</Label>
+                            <Select value={selectedServiceId} onValueChange={setSelectedServiceId}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select purpose of visit" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {services.map((service) => (
+                                        <SelectItem key={service.id} value={service.id}>
+                                            {service.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
 
                         {member.is_active && (

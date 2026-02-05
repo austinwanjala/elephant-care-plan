@@ -27,33 +27,18 @@ const Login = () => {
       if (error) throw error;
 
       // Check user role and redirect accordingly
-      let role = null;
-      let attempts = 0;
-      const maxAttempts = 5;
-      const delayMs = 500; // 0.5 seconds
+      const { data: roleData } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", data.user.id)
+        .maybeSingle();
 
-      while (attempts < maxAttempts && role === null) {
-          const { data: roleData } = await supabase
-              .from("user_roles")
-              .select("role")
-              .eq("user_id", data.user.id)
-              .maybeSingle();
-
-          if (roleData?.role) {
-              role = roleData.role;
-              break;
-          }
-
-          attempts++;
-          if (attempts < maxAttempts) {
-              await new Promise(resolve => setTimeout(resolve, delayMs));
-          }
-      }
+      const role = roleData?.role;
 
       if (!role) {
         toast({
           title: "Setup Incomplete",
-          description: "Your account is authenticated but has no portal role assigned after multiple attempts. Please contact your administrator.",
+          description: "Your account is authenticated but has no portal role assigned. Please contact your administrator.",
           variant: "destructive",
         });
         // logout to clear session

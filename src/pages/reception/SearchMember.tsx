@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Search, User, Phone, Mail, CreditCard, CalendarDays, ArrowLeft, Loader2 } from "lucide-react";
+import { Search, User, Phone, Mail, CreditCard, CalendarDays, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 
@@ -17,9 +17,7 @@ export default function ReceptionSearchMember() {
 
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
-        const term = searchTerm.trim();
-        if (!term) return;
-        
+        if (!searchTerm) return;
         setSearching(true);
         setMember(null);
 
@@ -27,20 +25,17 @@ export default function ReceptionSearchMember() {
             const { data, error } = await supabase
                 .from("members")
                 .select("*, membership_categories(name), branches(name)")
-                .or(`phone.ilike."%${term}%",id_number.ilike."%${term}%",member_number.ilike."%${term}%",full_name.ilike."%${term}%"`)
+                .or(`phone.eq.${searchTerm},id_number.eq.${searchTerm},member_number.eq.${searchTerm}`)
                 .maybeSingle();
 
-            if (error) {
-                if (error.code === 'PGRST116') {
-                    throw new Error("Multiple members found. Please be more specific.");
-                }
+            if (error && error.code !== 'PGRST116') { // PGRST116 is "No rows found"
                 throw error;
             }
 
             if (data) {
                 setMember(data);
             } else {
-                toast({ title: "Member not found", description: "No member found matching that criteria.", variant: "destructive" });
+                toast({ title: "Member not found", description: "No member found with that Phone, ID, or Member Number.", variant: "destructive" });
             }
         } catch (error: any) {
             toast({ title: "Search failed", description: error.message, variant: "destructive" });
@@ -63,12 +58,12 @@ export default function ReceptionSearchMember() {
             <Card>
                 <CardHeader>
                     <CardTitle>Member Lookup</CardTitle>
-                    <CardDescription>Enter Name, Phone, ID, or Member Number to find the member.</CardDescription>
+                    <CardDescription>Enter Phone Number, National ID, or Member Number to find the member.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleSearch} className="flex gap-4">
                         <Input
-                            placeholder="Name, Phone, ID, or Member #"
+                            placeholder="Phone, ID, or Member Number"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />

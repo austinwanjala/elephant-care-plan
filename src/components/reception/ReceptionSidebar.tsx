@@ -1,5 +1,4 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { useState, useEffect } from "react";
 import { useSidebar, Sidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { UserPlus, Fingerprint, Receipt, LogOut, LayoutDashboard, Search } from "lucide-react";
@@ -8,7 +7,6 @@ import { supabase } from "@/integrations/supabase/client";
 const menuItems = [
     { title: "Dashboard", url: "/reception", icon: LayoutDashboard },
     { title: "Register Visit", url: "/reception/register-visit", icon: UserPlus },
-    { title: "Add Member", url: "/reception/add-member", icon: UserPlus }, // New Add Member item
     { title: "Search Member", url: "/reception/search", icon: Search }, // New item
     { title: "Billing & Claims", url: "/reception/billing", icon: Receipt },
 ];
@@ -28,24 +26,6 @@ export function ReceptionSidebar() {
         if (path === "/reception") return location.pathname === "/reception";
         return location.pathname.startsWith(path);
     }
-
-    const [pendingBillsCount, setPendingBillsCount] = useState(0);
-
-    useEffect(() => {
-        const fetchPendingBills = async () => {
-            const { count } = await (supabase as any)
-                .from('bills')
-                .select('*', { count: 'exact', head: true })
-                .eq('status', 'pending'); // Assuming 'pending' status for unpaid bills
-            setPendingBillsCount(count || 0);
-        };
-
-        fetchPendingBills();
-
-        // Polling every 30s
-        const interval = setInterval(fetchPendingBills, 30000);
-        return () => clearInterval(interval);
-    }, []);
 
     return (
         <Sidebar collapsible="icon" className="border-r border-border">
@@ -73,17 +53,10 @@ export function ReceptionSidebar() {
                                     <a
                                         href={item.url}
                                         onClick={(e) => { e.preventDefault(); navigate(item.url); }}
-                                        className="flex items-center gap-3 justify-between"
+                                        className="flex items-center gap-3"
                                     >
-                                        <div className="flex items-center gap-3">
-                                            <item.icon className="h-5 w-5" />
-                                            <span>{item.title}</span>
-                                        </div>
-                                        {item.title === "Billing & Claims" && pendingBillsCount > 0 && (
-                                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white">
-                                                {pendingBillsCount}
-                                            </span>
-                                        )}
+                                        <item.icon className="h-5 w-5" />
+                                        <span>{item.title}</span>
                                     </a>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>

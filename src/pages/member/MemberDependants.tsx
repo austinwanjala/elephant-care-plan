@@ -7,13 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, ArrowLeft, Plus, Trash, Users, CalendarDays, CreditCard } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 interface Dependant {
   id: string;
   full_name: string;
   dob: string;
-  id_number: string;
+  identification_number: string;
   relationship: string;
 }
 
@@ -102,7 +102,7 @@ const MemberDependants = () => {
         member_id: memberId,
         full_name: newDependant.fullName,
         dob: newDependant.dob,
-        id_number: newDependant.idNumber,
+        identification_number: newDependant.idNumber,
         relationship: newDependant.relationship,
       });
 
@@ -111,7 +111,7 @@ const MemberDependants = () => {
       toast({ title: "Dependant Added", description: `${newDependant.fullName} has been added.` });
       setDialogOpen(false);
       setNewDependant({ fullName: "", dob: "", idNumber: "", relationship: "" });
-      fetchDependants();
+      fetchDependants(); // Refresh list
     } catch (error: any) {
       toast({ title: "Error adding dependant", description: error.message, variant: "destructive" });
     } finally {
@@ -127,7 +127,7 @@ const MemberDependants = () => {
       if (error) throw error;
 
       toast({ title: "Dependant Removed", description: "Dependant has been successfully removed." });
-      fetchDependants();
+      fetchDependants(); // Refresh list
     } catch (error: any) {
       toast({ title: "Error removing dependant", description: error.message, variant: "destructive" });
     }
@@ -137,6 +137,14 @@ const MemberDependants = () => {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!memberId) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-muted-foreground">Could not load member details. Please try again later.</p>
       </div>
     );
   }
@@ -245,7 +253,7 @@ const MemberDependants = () => {
                       <CalendarDays className="h-4 w-4" /> {dep.dob}
                     </div>
                     <div className="text-sm text-muted-foreground flex items-center gap-1">
-                      <CreditCard className="h-4 w-4" /> {dep.id_number}
+                      <CreditCard className="h-4 w-4" /> {dep.identification_number}
                     </div>
                     <Button variant="ghost" size="icon" onClick={() => handleDeleteDependant(dep.id)}>
                       <Trash className="h-4 w-4 text-destructive" />

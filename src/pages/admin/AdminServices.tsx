@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-
+import { AdminLayout } from "@/components/admin/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -35,9 +35,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, Edit, Settings, Shield, Download } from "lucide-react";
+import { Plus, MoreHorizontal, Edit, Settings, Shield } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { exportToCsv } from "@/utils/csvExport";
 
 interface Service {
   id: string;
@@ -205,8 +204,6 @@ export default function AdminServices() {
     setPreapprovalDialogOpen(true);
   };
 
-
-
   const resetForm = () => {
     setFormData({
       name: "",
@@ -217,19 +214,6 @@ export default function AdminServices() {
     });
   };
 
-  const handleExport = () => {
-    const dataToExport = services.map(s => ({
-      "Procedure Name": s.name,
-      "Real Cost": s.real_cost,
-      "Branch Compensation": s.branch_compensation,
-      "Benefit Cost": s.benefit_cost,
-      "Profit/Loss": s.profit_loss,
-      "Approval": s.approval_type === "all_branches" ? "All Branches" : "Pre-Approved Only",
-      "Active": s.is_active ? "Yes" : "No"
-    }));
-    exportToCsv("services_export.csv", dataToExport);
-  };
-
   const getApprovalBadge = (type: string) => {
     if (type === "all_branches") {
       return <Badge className="bg-success">All Branches</Badge>;
@@ -238,17 +222,13 @@ export default function AdminServices() {
   };
 
   return (
-    <div className="space-y-6">
-
-      <div className="flex flex-col sm:flex-row justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-serif font-bold text-foreground">Services</h1>
-          <p className="text-muted-foreground">Manage dental services and pricing</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleExport}>
-            <Download className="mr-2 h-4 w-4" /> Export CSV
-          </Button>
+    <AdminLayout>
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-serif font-bold text-foreground">Services</h1>
+            <p className="text-muted-foreground">Manage dental services and pricing</p>
+          </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button className="btn-primary">
@@ -331,164 +311,164 @@ export default function AdminServices() {
             </DialogContent>
           </Dialog>
         </div>
-      </div>
 
-      <div className="card-elevated overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Procedure</TableHead>
-                <TableHead>Real Cost</TableHead>
-                <TableHead>Branch Comp.</TableHead>
-                <TableHead>Benefit Cost</TableHead>
-                <TableHead>Profit/Loss</TableHead>
-                <TableHead>Approval</TableHead>
-                <TableHead>Active</TableHead>
-                <TableHead></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {services.map((service) => (
-                <TableRow key={service.id}>
-                  <TableCell className="font-medium">{service.name}</TableCell>
-                  <TableCell>KES {service.real_cost.toLocaleString()}</TableCell>
-                  <TableCell>KES {service.branch_compensation.toLocaleString()}</TableCell>
-                  <TableCell>KES {service.benefit_cost.toLocaleString()}</TableCell>
-                  <TableCell className={service.profit_loss >= 0 ? "text-success" : "text-destructive"}>
-                    KES {service.profit_loss.toLocaleString()}
-                  </TableCell>
-                  <TableCell>{getApprovalBadge(service.approval_type)}</TableCell>
-                  <TableCell>
-                    <Switch
-                      checked={service.is_active}
-                      onCheckedChange={() => handleToggleActive(service)}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => openEditDialog(service)}>
-                          <Edit className="mr-2 h-4 w-4" /> Edit
-                        </DropdownMenuItem>
-                        {service.approval_type === "pre_approved_only" && (
-                          <DropdownMenuItem onClick={() => openPreapprovalDialog(service)}>
-                            <Shield className="mr-2 h-4 w-4" /> Manage Branches
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+        <div className="card-elevated overflow-hidden">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Procedure</TableHead>
+                  <TableHead>Real Cost</TableHead>
+                  <TableHead>Branch Comp.</TableHead>
+                  <TableHead>Benefit Cost</TableHead>
+                  <TableHead>Profit/Loss</TableHead>
+                  <TableHead>Approval</TableHead>
+                  <TableHead>Active</TableHead>
+                  <TableHead></TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {services.map((service) => (
+                  <TableRow key={service.id}>
+                    <TableCell className="font-medium">{service.name}</TableCell>
+                    <TableCell>KES {service.real_cost.toLocaleString()}</TableCell>
+                    <TableCell>KES {service.branch_compensation.toLocaleString()}</TableCell>
+                    <TableCell>KES {service.benefit_cost.toLocaleString()}</TableCell>
+                    <TableCell className={service.profit_loss >= 0 ? "text-success" : "text-destructive"}>
+                      KES {service.profit_loss.toLocaleString()}
+                    </TableCell>
+                    <TableCell>{getApprovalBadge(service.approval_type)}</TableCell>
+                    <TableCell>
+                      <Switch
+                        checked={service.is_active}
+                        onCheckedChange={() => handleToggleActive(service)}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openEditDialog(service)}>
+                            <Edit className="mr-2 h-4 w-4" /> Edit
+                          </DropdownMenuItem>
+                          {service.approval_type === "pre_approved_only" && (
+                            <DropdownMenuItem onClick={() => openPreapprovalDialog(service)}>
+                              <Shield className="mr-2 h-4 w-4" /> Manage Branches
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </div>
-      </div>
 
-      {/* Edit Dialog */}
-      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="font-serif">Edit Service</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label>Procedure Name</Label>
-              <Input
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+        {/* Edit Dialog */}
+        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="font-serif">Edit Service</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
               <div className="space-y-2">
-                <Label>Real Cost (KES)</Label>
+                <Label>Procedure Name</Label>
                 <Input
-                  type="number"
-                  value={formData.realCost}
-                  onChange={(e) => setFormData({ ...formData, realCost: e.target.value })}
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Branch Compensation (KES)</Label>
-                <Input
-                  type="number"
-                  value={formData.branchCompensation}
-                  onChange={(e) => setFormData({ ...formData, branchCompensation: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Benefit Cost (KES)</Label>
-              <Input
-                type="number"
-                value={formData.benefitCost}
-                onChange={(e) => setFormData({ ...formData, benefitCost: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Approval Type</Label>
-              <Select
-                value={formData.approvalType}
-                onValueChange={(value: "all_branches" | "pre_approved_only") =>
-                  setFormData({ ...formData, approvalType: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all_branches">All Branches</SelectItem>
-                  <SelectItem value="pre_approved_only">Pre-Approved Only</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <Button onClick={handleEditService} className="btn-primary">
-              Update Service
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Pre-approval Dialog */}
-      <Dialog open={preapprovalDialogOpen} onOpenChange={setPreapprovalDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="font-serif">Manage Pre-Approved Branches</DialogTitle>
-          </DialogHeader>
-          <div className="py-4 space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Select branches that can perform "{selectedService?.name}"
-            </p>
-            <div className="space-y-3 max-h-64 overflow-y-auto">
-              {branches.map((branch) => (
-                <div key={branch.id} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={branch.id}
-                    checked={selectedBranches.includes(branch.id)}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        setSelectedBranches([...selectedBranches, branch.id]);
-                      } else {
-                        setSelectedBranches(selectedBranches.filter((id) => id !== branch.id));
-                      }
-                    }}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Real Cost (KES)</Label>
+                  <Input
+                    type="number"
+                    value={formData.realCost}
+                    onChange={(e) => setFormData({ ...formData, realCost: e.target.value })}
                   />
-                  <Label htmlFor={branch.id}>{branch.name}</Label>
                 </div>
-              ))}
+                <div className="space-y-2">
+                  <Label>Branch Compensation (KES)</Label>
+                  <Input
+                    type="number"
+                    value={formData.branchCompensation}
+                    onChange={(e) => setFormData({ ...formData, branchCompensation: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Benefit Cost (KES)</Label>
+                <Input
+                  type="number"
+                  value={formData.benefitCost}
+                  onChange={(e) => setFormData({ ...formData, benefitCost: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Approval Type</Label>
+                <Select
+                  value={formData.approvalType}
+                  onValueChange={(value: "all_branches" | "pre_approved_only") =>
+                    setFormData({ ...formData, approvalType: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all_branches">All Branches</SelectItem>
+                    <SelectItem value="pre_approved_only">Pre-Approved Only</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button onClick={handleEditService} className="btn-primary">
+                Update Service
+              </Button>
             </div>
-            <Button onClick={handleSavePreapprovals} className="w-full btn-primary">
-              Save Changes
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Pre-approval Dialog */}
+        <Dialog open={preapprovalDialogOpen} onOpenChange={setPreapprovalDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="font-serif">Manage Pre-Approved Branches</DialogTitle>
+            </DialogHeader>
+            <div className="py-4 space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Select branches that can perform "{selectedService?.name}"
+              </p>
+              <div className="space-y-3 max-h-64 overflow-y-auto">
+                {branches.map((branch) => (
+                  <div key={branch.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={branch.id}
+                      checked={selectedBranches.includes(branch.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedBranches([...selectedBranches, branch.id]);
+                        } else {
+                          setSelectedBranches(selectedBranches.filter((id) => id !== branch.id));
+                        }
+                      }}
+                    />
+                    <Label htmlFor={branch.id}>{branch.name}</Label>
+                  </div>
+                ))}
+              </div>
+              <Button onClick={handleSavePreapprovals} className="w-full btn-primary">
+                Save Changes
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </AdminLayout>
   );
 }

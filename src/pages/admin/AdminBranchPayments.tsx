@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { AdminLayout } from "@/components/admin/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -23,14 +24,18 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DollarSign, CheckCircle, Loader2, History, ClipboardList, CheckCircle2 } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format, getMonth, getYear, subMonths } from "date-fns";
+import { DollarSign, CheckCircle, Loader2, History } from "lucide-react";
+import { format, getMonth, getYear, subMonths, addMonths } from "date-fns";
 
 interface Branch {
   id: string;
   name: string;
   location: string;
+}
+
+interface BranchRevenueSummary {
+  branch_id: string;
+  total_compensation: number;
 }
 
 interface BranchPayment {
@@ -45,28 +50,14 @@ interface BranchPayment {
   created_at: string;
 }
 
-interface RevenueClaim {
-  id: string;
-  branch_id: string;
-  amount: number;
-  status: string;
-  notes: string | null;
-  created_at: string;
-  director_id: string;
-  director_name?: string;
-  branch_name?: string;
-  paid_at?: string;
-}
-
 export default function AdminBranchPayments() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [revenueSummaries, setRevenueSummaries] = useState<Record<string, number>>({});
   const [payments, setPayments] = useState<BranchPayment[]>([]);
-  const [claims, setClaims] = useState<RevenueClaim[]>([]);
   const [loading, setLoading] = useState(true);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
-  const [selectedClaim, setSelectedClaim] = useState<RevenueClaim | null>(null);
-  const [currentMonth, setCurrentMonth] = useState(getMonth(new Date()) + 1);
+  const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
+  const [currentMonth, setCurrentMonth] = useState(getMonth(new Date()) + 1); // 1-indexed
   const [currentYear, setCurrentYear] = useState(getYear(new Date()));
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentNotes, setPaymentNotes] = useState("");
@@ -79,63 +70,55 @@ export default function AdminBranchPayments() {
 
   const loadData = async (month: number, year: number) => {
     setLoading(true);
-    try {
-      const [branchesRes, revenueRes, paymentsRes, claimsRes] = await Promise.all([
-        supabase.from("branches").select("id, name, location").eq("is_active", true).order("name"),
-        (supabase as any)
-          .from("branch_revenue")
-          .select("branch_id, total_compensation")
-          .gte("date", format(new Date(year, month - 1, 1), "yyyy-MM-dd"))
-          .lt("date", format(new Date(year, month, 1), "yyyy-MM-dd")),
-        supabase
-          .from("branch_payments")
-          .select("*")
-          .eq("period_month", month)
-          .eq("period_year", year)
-          .order("payment_date", { ascending: false }),
-        (supabase as any)
-          .from("revenue_claims")
-          .select("*, staff:director_id(full_name), branches:branch_id(name)")
-          .order("created_at", { ascending: false }),
-      ]);
+    const [branchesRes, revenueRes, paymentsRes] = await Promise.all([
+      supabase.from("branches").select("id, name, location").eq("is_active", true).order("name"),
+      supabase
+        .from("branch_revenue")
+        .select("branch_id, total_compensation")
+        .gte("date", format(new Date(year, month - 1, 1), "yyyy-MM-dd"))
+        .lt("date", format(new Date(year, month, 1), "yyyy-MM-dd")),
+      supabase
+        .from("branch_payments")
+        .select("*")
+        .eq("period_month", month)
+        .eq("period_year", year)
+        .order("payment_date", { ascending: false }),
+    ]);
 
-      if (branchesRes.error) throw branchesRes.error;
+    if (branchesRes.data) setBranches(branchesRes.data);
 
-      if (branchesRes.data) setBranches(branchesRes.data);
-
-      if (revenueRes.data) {
-        const summary: Record<string, number> = {};
-        branchesRes.data?.forEach(branch => summary[branch.id] = 0);
-        revenueRes.data.forEach((r: any) => {
-          summary[r.branch_id] = (summary[r.branch_id] || 0) + r.total_compensation;
-        });
-        setRevenueSummaries(summary);
-      }
-
-      if (paymentsRes.data) setPayments(paymentsRes.data);
-      if (claimsRes.data) setClaims(claimsRes.data as any);
-
-    } catch (error: any) {
-      console.error("Error loading admin data:", error);
-      toast({
-        title: "Load Error",
-        description: error.message,
-        variant: "destructive"
+    if (revenueRes.data) {
+      const summary: Record<string, number> = {};
+      branchesRes.data?.forEach(branch => summary[branch.id] = 0); // Initialize all branches to 0
+      revenueRes.data.forEach((r) => {
+        summary[r.branch_id] = (summary[r.branch_id] || 0) + r.total_compensation;
       });
-    } finally {
-      setLoading(false);
+      setRevenueSummaries(summary);
     }
+
+    if (paymentsRes.data) setPayments(paymentsRes.data);
+
+    setLoading(false);
   };
 
-  const handleMarkAsPaid = (claim: RevenueClaim) => {
-    setSelectedClaim(claim);
-    setPaymentAmount(claim.amount.toString());
+  const getOutstandingPayable = (branchId: string) => {
+    const totalRevenue = revenueSummaries[branchId] || 0;
+    const totalPaid = payments
+      .filter((p) => p.branch_id === branchId && p.period_month === currentMonth && p.period_year === currentYear)
+      .reduce((sum, p) => sum + p.amount_paid, 0);
+    return totalRevenue - totalPaid;
+  };
+
+  const handleMarkAsPaid = (branch: Branch) => {
+    setSelectedBranch(branch);
+    const outstanding = getOutstandingPayable(branch.id);
+    setPaymentAmount(outstanding > 0 ? outstanding.toFixed(2) : "0.00");
     setPaymentNotes("");
     setPaymentDialogOpen(true);
   };
 
   const handleProcessPayment = async () => {
-    if (!selectedClaim || !paymentAmount || parseFloat(paymentAmount) <= 0) {
+    if (!selectedBranch || !paymentAmount || parseFloat(paymentAmount) <= 0) {
       toast({
         title: "Invalid Amount",
         description: "Please enter a valid payment amount.",
@@ -149,26 +132,23 @@ export default function AdminBranchPayments() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("User not authenticated.");
 
-      const { data: adminStaff } = await supabase.from("staff").select("id").eq("user_id", user.id).single();
+      const { error } = await supabase.from("branch_payments").insert({
+        branch_id: selectedBranch.id,
+        amount_paid: parseFloat(paymentAmount),
+        paid_by_user_id: user.id,
+        period_month: currentMonth,
+        period_year: currentYear,
+        notes: paymentNotes || null,
+      });
 
-      const { error: claimError } = await (supabase as any)
-        .from("revenue_claims")
-        .update({
-          status: 'paid',
-          paid_at: new Date().toISOString(),
-          paid_by: adminStaff?.id,
-          notes: paymentNotes || null
-        })
-        .eq("id", selectedClaim.id);
-
-      if (claimError) throw claimError;
+      if (error) throw error;
 
       toast({
-        title: "Claim Paid",
-        description: `KES ${parseFloat(paymentAmount).toLocaleString()} marked as paid and claim finalized.`,
+        title: "Payment Recorded",
+        description: `KES ${parseFloat(paymentAmount).toLocaleString()} marked as paid for ${selectedBranch.name} for ${format(new Date(currentYear, currentMonth - 1), "MMM yyyy")}.`,
       });
       setPaymentDialogOpen(false);
-      loadData(currentMonth, currentYear);
+      loadData(currentMonth, currentYear); // Reload data to update outstanding amounts
     } catch (error: any) {
       toast({
         title: "Payment Failed",
@@ -189,148 +169,149 @@ export default function AdminBranchPayments() {
   const getMonthOptions = () => {
     const options = [];
     let date = new Date();
+    // Go back 12 months from current month
     for (let i = 0; i < 12; i++) {
       options.push(date);
       date = subMonths(date, 1);
     }
-    return options.reverse();
+    return options.reverse(); // Show most recent first
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
+      <AdminLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </AdminLayout>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-serif font-bold text-foreground">Branch Payments</h1>
-          <p className="text-muted-foreground">Manage revenue payable to hospital branches</p>
+    <AdminLayout>
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-serif font-bold text-foreground">Branch Payments</h1>
+            <p className="text-muted-foreground">Manage revenue payable to hospital branches</p>
+          </div>
         </div>
-      </div>
 
-      <Tabs defaultValue="claims" className="space-y-6">
-        <TabsList className="bg-muted p-1 rounded-lg">
-          <TabsTrigger value="claims" className="flex items-center gap-2">
-            <ClipboardList className="h-4 w-4" />
-            Pending Claims
-          </TabsTrigger>
-          <TabsTrigger value="overview" className="flex items-center gap-2">
-            <DollarSign className="h-4 w-4" />
-            Revenue Overview
-          </TabsTrigger>
-          <TabsTrigger value="history" className="flex items-center gap-2">
-            <History className="h-4 w-4" />
-            Claim History
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="claims">
-          <Card className="card-elevated p-6">
-            <CardTitle className="mb-6 flex items-center gap-2">
-              <ClipboardList className="h-5 w-5 text-amber-600" />
-              Active Branch Claims
+        <Card className="card-elevated p-6">
+          <div className="flex items-center justify-between mb-4">
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-primary" />
+              Revenue Overview
             </CardTitle>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
+            <Select
+              value={`${currentYear}-${currentMonth.toString().padStart(2, '0')}`}
+              onValueChange={handleMonthChange}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Select month" />
+              </SelectTrigger>
+              <SelectContent>
+                {getMonthOptions().map((date, index) => (
+                  <SelectItem key={index} value={`${getYear(date)}-${(getMonth(date) + 1).toString().padStart(2, '0')}`}>
+                    {format(date, "MMM yyyy")}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Branch</TableHead>
+                  <TableHead>Total Revenue ({format(new Date(currentYear, currentMonth - 1), "MMM yyyy")})</TableHead>
+                  <TableHead>Outstanding Payable</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {branches.length === 0 ? (
                   <TableRow>
-                    <TableHead>Date Submitted</TableHead>
-                    <TableHead>Branch</TableHead>
-                    <TableHead>Director</TableHead>
-                    <TableHead>Compensation Requested</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Action</TableHead>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                      No active branches found.
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {claims.filter(c => c.status === 'pending').length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                        No pending claims at this time.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    claims.filter(c => c.status === 'pending').map((claim) => (
-                      <TableRow key={claim.id}>
-                        <TableCell>{format(new Date(claim.created_at), "MMM d, yyyy")}</TableCell>
-                        <TableCell className="font-bold">{(claim as any).branches?.name}</TableCell>
-                        <TableCell>{(claim as any).staff?.full_name}</TableCell>
-                        <TableCell className="text-lg font-bold text-blue-700">KES {Number(claim.amount).toLocaleString()}</TableCell>
-                        <TableCell><Badge className="bg-amber-100 text-amber-800 border-amber-200">PENDING</Badge></TableCell>
+                ) : (
+                  branches.map((branch) => {
+                    const outstanding = getOutstandingPayable(branch.id);
+                    const isPaid = outstanding <= 0;
+                    return (
+                      <TableRow key={branch.id}>
+                        <TableCell className="font-medium">{branch.name}</TableCell>
+                        <TableCell>KES {(revenueSummaries[branch.id] || 0).toLocaleString()}</TableCell>
+                        <TableCell className={isPaid ? "text-success" : "text-destructive"}>
+                          KES {outstanding.toLocaleString()}
+                        </TableCell>
                         <TableCell>
-                          <Button size="sm" onClick={() => handleMarkAsPaid(claim)} className="bg-green-600 hover:bg-green-700">
-                            <CheckCircle2 className="mr-2 h-4 w-4" /> Pay Claim
-                          </Button>
+                          {isPaid ? (
+                            <Badge className="bg-success">Paid</Badge>
+                          ) : (
+                            <Badge variant="secondary">Pending</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {!isPaid && (
+                            <Button
+                              size="sm"
+                              className="btn-primary"
+                              onClick={() => handleMarkAsPaid(branch)}
+                            >
+                              <CheckCircle className="mr-2 h-4 w-4" /> Mark as Paid
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </Card>
-        </TabsContent>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
 
-        <TabsContent value="overview">
-          <Card className="card-elevated p-6">
-            <div className="flex items-center justify-between mb-4">
-              <CardTitle className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-primary" />
-                Monthly Performance Overview
-              </CardTitle>
-              <Select
-                value={`${currentYear}-${currentMonth.toString().padStart(2, '0')}`}
-                onValueChange={handleMonthChange}
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Select month" />
-                </SelectTrigger>
-                <SelectContent>
-                  {getMonthOptions().map((date, index) => (
-                    <SelectItem key={index} value={`${getYear(date)}-${(getMonth(date) + 1).toString().padStart(2, '0')}`}>
-                      {format(date, "MMM yyyy")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
+        <Card className="card-elevated p-6">
+          <CardHeader className="p-0 pb-4">
+            <CardTitle className="flex items-center gap-2">
+              <History className="h-5 w-5 text-primary" />
+              Payment History
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Date</TableHead>
                     <TableHead>Branch</TableHead>
-                    <TableHead>Total Branch Compensation ({format(new Date(currentYear, currentMonth - 1), "MMM yyyy")})</TableHead>
-                    <TableHead>Claim Status</TableHead>
+                    <TableHead>Period</TableHead>
+                    <TableHead>Amount Paid</TableHead>
+                    <TableHead>Notes</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {branches.length === 0 ? (
+                  {payments.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
-                        No active branches found.
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                        No payments recorded for this period.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    branches.map((branch) => {
-                      const branchClaims = claims.filter(c => c.branch_id === branch.id);
-                      const hasPending = branchClaims.some(c => c.status === 'pending');
+                    payments.map((payment) => {
+                      const branchName = branches.find(b => b.id === payment.branch_id)?.name || "Unknown";
                       return (
-                        <TableRow key={branch.id}>
-                          <TableCell className="font-medium">{branch.name}</TableCell>
-                          <TableCell>KES {(revenueSummaries[branch.id] || 0).toLocaleString()}</TableCell>
-                          <TableCell>
-                            {hasPending ? (
-                              <Badge className="bg-amber-100 text-amber-800">Pending Claim</Badge>
-                            ) : (
-                              <Badge variant="outline">No Active Claims</Badge>
-                            )}
-                          </TableCell>
+                        <TableRow key={payment.id}>
+                          <TableCell>{format(new Date(payment.payment_date), "MMM d, yyyy")}</TableCell>
+                          <TableCell>{branchName}</TableCell>
+                          <TableCell>{format(new Date(payment.period_year, payment.period_month - 1), "MMM yyyy")}</TableCell>
+                          <TableCell className="text-success">KES {payment.amount_paid.toLocaleString()}</TableCell>
+                          <TableCell className="max-w-[200px] truncate">{payment.notes || "N/A"}</TableCell>
                         </TableRow>
                       );
                     })
@@ -338,92 +319,52 @@ export default function AdminBranchPayments() {
                 </TableBody>
               </Table>
             </div>
-          </Card>
-        </TabsContent>
+          </CardContent>
+        </Card>
 
-        <TabsContent value="history">
-          <Card className="card-elevated p-6">
-            <CardTitle className="mb-6 flex items-center gap-2">
-              <History className="h-5 w-5 text-blue-600" />
-              Processed Payment History
-            </CardTitle>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Paid Date</TableHead>
-                    <TableHead>Branch</TableHead>
-                    <TableHead>Amount Paid</TableHead>
-                    <TableHead>Method/Notes</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {claims.filter(c => c.status === 'paid').length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                        No processed claims found.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    claims.filter(c => c.status === 'paid').map((claim) => (
-                      <TableRow key={claim.id}>
-                        <TableCell>{claim.paid_at ? format(new Date(claim.paid_at), "MMM d, yyyy") : '-'}</TableCell>
-                        <TableCell>{(claim as any).branches?.name}</TableCell>
-                        <TableCell className="font-bold text-green-700">KES {Number(claim.amount).toLocaleString()}</TableCell>
-                        <TableCell>{claim.notes || 'N/A'}</TableCell>
-                        <TableCell><Badge className="bg-green-100 text-green-800 border-green-200">PAID</Badge></TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+        {/* Payment Dialog */}
+        <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="font-serif">Record Payment</DialogTitle>
+              <DialogDescription>
+                Record a payment to {selectedBranch?.name} for {format(new Date(currentYear, currentMonth - 1), "MMM yyyy")}.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="paymentAmount">Amount Paid (KES)</Label>
+                <Input
+                  id="paymentAmount"
+                  type="number"
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  placeholder="e.g., 15000"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="paymentNotes">Notes (Optional)</Label>
+                <Textarea
+                  id="paymentNotes"
+                  value={paymentNotes}
+                  onChange={(e) => setPaymentNotes(e.target.value)}
+                  placeholder="e.g., Bank transfer, M-Pesa"
+                />
+              </div>
+              <Button onClick={handleProcessPayment} className="btn-primary" disabled={submittingPayment}>
+                {submittingPayment ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Recording Payment...
+                  </>
+                ) : (
+                  "Record Payment"
+                )}
+              </Button>
             </div>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="font-serif">Process Claim Payment</DialogTitle>
-            <DialogDescription>
-              Record payment to {(selectedClaim as any)?.branches?.name} for the submitted revenue claim.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="paymentAmount">Amount Paid (KES)</Label>
-              <Input
-                id="paymentAmount"
-                type="number"
-                value={paymentAmount}
-                onChange={(e) => setPaymentAmount(e.target.value)}
-                placeholder="e.g., 15000"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="paymentNotes">Notes (Optional)</Label>
-              <Textarea
-                id="paymentNotes"
-                value={paymentNotes}
-                onChange={(e) => setPaymentNotes(e.target.value)}
-                placeholder="e.g., Bank transfer, M-Pesa"
-              />
-            </div>
-            <Button onClick={handleProcessPayment} className="btn-primary" disabled={submittingPayment}>
-              {submittingPayment ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Recording Payment...
-                </>
-              ) : (
-                "Record Payment"
-              )}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </AdminLayout>
   );
 }

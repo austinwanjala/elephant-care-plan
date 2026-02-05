@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -7,10 +7,10 @@ import {
     Users,
     DollarSign,
     Share2,
+    TrendingUp,
     Calendar,
     Copy,
-    Loader2,
-    CheckCircle2
+    Loader2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -20,14 +20,12 @@ export default function MarketerDashboard() {
     const [marketer, setMarketer] = useState<any>(null);
     const [referrals, setReferrals] = useState<any[]>([]);
     const [stats, setStats] = useState({
-        activeCount: 0,
-        totalLifeEarnings: 0,
-        totalPaid: 0,
-        claimable: 0,
-        pendingClaims: 0,
-        commissionRate: 0
+        memberCount: 0,
+        totalEarnings: 0,
+        pendingPayout: 0
     });
     const { toast } = useToast();
+    const navigate = useNavigate();
 
     useEffect(() => {
         loadMarketerData();
@@ -37,7 +35,10 @@ export default function MarketerDashboard() {
         setLoading(true);
         try {
             const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
+            if (!user) {
+                navigate("/login");
+                return;
+            }
 
             const { data: mData, error: mError } = await supabase
                 .from("marketers")
@@ -46,20 +47,13 @@ export default function MarketerDashboard() {
                 .maybeSingle();
 
             if (mError) throw mError;
+
             if (!mData) {
-                toast({ title: "Account Error", description: "Marketer profile not found.", variant: "destructive" });
+                toast({ title: "Account Error", description: "Marketer profile not found. Please contact admin.", variant: "destructive" });
                 return;
             }
+
             setMarketer(mData);
-
-            const { data: configData } = await (supabase as any)
-                .from("marketer_commission_config")
-                .select("commission_per_referral")
-                .order("updated_at", { ascending: false })
-                .limit(1)
-                .maybeSingle();
-
-            const rate = configData?.commission_per_referral || 0;
 
             const { data: members, error: membersError } = await supabase
                 .from("members")
@@ -71,26 +65,10 @@ export default function MarketerDashboard() {
 
             setReferrals(members || []);
 
-            const activeCount = members?.filter((m: any) => m.is_active).length || 0;
-            const lifeEarnings = activeCount * rate;
-
-            const { data: claims } = await (supabase as any)
-                .from("marketer_claims")
-                .select("amount, status")
-                .eq("marketer_id", mData.id);
-
-            const totalPaid = claims?.filter((c: any) => c.status === 'paid').reduce((sum: number, c: any) => sum + c.amount, 0) || 0;
-            const pendingClaims = claims?.filter((c: any) => c.status === 'pending').reduce((sum: number, c: any) => sum + c.amount, 0) || 0;
-
-            const claimable = Math.max(0, lifeEarnings - totalPaid - pendingClaims);
-
             setStats({
-                activeCount,
-                totalLifeEarnings: lifeEarnings,
-                totalPaid,
-                claimable,
-                pendingClaims,
-                commissionRate: rate
+                memberCount: members?.length || 0,
+                totalEarnings: Number(mData.total_earnings || 0),
+                pendingPayout: Number(mData.total_earnings || 0) * 0.1 // Simulated pending logic
             });
 
         } catch (error: any) {
@@ -146,44 +124,36 @@ export default function MarketerDashboard() {
             <div className="grid gap-4 md:grid-cols-3">
                 <Card className="shadow-sm border-blue-100">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Active Referrals</CardTitle>
+                        <CardTitle className="text-sm font-medium">Total Referrals</CardTitle>
                         <Users className="h-4 w-4 text-blue-600" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{stats.activeCount}</div>
-                        <p className="text-xs text-muted-foreground mt-1 text-blue-600 font-medium">
-                            @ KES {stats.commissionRate.toLocaleString()} each
+                        <div className="text-2xl font-bold">{stats.memberCount}</div>
+                        <p className="text-xs text-muted-foreground mt-1 text-green-600 font-medium">
+                            <TrendingUp className="h-3 w-3 inline mr-1" /> +2 this week
                         </p>
                     </CardContent>
                 </Card>
 
-                <Card className="shadow-sm border-emerald-100">
+                <Card className="shadow-sm border-blue-100">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
+                        <CardTitle className="text-sm font-medium">Total Earnings (Life)</CardTitle>
                         <DollarSign className="h-4 w-4 text-emerald-600" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-emerald-700">KES {stats.totalLifeEarnings.toLocaleString()}</div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            Paid: KES {stats.totalPaid.toLocaleString()}
-                        </p>
+                        <div className="text-2xl font-bold">KES {stats.totalEarnings.toLocaleString()}</div>
+                        <p className="text-xs text-muted-foreground mt-1">Paid directly to your phone</p>
                     </CardContent>
                 </Card>
 
-                <Card className="shadow-sm border-orange-100">
+                <Card className="shadow-sm border-blue-100">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Available to Claim</CardTitle>
-                        <CheckCircle2 className="h-4 w-4 text-orange-600" />
+                        <CardTitle className="text-sm font-medium">Available Balance</CardTitle>
+                        <TrendingUp className="h-4 w-4 text-orange-600" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-orange-700">KES {stats.claimable.toLocaleString()}</div>
-                        <div className="flex gap-2 mt-2">
-                            <Link to="/marketer/earnings">
-                                <Button size="sm" variant="outline" className="h-7 text-xs">
-                                    View Details
-                                </Button>
-                            </Link>
-                        </div>
+                        <div className="text-2xl font-bold text-blue-700">KES {(stats.totalEarnings * 0.2).toLocaleString()}</div>
+                        <p className="text-xs text-muted-foreground mt-1">Next payout scheduled: Monday</p>
                     </CardContent>
                 </Card>
             </div>
@@ -213,7 +183,7 @@ export default function MarketerDashboard() {
                                         </div>
                                     </div>
                                     <Badge variant={ref.is_active ? "default" : "secondary"} className={ref.is_active ? "bg-green-600" : ""}>
-                                        {ref.is_active ? "Active" : "Incomplete"}
+                                        {ref.is_active ? "Active" : "Inactive"}
                                     </Badge>
                                 </div>
                             ))

@@ -64,7 +64,7 @@ export default function DirectorPerformance() {
 
         const { data: visitsData, error: visitsError } = await supabase
             .from("visits")
-            .select("id, doctor_id, bills(total_branch_compensation, total_profit_loss)")
+            .select("id, doctor_id, bills(total_branch_compensation, total_profit_loss), doctor:doctor_id(full_name)")
             .eq("branch_id", branchId)
             .eq("status", "completed")
             .gte("created_at", startOfMonthDate)
@@ -77,17 +77,12 @@ export default function DirectorPerformance() {
             return;
         }
 
-        // Fetch doctor names separately
-        const doctorIds = [...new Set((visitsData || []).map(v => v.doctor_id).filter(Boolean))];
-        const { data: staffData } = await supabase.from("staff").select("id, full_name").in("id", doctorIds);
-        const doctorMap = new Map((staffData || []).map(s => [s.id, s.full_name]));
-
         const performanceMap: Record<string, DoctorPerformance> = {};
 
         (visitsData || []).forEach(visit => {
             const doctorId = visit.doctor_id;
-            const doctorName = doctorMap.get(doctorId || '') || "Unknown Doctor";
-            const bill = (visit.bills as any)?.[0];
+            const doctorName = visit.doctor?.full_name || "Unknown Doctor";
+            const bill = visit.bills?.[0];
 
             if (doctorId && bill) {
                 if (!performanceMap[doctorId]) {

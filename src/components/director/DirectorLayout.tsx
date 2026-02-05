@@ -21,30 +21,17 @@ export function DirectorLayout({ children }: DirectorLayoutProps) {
     }, []);
 
     const checkAuth = async () => {
-        setLoading(true); // Ensure loading starts
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
             navigate("/login");
-            setLoading(false); // IMPORTANT: Set loading to false here
             return;
         }
 
-        const { data: roleData, error: roleError } = await supabase
+        const { data: roleData } = await supabase
             .from("user_roles")
             .select("role")
             .eq("user_id", user.id)
             .maybeSingle();
-
-        if (roleError) {
-            toast({
-                title: "Error fetching role",
-                description: roleError.message,
-                variant: "destructive",
-            });
-            navigate("/");
-            setLoading(false);
-            return;
-        }
 
         // @ts-ignore
         if (roleData?.role !== "branch_director" && roleData?.role !== "admin") {

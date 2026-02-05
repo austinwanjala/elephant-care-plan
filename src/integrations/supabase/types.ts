@@ -19,40 +19,31 @@ export type Database = {
           benefit_cost: number
           bill_id: string
           branch_compensation: number
-          created_at: string | null
+          created_at: string
           id: string
-          notes: string | null
-          profit_loss: number | null
           real_cost: number
           service_id: string
           service_name: string
-          tooth_number: string | null
         }
         Insert: {
           benefit_cost: number
           bill_id: string
           branch_compensation: number
-          created_at?: string | null
+          created_at?: string
           id?: string
-          notes?: string | null
-          profit_loss?: number | null
           real_cost: number
           service_id: string
-          service_name?: string
-          tooth_number?: string | null
+          service_name: string
         }
         Update: {
           benefit_cost?: number
           bill_id?: string
           branch_compensation?: number
-          created_at?: string | null
+          created_at?: string
           id?: string
-          notes?: string | null
-          profit_loss?: number | null
           real_cost?: number
           service_id?: string
           service_name?: string
-          tooth_number?: string | null
         }
         Relationships: [
           {
@@ -73,93 +64,42 @@ export type Database = {
       }
       bills: {
         Row: {
-          branch_id: string | null
-          claim_id: string | null
-          created_at: string | null
-          diagnosis: string | null
-          doctor_id: string | null
+          created_at: string
           finalized_at: string | null
-          finalized_by: string | null
           id: string
           is_finalized: boolean | null
-          member_id: string | null
           receptionist_id: string | null
-          status: string
-          submitted_at: string | null
           total_benefit_cost: number
           total_branch_compensation: number
           total_profit_loss: number
           total_real_cost: number
-          treatment_notes: string | null
-          updated_at: string | null
           visit_id: string
         }
         Insert: {
-          branch_id?: string | null
-          claim_id?: string | null
-          created_at?: string | null
-          diagnosis?: string | null
-          doctor_id?: string | null
+          created_at?: string
           finalized_at?: string | null
-          finalized_by?: string | null
           id?: string
           is_finalized?: boolean | null
-          member_id?: string | null
           receptionist_id?: string | null
-          status?: string
-          submitted_at?: string | null
-          total_benefit_cost?: number
-          total_branch_compensation?: number
-          total_profit_loss?: number
-          total_real_cost?: number
-          treatment_notes?: string | null
-          updated_at?: string | null
+          total_benefit_cost: number
+          total_branch_compensation: number
+          total_profit_loss: number
+          total_real_cost: number
           visit_id: string
         }
         Update: {
-          branch_id?: string | null
-          claim_id?: string | null
-          created_at?: string | null
-          diagnosis?: string | null
-          doctor_id?: string | null
+          created_at?: string
           finalized_at?: string | null
-          finalized_by?: string | null
           id?: string
           is_finalized?: boolean | null
-          member_id?: string | null
           receptionist_id?: string | null
-          status?: string
-          submitted_at?: string | null
           total_benefit_cost?: number
           total_branch_compensation?: number
           total_profit_loss?: number
           total_real_cost?: number
-          treatment_notes?: string | null
-          updated_at?: string | null
           visit_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "bills_branch_id_fkey"
-            columns: ["branch_id"]
-            isOneToOne: false
-            referencedRelation: "branches"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "bills_claim_id_fkey"
-            columns: ["claim_id"]
-            isOneToOne: false
-            referencedRelation: "revenue_claims"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "bills_member_id_fkey"
-            columns: ["member_id"]
-            isOneToOne: false
-            referencedRelation: "members"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "bills_receptionist_id_fkey"
             columns: ["receptionist_id"]
@@ -170,52 +110,8 @@ export type Database = {
           {
             foreignKeyName: "bills_visit_id_fkey"
             columns: ["visit_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "visits"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      branch_directors: {
-        Row: {
-          branch_id: string | null
-          created_at: string | null
-          email: string
-          full_name: string
-          id: string
-          is_active: boolean | null
-          phone: string | null
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          branch_id?: string | null
-          created_at?: string | null
-          email: string
-          full_name: string
-          id?: string
-          is_active?: boolean | null
-          phone?: string | null
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          branch_id?: string | null
-          created_at?: string | null
-          email?: string
-          full_name?: string
-          id?: string
-          is_active?: boolean | null
-          phone?: string | null
-          updated_at?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "branch_directors_branch_id_fkey"
-            columns: ["branch_id"]
-            isOneToOne: false
-            referencedRelation: "branches"
             referencedColumns: ["id"]
           },
         ]
@@ -408,103 +304,35 @@ export type Database = {
           },
         ]
       }
-      dental_chart_records: {
-        Row: {
-          bill_id: string | null
-          created_at: string | null
-          dependant_id: string | null
-          id: string
-          member_id: string
-          notes: string | null
-          service_id: string
-          tooth_number: string
-          treated_at: string | null
-          treated_by: string | null
-        }
-        Insert: {
-          bill_id?: string | null
-          created_at?: string | null
-          dependant_id?: string | null
-          id?: string
-          member_id: string
-          notes?: string | null
-          service_id: string
-          tooth_number: string
-          treated_at?: string | null
-          treated_by?: string | null
-        }
-        Update: {
-          bill_id?: string | null
-          created_at?: string | null
-          dependant_id?: string | null
-          id?: string
-          member_id?: string
-          notes?: string | null
-          service_id?: string
-          tooth_number?: string
-          treated_at?: string | null
-          treated_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "dental_chart_records_bill_id_fkey"
-            columns: ["bill_id"]
-            isOneToOne: false
-            referencedRelation: "bills"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "dental_chart_records_dependant_id_fkey"
-            columns: ["dependant_id"]
-            isOneToOne: false
-            referencedRelation: "dependants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "dental_chart_records_member_id_fkey"
-            columns: ["member_id"]
-            isOneToOne: false
-            referencedRelation: "members"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "dental_chart_records_service_id_fkey"
-            columns: ["service_id"]
-            isOneToOne: false
-            referencedRelation: "services"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       dental_records: {
         Row: {
-          created_at: string | null
+          created_at: string
           id: string
           member_id: string
           notes: string | null
           status: string
           tooth_number: number
-          updated_at: string | null
+          updated_at: string
           visit_id: string | null
         }
         Insert: {
-          created_at?: string | null
+          created_at?: string
           id?: string
           member_id: string
           notes?: string | null
           status: string
           tooth_number: number
-          updated_at?: string | null
+          updated_at?: string
           visit_id?: string | null
         }
         Update: {
-          created_at?: string | null
+          created_at?: string
           id?: string
           member_id?: string
           notes?: string | null
           status?: string
           tooth_number?: number
-          updated_at?: string | null
+          updated_at?: string
           visit_id?: string | null
         }
         Relationships: [
@@ -526,43 +354,31 @@ export type Database = {
       }
       dependants: {
         Row: {
-          created_at: string | null
+          created_at: string
           dob: string
-          document_number: string | null
-          document_type: string | null
           full_name: string
           id: string
-          id_number: string | null
-          is_active: boolean | null
+          identification_number: string
           member_id: string
-          relationship: string | null
-          updated_at: string | null
+          relationship: string
         }
         Insert: {
-          created_at?: string | null
+          created_at?: string
           dob: string
-          document_number?: string | null
-          document_type?: string | null
           full_name: string
           id?: string
-          id_number?: string | null
-          is_active?: boolean | null
+          identification_number: string
           member_id: string
-          relationship?: string | null
-          updated_at?: string | null
+          relationship: string
         }
         Update: {
-          created_at?: string | null
+          created_at?: string
           dob?: string
-          document_number?: string | null
-          document_type?: string | null
           full_name?: string
           id?: string
-          id_number?: string | null
-          is_active?: boolean | null
+          identification_number?: string
           member_id?: string
-          relationship?: string | null
-          updated_at?: string | null
+          relationship?: string
         }
         Relationships: [
           {
@@ -574,369 +390,46 @@ export type Database = {
           },
         ]
       }
-      doctors: {
-        Row: {
-          branch_id: string | null
-          created_at: string | null
-          email: string
-          full_name: string
-          id: string
-          is_active: boolean | null
-          phone: string | null
-          specialization: string | null
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          branch_id?: string | null
-          created_at?: string | null
-          email: string
-          full_name: string
-          id?: string
-          is_active?: boolean | null
-          phone?: string | null
-          specialization?: string | null
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          branch_id?: string | null
-          created_at?: string | null
-          email?: string
-          full_name?: string
-          id?: string
-          is_active?: boolean | null
-          phone?: string | null
-          specialization?: string | null
-          updated_at?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "doctors_branch_id_fkey"
-            columns: ["branch_id"]
-            isOneToOne: false
-            referencedRelation: "branches"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      marketer_claims: {
-        Row: {
-          amount: number
-          created_at: string | null
-          id: string
-          marketer_id: string
-          notes: string | null
-          paid_at: string | null
-          paid_by: string | null
-          referral_count: number
-          status: string
-        }
-        Insert: {
-          amount: number
-          created_at?: string | null
-          id?: string
-          marketer_id: string
-          notes?: string | null
-          paid_at?: string | null
-          paid_by?: string | null
-          referral_count: number
-          status?: string
-        }
-        Update: {
-          amount?: number
-          created_at?: string | null
-          id?: string
-          marketer_id?: string
-          notes?: string | null
-          paid_at?: string | null
-          paid_by?: string | null
-          referral_count?: number
-          status?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "marketer_claims_marketer_id_fkey"
-            columns: ["marketer_id"]
-            isOneToOne: false
-            referencedRelation: "marketers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "marketer_claims_paid_by_fkey"
-            columns: ["paid_by"]
-            isOneToOne: false
-            referencedRelation: "staff"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      marketer_commission_config: {
-        Row: {
-          commission_per_referral: number
-          id: string
-          updated_at: string | null
-          updated_by: string | null
-        }
-        Insert: {
-          commission_per_referral?: number
-          id?: string
-          updated_at?: string | null
-          updated_by?: string | null
-        }
-        Update: {
-          commission_per_referral?: number
-          id?: string
-          updated_at?: string | null
-          updated_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "marketer_commission_config_updated_by_fkey"
-            columns: ["updated_by"]
-            isOneToOne: false
-            referencedRelation: "staff"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      marketer_commissions: {
-        Row: {
-          amount: number
-          claimed_at: string | null
-          created_at: string | null
-          id: string
-          marketer_id: string
-          member_id: string
-          notes: string | null
-          paid_at: string | null
-          paid_by: string | null
-          status: string
-          updated_at: string | null
-        }
-        Insert: {
-          amount: number
-          claimed_at?: string | null
-          created_at?: string | null
-          id?: string
-          marketer_id: string
-          member_id: string
-          notes?: string | null
-          paid_at?: string | null
-          paid_by?: string | null
-          status?: string
-          updated_at?: string | null
-        }
-        Update: {
-          amount?: number
-          claimed_at?: string | null
-          created_at?: string | null
-          id?: string
-          marketer_id?: string
-          member_id?: string
-          notes?: string | null
-          paid_at?: string | null
-          paid_by?: string | null
-          status?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "marketer_commissions_marketer_id_fkey"
-            columns: ["marketer_id"]
-            isOneToOne: false
-            referencedRelation: "marketers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "marketer_commissions_member_id_fkey"
-            columns: ["member_id"]
-            isOneToOne: false
-            referencedRelation: "members"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "marketer_commissions_paid_by_fkey"
-            columns: ["paid_by"]
-            isOneToOne: false
-            referencedRelation: "staff"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      marketer_earnings: {
-        Row: {
-          amount: number
-          created_at: string | null
-          id: string
-          marketer_id: string
-          member_id: string
-          paid_at: string | null
-          payment_id: string | null
-          status: string | null
-        }
-        Insert: {
-          amount: number
-          created_at?: string | null
-          id?: string
-          marketer_id: string
-          member_id: string
-          paid_at?: string | null
-          payment_id?: string | null
-          status?: string | null
-        }
-        Update: {
-          amount?: number
-          created_at?: string | null
-          id?: string
-          marketer_id?: string
-          member_id?: string
-          paid_at?: string | null
-          payment_id?: string | null
-          status?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "marketer_earnings_marketer_id_fkey"
-            columns: ["marketer_id"]
-            isOneToOne: false
-            referencedRelation: "marketers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "marketer_earnings_member_id_fkey"
-            columns: ["member_id"]
-            isOneToOne: false
-            referencedRelation: "members"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "marketer_earnings_payment_id_fkey"
-            columns: ["payment_id"]
-            isOneToOne: false
-            referencedRelation: "payments"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       marketers: {
         Row: {
           code: string
-          commission_type: string
-          commission_value: number
-          created_at: string | null
+          created_at: string
           email: string
           full_name: string
           id: string
           is_active: boolean | null
-          marketer_code: string
           phone: string | null
-          updated_at: string | null
+          total_earnings: number | null
           user_id: string
         }
         Insert: {
           code: string
-          commission_type?: string
-          commission_value?: number
-          created_at?: string | null
+          created_at?: string
           email: string
           full_name: string
           id?: string
           is_active?: boolean | null
-          marketer_code?: string
           phone?: string | null
-          updated_at?: string | null
+          total_earnings?: number | null
           user_id: string
         }
         Update: {
           code?: string
-          commission_type?: string
-          commission_value?: number
-          created_at?: string | null
+          created_at?: string
           email?: string
           full_name?: string
           id?: string
           is_active?: boolean | null
-          marketer_code?: string
           phone?: string | null
-          updated_at?: string | null
+          total_earnings?: number | null
           user_id?: string
-        }
-        Relationships: []
-      }
-      member_visits: {
-        Row: {
-          biometric_verified: boolean | null
-          biometric_verified_at: string | null
-          branch_id: string
-          check_in_time: string | null
-          check_out_time: string | null
-          created_at: string | null
-          dependant_id: string | null
-          doctor_id: string | null
-          id: string
-          member_id: string
-          notes: string | null
-          receptionist_id: string | null
-          status: string
-          updated_at: string | null
-          visit_date: string
-        }
-        Insert: {
-          biometric_verified?: boolean | null
-          biometric_verified_at?: string | null
-          branch_id: string
-          check_in_time?: string | null
-          check_out_time?: string | null
-          created_at?: string | null
-          dependant_id?: string | null
-          doctor_id?: string | null
-          id?: string
-          member_id: string
-          notes?: string | null
-          receptionist_id?: string | null
-          status?: string
-          updated_at?: string | null
-          visit_date?: string
-        }
-        Update: {
-          biometric_verified?: boolean | null
-          biometric_verified_at?: string | null
-          branch_id?: string
-          check_in_time?: string | null
-          check_out_time?: string | null
-          created_at?: string | null
-          dependant_id?: string | null
-          doctor_id?: string | null
-          id?: string
-          member_id?: string
-          notes?: string | null
-          receptionist_id?: string | null
-          status?: string
-          updated_at?: string | null
-          visit_date?: string
         }
         Relationships: [
           {
-            foreignKeyName: "member_visits_branch_id_fkey"
-            columns: ["branch_id"]
-            isOneToOne: false
-            referencedRelation: "branches"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "member_visits_dependant_id_fkey"
-            columns: ["dependant_id"]
-            isOneToOne: false
-            referencedRelation: "dependants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "member_visits_member_id_fkey"
-            columns: ["member_id"]
-            isOneToOne: false
-            referencedRelation: "members"
+            foreignKeyName: "marketers_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -949,24 +442,19 @@ export type Database = {
           branch_id: string | null
           coverage_balance: number | null
           created_at: string
-          data_consent: boolean | null
-          digital_signature: string | null
           email: string
           full_name: string
           id: string
           id_number: string
           is_active: boolean | null
-          marketer_code: string | null
-          marketer_id: string | null
           member_number: string
           membership_category_id: string | null
+          marketer_id: string | null
           next_of_kin_name: string | null
           next_of_kin_phone: string | null
           phone: string
-          qr_code_data: string | null
           rollover_balance: number | null
           rollover_years: number | null
-          scheme_selected: boolean | null
           total_contributions: number | null
           updated_at: string
           user_id: string
@@ -978,24 +466,19 @@ export type Database = {
           branch_id?: string | null
           coverage_balance?: number | null
           created_at?: string
-          data_consent?: boolean | null
-          digital_signature?: string | null
           email: string
           full_name: string
           id?: string
           id_number: string
           is_active?: boolean | null
-          marketer_code?: string | null
-          marketer_id?: string | null
           member_number: string
           membership_category_id?: string | null
+          marketer_id?: string | null
           next_of_kin_name?: string | null
           next_of_kin_phone?: string | null
           phone: string
-          qr_code_data?: string | null
           rollover_balance?: number | null
           rollover_years?: number | null
-          scheme_selected?: boolean | null
           total_contributions?: number | null
           updated_at?: string
           user_id: string
@@ -1007,24 +490,19 @@ export type Database = {
           branch_id?: string | null
           coverage_balance?: number | null
           created_at?: string
-          data_consent?: boolean | null
-          digital_signature?: string | null
           email?: string
           full_name?: string
           id?: string
           id_number?: string
           is_active?: boolean | null
-          marketer_code?: string | null
-          marketer_id?: string | null
           member_number?: string
           membership_category_id?: string | null
+          marketer_id?: string | null
           next_of_kin_name?: string | null
           next_of_kin_phone?: string | null
           phone?: string
-          qr_code_data?: string | null
           rollover_balance?: number | null
           rollover_years?: number | null
-          scheme_selected?: boolean | null
           total_contributions?: number | null
           updated_at?: string
           user_id?: string
@@ -1049,6 +527,13 @@ export type Database = {
             columns: ["membership_category_id"]
             isOneToOne: false
             referencedRelation: "membership_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -1132,111 +617,6 @@ export type Database = {
             columns: ["member_id"]
             isOneToOne: false
             referencedRelation: "members"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      receptionists: {
-        Row: {
-          branch_id: string | null
-          created_at: string | null
-          email: string
-          full_name: string
-          id: string
-          is_active: boolean | null
-          phone: string | null
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          branch_id?: string | null
-          created_at?: string | null
-          email: string
-          full_name: string
-          id?: string
-          is_active?: boolean | null
-          phone?: string | null
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          branch_id?: string | null
-          created_at?: string | null
-          email?: string
-          full_name?: string
-          id?: string
-          is_active?: boolean | null
-          phone?: string | null
-          updated_at?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "receptionists_branch_id_fkey"
-            columns: ["branch_id"]
-            isOneToOne: false
-            referencedRelation: "branches"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      revenue_claims: {
-        Row: {
-          amount: number
-          branch_id: string
-          created_at: string | null
-          director_id: string
-          id: string
-          notes: string | null
-          paid_at: string | null
-          paid_by: string | null
-          status: string
-          updated_at: string | null
-        }
-        Insert: {
-          amount: number
-          branch_id: string
-          created_at?: string | null
-          director_id: string
-          id?: string
-          notes?: string | null
-          paid_at?: string | null
-          paid_by?: string | null
-          status?: string
-          updated_at?: string | null
-        }
-        Update: {
-          amount?: number
-          branch_id?: string
-          created_at?: string | null
-          director_id?: string
-          id?: string
-          notes?: string | null
-          paid_at?: string | null
-          paid_by?: string | null
-          status?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "revenue_claims_branch_id_fkey"
-            columns: ["branch_id"]
-            isOneToOne: false
-            referencedRelation: "branches"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "revenue_claims_director_id_fkey"
-            columns: ["director_id"]
-            isOneToOne: false
-            referencedRelation: "staff"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "revenue_claims_paid_by_fkey"
-            columns: ["paid_by"]
-            isOneToOne: false
-            referencedRelation: "staff"
             referencedColumns: ["id"]
           },
         ]
@@ -1358,39 +738,11 @@ export type Database = {
             referencedRelation: "branches"
             referencedColumns: ["id"]
           },
-        ]
-      }
-      system_settings: {
-        Row: {
-          description: string | null
-          id: string
-          key: string
-          updated_at: string | null
-          updated_by: string | null
-          value: string
-        }
-        Insert: {
-          description?: string | null
-          id?: string
-          key: string
-          updated_at?: string | null
-          updated_by?: string | null
-          value: string
-        }
-        Update: {
-          description?: string | null
-          id?: string
-          key?: string
-          updated_at?: string | null
-          updated_by?: string | null
-          value?: string
-        }
-        Relationships: [
           {
-            foreignKeyName: "system_settings_updated_by_fkey"
-            columns: ["updated_by"]
-            isOneToOne: false
-            referencedRelation: "staff"
+            foreignKeyName: "staff_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -1427,11 +779,10 @@ export type Database = {
           notes: string | null
           profit_loss: number
           receptionist_id: string | null
-          service_id: string | null
+          service_id: string
           staff_id: string | null
-          status: string
+          status: string | null
           treatment_notes: string | null
-          updated_at: string | null
         }
         Insert: {
           benefit_deducted: number
@@ -1446,11 +797,10 @@ export type Database = {
           notes?: string | null
           profit_loss: number
           receptionist_id?: string | null
-          service_id?: string | null
+          service_id: string
           staff_id?: string | null
-          status?: string
+          status?: string | null
           treatment_notes?: string | null
-          updated_at?: string | null
         }
         Update: {
           benefit_deducted?: number
@@ -1465,11 +815,10 @@ export type Database = {
           notes?: string | null
           profit_loss?: number
           receptionist_id?: string | null
-          service_id?: string | null
+          service_id?: string
           staff_id?: string | null
-          status?: string
+          status?: string | null
           treatment_notes?: string | null
-          updated_at?: string | null
         }
         Relationships: [
           {
@@ -1539,14 +888,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role:
-        | "admin"
-        | "staff"
-        | "member"
-        | "receptionist"
-        | "doctor"
-        | "branch_director"
-        | "marketer"
+      app_role: "admin" | "staff" | "member" | "receptionist" | "doctor" | "branch_director" | "marketer"
       approval_type: "all_branches" | "pre_approved_only"
       claim_status: "pending" | "approved" | "rejected" | "completed"
       membership_level:
@@ -1684,15 +1026,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: [
-        "admin",
-        "staff",
-        "member",
-        "receptionist",
-        "doctor",
-        "branch_director",
-        "marketer",
-      ],
+      app_role: ["admin", "staff", "member", "receptionist", "doctor", "branch_director", "marketer"],
       approval_type: ["all_branches", "pre_approved_only"],
       claim_status: ["pending", "approved", "rejected", "completed"],
       membership_level: [

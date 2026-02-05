@@ -1,16 +1,15 @@
 import { useLocation, useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
 import {
   Users,
   Building2,
   UserCog,
+  FileText, // Removed for claims
   Stethoscope,
   LayoutDashboard,
   LogOut,
   Settings,
   History,
   DollarSign,
-  ClipboardList,
 } from "lucide-react";
 import {
   Sidebar,
@@ -33,16 +32,11 @@ const menuItems = [
   { title: "Members", url: "/admin/members", icon: Users },
   { title: "Branches", url: "/admin/branches", icon: Building2 },
   { title: "Staff", url: "/admin/staff", icon: UserCog },
+  // { title: "Claims", url: "/admin/claims", icon: FileText }, // Removed
   { title: "Visits", url: "/admin/visits", icon: History },
   { title: "Services", url: "/admin/services", icon: Stethoscope },
   { title: "Branch Payments", url: "/admin/branch-payments", icon: DollarSign },
-  { title: "Marketer Claims", url: "/admin/marketer-claims", icon: ClipboardList },
-];
-
-const settingsMenuItems = [
-  { title: "General Settings", url: "/admin/settings", icon: Settings },
-  { title: "Membership Categories", url: "/admin/membership-categories", icon: Users },
-  { title: "Commission Rates", url: "/admin/commission-settings", icon: DollarSign },
+  { title: "Settings", url: "/admin/settings", icon: Settings },
 ];
 
 export function AdminSidebar() {
@@ -50,39 +44,6 @@ export function AdminSidebar() {
   const collapsed = state === "collapsed";
   const location = useLocation();
   const navigate = useNavigate();
-  const [pendingClaimsCount, setPendingClaimsCount] = useState(0);
-
-  useEffect(() => {
-    const fetchPendingClaims = async () => {
-      const { count } = await (supabase as any)
-        .from('marketer_claims')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
-      setPendingClaimsCount(count || 0);
-    };
-
-    fetchPendingClaims();
-
-    // Subscribe to changes for realtime updates
-    const channel = supabase
-      .channel('schema-db-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'marketer_claims'
-        },
-        () => {
-          fetchPendingClaims();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
 
   const isActive = (path: string) => {
     if (path === "/admin") {
@@ -126,42 +87,8 @@ export function AdminSidebar() {
                   <a
                     href={item.url}
                     onClick={(e) => {
-                      e.preventDefault();
-                      navigate(item.url);
-                    }}
-                    className="flex items-center gap-3 justify-between"
-                  >
-                    <div className="flex items-center gap-3">
-                      <item.icon className="h-5 w-5" />
-                      <span>{item.title}</span>
-                    </div>
-                    {item.title === "Marketer Claims" && pendingClaimsCount > 0 && (
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white">
-                        {pendingClaimsCount}
-                      </span>
-                    )}
-                  </a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
-        </SidebarGroup>
-
-        <SidebarGroup>
-          <SidebarGroupLabel>Configuration</SidebarGroupLabel>
-          <SidebarMenu>
-            {settingsMenuItems.map((item) => (
-              <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isActive(item.url)}
-                  tooltip={item.title}
-                >
-                  <a
-                    href={item.url}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      navigate(item.url);
+                        e.preventDefault();
+                        navigate(item.url);
                     }}
                     className="flex items-center gap-3"
                   >

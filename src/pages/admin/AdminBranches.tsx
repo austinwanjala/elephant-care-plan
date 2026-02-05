@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { AdminLayout } from "@/components/admin/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -26,9 +27,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, Edit, Trash2, CheckCircle, XCircle, Download } from "lucide-react";
+import { Plus, MoreHorizontal, Edit, Trash2, CheckCircle, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { exportToCsv } from "@/utils/csvExport";
 
 interface Branch {
   id: string;
@@ -37,7 +37,7 @@ interface Branch {
   phone: string | null;
   email: string | null;
   is_active: boolean;
-  is_globally_preapproved_for_services: boolean | null;
+  is_globally_preapproved_for_services: boolean | null; // Added this field
 }
 
 interface BranchRevenue {
@@ -57,7 +57,7 @@ export default function AdminBranches() {
     location: "",
     phone: "",
     email: "",
-    isGloballyPreapprovedForServices: false,
+    isGloballyPreapprovedForServices: false, // Added to form data
   });
   const { toast } = useToast();
 
@@ -92,7 +92,7 @@ export default function AdminBranches() {
         location: formData.location,
         phone: formData.phone || null,
         email: formData.email || null,
-        is_globally_preapproved_for_services: formData.isGloballyPreapprovedForServices,
+        is_globally_preapproved_for_services: formData.isGloballyPreapprovedForServices, // Save new field
       });
 
       if (error) throw error;
@@ -117,7 +117,7 @@ export default function AdminBranches() {
           location: formData.location,
           phone: formData.phone || null,
           email: formData.email || null,
-          is_globally_preapproved_for_services: formData.isGloballyPreapprovedForServices,
+          is_globally_preapproved_for_services: formData.isGloballyPreapprovedForServices, // Update new field
         })
         .eq("id", selectedBranch.id);
 
@@ -166,7 +166,7 @@ export default function AdminBranches() {
       location: branch.location,
       phone: branch.phone || "",
       email: branch.email || "",
-      isGloballyPreapprovedForServices: branch.is_globally_preapproved_for_services || false,
+      isGloballyPreapprovedForServices: branch.is_globally_preapproved_for_services || false, // Populate new field
     });
     setEditDialogOpen(true);
   };
@@ -175,32 +175,14 @@ export default function AdminBranches() {
     setFormData({ name: "", location: "", phone: "", email: "", isGloballyPreapprovedForServices: false });
   };
 
-  const handleExport = () => {
-    const dataToExport = branches.map(b => ({
-      "Branch Name": b.name,
-      "Location": b.location,
-      "Phone": b.phone || "",
-      "Email": b.email || "",
-      "Revenue": revenue[b.id]?.total_compensation || 0,
-      "Visits": revenue[b.id]?.visit_count || 0,
-      "Status": b.is_active ? "Active" : "Inactive",
-      "Global Pre-approval": b.is_globally_preapproved_for_services ? "Yes" : "No"
-    }));
-    exportToCsv("branches_export.csv", dataToExport);
-  };
-
   return (
-    <div className="space-y-6">
-
-      <div className="flex flex-col sm:flex-row justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-serif font-bold text-foreground">Branches</h1>
-          <p className="text-muted-foreground">Manage hospital branches and locations</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleExport}>
-            <Download className="mr-2 h-4 w-4" /> Export CSV
-          </Button>
+    <AdminLayout>
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-serif font-bold text-foreground">Branches</h1>
+            <p className="text-muted-foreground">Manage hospital branches and locations</p>
+          </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button className="btn-primary">
@@ -261,126 +243,126 @@ export default function AdminBranches() {
             </DialogContent>
           </Dialog>
         </div>
-      </div>
 
-      <div className="card-elevated overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Revenue</TableHead>
-                <TableHead>Visits</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Global Pre-approval</TableHead>
-                <TableHead></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {branches.map((branch) => (
-                <TableRow key={branch.id}>
-                  <TableCell className="font-medium">{branch.name}</TableCell>
-                  <TableCell>{branch.location}</TableCell>
-                  <TableCell>{branch.phone || "N/A"}</TableCell>
-                  <TableCell>{branch.email || "N/A"}</TableCell>
-                  <TableCell className="text-success">
-                    KES {(revenue[branch.id]?.total_compensation || 0).toLocaleString()}
-                  </TableCell>
-                  <TableCell>{revenue[branch.id]?.visit_count || 0}</TableCell>
-                  <TableCell>
-                    <Switch
-                      checked={branch.is_active}
-                      onCheckedChange={() => handleToggleActive(branch)}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    {branch.is_globally_preapproved_for_services ? (
-                      <CheckCircle className="h-5 w-5 text-success" />
-                    ) : (
-                      <XCircle className="h-5 w-5 text-muted-foreground" />
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => openEditDialog(branch)}>
-                          <Edit className="mr-2 h-4 w-4" /> Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive"
-                          onClick={() => handleDeleteBranch(branch.id)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" /> Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+        <div className="card-elevated overflow-hidden">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Location</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Revenue</TableHead>
+                  <TableHead>Visits</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Global Pre-approval</TableHead> {/* New column */}
+                  <TableHead></TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
-
-      {/* Edit Dialog */}
-      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="font-serif">Edit Branch</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label>Branch Name</Label>
-              <Input
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Location</Label>
-              <Input
-                value={formData.location}
-                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Phone</Label>
-              <Input
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              />
-            </div>
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="globally-preapproved-edit"
-                checked={formData.isGloballyPreapprovedForServices}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, isGloballyPreapprovedForServices: checked })
-                }
-              />
-              <Label htmlFor="globally-preapproved-edit">Globally Pre-approved for Services</Label>
-            </div>
-            <Button onClick={handleEditBranch} className="btn-primary">
-              Update Branch
-            </Button>
+              </TableHeader>
+              <TableBody>
+                {branches.map((branch) => (
+                  <TableRow key={branch.id}>
+                    <TableCell className="font-medium">{branch.name}</TableCell>
+                    <TableCell>{branch.location}</TableCell>
+                    <TableCell>{branch.phone || "N/A"}</TableCell>
+                    <TableCell>{branch.email || "N/A"}</TableCell>
+                    <TableCell className="text-success">
+                      KES {(revenue[branch.id]?.total_compensation || 0).toLocaleString()}
+                    </TableCell>
+                    <TableCell>{revenue[branch.id]?.visit_count || 0}</TableCell>
+                    <TableCell>
+                      <Switch
+                        checked={branch.is_active}
+                        onCheckedChange={() => handleToggleActive(branch)}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {branch.is_globally_preapproved_for_services ? (
+                        <CheckCircle className="h-5 w-5 text-success" />
+                      ) : (
+                        <XCircle className="h-5 w-5 text-muted-foreground" />
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openEditDialog(branch)}>
+                            <Edit className="mr-2 h-4 w-4" /> Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => handleDeleteBranch(branch.id)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
-        </DialogContent>
-      </Dialog>
-    </div>
+        </div>
+
+        {/* Edit Dialog */}
+        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="font-serif">Edit Branch</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label>Branch Name</Label>
+                <Input
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Location</Label>
+                <Input
+                  value={formData.location}
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Phone</Label>
+                <Input
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                />
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="globally-preapproved-edit"
+                  checked={formData.isGloballyPreapprovedForServices}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, isGloballyPreapprovedForServices: checked })
+                  }
+                />
+                <Label htmlFor="globally-preapproved-edit">Globally Pre-approved for Services</Label>
+              </div>
+              <Button onClick={handleEditBranch} className="btn-primary">
+                Update Branch
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </AdminLayout>
   );
 }

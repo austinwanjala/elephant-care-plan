@@ -1,5 +1,4 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { useState, useEffect } from "react";
 import { useSidebar, Sidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Users, DollarSign, Link2, LogOut, LayoutDashboard, Megaphone } from "lucide-react";
@@ -28,52 +27,6 @@ export function MarketerSidebar() {
         return location.pathname.startsWith(path);
     }
 
-    const [claimableAmount, setClaimableAmount] = useState(0);
-
-    useEffect(() => {
-        const fetchEarnings = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
-
-            const { data: marketer } = await supabase
-                .from("marketers")
-                .select("id")
-                .eq("user_id", user.id)
-                .maybeSingle();
-
-            if (!marketer) return;
-
-            const { data: config } = await (supabase as any)
-                .from("marketer_commission_config")
-                .select("commission_per_referral")
-                .order("updated_at", { ascending: false })
-                .limit(1)
-                .maybeSingle();
-
-            const rate = config?.commission_per_referral || 0;
-
-            const { count: activeCount } = await supabase
-                .from("members")
-                .select("*", { count: 'exact', head: true })
-                .eq("marketer_id", marketer.id)
-                .eq("is_active", true);
-
-            const { data: claims } = await (supabase as any)
-                .from("marketer_claims")
-                .select("amount, status")
-                .eq("marketer_id", marketer.id);
-
-            const totalPaid = claims?.filter((c: any) => c.status === 'paid').reduce((sum: number, c: any) => sum + c.amount, 0) || 0;
-            const pending = claims?.filter((c: any) => c.status === 'pending').reduce((sum: number, c: any) => sum + c.amount, 0) || 0;
-
-            const earnings = (activeCount || 0) * rate;
-            const claimable = Math.max(0, earnings - totalPaid - pending);
-            setClaimableAmount(claimable);
-        };
-
-        fetchEarnings();
-    }, []);
-
     return (
         <Sidebar collapsible="icon" className="border-r border-border">
             <SidebarHeader className="p-4 border-b border-border">
@@ -100,17 +53,10 @@ export function MarketerSidebar() {
                                     <a
                                         href={item.url}
                                         onClick={(e) => { e.preventDefault(); navigate(item.url); }}
-                                        className="flex items-center gap-3 justify-between"
+                                        className="flex items-center gap-3"
                                     >
-                                        <div className="flex items-center gap-3">
-                                            <item.icon className="h-5 w-5" />
-                                            <span>{item.title}</span>
-                                        </div>
-                                        {item.title === "Earnings" && claimableAmount > 0 && (
-                                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-600 text-[10px] font-bold text-white">
-                                                $
-                                            </span>
-                                        )}
+                                        <item.icon className="h-5 w-5" />
+                                        <span>{item.title}</span>
                                     </a>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>

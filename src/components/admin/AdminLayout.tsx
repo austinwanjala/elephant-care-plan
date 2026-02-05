@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useState } from "react";
-import { useNavigate, Outlet } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AdminSidebar } from "./AdminSidebar";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 
 interface AdminLayoutProps {
-  children?: ReactNode; // Made optional as Outlet will be used for nested routes
+  children: ReactNode;
 }
 
 export function AdminLayout({ children }: AdminLayoutProps) {
@@ -21,30 +21,17 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   }, []);
 
   const checkAuth = async () => {
-    setLoading(true); // Ensure loading starts
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       navigate("/login");
-      setLoading(false); // IMPORTANT: Set loading to false here
       return;
     }
 
-    const { data: roleData, error: roleError } = await supabase
+    const { data: roleData } = await supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (roleError) {
-      toast({
-        title: "Error fetching role",
-        description: roleError.message,
-        variant: "destructive",
-      });
-      navigate("/"); // Redirect on error
-      setLoading(false);
-      return;
-    }
+      .maybeSingle(); // Changed from .single() to .maybeSingle()
 
     if (roleData?.role !== "admin") {
       toast({
@@ -52,8 +39,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         description: "You don't have admin privileges",
         variant: "destructive",
       });
-      navigate("/dashboard"); // Redirect to a non-admin dashboard or home
-      setLoading(false);
+      navigate("/dashboard");
       return;
     }
 
@@ -70,7 +56,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   }
 
   if (!authorized) {
-    return null; // Should have been redirected by checkAuth if not authorized
+    return null;
   }
 
   return (
@@ -82,7 +68,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             <SidebarTrigger className="mr-4" />
           </header>
           <main className="p-6">
-            {children || <Outlet />} {/* Render children or nested routes */}
+            {children}
           </main>
         </SidebarInset>
       </div>

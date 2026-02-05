@@ -219,7 +219,7 @@ export default function Consultation() {
                 benefit_deducted: 0,
                 branch_compensation: 0,
                 profit_loss: 0,
-                service_id: '00000000-0000-0000-0000-000000000000' // Placeholder, as services are now in bill_items
+                service_id: null // Set to null as services are now in bill_items
             }).eq("id", visitId);
 
             if (visitUpdateError) throw visitUpdateError;

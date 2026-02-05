@@ -172,25 +172,46 @@ const Register = () => {
         if (depError) console.error("Error adding dependants:", depError);
       }
 
-      // 3. Send Welcome SMS (Optional)
+      // 3. Generate and Send OTP for verification
+      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+      const { error: otpError } = await supabase
+        .from("otp_verifications")
+        .insert({
+          phone: formData.phone,
+          code: otpCode,
+          expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+        });
+
+      if (otpError) throw otpError;
+
+      // Send OTP via SMS and Email
       try {
-        await supabase.functions.invoke('send-sms', {
+        const { data: smsResponse, error: invokeError } = await supabase.functions.invoke('send-sms', {
           body: {
-            type: 'welcome',
+            type: 'otp',
             phone: formData.phone,
-            data: { name: formData.fullName }
+            email: formData.email,
+            data: { code: otpCode }
           }
         });
-      } catch (smsErr) {
-        console.error("Failed to send Welcome SMS:", smsErr);
+
+        if (invokeError) throw invokeError;
+
+        if (smsResponse && !smsResponse.sms?.success && !smsResponse.email?.success) {
+          console.warn("Notification delivery warning:", smsResponse);
+        }
+      } catch (smsErr: any) {
+        console.error("Failed to send OTP notification:", smsErr);
+        // Continue anyway - OTP is stored in database
       }
 
       toast({
-        title: "Registration Successful",
-        description: "Your account has been created. Please log in.",
+        title: "Verification Code Sent",
+        description: "Please check your phone and email for the 6-digit code.",
       });
 
-      navigate("/login");
+      navigate(`/verify-otp?phone=${encodeURIComponent(formData.phone)}&email=${encodeURIComponent(formData.email)}`);
     } catch (error: any) {
       toast({
         title: "Registration failed",

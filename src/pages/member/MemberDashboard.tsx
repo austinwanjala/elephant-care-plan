@@ -11,7 +11,7 @@ import {
   FileText,
   AlertCircle,
   DollarSign,
-  Users, // Added for dependants
+  Users,
 } from "lucide-react";
 import {
   Table,
@@ -35,7 +35,6 @@ interface Member {
   coverage_balance: number;
   total_contributions: number;
   benefit_limit: number;
-  qr_code_data: string | null;
   is_active: boolean;
   membership_categories: { name: string; benefit_amount: number } | null;
   id_number: string;
@@ -305,7 +304,6 @@ const MemberDashboard = () => {
               full_name: member.full_name,
               member_number: member.member_number,
               membership_categories: member.membership_categories,
-              qr_code_data: member.qr_code_data,
               is_active: member.is_active,
               coverage_balance: member.coverage_balance || 0,
               benefit_limit: member.benefit_limit || 0,
@@ -331,10 +329,10 @@ const MemberDashboard = () => {
                     dependants.map((dep, idx) => (
                       <div key={idx} className="flex justify-between items-center border-b pb-2 last:border-0 last:pb-0">
                         <div>
-                          <p className="font-medium">{dep.full_name}</p>
-                          <p className="text-xs text-muted-foreground">{dep.relationship}</p>
+                          <p className="font-medium">{dep.full_name || "Unknown Name"}</p>
+                          <p className="text-xs text-muted-foreground">{dep.relationship || "Dependant"}</p>
                         </div>
-                        <Badge variant="outline">{dep.identification_number}</Badge>
+                        <Badge variant="outline">{dep.identification_number || "N/A"}</Badge>
                       </div>
                     ))
                   )}

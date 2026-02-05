@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, ArrowLeft, Plus, Trash, Users, CalendarDays, CreditCard } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 
 interface Dependant {
   id: string;
@@ -241,19 +241,19 @@ const MemberDependants = () => {
                 <Card key={dep.id} className="flex items-center justify-between p-4">
                   <div className="flex items-center gap-4">
                     <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                      {dep.full_name.charAt(0)}
+                      {(dep.full_name || "?").charAt(0)}
                     </div>
                     <div>
-                      <p className="font-semibold">{dep.full_name}</p>
-                      <p className="text-sm text-muted-foreground">{dep.relationship}</p>
+                      <p className="font-semibold">{dep.full_name || "Unknown Name"}</p>
+                      <p className="text-sm text-muted-foreground">{dep.relationship || "Dependant"}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-sm text-muted-foreground flex items-center gap-1">
-                      <CalendarDays className="h-4 w-4" /> {dep.dob}
+                      <CalendarDays className="h-4 w-4" /> {dep.dob || "N/A"}
                     </div>
                     <div className="text-sm text-muted-foreground flex items-center gap-1">
-                      <CreditCard className="h-4 w-4" /> {dep.identification_number}
+                      <CreditCard className="h-4 w-4" /> {dep.identification_number || "N/A"}
                     </div>
                     <Button variant="ghost" size="icon" onClick={() => handleDeleteDependant(dep.id)}>
                       <Trash className="h-4 w-4 text-destructive" />

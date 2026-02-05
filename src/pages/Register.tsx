@@ -7,12 +7,27 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, ArrowLeft, Plus, Trash } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface Dependant {
   fullName: string;
   dob: string;
   idNumber: string; // Birth Cert or Student ID
   relationship: string;
+}
+
+interface Marketer {
+  id: string;
+  full_name: string;
+  code: string;
 }
 
 const Register = () => {
@@ -24,9 +39,12 @@ const Register = () => {
     email: "",
     password: "",
   });
+  const [referralSource, setReferralSource] = useState("");
   const [marketerCode, setMarketerCode] = useState("");
+  const [marketers, setMarketers] = useState<Marketer[]>([]);
   const [dependants, setDependants] = useState<Dependant[]>([]);
-  const [consent, setConsent] = useState(false);
+  const [consentToS, setConsentToS] = useState(false);
+  const [consentPrivacy, setConsentPrivacy] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
@@ -36,9 +54,24 @@ const Register = () => {
   useEffect(() => {
     const refCode = searchParams.get("ref");
     if (refCode) {
+      setReferralSource("Marketer");
       setMarketerCode(refCode);
     }
+    fetchMarketers();
   }, [searchParams]);
+
+  const fetchMarketers = async () => {
+    const { data, error } = await supabase
+      .from("marketers")
+      .select("id, full_name, code")
+      .eq("is_active", true);
+
+    if (error) {
+      console.error("Error fetching marketers:", error);
+    } else {
+      setMarketers(data || []);
+    }
+  };
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -66,8 +99,8 @@ const Register = () => {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!consent) {
-      toast({ title: "Please accept the data usage consent", variant: "destructive" });
+    if (!consentToS || !consentPrivacy) {
+      toast({ title: "Please accept the Terms of Service and Privacy Policy", variant: "destructive" });
       return;
     }
 
@@ -75,18 +108,21 @@ const Register = () => {
 
     try {
       // 1. Create auth user with all metadata for atomic setup
+      const userMetadata = {
+        role: 'member',
+        full_name: formData.fullName,
+        phone: formData.phone,
+        id_number: formData.idNumber,
+        age: formData.age,
+        marketer_code: referralSource === "Marketer" ? marketerCode : null,
+        referral_source: referralSource
+      };
+
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
-          data: {
-            role: 'member',
-            full_name: formData.fullName,
-            phone: formData.phone,
-            id_number: formData.idNumber,
-            age: formData.age,
-            marketer_code: marketerCode || null
-          }
+          data: userMetadata
         }
       });
 
@@ -251,15 +287,45 @@ const Register = () => {
                   minLength={6}
                 />
               </div>
+
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="marketerCode">Marketer Referral Code (Optional)</Label>
-                <Input
-                  id="marketerCode"
-                  placeholder="Enter code if referred by a marketer"
-                  value={marketerCode}
-                  onChange={(e) => setMarketerCode(e.target.value)}
-                />
+                <Label htmlFor="referralSource">How did you hear about us?</Label>
+                <Select value={referralSource} onValueChange={setReferralSource}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select an option" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Facebook">Facebook</SelectItem>
+                    <SelectItem value="Instagram">Instagram</SelectItem>
+                    <SelectItem value="Google">Google Search</SelectItem>
+                    <SelectItem value="Friend">Friend / Family</SelectItem>
+                    <SelectItem value="Marketer">Sales Agent / Marketer</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+
+              {referralSource === "Marketer" && (
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="marketerCode">Select Marketer</Label>
+                  <Select value={marketerCode} onValueChange={setMarketerCode}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Marketer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {marketers.length > 0 ? (
+                        marketers.map((m) => (
+                          <SelectItem key={m.id} value={m.code}>
+                            {m.full_name} ({m.code})
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="none" disabled>No active marketers found</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
             <div className="space-y-4 pt-4 border-t">
@@ -325,11 +391,19 @@ const Register = () => {
               ))}
             </div>
 
-            <div className="flex items-center space-x-2 pt-4">
-              <Checkbox id="consent" checked={consent} onCheckedChange={(checked) => setConsent(checked as boolean)} />
-              <Label htmlFor="consent" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                I agree to the data usage policy and use my name "{formData.fullName}" as a digital signature.
-              </Label>
+            <div className="space-y-3 pt-4 border-t">
+              <div className="flex items-center space-x-2">
+                <Checkbox id="consentToS" checked={consentToS} onCheckedChange={(checked) => setConsentToS(checked as boolean)} />
+                <Label htmlFor="consentToS" className="text-sm">
+                  I agree to the <Link to="/terms-of-service" className="text-primary hover:underline" target="_blank">Terms of Service</Link>.
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox id="consentPrivacy" checked={consentPrivacy} onCheckedChange={(checked) => setConsentPrivacy(checked as boolean)} />
+                <Label htmlFor="consentPrivacy" className="text-sm">
+                  I agree to the <Link to="/privacy-policy" className="text-primary hover:underline" target="_blank">Privacy Policy</Link>.
+                </Label>
+              </div>
             </div>
 
             <Button type="submit" className="w-full btn-primary" disabled={loading}>

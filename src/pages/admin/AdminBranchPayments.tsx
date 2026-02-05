@@ -57,7 +57,12 @@ export default function AdminBranchPayments() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      toast({ title: "Error", description: "Could not load claims.", variant: "destructive" });
+      console.error("Error loading claims:", error);
+      toast({
+        title: "Error loading claims",
+        description: error.message || "Unknown error occurred",
+        variant: "destructive"
+      });
     } else {
       setClaims(data || []);
     }

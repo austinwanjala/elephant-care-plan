@@ -115,6 +115,7 @@ const Register = () => {
           relationship: d.relationship || 'Dependant'
         }));
 
+<<<<<<< HEAD
         const { error: depError } = await supabase.from("dependants").insert(dependantsToInsert);
         if (depError) throw depError;
       }
@@ -122,9 +123,52 @@ const Register = () => {
       toast({
         title: "Registration successful!",
         description: "Please login to select your scheme and make payment.",
+=======
+        const { error: depError } = await supabase.from("dependants").insert(depsToInsert);
+        if (depError) console.error("Error adding dependants:", depError);
+      }
+
+      // 3. Generate and Send OTP for verification
+      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+      const { error: otpError } = await supabase
+        .from("otp_verifications")
+        .insert({
+          phone: formData.phone,
+          code: otpCode,
+          expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+        });
+
+      if (otpError) throw otpError;
+
+      // Send OTP via SMS and Email
+      try {
+        const { data: smsResponse, error: invokeError } = await supabase.functions.invoke('send-sms', {
+          body: {
+            type: 'otp',
+            phone: formData.phone,
+            email: formData.email,
+            data: { code: otpCode }
+          }
+        });
+
+        if (invokeError) throw invokeError;
+
+        if (smsResponse && !smsResponse.sms?.success && !smsResponse.email?.success) {
+          console.warn("Notification delivery warning:", smsResponse);
+        }
+      } catch (smsErr: any) {
+        console.error("Failed to send OTP notification:", smsErr);
+        // Continue anyway - OTP is stored in database
+      }
+
+      toast({
+        title: "Verification Code Sent",
+        description: "Please check your phone and email for the 6-digit code.",
+>>>>>>> 66d7c01f7c17203464da87c0e189b2a1f99f56bc
       });
 
-      navigate("/login");
+      navigate(`/verify-otp?phone=${encodeURIComponent(formData.phone)}&email=${encodeURIComponent(formData.email)}`);
     } catch (error: any) {
       toast({
         title: "Registration failed",

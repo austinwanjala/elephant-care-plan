@@ -577,6 +577,33 @@ export type Database = {
         }
         Relationships: []
       }
+      otp_verifications: {
+        Row: {
+          code: string
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          phone: string
+          verified_at: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          phone: string
+          verified_at?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          phone?: string
+          verified_at?: string | null
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount: number
@@ -772,6 +799,7 @@ export type Database = {
           branch_compensation: number
           branch_id: string
           created_at: string
+          dependant_id: string | null
           diagnosis: string | null
           doctor_id: string | null
           id: string
@@ -790,6 +818,7 @@ export type Database = {
           branch_compensation: number
           branch_id: string
           created_at?: string
+          dependant_id?: string | null
           diagnosis?: string | null
           doctor_id?: string | null
           id?: string
@@ -808,6 +837,7 @@ export type Database = {
           branch_compensation?: number
           branch_id?: string
           created_at?: string
+          dependant_id?: string | null
           diagnosis?: string | null
           doctor_id?: string | null
           id?: string
@@ -826,6 +856,13 @@ export type Database = {
             columns: ["branch_id"]
             isOneToOne: false
             referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visits_dependant_id_fkey"
+            columns: ["dependant_id"]
+            isOneToOne: false
+            referencedRelation: "dependants"
             referencedColumns: ["id"]
           },
           {
@@ -874,6 +911,15 @@ export type Database = {
       finalize_bill: {
         Args: { _bill_id: string; _receptionist_id: string }
         Returns: undefined
+      }
+      get_auth_user_branch_id: { Args: never; Returns: string }
+      get_branch_doctors: {
+        Args: { branch_id_input: string }
+        Returns: {
+          full_name: string
+          id: string
+          user_id: string
+        }[]
       }
       get_user_role: {
         Args: { _user_id: string }

@@ -116,6 +116,10 @@ serve(async (req) => {
 
         if (RESEND_API_KEY && email) {
             try {
+                // Use onboarding@resend.dev for testing, replace with verified domain in production
+                const fromEmail = 'Elephant Dental <onboarding@resend.dev>';
+                console.log(`[send-sms] Sending email to ${email} via Resend`);
+                
                 const res = await fetch('https://api.resend.com/emails', {
                     method: 'POST',
                     headers: {
@@ -123,7 +127,7 @@ serve(async (req) => {
                         'Authorization': `Bearer ${RESEND_API_KEY}`
                     },
                     body: JSON.stringify({
-                        from: 'Elephant Dental <notifications@elephantdental.co.ke>',
+                        from: fromEmail,
                         to: [email],
                         subject: subject,
                         html: `<p>${message}</p>`

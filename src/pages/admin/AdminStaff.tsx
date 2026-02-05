@@ -301,6 +301,6 @@ export default function AdminStaff() {
         </Table>
       </Card>
     </div>
-    </AdminLayout >
+
   );
 }

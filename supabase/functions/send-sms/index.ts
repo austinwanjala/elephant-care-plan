@@ -6,7 +6,7 @@ const corsHeaders = {
 };
 
 interface SmsPayload {
-    type: 'welcome' | 'payment_confirmation' | 'billing_completion' | 'low_balance' | 'payment_failed' | 'otp';
+    type: 'welcome' | 'payment_confirmation' | 'billing_completion' | 'low_balance' | 'payment_failed';
     phone: string;
     email?: string;
     data: any;
@@ -42,10 +42,6 @@ serve(async (req) => {
         let subject = "Elephant Dental Notification";
 
         switch (type) {
-            case 'otp':
-                message = `Your Elephant Dental verification code is: ${data.code}. Valid for 10 minutes.`;
-                subject = "Your Verification Code";
-                break;
             case 'welcome':
                 message = `Hello ${data.name}, welcome to Elephant Dental. Your account has been created successfully. Please log in to choose your scheme and complete payment.`;
                 subject = "Welcome to Elephant Dental";
@@ -81,8 +77,6 @@ serve(async (req) => {
                     ? 'https://api.sandbox.africastalking.com/version1/messaging'
                     : 'https://api.africastalking.com/version1/messaging';
 
-                console.log(`[send-sms] Using Africa's Talking Env: ${isSandbox ? 'SANDBOX' : 'LIVE'}`);
-
                 const response = await fetch(atUrl, {
                     method: 'POST',
                     headers: {
@@ -94,14 +88,13 @@ serve(async (req) => {
                 });
 
                 const result = await response.json();
-                console.log("[send-sms] Africa's Talking Response:", result);
                 smsResult = { success: true, ...result };
             } catch (err) {
                 console.error("[send-sms] SMS Provider Error:", err);
             }
         }
 
-        // 2. Try Email via Resend (if email provided and key exists)
+        // 2. Try Email via Resend
         const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
         let emailResult = { success: false, message: "Provider not configured or no email provided" };
 
@@ -121,7 +114,6 @@ serve(async (req) => {
                     })
                 });
                 const result = await res.json();
-                console.log("[send-sms] Resend Response:", result);
                 emailResult = { success: true, ...result };
             } catch (err) {
                 console.error("[send-sms] Email Provider Error:", err);

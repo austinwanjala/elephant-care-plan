@@ -4,22 +4,27 @@ import {
   Users,
   CreditCard,
   Shield,
-  Building2,
   TrendingUp,
   TrendingDown,
-  DollarSign,
   ArrowUpRight,
   ArrowDownRight,
   Calendar,
-  AlertCircle,
   CheckCircle,
-  Activity
+  Activity,
+  Loader2
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   LineChart,
   Line,
@@ -28,10 +33,9 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  BarChart,
-  Bar,
   Legend
 } from "recharts";
+import { format, startOfMonth, endOfMonth, subMonths, getMonth, getYear } from "date-fns";
 
 interface Stats {
   totalMembers: number;
@@ -39,23 +43,15 @@ interface Stats {
   totalContributions: number;
   totalCoverage: number;
   totalVisits: number;
-  totalBranches: number;
   totalRevenue: number;
   totalProfitLoss: number;
-  totalMarketers: number;
-  newMembersThisMonth: number;
+  newMembersInPeriod: number;
 }
 
 interface CategoryDistribution {
   name: string;
   count: number;
   color: string;
-}
-
-interface ChartData {
-  month: string;
-  revenue: number;
-  visits: number;
 }
 
 const categoryColors = [
@@ -68,59 +64,72 @@ const categoryColors = [
 ];
 
 export default function AdminDashboard() {
+  const [loading, setLoading] = useState(true);
+  const [filterPeriod, setFilterPeriod] = useState<string>("all"); // "all" or "YYYY-MM"
   const [stats, setStats] = useState<Stats>({
     totalMembers: 0,
     activeMembers: 0,
     totalContributions: 0,
     totalCoverage: 0,
     totalVisits: 0,
-    totalBranches: 0,
     totalRevenue: 0,
     totalProfitLoss: 0,
-    totalMarketers: 0,
-    newMembersThisMonth: 0,
+    newMembersInPeriod: 0,
   });
   const [categoryDistribution, setCategoryDistribution] = useState<CategoryDistribution[]>([]);
   const [recentMembers, setRecentMembers] = useState<any[]>([]);
-  const [chartData, setChartData] = useState<ChartData[]>([]);
+  const [chartData, setChartData] = useState<any[]>([]);
   const [pendingClaims, setPendingClaims] = useState<any[]>([]);
   const navigate = useNavigate();
 
   useEffect(() => {
-    loadStats();
-    loadRecentMembers();
-    loadChartData();
-    loadPendingClaims();
-  }, []);
+    loadDashboardData();
+  }, [filterPeriod]);
+
+  const loadDashboardData = async () => {
+    setLoading(true);
+    await Promise.all([
+      loadStats(),
+      loadRecentMembers(),
+      loadChartData(),
+      loadPendingClaims()
+    ]);
+    setLoading(false);
+  };
 
   const loadStats = async () => {
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
+    let membersQuery = supabase.from("members").select("coverage_balance, total_contributions, is_active, created_at");
+    let revenueQuery = supabase.from("branch_revenue").select("total_compensation, total_profit_loss, date");
+    let visitsQuery = supabase.from("visits").select("id, created_at");
 
-    const [membersRes, branchesRes, revenueRes, categoriesRes, visitsRes, marketersRes, newMembersRes] = await Promise.all([
-      supabase.from("members").select("coverage_balance, total_contributions, is_active"),
-      supabase.from("branches").select("id").eq("is_active", true),
-      supabase.from("branch_revenue").select("total_compensation, total_profit_loss"),
-      supabase.from("members").select("membership_category_id, membership_categories(name)"),
-      supabase.from("visits").select("id"),
-      supabase.from("marketers").select("id").eq("is_active", true),
-      supabase.from("members").select("id").gte("created_at", startOfMonth.toISOString()),
+    if (filterPeriod !== "all") {
+      const [year, month] = filterPeriod.split('-').map(Number);
+      const start = format(startOfMonth(new Date(year, month - 1)), "yyyy-MM-dd'T'HH:mm:ss");
+      const end = format(endOfMonth(new Date(year, month - 1)), "yyyy-MM-dd'T'HH:mm:ss");
+      
+      membersQuery = membersQuery.gte("created_at", start).lte("created_at", end);
+      revenueQuery = revenueQuery.gte("date", start.split('T')[0]).lte("date", end.split('T')[0]);
+      visitsQuery = visitsQuery.gte("created_at", start).lte("created_at", end);
+    }
+
+    const [membersRes, revenueRes, categoriesRes, visitsRes] = await Promise.all([
+      membersQuery,
+      revenueQuery,
+      supabase.from("members").select("membership_categories(name)"),
+      visitsQuery
     ]);
 
-    if (membersRes.data && branchesRes.data && visitsRes.data && marketersRes.data) {
+    if (membersRes.data) {
       const revenueData = revenueRes.data || [];
       setStats({
         totalMembers: membersRes.data.length,
         activeMembers: membersRes.data.filter(m => m.is_active).length,
         totalContributions: membersRes.data.reduce((sum, m) => sum + (m.total_contributions || 0), 0),
         totalCoverage: membersRes.data.reduce((sum, m) => sum + (m.coverage_balance || 0), 0),
-        totalVisits: visitsRes.data.length,
-        totalBranches: branchesRes.data.length,
+        totalVisits: visitsRes.data?.length || 0,
         totalRevenue: revenueData.reduce((sum, r) => sum + (r.total_compensation || 0), 0),
         totalProfitLoss: revenueData.reduce((sum, r) => sum + (r.total_profit_loss || 0), 0),
-        totalMarketers: marketersRes.data.length,
-        newMembersThisMonth: newMembersRes.data?.length || 0,
+        newMembersInPeriod: membersRes.data.length,
       });
     }
 
@@ -150,53 +159,42 @@ export default function AdminDashboard() {
   };
 
   const loadChartData = async () => {
-    // Fetch last 6 months of data
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
-    sixMonthsAgo.setDate(1); // Start of that month
+    const sixMonthsAgo = subMonths(new Date(), 5);
+    sixMonthsAgo.setDate(1);
 
-    // Fetch Revenue
     const { data: revenueData } = await supabase
       .from("branch_revenue")
       .select("date, total_compensation")
-      .gte("date", sixMonthsAgo.toISOString().split('T')[0]);
+      .gte("date", format(sixMonthsAgo, "yyyy-MM-dd"));
 
-    // Fetch Visits
     const { data: visitData } = await supabase
       .from("visits")
       .select("created_at")
       .gte("created_at", sixMonthsAgo.toISOString());
 
-    // Aggregate by Month
     const months: Record<string, { revenue: number; visits: number }> = {};
 
-    // Initialize last 6 months
     for (let i = 0; i < 6; i++) {
-      const d = new Date(sixMonthsAgo);
-      d.setMonth(d.getMonth() + i);
-      const key = d.toLocaleString('default', { month: 'short', year: '2-digit' }); // e.g., "Jan 24"
+      const d = subMonths(new Date(), 5 - i);
+      const key = format(d, "MMM yy");
       months[key] = { revenue: 0, visits: 0 };
     }
 
     revenueData?.forEach((r: any) => {
-      const date = new Date(r.date);
-      const key = date.toLocaleString('default', { month: 'short', year: '2-digit' });
+      const key = format(new Date(r.date), "MMM yy");
       if (months[key]) months[key].revenue += Number(r.total_compensation);
     });
 
     visitData?.forEach((v: any) => {
-      const date = new Date(v.created_at);
-      const key = date.toLocaleString('default', { month: 'short', year: '2-digit' });
+      const key = format(new Date(v.created_at), "MMM yy");
       if (months[key]) months[key].visits += 1;
     });
 
-    const formattedData = Object.entries(months).map(([month, data]) => ({
+    setChartData(Object.entries(months).map(([month, data]) => ({
       month,
       revenue: data.revenue,
       visits: data.visits
-    }));
-
-    setChartData(formattedData);
+    })));
   };
 
   const loadPendingClaims = async () => {
@@ -204,204 +202,152 @@ export default function AdminDashboard() {
       .from("revenue_claims")
       .select("id, amount, created_at, branches(name), staff:director_id(full_name)")
       .eq("status", "pending")
-      .order("created_at", { ascending: false })
-      .limit(5);
+      .order("created_at", { ascending: false });
 
     setPendingClaims(data || []);
   };
 
-  const formatCurrency = (amount: number) => {
-    if (amount >= 1000000) return `KES ${(amount / 1000000).toFixed(1)}M`;
-    if (amount >= 1000) return `KES ${(amount / 1000).toFixed(0)}K`;
-    return `KES ${amount.toLocaleString()}`;
+  const getMonthOptions = () => {
+    const options = [{ label: "All Time", value: "all" }];
+    for (let i = 0; i < 12; i++) {
+      const d = subMonths(new Date(), i);
+      options.push({
+        label: format(d, "MMMM yyyy"),
+        value: format(d, "yyyy-MM")
+      });
+    }
+    return options;
   };
+
+  if (loading && !stats.totalMembers) {
+    return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  }
 
   return (
     <div className="space-y-8">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-            Admin Dashboard
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Welcome back! Here's an overview of your dental insurance system.
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight text-primary">Admin Dashboard</h1>
+          <p className="text-muted-foreground mt-1">System-wide performance and member analytics.</p>
         </div>
         <div className="flex items-center gap-3">
-          <Badge variant="outline" className="px-3 py-1.5 text-sm bg-primary/5 border-primary/20">
-            <Calendar className="h-3.5 w-3.5 mr-1.5" />
-            {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-          </Badge>
+          <Select value={filterPeriod} onValueChange={setFilterPeriod}>
+            <SelectTrigger className="w-[200px] bg-white">
+              <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
+              <SelectValue placeholder="Filter by month" />
+            </SelectTrigger>
+            <SelectContent>
+              {getMonthOptions().map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="relative overflow-hidden border-0 shadow-md bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950 dark:to-blue-900/50">
+        <Card className="border-l-4 border-l-blue-500 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-blue-700 dark:text-blue-300">Total Members</CardTitle>
-            <div className="h-9 w-9 rounded-full bg-blue-500/10 flex items-center justify-center">
-              <Users className="h-4 w-4 text-blue-600" />
-            </div>
+            <CardTitle className="text-sm font-medium">Members</CardTitle>
+            <Users className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-blue-900 dark:text-blue-100">{stats.totalMembers}</div>
-            <div className="flex items-center gap-2 mt-2">
-              <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 text-xs">
-                <ArrowUpRight className="h-3 w-3 mr-0.5" />
-                +{stats.newMembersThisMonth} this month
-              </Badge>
-            </div>
-            <div className="mt-3">
-              <div className="flex justify-between text-xs mb-1">
-                <span className="text-muted-foreground">Active rate</span>
-                <span className="font-medium">{stats.totalMembers > 0 ? Math.round((stats.activeMembers / stats.totalMembers) * 100) : 0}%</span>
-              </div>
-              <Progress value={stats.totalMembers > 0 ? (stats.activeMembers / stats.totalMembers) * 100 : 0} className="h-1.5" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="relative overflow-hidden border-0 shadow-md bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950 dark:to-emerald-900/50">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Total Contributions</CardTitle>
-            <div className="h-9 w-9 rounded-full bg-emerald-500/10 flex items-center justify-center">
-              <CreditCard className="h-4 w-4 text-emerald-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-emerald-900 dark:text-emerald-100">
-              {formatCurrency(stats.totalContributions)}
-            </div>
-            <p className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-2">
-              From {stats.totalMembers} members
+            <div className="text-2xl font-bold">{stats.totalMembers}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {stats.activeMembers} active accounts
             </p>
           </CardContent>
         </Card>
 
-        <Card className="relative overflow-hidden border-0 shadow-md bg-gradient-to-br from-violet-50 to-violet-100/50 dark:from-violet-950 dark:to-violet-900/50">
+        <Card className="border-l-4 border-l-emerald-500 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-violet-700 dark:text-violet-300">Active Coverage</CardTitle>
-            <div className="h-9 w-9 rounded-full bg-violet-500/10 flex items-center justify-center">
-              <Shield className="h-4 w-4 text-violet-600" />
-            </div>
+            <CardTitle className="text-sm font-medium">Revenue</CardTitle>
+            <TrendingUp className="h-4 w-4 text-emerald-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-violet-900 dark:text-violet-100">
-              {formatCurrency(stats.totalCoverage)}
-            </div>
-            <p className="text-xs text-violet-600/80 dark:text-violet-400/80 mt-2">
-              Available benefit pool
-            </p>
+            <div className="text-2xl font-bold">KES {stats.totalRevenue.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground mt-1">Branch compensation pool</p>
           </CardContent>
         </Card>
 
-        <Card className={`relative overflow-hidden border-0 shadow-md ${stats.totalProfitLoss >= 0
-          ? 'bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-950 dark:to-green-900/50'
-          : 'bg-gradient-to-br from-red-50 to-red-100/50 dark:from-red-950 dark:to-red-900/50'
-          }`}>
+        <Card className="border-l-4 border-l-violet-500 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className={`text-sm font-medium ${stats.totalProfitLoss >= 0 ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'
-              }`}>
-              Net Profit/Loss
-            </CardTitle>
-            <div className={`h-9 w-9 rounded-full flex items-center justify-center ${stats.totalProfitLoss >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'
-              }`}>
-              {stats.totalProfitLoss >= 0
-                ? <TrendingUp className="h-4 w-4 text-green-600" />
-                : <TrendingDown className="h-4 w-4 text-red-600" />
-              }
-            </div>
+            <CardTitle className="text-sm font-medium">Visits</CardTitle>
+            <Activity className="h-4 w-4 text-violet-500" />
           </CardHeader>
           <CardContent>
-            <div className={`text-3xl font-bold ${stats.totalProfitLoss >= 0 ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'
-              }`}>
-              {formatCurrency(Math.abs(stats.totalProfitLoss))}
+            <div className="text-2xl font-bold">{stats.totalVisits}</div>
+            <p className="text-xs text-muted-foreground mt-1">Total consultations</p>
+          </CardContent>
+        </Card>
+
+        <Card className={`border-l-4 shadow-sm ${stats.totalProfitLoss >= 0 ? 'border-l-green-500' : 'border-l-red-500'}`}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Net Profit/Loss</CardTitle>
+            {stats.totalProfitLoss >= 0 ? <ArrowUpRight className="h-4 w-4 text-green-500" /> : <ArrowDownRight className="h-4 w-4 text-red-500" />}
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${stats.totalProfitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              KES {Math.abs(stats.totalProfitLoss).toLocaleString()}
             </div>
-            <div className="flex items-center gap-1 mt-2">
-              {stats.totalProfitLoss >= 0
-                ? <ArrowUpRight className="h-3 w-3 text-green-600" />
-                : <ArrowDownRight className="h-3 w-3 text-red-600" />
-              }
-              <span className={`text-xs ${stats.totalProfitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {stats.totalProfitLoss >= 0 ? 'Profitable' : 'Loss'}
-              </span>
-            </div>
+            <p className="text-xs text-muted-foreground mt-1">{stats.totalProfitLoss >= 0 ? 'Surplus' : 'Deficit'}</p>
           </CardContent>
         </Card>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Revenue Trend Chart */}
-        <Card className="lg:col-span-2 shadow-md">
+        <Card className="lg:col-span-2 shadow-sm">
           <CardHeader>
             <CardTitle>Trend Analytics</CardTitle>
-            <CardDescription>Revenue and Visit trends over last 6 months</CardDescription>
+            <CardDescription>Revenue and Visit trends over the last 6 months</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                  <XAxis dataKey="month" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis yAxisId="left" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value / 1000}k`} />
-                  <YAxis yAxisId="right" orientation="right" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                  <Tooltip
-                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                    formatter={(value: any, name: any) => [name === 'revenue' ? `KES ${value.toLocaleString()}` : value, name === 'revenue' ? 'Revenue' : 'Visits']}
-                  />
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="month" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `KES ${v/1000}k`} />
+                  <Tooltip />
                   <Legend />
-                  <Line yAxisId="left" type="monotone" dataKey="revenue" stroke="#2563eb" strokeWidth={2} name="Total Revenue" activeDot={{ r: 8 }} />
-                  <Line yAxisId="right" type="monotone" dataKey="visits" stroke="#10b981" strokeWidth={2} name="Total Visits" />
+                  <Line type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2} name="Revenue" />
+                  <Line type="monotone" dataKey="visits" stroke="#6366f1" strokeWidth={2} name="Visits" />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
 
-        {/* Pending Claims Card */}
-        <Card className="shadow-md">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Pending Claims</CardTitle>
-              <CardDescription>Branch claims requiring approval</CardDescription>
-            </div>
-            <Badge variant="secondary" className="bg-orange-100 text-orange-700">
-              {pendingClaims.length} Pending
-            </Badge>
+        <Card className="shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              Pending Claims
+              <Badge variant="secondary" className="bg-orange-100 text-orange-700">{pendingClaims.length}</Badge>
+            </CardTitle>
+            <CardDescription>Branch revenue requests</CardDescription>
           </CardHeader>
           <CardContent>
-            {pendingClaims.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
-                <CheckCircle className="h-12 w-12 mb-3 text-green-500/50" />
-                <p>All cleared!</p>
-                <p className="text-sm">No pending claims found.</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {pendingClaims.map((claim) => (
-                  <div key={claim.id} className="flex items-center justify-between p-3 border rounded-lg bg-card hover:bg-muted/50 transition-colors">
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium">{claim.branches?.name || 'Unknown Branch'}</p>
-                      <p className="text-xs text-muted-foreground">
-                        By {claim.staff?.full_name?.split(' ')[0]} • {new Date(claim.created_at).toLocaleDateString()}
-                      </p>
+            <div className="space-y-4">
+              {pendingClaims.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <CheckCircle className="h-8 w-8 mx-auto mb-2 opacity-20" />
+                  <p className="text-sm">No pending claims</p>
+                </div>
+              ) : (
+                pendingClaims.map((claim) => (
+                  <div key={claim.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => navigate('/admin/branch-payments')}>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{claim.branches?.name}</p>
+                      <p className="text-xs text-muted-foreground">{format(new Date(claim.created_at), "MMM d")}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-bold text-primary">
-                        KES {claim.amount?.toLocaleString()}
-                      </p>
+                      <p className="text-sm font-bold text-primary">KES {claim.amount.toLocaleString()}</p>
                     </div>
                   </div>
-                ))}
-                <Button
-                  variant="outline"
-                  className="w-full mt-2"
-                  onClick={() => navigate('/admin/branch-payments')}
-                >
-                  View All Claims
-                </Button>
-              </div>
-            )}
+                ))
+              )}
+              <Button variant="outline" className="w-full text-xs" onClick={() => navigate('/admin/branch-payments')}>Manage All Claims</Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -409,68 +355,42 @@ export default function AdminDashboard() {
       <div className="grid lg:grid-cols-2 gap-6">
         <Card className="shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg">Membership Distribution</CardTitle>
-            <CardDescription>Members by category</CardDescription>
+            <CardTitle>Membership Distribution</CardTitle>
           </CardHeader>
-          <CardContent>
-            {categoryDistribution.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Activity className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                <p>No members registered yet</p>
+          <CardContent className="space-y-4">
+            {categoryDistribution.map((cat) => (
+              <div key={cat.name} className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="font-medium">{cat.name}</span>
+                  <span className="text-muted-foreground">{cat.count} members</span>
+                </div>
+                <Progress value={stats.totalMembers > 0 ? (cat.count / stats.totalMembers) * 100 : 0} className="h-2" />
               </div>
-            ) : (
-              <div className="space-y-4">
-                {categoryDistribution.map((cat) => (
-                  <div key={cat.name} className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-2">
-                        <div className={`h-3 w-3 rounded-full ${cat.color}`} />
-                        <span className="text-sm font-medium">{cat.name}</span>
-                      </div>
-                      <span className="text-sm text-muted-foreground">{cat.count} members</span>
-                    </div>
-                    <Progress
-                      value={stats.totalMembers > 0 ? (cat.count / stats.totalMembers) * 100 : 0}
-                      className="h-2"
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
+            ))}
           </CardContent>
         </Card>
 
         <Card className="shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg">Recent Members</CardTitle>
-            <CardDescription>Latest member registrations</CardDescription>
+            <CardTitle>Recent Registrations</CardTitle>
           </CardHeader>
-          <CardContent>
-            {recentMembers.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Users className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                <p>No members yet</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {recentMembers.map((member) => (
-                  <div key={member.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors">
-                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                      <span className="text-sm font-bold text-primary">
-                        {member.full_name?.charAt(0)?.toUpperCase()}
-                      </span>
+          <CardContent className="p-0">
+            <div className="divide-y">
+              {recentMembers.map((m) => (
+                <div key={m.id} className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
+                      {m.full_name.charAt(0)}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{member.full_name}</p>
-                      <p className="text-xs text-muted-foreground truncate">{member.email}</p>
+                    <div>
+                      <p className="text-sm font-medium">{m.full_name}</p>
+                      <p className="text-xs text-muted-foreground">{format(new Date(m.created_at), "MMM d, yyyy")}</p>
                     </div>
-                    <Badge variant="outline" className="text-xs shrink-0">
-                      {(member.membership_categories as any)?.name || 'Pending'}
-                    </Badge>
                   </div>
-                ))}
-              </div>
-            )}
+                  <Badge variant="outline" className="text-[10px]">{m.membership_categories?.name || 'Pending'}</Badge>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       </div>

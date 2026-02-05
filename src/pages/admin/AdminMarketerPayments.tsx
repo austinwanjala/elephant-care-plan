@@ -31,6 +31,7 @@ interface Marketer {
     referral_count: number; // Calculated
     total_commission_value: number; // Calculated
     pending_payout: number; // Calculated
+    active_referral_count: number; // Calculated
 }
 
 export default function AdminMarketerPayments() {

@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { AdminLayout } from "@/components/admin/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -163,146 +162,145 @@ export default function AdminStaff() {
   };
 
   return (
-    <AdminLayout>
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-serif font-bold text-blue-900">Staff & Management</h1>
-            <p className="text-muted-foreground">Manage Doctors, Receptionists, Directors, and Marketers</p>
-          </div>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-blue-600 hover:bg-blue-700">
-                <Plus className="mr-2 h-4 w-4" /> Add New User
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle className="font-serif text-xl">Create Portal Access</DialogTitle>
-                <CardDescription>All fields marked with * are required.</CardDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-serif font-bold text-blue-900">Staff & Management</h1>
+          <p className="text-muted-foreground">Manage Doctors, Receptionists, Directors, and Marketers</p>
+        </div>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="bg-blue-600 hover:bg-blue-700">
+              <Plus className="mr-2 h-4 w-4" /> Add New User
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="font-serif text-xl">Create Portal Access</DialogTitle>
+              <CardDescription>All fields marked with * are required.</CardDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label>Full Name *</Label>
+                <Input value={formData.fullName} onChange={(e) => setFormData({ ...formData, fullName: e.target.value })} placeholder="John Doe" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Full Name *</Label>
-                  <Input value={formData.fullName} onChange={(e) => setFormData({ ...formData, fullName: e.target.value })} placeholder="John Doe" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Email *</Label>
-                    <Input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="email@example.com" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Password *</Label>
-                    <Input type="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} placeholder="••••••••" />
-                  </div>
+                  <Label>Email *</Label>
+                  <Input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="email@example.com" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Phone Number</Label>
-                  <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="0712 345 678" />
+                  <Label>Password *</Label>
+                  <Input type="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} placeholder="••••••••" />
                 </div>
-                <div className="space-y-2">
-                  <Label>Target Portal Role *</Label>
-                  <Select value={formData.role} onValueChange={(v) => setFormData({ ...formData, role: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+              </div>
+              <div className="space-y-2">
+                <Label>Phone Number</Label>
+                <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="0712 345 678" />
+              </div>
+              <div className="space-y-2">
+                <Label>Target Portal Role *</Label>
+                <Select value={formData.role} onValueChange={(v) => setFormData({ ...formData, role: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="receptionist">Receptionist</SelectItem>
+                    <SelectItem value="doctor">Doctor</SelectItem>
+                    <SelectItem value="branch_director">Branch Director</SelectItem>
+                    <SelectItem value="marketer">Marketer</SelectItem>
+                    <SelectItem value="admin">Administrator</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {formData.role !== 'marketer' && formData.role !== 'admin' && (
+                <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                  <Label>Assigned Branch</Label>
+                  <Select value={formData.branchId} onValueChange={(v) => setFormData({ ...formData, branchId: v })}>
+                    <SelectTrigger><SelectValue placeholder="Select branch" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="receptionist">Receptionist</SelectItem>
-                      <SelectItem value="doctor">Doctor</SelectItem>
-                      <SelectItem value="branch_director">Branch Director</SelectItem>
-                      <SelectItem value="marketer">Marketer</SelectItem>
-                      <SelectItem value="admin">Administrator</SelectItem>
+                      {branches.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
-                {formData.role !== 'marketer' && formData.role !== 'admin' && (
-                  <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-                    <Label>Assigned Branch</Label>
-                    <Select value={formData.branchId} onValueChange={(v) => setFormData({ ...formData, branchId: v })}>
-                      <SelectTrigger><SelectValue placeholder="Select branch" /></SelectTrigger>
-                      <SelectContent>
-                        {branches.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-                {formData.role === 'marketer' && (
-                  <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-                    <Label>Marketer Referral Code (Optional)</Label>
-                    <Input value={formData.marketerCode} onChange={(e) => setFormData({ ...formData, marketerCode: e.target.value })} placeholder="e.g. AGENT001" />
-                  </div>
-                )}
-                <Button onClick={handleAddUser} className="bg-blue-600 hover:bg-blue-700 mt-2 w-full">
-                  Create Account & Profile
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-
-        <Card className="shadow-sm border-blue-50 overflow-hidden">
-          <Table>
-            <TableHeader className="bg-slate-50">
-              <TableRow>
-                <TableHead>User</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Branch / Details</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-[80px]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground">Refreshing staff records...</TableCell></TableRow>
-              ) : users.length === 0 ? (
-                <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground">No staff members found. Create your first portal user above.</TableCell></TableRow>
-              ) : (
-                users.map((u) => (
-                  <TableRow key={u.user_id}>
-                    <TableCell>
-                      <div className="font-bold text-slate-900">{u.full_name}</div>
-                      <div className="text-xs text-muted-foreground">{u.email || u.phone}</div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="capitalize bg-blue-50 text-blue-700 border-blue-200">
-                        {u.displayRole.replace('_', ' ')}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-slate-600">
-                      {u.type === 'marketer' ? (
-                        <span className="text-xs font-mono bg-slate-100 px-2 py-1 rounded">Code: {u.code}</span>
-                      ) : (
-                        u.branches?.name || 'Unassigned'
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          checked={u.is_active}
-                          onCheckedChange={() => handleToggleActive(u.user_id, u.type, u.is_active)}
-                        />
-                        <span className={`text-xs font-medium ${u.is_active ? 'text-green-600' : 'text-slate-400'}`}>
-                          {u.is_active ? 'Active' : 'Paused'}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem className="text-destructive font-medium" onClick={() => handleDelete(u.user_id, u.type)}>
-                            <Trash2 className="mr-2 h-4 w-4" /> Revoke Access
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))
               )}
-            </TableBody>
-          </Table>
-        </Card>
+              {formData.role === 'marketer' && (
+                <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                  <Label>Marketer Referral Code (Optional)</Label>
+                  <Input value={formData.marketerCode} onChange={(e) => setFormData({ ...formData, marketerCode: e.target.value })} placeholder="e.g. AGENT001" />
+                </div>
+              )}
+              <Button onClick={handleAddUser} className="bg-blue-600 hover:bg-blue-700 mt-2 w-full">
+                Create Account & Profile
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
-    </AdminLayout>
+
+      <Card className="shadow-sm border-blue-50 overflow-hidden">
+        <Table>
+          <TableHeader className="bg-slate-50">
+            <TableRow>
+              <TableHead>User</TableHead>
+              <TableHead>Role</TableHead>
+              <TableHead>Branch / Details</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="w-[80px]"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground">Refreshing staff records...</TableCell></TableRow>
+            ) : users.length === 0 ? (
+              <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground">No staff members found. Create your first portal user above.</TableCell></TableRow>
+            ) : (
+              users.map((u) => (
+                <TableRow key={u.user_id}>
+                  <TableCell>
+                    <div className="font-bold text-slate-900">{u.full_name}</div>
+                    <div className="text-xs text-muted-foreground">{u.email || u.phone}</div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="capitalize bg-blue-50 text-blue-700 border-blue-200">
+                      {u.displayRole.replace('_', ' ')}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-sm text-slate-600">
+                    {u.type === 'marketer' ? (
+                      <span className="text-xs font-mono bg-slate-100 px-2 py-1 rounded">Code: {u.code}</span>
+                    ) : (
+                      u.branches?.name || 'Unassigned'
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={u.is_active}
+                        onCheckedChange={() => handleToggleActive(u.user_id, u.type, u.is_active)}
+                      />
+                      <span className={`text-xs font-medium ${u.is_active ? 'text-green-600' : 'text-slate-400'}`}>
+                        {u.is_active ? 'Active' : 'Paused'}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem className="text-destructive font-medium" onClick={() => handleDelete(u.user_id, u.type)}>
+                          <Trash2 className="mr-2 h-4 w-4" /> Revoke Access
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </Card>
+    </div>
+    </AdminLayout >
   );
 }

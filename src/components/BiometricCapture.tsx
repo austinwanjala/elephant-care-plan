@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Fingerprint, Check, AlertCircle, Loader2, ShieldCheck, ShieldX } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useToast } from "@/hooks/use-toast"; // Keep useToast for notifications
+import { useToast } from "@/hooks/use-toast";
+import { registerCredential, verifyCredential } from "@/lib/webauthn";
 
 interface BiometricCaptureProps {
   mode: "register" | "verify";
@@ -27,10 +28,15 @@ export const BiometricCapture = ({
   const [captured, setCaptured] = useState(false);
   const [verified, setVerified] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isSupported, setIsSupported] = useState(false);
   const { toast } = useToast();
 
-  // Simulate WebAuthn support for UI purposes
-  const isSupported = true; 
+  useEffect(() => {
+    // Check if WebAuthn is supported
+    if (window.PublicKeyCredential) {
+      setIsSupported(true);
+    }
+  }, []);
 
   const handleCapture = async () => {
     setIsLoading(true);
@@ -38,47 +44,63 @@ export const BiometricCapture = ({
     setCaptured(false);
     setVerified(null);
 
-    // Simulate an asynchronous biometric operation
-    setTimeout(() => {
-      const success = Math.random() > 0.3; // 70% chance of success
-
+    try {
       if (mode === "register") {
-        if (success) {
-          const simulatedCredentialId = `simulated_cred_${Date.now()}`;
-          setCaptured(true);
-          onCaptureComplete?.(simulatedCredentialId);
-          toast({
-            title: "Biometric Registered Successfully (Simulated)",
-            description: "Fingerprint/biometric data has been simulated and captured.",
-          });
-        } else {
-          setError("Simulated capture failed. Please try again.");
-          toast({
-            title: "Biometric Capture Failed (Simulated)",
-            description: "The simulated biometric capture was unsuccessful.",
-            variant: "destructive",
-          });
+        if (!userId || !userName) {
+          throw new Error("User details required for registration");
         }
+
+        const credentialData = await registerCredential(userId, userName);
+
+        setCaptured(true);
+        onCaptureComplete?.(credentialData);
+        toast({
+          title: "Biometric Registered Successfully",
+          description: "Fingerprint/biometric data has been secured securely.",
+        });
       } else if (mode === "verify") {
-        if (success) {
+        if (!credentialId) {
+          throw new Error("No biometric data found for this user");
+        }
+
+        const isValid = await verifyCredential(credentialId);
+
+        if (isValid) {
           setVerified(true);
           onVerificationComplete?.(true);
           toast({
-            title: "Verification Successful (Simulated)",
-            description: "Member identity has been verified via simulated biometrics.",
+            title: "Verification Successful",
+            description: "Member identity has been verified.",
           });
         } else {
           setVerified(false);
-          setError("Simulated verification failed. Fingerprint may not match.");
+          onVerificationComplete?.(false);
+          setError("Verification failed. Fingerprint did not match or was cancelled.");
           toast({
-            title: "Verification Failed (Simulated)",
-            description: "The simulated biometric verification was unsuccessful.",
+            title: "Verification Failed",
+            description: "Biometric verification was unsuccessful.",
             variant: "destructive",
           });
         }
       }
+    } catch (err: any) {
+      console.error("Biometric error:", err);
+      const errorMessage = err.message || "An unexpected error occurred";
+
+      setError(errorMessage);
+      if (mode === "verify") {
+        setVerified(false);
+        onVerificationComplete?.(false);
+      }
+
+      toast({
+        title: mode === "register" ? "Capture Failed" : "Verification Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-    }, 2000); // Simulate a 2-second delay
+    }
   };
 
   const hasNoBiometricData = mode === "verify" && !credentialId;
@@ -95,9 +117,9 @@ export const BiometricCapture = ({
       )}>
         <div className={cn(
           "w-12 h-12 rounded-full flex items-center justify-center shrink-0 transition-colors",
-          captured || verified === true ? "bg-green-100 dark:bg-green-900/30" : 
-          verified === false ? "bg-destructive/20" :
-          "bg-primary/10"
+          captured || verified === true ? "bg-green-100 dark:bg-green-900/30" :
+            verified === false ? "bg-destructive/20" :
+              "bg-primary/10"
         )}>
           {isLoading ? (
             <Loader2 className="h-6 w-6 text-primary animate-spin" />
@@ -109,19 +131,19 @@ export const BiometricCapture = ({
             <Fingerprint className="h-6 w-6 text-primary" />
           )}
         </div>
-        
+
         <div className="flex-1 min-w-0">
           <p className="font-medium text-sm">
-            {mode === "register" ? "Fingerprint Registration (Simulated)" : "Fingerprint Verification (Simulated)"}
+            {mode === "register" ? "Fingerprint Registration" : "Fingerprint Verification"}
           </p>
           <p className="text-xs text-muted-foreground">
-            {isLoading && mode === "register" && "Simulating capture..."}
-            {isLoading && mode === "verify" && "Simulating verification..."}
-            {!isLoading && mode === "register" && !captured && "Simulate fingerprint capture for secure identification"}
-            {!isLoading && mode === "register" && captured && "Fingerprint registered successfully (Simulated)"}
-            {!isLoading && mode === "verify" && verified === null && !hasNoBiometricData && "Simulate member identity verification"}
-            {!isLoading && mode === "verify" && verified === true && "Identity verified successfully (Simulated)"}
-            {!isLoading && mode === "verify" && verified === false && "Fingerprint verification failed (Simulated)"}
+            {isLoading && mode === "register" && "Follow browser prompts..."}
+            {isLoading && mode === "verify" && "Verify your identity..."}
+            {!isLoading && mode === "register" && !captured && "Securely register your fingerprint/FaceID"}
+            {!isLoading && mode === "register" && captured && "Biometric registered successfully"}
+            {!isLoading && mode === "verify" && verified === null && !hasNoBiometricData && "Click Verify to confirm identity"}
+            {!isLoading && mode === "verify" && verified === true && "Identity verified successfully"}
+            {!isLoading && mode === "verify" && verified === false && "Biometric verification failed"}
             {hasNoBiometricData && "No biometric data registered for this member"}
           </p>
           {error && !captured && verified === null && (
@@ -145,7 +167,7 @@ export const BiometricCapture = ({
           {isLoading ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin mr-1" />
-              {mode === "register" ? "Capturing..." : "Verifying..."}
+              {mode === "register" ? "Waiting..." : "Waiting..."}
             </>
           ) : captured ? (
             <>
@@ -180,8 +202,7 @@ export const BiometricCapture = ({
       {!isSupported && (
         <p className="text-xs text-muted-foreground bg-amber-50 dark:bg-amber-950/20 p-2 rounded border border-amber-200 dark:border-amber-800">
           <AlertCircle className="h-3 w-3 inline mr-1" />
-          WebAuthn biometrics requires a compatible device with fingerprint sensor or Windows Hello, 
-          and must be accessed via HTTPS.
+          WebAuthn biometrics requires a compatible device (Fingerprint/FaceID) and HTTPS context.
         </p>
       )}
     </div>

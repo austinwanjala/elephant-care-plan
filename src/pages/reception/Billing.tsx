@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, CreditCard, Check, Search, Receipt, History, Printer, Fingerprint } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { verifyCredential } from "@/lib/webauthn";
 
 export default function ReceptionBilling() {
     const [visits, setVisits] = useState<any[]>([]);
@@ -95,14 +96,14 @@ export default function ReceptionBilling() {
             try {
                 const bill = visit.bills?.[0];
                 const newBalance = (visit.members?.coverage_balance || 0) - (bill?.total_benefit_cost || 0);
-                
+
                 await supabase.functions.invoke('send-sms', {
                     body: {
                         type: 'billing_completion',
                         phone: visit.members?.phone,
-                        data: { 
-                            benefit_cost: bill?.total_benefit_cost, 
-                            balance: Math.max(0, newBalance) 
+                        data: {
+                            benefit_cost: bill?.total_benefit_cost,
+                            balance: Math.max(0, newBalance)
                         }
                     }
                 });
@@ -111,6 +112,14 @@ export default function ReceptionBilling() {
             }
 
             toast({ title: "Bill Finalized", description: "Coverage deducted and visit completed." });
+
+            // Log System Action
+            await (supabase as any).from("system_logs").insert({
+                action: "Bill Finalized",
+                details: { visit_id: visit.id, bill_id: billId, receptionist_id: receptionistId },
+                user_id: (await supabase.auth.getUser()).data.user?.id
+            });
+
             fetchBilledVisits();
         } catch (error: any) {
             toast({ title: "Finalization Failed", description: error.message, variant: "destructive" });
@@ -339,15 +348,39 @@ export default function ReceptionBilling() {
                                                                         <Button
                                                                             variant={biometricsVerified === visit.id ? "default" : "outline"}
                                                                             className={`w-full py-6 text-lg border-2 ${biometricsVerified === visit.id ? 'bg-green-600 hover:bg-green-700 border-green-600' : 'border-blue-200 hover:border-blue-400 text-blue-700'}`}
-                                                                            onClick={() => {
-                                                                                setBiometricsVerified(visit.id);
-                                                                                toast({ title: "Biometrics Verified", description: "Identity confirmed via biometric scan." });
+                                                                            onClick={async () => {
+                                                                                if (biometricsVerified === visit.id) return; // Already verified
+
+                                                                                // 1. Check if member has biometrics enrolled
+                                                                                if (!visit.members.biometric_data) {
+                                                                                    toast({
+                                                                                        title: "Biometrics Not Enrolled",
+                                                                                        description: "This member has not set up biometrics yet. Please update their profile.",
+                                                                                        variant: "destructive"
+                                                                                    });
+                                                                                    return;
+                                                                                }
+
+                                                                                try {
+                                                                                    // 2. Perform WebAuthn Verification
+                                                                                    const isVerified = await verifyCredential(visit.members.biometric_data);
+
+                                                                                    if (isVerified) {
+                                                                                        setBiometricsVerified(visit.id);
+                                                                                        toast({ title: "Biometrics Verified", description: "Identity confirmed via biometric scan." });
+                                                                                    } else {
+                                                                                        toast({ title: "Verification Failed", description: "Biometric match failed.", variant: "destructive" });
+                                                                                    }
+                                                                                } catch (err: any) {
+                                                                                    console.error("Biometric error:", err);
+                                                                                    toast({ title: "Error", description: err.message || "Biometric verification error", variant: "destructive" });
+                                                                                }
                                                                             }}
                                                                         >
                                                                             {biometricsVerified === visit.id ? (
                                                                                 <><Check className="mr-2 h-6 w-6" /> Biometrics Confirmed</>
                                                                             ) : (
-                                                                                <><Fingerprint className="mr-2 h-6 w-6" /> Capture Member Biometrics</>
+                                                                                <><Fingerprint className="mr-2 h-6 w-6" /> Verify Member Biometrics</>
                                                                             )}
                                                                         </Button>
                                                                         <p className="text-[10px] text-center text-muted-foreground mt-1">Authorization required by member before coverage deduction.</p>

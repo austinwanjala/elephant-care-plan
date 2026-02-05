@@ -13,6 +13,7 @@ interface DoctorLayoutProps {
 export function DoctorLayout({ children }: DoctorLayoutProps) {
     const [loading, setLoading] = useState(true);
     const [authorized, setAuthorized] = useState(false);
+    const [userName, setUserName] = useState<string | null>(null);
     const navigate = useNavigate();
     const { toast } = useToast();
 
@@ -58,9 +59,21 @@ export function DoctorLayout({ children }: DoctorLayoutProps) {
             return;
         }
 
+        // Fetch Doctor Name
+        const { data: doctorData } = await supabase
+            .from("doctors")
+            .select("full_name")
+            .eq("user_id", user.id)
+            .maybeSingle();
+
+        if (doctorData) {
+            setUserName(doctorData.full_name);
+        }
+
         setAuthorized(true);
         setLoading(false);
-    };
+        return;
+    }
 
     if (loading) {
         return (
@@ -80,6 +93,9 @@ export function DoctorLayout({ children }: DoctorLayoutProps) {
                     <header className="h-14 border-b border-border flex items-center px-4 sticky top-0 bg-background/95 backdrop-blur z-40">
                         <SidebarTrigger className="mr-4" />
                         <span className="font-semibold text-blue-700">Doctor Portal</span>
+                        <div className="ml-auto text-sm text-slate-600">
+                            Welcome, <span className="font-bold text-slate-800">{loading ? "..." : authorized ? (userName || "Doctor") : ""}</span>
+                        </div>
                     </header>
                     <main className="p-6">
                         {children || <Outlet />}

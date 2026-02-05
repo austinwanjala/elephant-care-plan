@@ -23,6 +23,7 @@ import AdminBranchPayments from "./pages/admin/AdminBranchPayments";
 import AdminMembershipCategories from "./pages/admin/AdminMembershipCategories";
 import AdminMarketerClaims from "./pages/admin/AdminMarketerClaims";
 import AdminCommissionSettings from "./pages/admin/AdminCommissionSettings";
+import AdminLogs from "./pages/admin/AdminLogs";
 
 // Reception pages
 import { ReceptionLayout } from "./components/reception/ReceptionLayout";
@@ -130,7 +131,9 @@ const App = () => (
             <Route path="marketer-claims" element={<AdminMarketerClaims />} />
             <Route path="commission-settings" element={<AdminCommissionSettings />} />
             <Route path="settings" element={<AdminSettings />} />
+            <Route path="settings" element={<AdminSettings />} />
             <Route path="membership-categories" element={<AdminMembershipCategories />} />
+            <Route path="logs" element={<AdminLogs />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />

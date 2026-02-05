@@ -11,10 +11,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { History, Loader2, Download } from "lucide-react";
+import { History, Loader2, Download, Calendar as CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { exportToCsv } from "@/utils/csvExport";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DateRange } from "react-day-picker";
+import { cn } from "@/lib/utils";
 
 interface Visit {
   id: string;
@@ -36,16 +40,17 @@ interface Visit {
 export default function AdminVisits() {
   const [visits, setVisits] = useState<Visit[]>([]);
   const [loading, setLoading] = useState(true);
+  const [date, setDate] = useState<DateRange | undefined>(undefined);
   const { toast } = useToast();
 
   useEffect(() => {
     loadVisits();
-  }, []);
+  }, [date]); // Reload when date changes
 
   const loadVisits = async () => {
     setLoading(true);
     // Updated query to include aliased joins for doctor and receptionist names
-    const { data, error } = await (supabase as any)
+    let query = (supabase as any)
       .from("visits")
       .select(`
         *, 
@@ -56,6 +61,21 @@ export default function AdminVisits() {
         bills(total_benefit_cost, total_branch_compensation, total_profit_loss, bill_items(service_name))
       `)
       .order("created_at", { ascending: false });
+
+    if (date?.from) {
+      // Set start time to beginning of the day
+      const fromDate = new Date(date.from);
+      fromDate.setHours(0, 0, 0, 0);
+      query = query.gte("created_at", fromDate.toISOString());
+    }
+    if (date?.to) {
+      // Set end time to end of the day
+      const toDate = new Date(date.to);
+      toDate.setHours(23, 59, 59, 999);
+      query = query.lte("created_at", toDate.toISOString());
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       toast({
@@ -122,7 +142,43 @@ export default function AdminVisits() {
           <h1 className="text-3xl font-serif font-bold text-foreground">All Visits</h1>
           <p className="text-muted-foreground">Comprehensive record of all processed dental services</p>
         </div>
-        <div>
+        <div className="flex gap-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                id="date"
+                variant={"outline"}
+                className={cn(
+                  "w-[300px] justify-start text-left font-normal",
+                  !date && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {date?.from ? (
+                  date.to ? (
+                    <>
+                      {format(date.from, "LLL dd, y")} -{" "}
+                      {format(date.to, "LLL dd, y")}
+                    </>
+                  ) : (
+                    format(date.from, "LLL dd, y")
+                  )
+                ) : (
+                  <span>Pick a date range</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                initialFocus
+                mode="range"
+                defaultMonth={date?.from}
+                selected={date}
+                onSelect={setDate}
+                numberOfMonths={2}
+              />
+            </PopoverContent>
+          </Popover>
           <Button variant="outline" onClick={handleExport}>
             <Download className="mr-2 h-4 w-4" /> Export CSV
           </Button>

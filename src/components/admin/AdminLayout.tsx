@@ -13,6 +13,7 @@ interface AdminLayoutProps {
 export function AdminLayout({ children }: AdminLayoutProps) {
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
+  const [userName, setUserName] = useState<string | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -57,6 +58,17 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       return;
     }
 
+    // Fetch Admin Name (likely from staff)
+    const { data: staffData } = await supabase
+      .from("staff")
+      .select("full_name")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (staffData) {
+      setUserName(staffData.full_name);
+    }
+
     setAuthorized(true);
     setLoading(false);
   };
@@ -80,6 +92,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         <SidebarInset className="flex-1">
           <header className="h-14 border-b border-border flex items-center px-4 sticky top-0 bg-background/95 backdrop-blur z-40">
             <SidebarTrigger className="mr-4" />
+            <div className="ml-auto text-sm text-slate-600">
+              Welcome, <span className="font-bold text-slate-800">{loading ? "..." : authorized ? (userName || "Admin") : ""}</span>
+            </div>
           </header>
           <main className="p-6">
             {children || <Outlet />} {/* Render children or nested routes */}

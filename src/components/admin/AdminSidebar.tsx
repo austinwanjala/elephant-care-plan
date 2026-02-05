@@ -11,6 +11,7 @@ import {
   History,
   DollarSign,
   ClipboardList,
+  FileText,
 } from "lucide-react";
 import {
   Sidebar,
@@ -37,6 +38,7 @@ const menuItems = [
   { title: "Services", url: "/admin/services", icon: Stethoscope },
   { title: "Branch Payments", url: "/admin/branch-payments", icon: DollarSign },
   { title: "Marketer Claims", url: "/admin/marketer-claims", icon: ClipboardList },
+  { title: "System Logs", url: "/admin/logs", icon: FileText },
 ];
 
 const settingsMenuItems = [

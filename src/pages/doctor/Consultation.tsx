@@ -259,6 +259,33 @@ export default function Consultation() {
             return;
         }
 
+        // Check for daily claim limit
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const todayEnd = new Date();
+        todayEnd.setHours(23, 59, 59, 999);
+
+        const { data: existingBills, error: checkError } = await supabase
+            .from("bills")
+            .select("id")
+            .eq("member_id", visit.member_id)
+            .gte("created_at", todayStart.toISOString())
+            .lte("created_at", todayEnd.toISOString());
+
+        if (checkError) {
+            toast({ title: "Error checking limits", description: checkError.message, variant: "destructive" });
+            return;
+        }
+
+        if (existingBills && existingBills.length > 0) {
+            toast({
+                title: "Daily Limit Reached",
+                description: "A claim has already been submitted for this member today. Only one claim per day is allowed.",
+                variant: "destructive"
+            });
+            return;
+        }
+
         setSubmitting(true);
         try {
             // 1. Save Dental Records (Statuses)
@@ -339,6 +366,14 @@ export default function Consultation() {
             if (visitUpdateError) throw visitUpdateError;
 
             toast({ title: "Consultation Completed", description: "Bill generated and sent to reception for finalization." });
+
+            // Log System Action
+            await (supabase as any).from("system_logs").insert({
+                action: "Consultation Submitted",
+                details: { visit_id: visitId, doctor_id: doctorId, services_count: selectedServices.length, bill_id: bill.id },
+                user_id: (await supabase.auth.getUser()).data.user?.id
+            });
+
             navigate("/doctor");
 
         } catch (error: any) {

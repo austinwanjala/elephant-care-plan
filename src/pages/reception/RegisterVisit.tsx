@@ -28,6 +28,8 @@ export default function RegisterVisit() {
     const [receptionistBranchId, setReceptionistBranchId] = useState<string | null>(null);
     const [doctors, setDoctors] = useState<any[]>([]);
     const [selectedDoctorId, setSelectedDoctorId] = useState<string>("");
+    const [dependants, setDependants] = useState<any[]>([]);
+    const [selectedPatientId, setSelectedPatientId] = useState<string>("");
     const { toast } = useToast();
     const navigate = useNavigate();
 
@@ -65,37 +67,30 @@ export default function RegisterVisit() {
 
     const fetchDoctors = async () => {
         try {
-            // 1. Get all active staff in this branch
-            const { data: branchStaff, error: staffError } = await supabase
-                .from("staff")
-                .select("id, full_name, user_id")
-                .eq("branch_id", receptionistBranchId)
-                .eq("is_active", true);
+            console.log("Fetching doctors for branch:", receptionistBranchId);
+            const { data, error } = await supabase
+                .rpc("get_branch_doctors", { branch_id_input: receptionistBranchId });
 
-            if (staffError) throw staffError;
-
-            if (!branchStaff || branchStaff.length === 0) {
-                setDoctors([]);
-                return;
+            if (error) {
+                console.error("RPC Error:", error);
+                throw error;
             }
 
-            // 2. Filter these staff to check who has the 'doctor' role
-            const staffUserIds = branchStaff.map(s => s.user_id);
-            const { data: doctorRoles, error: roleError } = await supabase
-                .from("user_roles")
-                .select("user_id")
-                .eq("role", "doctor")
-                .in("user_id", staffUserIds);
+            console.log("Doctors fetched:", data);
 
-            if (roleError) throw roleError;
-
-            const doctorUserIdSet = new Set(doctorRoles?.map(r => r.user_id));
-            const doctorsList = branchStaff.filter(s => doctorUserIdSet.has(s.user_id));
-
-            setDoctors(doctorsList);
+            if (!data || data.length === 0) {
+                toast({ title: "Info", description: "No doctors found for this branch." });
+                setDoctors([]);
+            } else {
+                setDoctors(data);
+            }
         } catch (error: any) {
             console.error("Error fetching doctors:", error);
-            toast({ title: "Error", description: "Failed to load doctors list.", variant: "destructive" });
+            toast({
+                title: "Error fetching doctors",
+                description: error.message || "Unknown RPC error",
+                variant: "destructive"
+            });
         }
     };
 
@@ -106,6 +101,7 @@ export default function RegisterVisit() {
 
         setSearching(true);
         setMember(null);
+        setDependants([]);
         setBiometricsVerified(false);
 
         try {
@@ -125,6 +121,18 @@ export default function RegisterVisit() {
 
             if (data) {
                 setMember(data);
+                setSelectedPatientId(data.id); // Default to member
+
+                // Fetch Dependants
+                const { data: depsData, error: depsError } = await supabase
+                    .from("dependants")
+                    .select("*")
+                    .eq("member_id", data.id);
+
+                if (!depsError && depsData) {
+                    setDependants(depsData);
+                }
+
                 if (data.biometric_data) {
                     setBiometricsVerified(false);
                 } else {
@@ -155,23 +163,30 @@ export default function RegisterVisit() {
             return;
         }
         if (!member.is_active) {
-            toast({ title: "Inactive Member", description: "Member is inactive. Advise payment before service.", variant: "destructive" });
+            toast({ title: "Inactive Member", description: "Member is inactive. Advise payment before service. Principal member must be active.", variant: "destructive" });
             return;
         }
 
         setLoading(true);
         try {
-            const { error } = await supabase.from('visits').insert([{
+            const isDependant = selectedPatientId !== member.id;
+            const payload: any = {
                 member_id: member.id,
                 branch_id: receptionistBranchId,
                 receptionist_id: receptionistId,
                 status: 'registered',
-                doctor_id: selectedDoctorId || null, // Assign doctor if selected
+                doctor_id: selectedDoctorId || null,
                 biometrics_verified: biometricsVerified,
                 benefit_deducted: 0,
                 branch_compensation: 0,
                 profit_loss: 0
-            }]);
+            };
+
+            if (isDependant) {
+                payload.dependant_id = selectedPatientId;
+            }
+
+            const { error } = await supabase.from('visits').insert([payload]);
 
             if (error) throw error;
 
@@ -273,6 +288,45 @@ export default function RegisterVisit() {
                                         </div>
                                     </div>
                                 )}
+
+                                <div className="space-y-4 pt-4 border-t">
+                                    <Label className="text-base">Who is this visit for?</Label>
+                                    <div className="grid gap-4">
+                                        <div
+                                            className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${selectedPatientId === member.id ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
+                                            onClick={() => setSelectedPatientId(member.id)}
+                                        >
+                                            <div className="flex justify-between items-center">
+                                                <div>
+                                                    <p className="font-semibold text-sm">Principal Member</p>
+                                                    <p className="text-lg font-bold">{member.full_name}</p>
+                                                </div>
+                                                {selectedPatientId === member.id && <CheckCircle className="h-5 w-5 text-primary" />}
+                                            </div>
+                                        </div>
+
+                                        {dependants.length > 0 && (
+                                            <>
+                                                <p className="text-sm font-medium text-muted-foreground mt-2">Dependants</p>
+                                                {dependants.map((dep) => (
+                                                    <div
+                                                        key={dep.id}
+                                                        className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${selectedPatientId === dep.id ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
+                                                        onClick={() => setSelectedPatientId(dep.id)}
+                                                    >
+                                                        <div className="flex justify-between items-center">
+                                                            <div>
+                                                                <p className="font-semibold text-sm capitalize">{dep.relationship}</p>
+                                                                <p className="text-lg font-bold">{dep.full_name}</p>
+                                                            </div>
+                                                            {selectedPatientId === dep.id && <CheckCircle className="h-5 w-5 text-primary" />}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
 
                                 <div className="space-y-2">
                                     <Label>Assign Doctor (Optional)</Label>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,13 +33,12 @@ const Register = () => {
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
 
-  // Pre-fill marketer code if present in URL
-  useState(() => {
+  useEffect(() => {
     const refCode = searchParams.get("ref");
     if (refCode) {
       setMarketerCode(refCode);
     }
-  });
+  }, [searchParams]);
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -76,7 +75,6 @@ const Register = () => {
 
     try {
       // 1. Create auth user with all metadata for atomic setup
-      // The trigger 'on_auth_user_created' handles role and profile creation
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -96,7 +94,6 @@ const Register = () => {
       if (!authData.user) throw new Error("User creation failed");
 
       // 2. Fetch the created member record to add dependants
-      // The trigger is atomic so it should be there immediately
       const { data: memberData, error: memberError } = await supabase
         .from("members")
         .select("id")
@@ -115,20 +112,11 @@ const Register = () => {
           relationship: d.relationship || 'Dependant'
         }));
 
-<<<<<<< HEAD
         const { error: depError } = await supabase.from("dependants").insert(dependantsToInsert);
-        if (depError) throw depError;
-      }
-
-      toast({
-        title: "Registration successful!",
-        description: "Please login to select your scheme and make payment.",
-=======
-        const { error: depError } = await supabase.from("dependants").insert(depsToInsert);
         if (depError) console.error("Error adding dependants:", depError);
       }
 
-      // 3. Generate and Send OTP for verification
+      // 4. Generate and Send OTP for verification
       const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
 
       const { error: otpError } = await supabase
@@ -143,7 +131,7 @@ const Register = () => {
 
       // Send OTP via SMS and Email
       try {
-        const { data: smsResponse, error: invokeError } = await supabase.functions.invoke('send-sms', {
+        await supabase.functions.invoke('send-sms', {
           body: {
             type: 'otp',
             phone: formData.phone,
@@ -151,21 +139,13 @@ const Register = () => {
             data: { code: otpCode }
           }
         });
-
-        if (invokeError) throw invokeError;
-
-        if (smsResponse && !smsResponse.sms?.success && !smsResponse.email?.success) {
-          console.warn("Notification delivery warning:", smsResponse);
-        }
       } catch (smsErr: any) {
         console.error("Failed to send OTP notification:", smsErr);
-        // Continue anyway - OTP is stored in database
       }
 
       toast({
         title: "Verification Code Sent",
         description: "Please check your phone and email for the 6-digit code.",
->>>>>>> 66d7c01f7c17203464da87c0e189b2a1f99f56bc
       });
 
       navigate(`/verify-otp?phone=${encodeURIComponent(formData.phone)}&email=${encodeURIComponent(formData.email)}`);

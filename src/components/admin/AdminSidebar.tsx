@@ -36,6 +36,7 @@ const menuItems = [
   { title: "Visits", url: "/admin/visits", icon: History },
   { title: "Services", url: "/admin/services", icon: Stethoscope },
   { title: "Branch Payments", url: "/admin/branch-payments", icon: DollarSign },
+  { title: "Marketer Comm.", url: "/admin/marketer-payments", icon: DollarSign },
   { title: "Settings", url: "/admin/settings", icon: Settings },
 ];
 
@@ -87,8 +88,8 @@ export function AdminSidebar() {
                   <a
                     href={item.url}
                     onClick={(e) => {
-                        e.preventDefault();
-                        navigate(item.url);
+                      e.preventDefault();
+                      navigate(item.url);
                     }}
                     className="flex items-center gap-3"
                   >

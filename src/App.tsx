@@ -21,6 +21,7 @@ import AdminServices from "./pages/admin/AdminServices";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminVisits from "./pages/admin/AdminVisits";
 import AdminBranchPayments from "./pages/admin/AdminBranchPayments";
+import AdminMarketerPayments from "./pages/admin/AdminMarketerPayments";
 
 // Reception pages
 import { ReceptionLayout } from "./components/reception/ReceptionLayout";
@@ -124,6 +125,7 @@ const App = () => (
             <Route path="visits" element={<AdminVisits />} />
             <Route path="services" element={<AdminServices />} />
             <Route path="branch-payments" element={<AdminBranchPayments />} />
+            <Route path="marketer-payments" element={<AdminMarketerPayments />} />
             <Route path="settings" element={<AdminSettings />} />
           </Route>
 

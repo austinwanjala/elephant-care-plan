@@ -87,91 +87,90 @@ export default function AdminVisits() {
   }
 
   return (
-    <AdminLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-serif font-bold text-foreground">All Visits</h1>
-          <p className="text-muted-foreground">Comprehensive record of all processed dental services</p>
-        </div>
-
-        <Card className="card-elevated overflow-hidden">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <History className="h-5 w-5 text-primary" />
-              Processed Services
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Member</TableHead>
-                    <TableHead>Branch</TableHead>
-                    <TableHead>Doctor</TableHead>
-                    <TableHead>Receptionist</TableHead>
-                    <TableHead>Services</TableHead>
-                    <TableHead>Diagnosis</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Benefit Deducted</TableHead>
-                    <TableHead>Branch Comp.</TableHead>
-                    <TableHead>Profit/Loss</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {visits.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
-                        No visits recorded yet.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    visits.map((visit) => {
-                      const bill = visit.bills?.[0];
-                      const servicesList = bill?.bill_items?.map(item => item.service_name).join(", ") || "N/A";
-                      const benefitDeducted = bill?.total_benefit_cost || 0;
-                      const branchCompensation = bill?.total_branch_compensation || 0;
-                      const profitLoss = bill?.total_profit_loss || 0;
-
-                      return (
-                        <TableRow key={visit.id}>
-                          <TableCell>
-                            {format(new Date(visit.created_at), "MMM d, yyyy HH:mm")}
-                          </TableCell>
-                          <TableCell>
-                            <div>
-                              <p className="font-medium">{visit.members?.full_name}</p>
-                              <p className="text-xs text-muted-foreground font-mono">
-                                {visit.members?.member_number}
-                              </p>
-                            </div>
-                          </TableCell>
-                          <TableCell>{visit.branches?.name || "N/A"}</TableCell>
-                          <TableCell>{visit.doctor?.full_name || "N/A"}</TableCell>
-                          <TableCell>{visit.receptionist?.full_name || "N/A"}</TableCell>
-                          <TableCell className="max-w-[150px] truncate">{servicesList}</TableCell>
-                          <TableCell className="max-w-[150px] truncate">{visit.diagnosis || "N/A"}</TableCell>
-                          <TableCell>{getStatusBadge(visit.status || "unknown")}</TableCell>
-                          <TableCell className="text-destructive">
-                            -KES {benefitDeducted.toLocaleString()}
-                          </TableCell>
-                          <TableCell className="text-success">
-                            +KES {branchCompensation.toLocaleString()}
-                          </TableCell>
-                          <TableCell className={profitLoss >= 0 ? "text-success" : "text-destructive"}>
-                            KES {profitLoss.toLocaleString()}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-serif font-bold text-foreground">All Visits</h1>
+        <p className="text-muted-foreground">Comprehensive record of all processed dental services</p>
       </div>
-    </AdminLayout>
+
+      <Card className="card-elevated overflow-hidden">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <History className="h-5 w-5 text-primary" />
+            Processed Services
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Member</TableHead>
+                  <TableHead>Branch</TableHead>
+                  <TableHead>Doctor</TableHead>
+                  <TableHead>Receptionist</TableHead>
+                  <TableHead>Services</TableHead>
+                  <TableHead>Diagnosis</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Benefit Deducted</TableHead>
+                  <TableHead>Branch Comp.</TableHead>
+                  <TableHead>Profit/Loss</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {visits.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
+                      No visits recorded yet.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  visits.map((visit) => {
+                    const bill = visit.bills?.[0];
+                    const servicesList = bill?.bill_items?.map(item => item.service_name).join(", ") || "N/A";
+                    const benefitDeducted = bill?.total_benefit_cost || 0;
+                    const branchCompensation = bill?.total_branch_compensation || 0;
+                    const profitLoss = bill?.total_profit_loss || 0;
+
+                    return (
+                      <TableRow key={visit.id}>
+                        <TableCell>
+                          {format(new Date(visit.created_at), "MMM d, yyyy HH:mm")}
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{visit.members?.full_name}</p>
+                            <p className="text-xs text-muted-foreground font-mono">
+                              {visit.members?.member_number}
+                            </p>
+                          </div>
+                        </TableCell>
+                        <TableCell>{visit.branches?.name || "N/A"}</TableCell>
+                        <TableCell>{visit.doctor?.full_name || "N/A"}</TableCell>
+                        <TableCell>{visit.receptionist?.full_name || "N/A"}</TableCell>
+                        <TableCell className="max-w-[150px] truncate">{servicesList}</TableCell>
+                        <TableCell className="max-w-[150px] truncate">{visit.diagnosis || "N/A"}</TableCell>
+                        <TableCell>{getStatusBadge(visit.status || "unknown")}</TableCell>
+                        <TableCell className="text-destructive">
+                          -KES {benefitDeducted.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-success">
+                          +KES {branchCompensation.toLocaleString()}
+                        </TableCell>
+                        <TableCell className={profitLoss >= 0 ? "text-success" : "text-destructive"}>
+                          KES {profitLoss.toLocaleString()}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

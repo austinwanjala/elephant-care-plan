@@ -222,192 +222,59 @@ export default function AdminServices() {
   };
 
   return (
-    <AdminLayout>
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-serif font-bold text-foreground">Services</h1>
-            <p className="text-muted-foreground">Manage dental services and pricing</p>
-          </div>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="btn-primary">
-                <Plus className="mr-2 h-4 w-4" /> Add Service
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle className="font-serif">Add New Service</DialogTitle>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="space-y-2">
-                  <Label>Procedure Name *</Label>
-                  <Input
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="e.g., Tooth Extraction"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Real Cost (KES) *</Label>
-                    <Input
-                      type="number"
-                      value={formData.realCost}
-                      onChange={(e) => setFormData({ ...formData, realCost: e.target.value })}
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Branch Compensation (KES) *</Label>
-                    <Input
-                      type="number"
-                      value={formData.branchCompensation}
-                      onChange={(e) => setFormData({ ...formData, branchCompensation: e.target.value })}
-                      placeholder="0"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Benefit Cost (KES) *</Label>
-                  <Input
-                    type="number"
-                    value={formData.benefitCost}
-                    onChange={(e) => setFormData({ ...formData, benefitCost: e.target.value })}
-                    placeholder="0"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Approval Type</Label>
-                  <Select
-                    value={formData.approvalType}
-                    onValueChange={(value: "all_branches" | "pre_approved_only") =>
-                      setFormData({ ...formData, approvalType: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all_branches">All Branches</SelectItem>
-                      <SelectItem value="pre_approved_only">Pre-Approved Only</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {formData.realCost && formData.branchCompensation && formData.benefitCost && (
-                  <div className="bg-muted/50 rounded-lg p-4">
-                    <div className="flex justify-between text-sm">
-                      <span>Profit/Loss:</span>
-                      <span className={parseFloat(formData.benefitCost) - parseFloat(formData.branchCompensation) >= 0 ? "text-success" : "text-destructive"}>
-                        KES {(parseFloat(formData.benefitCost) - parseFloat(formData.branchCompensation)).toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                )}
-                <Button onClick={handleAddService} className="btn-primary">
-                  Add Service
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
 
-        <div className="card-elevated overflow-hidden">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Procedure</TableHead>
-                  <TableHead>Real Cost</TableHead>
-                  <TableHead>Branch Comp.</TableHead>
-                  <TableHead>Benefit Cost</TableHead>
-                  <TableHead>Profit/Loss</TableHead>
-                  <TableHead>Approval</TableHead>
-                  <TableHead>Active</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {services.map((service) => (
-                  <TableRow key={service.id}>
-                    <TableCell className="font-medium">{service.name}</TableCell>
-                    <TableCell>KES {service.real_cost.toLocaleString()}</TableCell>
-                    <TableCell>KES {service.branch_compensation.toLocaleString()}</TableCell>
-                    <TableCell>KES {service.benefit_cost.toLocaleString()}</TableCell>
-                    <TableCell className={service.profit_loss >= 0 ? "text-success" : "text-destructive"}>
-                      KES {service.profit_loss.toLocaleString()}
-                    </TableCell>
-                    <TableCell>{getApprovalBadge(service.approval_type)}</TableCell>
-                    <TableCell>
-                      <Switch
-                        checked={service.is_active}
-                        onCheckedChange={() => handleToggleActive(service)}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEditDialog(service)}>
-                            <Edit className="mr-2 h-4 w-4" /> Edit
-                          </DropdownMenuItem>
-                          {service.approval_type === "pre_approved_only" && (
-                            <DropdownMenuItem onClick={() => openPreapprovalDialog(service)}>
-                              <Shield className="mr-2 h-4 w-4" /> Manage Branches
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-serif font-bold text-foreground">Services</h1>
+          <p className="text-muted-foreground">Manage dental services and pricing</p>
         </div>
-
-        {/* Edit Dialog */}
-        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="btn-primary">
+              <Plus className="mr-2 h-4 w-4" /> Add Service
+            </Button>
+          </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle className="font-serif">Edit Service</DialogTitle>
+              <DialogTitle className="font-serif">Add New Service</DialogTitle>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="space-y-2">
-                <Label>Procedure Name</Label>
+                <Label>Procedure Name *</Label>
                 <Input
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="e.g., Tooth Extraction"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Real Cost (KES)</Label>
+                  <Label>Real Cost (KES) *</Label>
                   <Input
                     type="number"
                     value={formData.realCost}
                     onChange={(e) => setFormData({ ...formData, realCost: e.target.value })}
+                    placeholder="0"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Branch Compensation (KES)</Label>
+                  <Label>Branch Compensation (KES) *</Label>
                   <Input
                     type="number"
                     value={formData.branchCompensation}
                     onChange={(e) => setFormData({ ...formData, branchCompensation: e.target.value })}
+                    placeholder="0"
                   />
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Benefit Cost (KES)</Label>
+                <Label>Benefit Cost (KES) *</Label>
                 <Input
                   type="number"
                   value={formData.benefitCost}
                   onChange={(e) => setFormData({ ...formData, benefitCost: e.target.value })}
+                  placeholder="0"
                 />
               </div>
               <div className="space-y-2">
@@ -427,48 +294,180 @@ export default function AdminServices() {
                   </SelectContent>
                 </Select>
               </div>
-              <Button onClick={handleEditService} className="btn-primary">
-                Update Service
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Pre-approval Dialog */}
-        <Dialog open={preapprovalDialogOpen} onOpenChange={setPreapprovalDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle className="font-serif">Manage Pre-Approved Branches</DialogTitle>
-            </DialogHeader>
-            <div className="py-4 space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Select branches that can perform "{selectedService?.name}"
-              </p>
-              <div className="space-y-3 max-h-64 overflow-y-auto">
-                {branches.map((branch) => (
-                  <div key={branch.id} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={branch.id}
-                      checked={selectedBranches.includes(branch.id)}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedBranches([...selectedBranches, branch.id]);
-                        } else {
-                          setSelectedBranches(selectedBranches.filter((id) => id !== branch.id));
-                        }
-                      }}
-                    />
-                    <Label htmlFor={branch.id}>{branch.name}</Label>
+              {formData.realCost && formData.branchCompensation && formData.benefitCost && (
+                <div className="bg-muted/50 rounded-lg p-4">
+                  <div className="flex justify-between text-sm">
+                    <span>Profit/Loss:</span>
+                    <span className={parseFloat(formData.benefitCost) - parseFloat(formData.branchCompensation) >= 0 ? "text-success" : "text-destructive"}>
+                      KES {(parseFloat(formData.benefitCost) - parseFloat(formData.branchCompensation)).toLocaleString()}
+                    </span>
                   </div>
-                ))}
-              </div>
-              <Button onClick={handleSavePreapprovals} className="w-full btn-primary">
-                Save Changes
+                </div>
+              )}
+              <Button onClick={handleAddService} className="btn-primary">
+                Add Service
               </Button>
             </div>
           </DialogContent>
         </Dialog>
       </div>
-    </AdminLayout>
+
+      <div className="card-elevated overflow-hidden">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Procedure</TableHead>
+                <TableHead>Real Cost</TableHead>
+                <TableHead>Branch Comp.</TableHead>
+                <TableHead>Benefit Cost</TableHead>
+                <TableHead>Profit/Loss</TableHead>
+                <TableHead>Approval</TableHead>
+                <TableHead>Active</TableHead>
+                <TableHead></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {services.map((service) => (
+                <TableRow key={service.id}>
+                  <TableCell className="font-medium">{service.name}</TableCell>
+                  <TableCell>KES {service.real_cost.toLocaleString()}</TableCell>
+                  <TableCell>KES {service.branch_compensation.toLocaleString()}</TableCell>
+                  <TableCell>KES {service.benefit_cost.toLocaleString()}</TableCell>
+                  <TableCell className={service.profit_loss >= 0 ? "text-success" : "text-destructive"}>
+                    KES {service.profit_loss.toLocaleString()}
+                  </TableCell>
+                  <TableCell>{getApprovalBadge(service.approval_type)}</TableCell>
+                  <TableCell>
+                    <Switch
+                      checked={service.is_active}
+                      onCheckedChange={() => handleToggleActive(service)}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => openEditDialog(service)}>
+                          <Edit className="mr-2 h-4 w-4" /> Edit
+                        </DropdownMenuItem>
+                        {service.approval_type === "pre_approved_only" && (
+                          <DropdownMenuItem onClick={() => openPreapprovalDialog(service)}>
+                            <Shield className="mr-2 h-4 w-4" /> Manage Branches
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+
+      {/* Edit Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="font-serif">Edit Service</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label>Procedure Name</Label>
+              <Input
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Real Cost (KES)</Label>
+                <Input
+                  type="number"
+                  value={formData.realCost}
+                  onChange={(e) => setFormData({ ...formData, realCost: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Branch Compensation (KES)</Label>
+                <Input
+                  type="number"
+                  value={formData.branchCompensation}
+                  onChange={(e) => setFormData({ ...formData, branchCompensation: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Benefit Cost (KES)</Label>
+              <Input
+                type="number"
+                value={formData.benefitCost}
+                onChange={(e) => setFormData({ ...formData, benefitCost: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Approval Type</Label>
+              <Select
+                value={formData.approvalType}
+                onValueChange={(value: "all_branches" | "pre_approved_only") =>
+                  setFormData({ ...formData, approvalType: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all_branches">All Branches</SelectItem>
+                  <SelectItem value="pre_approved_only">Pre-Approved Only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={handleEditService} className="btn-primary">
+              Update Service
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Pre-approval Dialog */}
+      <Dialog open={preapprovalDialogOpen} onOpenChange={setPreapprovalDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="font-serif">Manage Pre-Approved Branches</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Select branches that can perform "{selectedService?.name}"
+            </p>
+            <div className="space-y-3 max-h-64 overflow-y-auto">
+              {branches.map((branch) => (
+                <div key={branch.id} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={branch.id}
+                    checked={selectedBranches.includes(branch.id)}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setSelectedBranches([...selectedBranches, branch.id]);
+                      } else {
+                        setSelectedBranches(selectedBranches.filter((id) => id !== branch.id));
+                      }
+                    }}
+                  />
+                  <Label htmlFor={branch.id}>{branch.name}</Label>
+                </div>
+              ))}
+            </div>
+            <Button onClick={handleSavePreapprovals} className="w-full btn-primary">
+              Save Changes
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

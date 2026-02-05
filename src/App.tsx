@@ -6,7 +6,6 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import VerifyOtp from "./pages/VerifyOtp";
 import NotFound from "./pages/NotFound";
 
 // Admin pages
@@ -15,7 +14,6 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminMembers from "./pages/admin/AdminMembers";
 import AdminBranches from "./pages/admin/AdminBranches";
 import AdminStaff from "./pages/admin/AdminStaff";
-import AdminClaims from "./pages/admin/AdminClaims";
 import AdminServices from "./pages/admin/AdminServices";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminVisits from "./pages/admin/AdminVisits";
@@ -69,12 +67,6 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-<<<<<<< HEAD
-=======
-          <Route path="/verify-otp" element={<VerifyOtp />} />
-          <Route path="/terms-of-service" element={<TermsOfService />} />
-          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
->>>>>>> 66d7c01f7c17203464da87c0e189b2a1f99f56bc
 
           {/* Member Routes */}
           <Route path="/dashboard" element={<MemberLayout />}>
@@ -123,7 +115,6 @@ const App = () => (
             <Route path="members" element={<AdminMembers />} />
             <Route path="branches" element={<AdminBranches />} />
             <Route path="staff" element={<AdminStaff />} />
-            <Route path="claims" element={<AdminClaims />} />
             <Route path="visits" element={<AdminVisits />} />
             <Route path="services" element={<AdminServices />} />
             <Route path="branch-payments" element={<AdminBranchPayments />} />

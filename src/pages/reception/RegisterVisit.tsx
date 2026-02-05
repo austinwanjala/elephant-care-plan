@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Search, UserCheck, UserX, Fingerprint, ArrowRight, Loader2, CheckCircle, ArrowLeft } from "lucide-react";
+import { Search, UserCheck, UserX, Fingerprint, ArrowRight, Loader2, CheckCircle, ArrowLeft, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, Link } from "react-router-dom";
 import { BiometricCapture } from "@/components/BiometricCapture";
@@ -17,11 +17,14 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 export default function RegisterVisit() {
     const [searchTerm, setSearchTerm] = useState("");
     const [searching, setSearching] = useState(false);
     const [member, setMember] = useState<any>(null);
+    const [dependants, setDependants] = useState<any[]>([]);
+    const [selectedPatientId, setSelectedPatientId] = useState<string>("");
     const [biometricsVerified, setBiometricsVerified] = useState(false);
     const [loading, setLoading] = useState(false);
     const [receptionistId, setReceptionistId] = useState<string | null>(null);
@@ -106,6 +109,8 @@ export default function RegisterVisit() {
 
         setSearching(true);
         setMember(null);
+        setDependants([]);
+        setSelectedPatientId("");
         setBiometricsVerified(false);
 
         try {
@@ -125,11 +130,24 @@ export default function RegisterVisit() {
 
             if (data) {
                 setMember(data);
+                setSelectedPatientId(data.id);
+
+                // Fetch dependants
+                const { data: dependantsData } = await supabase
+                    .from("dependants")
+                    .select("*")
+                    .eq("member_id", data.id)
+                    .eq("is_active", true);
+
+                if (dependantsData) {
+                    setDependants(dependantsData);
+                }
+
                 if (data.biometric_data) {
                     setBiometricsVerified(false);
                 } else {
                     setBiometricsVerified(true);
-                    toast({ title: "No Biometric Data", description: "Member has no registered biometric data. Proceeding without biometric verification.", variant: "default" });
+                    toast({ title: "No Biometric Data", description: "Principal member has no registered biometric data. Proceeding without biometric verification.", variant: "default" });
                 }
             } else {
                 toast({ title: "Member not found", description: "No member found matching that criteria.", variant: "destructive" });
@@ -151,7 +169,7 @@ export default function RegisterVisit() {
     const handleRegisterVisit = async () => {
         if (!member || !receptionistId || !receptionistBranchId) return;
         if (!biometricsVerified) {
-            toast({ title: "Biometrics required", description: "Please verify identity first.", variant: "destructive" });
+            toast({ title: "Biometrics required", description: "Please verify principal member identity first.", variant: "destructive" });
             return;
         }
         if (!member.is_active) {
@@ -161,13 +179,25 @@ export default function RegisterVisit() {
 
         setLoading(true);
         try {
+            const isDependant = selectedPatientId !== member.id;
+            const dependantId = isDependant ? selectedPatientId : null;
+
+            // Verify if dependant is valid (double check)
+            if (isDependant) {
+                const selectedDependant = dependants.find(d => d.id === selectedPatientId);
+                if (!selectedDependant) {
+                    throw new Error("Invalid patient selected.");
+                }
+            }
+
             const { error } = await supabase.from('visits').insert([{
                 member_id: member.id,
+                dependant_id: dependantId,
                 branch_id: receptionistBranchId,
                 receptionist_id: receptionistId,
                 status: 'registered',
                 doctor_id: selectedDoctorId || null, // Assign doctor if selected
-                biometrics_verified: biometricsVerified,
+                biometrics_verified: biometricsVerified, // We verified the principal
                 benefit_deducted: 0,
                 branch_compensation: 0,
                 profit_loss: 0
@@ -175,7 +205,7 @@ export default function RegisterVisit() {
 
             if (error) throw error;
 
-            toast({ title: "Visit Registered", description: "Member is now in the queue for the doctor." });
+            toast({ title: "Visit Registered", description: `${isDependant ? 'Dependant' : 'Member'} is now in the queue for the doctor.` });
             navigate("/reception");
         } catch (error: any) {
             toast({ title: "Registration failed", description: error.message, variant: "destructive" });
@@ -216,47 +246,83 @@ export default function RegisterVisit() {
             </Card>
 
             {member && (
-                <Card className="border-primary/50">
-                    <CardHeader className="bg-primary/5">
-                        <div className="flex justify-between items-start">
-                            <div>
-                                <CardTitle>{member.full_name}</CardTitle>
-                                <CardDescription>Member #{member.member_number}</CardDescription>
+                <div className="space-y-6">
+                    <Card className="border-primary/50">
+                        <CardHeader className="bg-primary/5">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <CardTitle>{member.full_name}</CardTitle>
+                                    <CardDescription>Principal Member #{member.member_number}</CardDescription>
+                                </div>
+                                <Badge variant={member.is_active ? "default" : "destructive"}>
+                                    {member.is_active ? "Active" : "Inactive"}
+                                </Badge>
                             </div>
-                            <Badge variant={member.is_active ? "default" : "destructive"}>
-                                {member.is_active ? "Active" : "Inactive"}
-                            </Badge>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="pt-6 space-y-6">
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                                <Label className="text-muted-foreground">Phone</Label>
-                                <p className="font-medium">{member.phone}</p>
+                        </CardHeader>
+                        <CardContent className="pt-6 space-y-6">
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <Label className="text-muted-foreground">Phone</Label>
+                                    <p className="font-medium">{member.phone}</p>
+                                </div>
+                                <div>
+                                    <Label className="text-muted-foreground">ID Number</Label>
+                                    <p className="font-medium">{member.id_number}</p>
+                                </div>
+                                <div>
+                                    <Label className="text-muted-foreground">Coverage Balance</Label>
+                                    <p className="font-medium text-primary">KES {member.coverage_balance?.toLocaleString()}</p>
+                                </div>
+                                <div>
+                                    <Label className="text-muted-foreground">Membership</Label>
+                                    <p className="font-medium">{member.membership_categories?.name || "N/A"}</p>
+                                </div>
                             </div>
-                            <div>
-                                <Label className="text-muted-foreground">ID Number</Label>
-                                <p className="font-medium">{member.id_number}</p>
-                            </div>
-                            <div>
-                                <Label className="text-muted-foreground">Coverage Balance</Label>
-                                <p className="font-medium text-primary">KES {member.coverage_balance?.toLocaleString()}</p>
-                            </div>
-                            <div>
-                                <Label className="text-muted-foreground">Membership</Label>
-                                <p className="font-medium">{member.membership_categories?.name || "N/A"}</p>
-                            </div>
-                        </div>
 
-                        {!member.is_active && (
-                            <div className="bg-destructive/10 text-destructive p-3 rounded-md flex items-center gap-2">
-                                <UserX className="h-5 w-5" />
-                                <span className="font-medium">Member is inactive. Advise payment before service.</span>
-                            </div>
-                        )}
+                            {!member.is_active && (
+                                <div className="bg-destructive/10 text-destructive p-3 rounded-md flex items-center gap-2">
+                                    <UserX className="h-5 w-5" />
+                                    <span className="font-medium">Member is inactive. Advise payment before service.</span>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
 
-                        {member.is_active && (
-                            <div className="space-y-4 pt-4 border-t">
+                    {member.is_active && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-lg">Select Patient</CardTitle>
+                                <CardDescription>Who is receiving treatment today?</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <RadioGroup value={selectedPatientId} onValueChange={setSelectedPatientId} className="grid grid-cols-1 gap-4">
+                                    <div className={`flex items-center space-x-3 rounded-lg border p-4 cursor-pointer transition-colors ${selectedPatientId === member.id ? 'bg-primary/5 border-primary' : 'hover:bg-muted/50'}`}>
+                                        <RadioGroupItem value={member.id} id={member.id} />
+                                        <Label htmlFor={member.id} className="flex-1 cursor-pointer font-medium">
+                                            {member.full_name} <Badge variant="outline" className="ml-2">Principal</Badge>
+                                        </Label>
+                                    </div>
+
+                                    {dependants.map((dep) => (
+                                        <div key={dep.id} className={`flex items-center space-x-3 rounded-lg border p-4 cursor-pointer transition-colors ${selectedPatientId === dep.id ? 'bg-primary/5 border-primary' : 'hover:bg-muted/50'}`}>
+                                            <RadioGroupItem value={dep.id} id={dep.id} />
+                                            <Label htmlFor={dep.id} className="flex-1 cursor-pointer">
+                                                <div className="font-medium">{dep.full_name}</div>
+                                                <div className="text-sm text-muted-foreground">{dep.relationship} • {dep.id_number}</div>
+                                            </Label>
+                                        </div>
+                                    ))}
+                                </RadioGroup>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {member.is_active && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-lg">Authorization & Assignment</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-6">
                                 {member.biometric_data ? (
                                     <BiometricCapture
                                         mode="verify"
@@ -298,10 +364,10 @@ export default function RegisterVisit() {
                                     {loading ? <Loader2 className="animate-spin mr-2" /> : <UserCheck className="mr-2 h-5 w-5" />}
                                     Register Visit
                                 </Button>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                            </CardContent>
+                        </Card>
+                    )}
+                </div>
             )}
         </div>
     );

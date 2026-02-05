@@ -29,6 +29,27 @@ export default function DirectorRevenue() {
         fetchDirectorInfo();
     }, []);
 
+    const fetchDirectorInfo = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            navigate("/login");
+            return;
+        }
+
+        const { data: staffData, error: staffError } = await supabase
+            .from("staff")
+            .select("branch_id")
+            .eq("user_id", user.id)
+            .maybeSingle();
+
+        if (staffError || !staffData?.branch_id) {
+            toast({ title: "Access Denied", description: "You are not assigned to a branch.", variant: "destructive" });
+            navigate("/");
+            return;
+        }
+        setDirectorBranchId(staffData.branch_id);
+    };
+
 
     const [stats, setStats] = useState({ compensation: 0, profit_loss: 0, visits: 0 });
     const [submittingClaim, setSubmittingClaim] = useState(false);

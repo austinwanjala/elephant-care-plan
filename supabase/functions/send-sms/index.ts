@@ -93,11 +93,20 @@ serve(async (req) => {
                     body: formData.toString()
                 });
 
-                const result = await response.json();
-                console.log("[send-sms] Africa's Talking Response:", result);
-                smsResult = { success: true, ...result };
+                const responseText = await response.text();
+                console.log("[send-sms] Africa's Talking Raw Response:", responseText);
+                
+                try {
+                    const result = JSON.parse(responseText);
+                    console.log("[send-sms] Africa's Talking Parsed:", result);
+                    smsResult = { success: response.ok, ...result };
+                } catch {
+                    console.error("[send-sms] Africa's Talking returned non-JSON:", responseText);
+                    smsResult = { success: false, message: responseText };
+                }
             } catch (err) {
                 console.error("[send-sms] SMS Provider Error:", err);
+                smsResult = { success: false, message: err instanceof Error ? err.message : "SMS send failed" };
             }
         }
 

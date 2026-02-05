@@ -5,8 +5,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ArrowLeft, DollarSign, TrendingUp, CalendarDays } from "lucide-react";
+import { Loader2, ArrowLeft, DollarSign, TrendingUp, CalendarDays, History } from "lucide-react";
 import { format } from "date-fns";
+import { Badge } from "@/components/ui/badge";
 
 interface MarketerInfo {
     id: string;
@@ -20,7 +21,7 @@ interface EarningsEntry {
     member_number: string;
     amount: number;
     earned_at: string;
-    status: string; // e.g., 'pending', 'paid'
+    status: string; // e.g., 'active' -> 'Earned', 'inactive' -> 'Pending'
 }
 
 export default function MarketerEarnings() {
@@ -54,12 +55,29 @@ export default function MarketerEarnings() {
             return;
         }
         setMarketer(mData);
-        // For now, earnings history is simulated. In a real app, this would come from a dedicated 'marketer_earnings' table.
-        setEarningsHistory([
-            { id: 'e1', member_name: 'Alice Smith', member_number: 'ED123456', amount: 50, earned_at: '2024-07-01T10:00:00Z', status: 'paid' },
-            { id: 'e2', member_name: 'Bob Johnson', member_number: 'ED789012', amount: 50, earned_at: '2024-07-15T11:30:00Z', status: 'paid' },
-            { id: 'e3', member_name: 'Charlie Brown', member_number: 'ED345678', amount: 50, earned_at: '2024-08-01T09:00:00Z', status: 'pending' },
-        ]);
+
+        // Fetch referred members to construct earnings history
+        // Assuming there isn't a direct "commissions" table, we use the members table
+        // where marketer_id matches.
+        const { data: membersData, error: membersError } = await supabase
+            .from("members")
+            .select("id, full_name, member_number, created_at, is_active")
+            .eq("marketer_id", mData.id)
+            .order("created_at", { ascending: false });
+
+        if (membersError) {
+            console.error("Error fetching referrals:", membersError);
+        } else if (membersData) {
+            const mappedHistory: EarningsEntry[] = membersData.map(m => ({
+                id: m.id,
+                member_name: m.full_name,
+                member_number: m.member_number,
+                amount: 500, // Fixed commission amount for now, or could vary
+                earned_at: m.created_at,
+                status: m.is_active ? 'Earned' : 'Pending Activation'
+            }));
+            setEarningsHistory(mappedHistory);
+        }
 
         setLoading(false);
     };
@@ -76,7 +94,10 @@ export default function MarketerEarnings() {
         return <div className="p-8 text-center text-muted-foreground">No marketer account found.</div>;
     }
 
-    const pendingEarnings = earningsHistory.filter(e => e.status === 'pending').reduce((sum, e) => sum + e.amount, 0);
+    // Calculate pending earnings from our history list
+    const pendingEarnings = earningsHistory
+        .filter(e => e.status === 'Pending Activation')
+        .reduce((sum, e) => sum + e.amount, 0);
 
     return (
         <div className="space-y-6">
@@ -95,23 +116,23 @@ export default function MarketerEarnings() {
             <div className="grid gap-4 md:grid-cols-2">
                 <Card className="border-l-4 border-l-emerald-600 shadow-sm">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Total Earnings (Life)</CardTitle>
+                        <CardTitle className="text-sm font-medium">Total Earnings (Paid)</CardTitle>
                         <DollarSign className="h-4 w-4 text-emerald-600" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">KES {marketer.total_earnings.toLocaleString()}</div>
-                        <p className="text-xs text-muted-foreground mt-1">Accumulated from all referrals</p>
+                        <div className="text-2xl font-bold">KES {marketer.total_earnings?.toLocaleString() || 0}</div>
+                        <p className="text-xs text-muted-foreground mt-1">Accumulated verified commissions</p>
                     </CardContent>
                 </Card>
 
                 <Card className="border-l-4 border-l-orange-600 shadow-sm">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Pending Payout</CardTitle>
+                        <CardTitle className="text-sm font-medium">Pending Estimations</CardTitle>
                         <TrendingUp className="h-4 w-4 text-orange-600" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-orange-700">KES {pendingEarnings.toLocaleString()}</div>
-                        <p className="text-xs text-muted-foreground mt-1">Next payout scheduled: Monday</p>
+                        <p className="text-xs text-muted-foreground mt-1">Potential earnings from inactive members</p>
                     </CardContent>
                 </Card>
             </div>
@@ -121,40 +142,47 @@ export default function MarketerEarnings() {
                     <CardTitle className="flex items-center gap-2">
                         <History className="h-5 w-5" /> Earnings History
                     </CardTitle>
-                    <CardDescription>Record of commissions earned per referred member.</CardDescription>
+                    <CardDescription>Record of commissions based on your referrals.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     {earningsHistory.length === 0 ? (
-                        <p className="text-center text-muted-foreground py-8">No earnings recorded yet.</p>
+                        <p className="text-center text-muted-foreground py-8">No referrals recorded yet.</p>
                     ) : (
                         <div className="overflow-x-auto">
-                            <table className="w-full min-w-[600px] divide-y divide-border">
-                                <thead>
-                                    <tr className="text-left text-sm text-muted-foreground">
-                                        <th className="py-3 pr-3 font-semibold">Date</th>
-                                        <th className="py-3 px-3 font-semibold">Referred Member</th>
-                                        <th className="py-3 px-3 font-semibold">Amount</th>
-                                        <th className="py-3 pl-3 font-semibold text-right">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-border">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead>Referred Member</TableHead>
+                                        <TableHead>Est. Amount</TableHead>
+                                        <TableHead className="text-right">Status</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
                                     {earningsHistory.map(entry => (
-                                        <tr key={entry.id} className="hover:bg-muted/50">
-                                            <td className="py-3 pr-3 text-sm">{format(new Date(entry.earned_at), 'MMM d, yyyy')}</td>
-                                            <td className="py-3 px-3 text-sm">
+                                        <TableRow key={entry.id} className="hover:bg-muted/50">
+                                            <TableCell className="font-medium text-muted-foreground">
+                                                {format(new Date(entry.earned_at), 'MMM d, yyyy')}
+                                            </TableCell>
+                                            <TableCell>
                                                 <div className="font-medium">{entry.member_name}</div>
                                                 <div className="text-xs text-muted-foreground">{entry.member_number}</div>
-                                            </td>
-                                            <td className="py-3 px-3 text-sm text-emerald-700">KES {entry.amount.toLocaleString()}</td>
-                                            <td className="py-3 pl-3 text-sm text-right">
-                                                <Badge variant={entry.status === 'paid' ? 'default' : 'secondary'} className={entry.status === 'paid' ? 'bg-green-600' : ''}>
+                                            </TableCell>
+                                            <TableCell className="text-emerald-700 font-semibold">
+                                                KES {entry.amount.toLocaleString()}
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <Badge
+                                                    variant={entry.status === 'Earned' ? 'default' : 'secondary'}
+                                                    className={entry.status === 'Earned' ? 'bg-green-600 hover:bg-green-700' : ''}
+                                                >
                                                     {entry.status}
                                                 </Badge>
-                                            </td>
-                                        </tr>
+                                            </TableCell>
+                                        </TableRow>
                                     ))}
-                                </tbody>
-                            </table>
+                                </TableBody>
+                            </Table>
                         </div>
                     )}
                 </CardContent>

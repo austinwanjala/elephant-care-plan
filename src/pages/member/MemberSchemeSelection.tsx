@@ -118,7 +118,8 @@ const MemberSchemeSelection = () => {
 
     try {
       const totalPayment = selectedCategory.payment_amount + selectedCategory.registration_fee + selectedCategory.management_fee;
-      const benefitToAdd = selectedCategory.benefit_amount;
+      // Coverage is double the principal amount (payment_amount)
+      const benefitToAdd = selectedCategory.payment_amount * 2;
 
       const qrCodeValue = `MEMBER-${member.member_number}`; // Generate QR code data
 
@@ -131,7 +132,7 @@ const MemberSchemeSelection = () => {
           is_active: true,
           qr_code_data: qrCodeValue,
           membership_category_id: selectedCategory.id,
-          benefit_limit: selectedCategory.benefit_amount, // Set initial benefit limit
+          benefit_limit: benefitToAdd, // Set benefit limit to the new coverage amount
         })
         .eq("id", member.id);
 

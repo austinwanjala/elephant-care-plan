@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, Send, ArrowLeft, Trash2, Plus } from "lucide-react";
+import { Loader2, Save, Send, ArrowLeft, Trash2, Plus, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { DentalChart } from "@/components/doctor/DentalChart";
 
@@ -19,12 +19,14 @@ export default function Consultation() {
     const [submitting, setSubmitting] = useState(false);
     const [selectedTeeth, setSelectedTeeth] = useState<number[]>([]);
     const [toothStatus, setToothStatus] = useState<Record<number, string>>({});
-    const [diagnosis, setDiagnosis] = useState(""); // Renamed from notes to diagnosis
-    const [treatmentNotes, setTreatmentNotes] = useState(""); // New field for doctor's notes
-    const [availableServices, setAvailableServices] = useState<any[]>([]); // Renamed from services to availableServices
-    const [selectedServices, setSelectedServices] = useState<any[]>([]);
+    const [diagnosis, setDiagnosis] = useState("");
+    const [treatmentNotes, setTreatmentNotes] = useState("");
+    const [availableServices, setAvailableServices] = useState<any[]>([]);
+    // selectedServices now stores object with service and specific tooth info
+    const [selectedServices, setSelectedServices] = useState<{ service: any, tooth_number: number | null }[]>([]);
+    const [serviceHistory, setServiceHistory] = useState<any[]>([]); // To check for duplicates
     const [doctorId, setDoctorId] = useState<string | null>(null);
-    const [doctorBranchId, setDoctorBranchId] = useState<string | null>(null); // Store doctor's branch ID
+    const [doctorBranchId, setDoctorBranchId] = useState<string | null>(null);
 
     useEffect(() => {
         if (visitId) {
@@ -35,7 +37,7 @@ export default function Consultation() {
     useEffect(() => {
         if (doctorId && doctorBranchId) {
             loadVisitData();
-            loadServices(doctorBranchId); // Pass branch ID to load services
+            loadServices(doctorBranchId);
         }
     }, [doctorId, doctorBranchId]);
 
@@ -73,17 +75,27 @@ export default function Consultation() {
             navigate("/doctor");
         } else {
             setVisit(data);
-            // Load existing dental records
+
+            // Load existing dental records (status)
             const { data: records } = await supabase.from("dental_records").select("tooth_number, status").eq("member_id", data.member_id);
             if (records) {
                 const statuses: any = {};
                 records.forEach((r: any) => statuses[r.tooth_number] = r.status);
                 setToothStatus(statuses);
             }
+
+            // Load service history (dental_chart_records)
+            const { data: history } = await supabase
+                .from("dental_chart_records")
+                .select("tooth_number, service_id, created_at")
+                .eq("member_id", data.member_id);
+            if (history) {
+                setServiceHistory(history);
+            }
+
             if (data.diagnosis) setDiagnosis(data.diagnosis);
             if (data.treatment_notes) setTreatmentNotes(data.treatment_notes);
 
-            // If status is 'registered', update to 'with_doctor'
             if (data.status === 'registered' && doctorId) {
                 const { error: updateStatusError } = await supabase
                     .from("visits")
@@ -118,14 +130,8 @@ export default function Consultation() {
         }
 
         const filteredServices = servicesData?.filter(service => {
-            if (service.approval_type === 'all_branches') {
-                return true;
-            }
-            // If service is 'pre_approved_only'
-            if (branchData?.is_globally_preapproved_for_services) {
-                return true; // Branch is globally pre-approved for all services
-            }
-            // Check if the specific branch is pre-approved for this service
+            if (service.approval_type === 'all_branches') return true;
+            if (branchData?.is_globally_preapproved_for_services) return true;
             return service.service_preapprovals.some((preapproval: any) => preapproval.branch_id === branchId);
         }) || [];
 
@@ -146,19 +152,71 @@ export default function Consultation() {
             newStatus[id] = status;
         });
         setToothStatus(newStatus);
-        setSelectedTeeth([]);
+        // Don't clear selected teeth here, might want to add service too
         toast({ title: "Chart Updated", description: `${selectedTeeth.length} teeth marked as ${status}` });
     };
 
     const addService = (serviceId: string) => {
+        if (!serviceId) return;
         const service = availableServices.find(s => s.id === serviceId);
-        if (service && !selectedServices.find(s => s.id === serviceId)) {
-            setSelectedServices([...selectedServices, service]);
+        if (!service) return;
+
+        // If teeth are selected, add service for EACH selected tooth
+        // checking valid history locking
+        if (selectedTeeth.length > 0) {
+            let addedCount = 0;
+            const newSelections = [...selectedServices];
+            const blockedTeeth: number[] = [];
+
+            selectedTeeth.forEach(tooth => {
+                // Check if already selected locally
+                if (newSelections.find(s => s.service.id === serviceId && s.tooth_number === tooth)) {
+                    return; // Skip duplicate draft
+                }
+
+                // Check history locking
+                const hasExistingRecord = serviceHistory.some(h =>
+                    h.tooth_number == tooth && h.service_id === serviceId
+                );
+
+                if (hasExistingRecord) {
+                    blockedTeeth.push(tooth);
+                } else {
+                    newSelections.push({ service, tooth_number: tooth });
+                    addedCount++;
+                }
+            });
+
+            if (blockedTeeth.length > 0) {
+                toast({
+                    title: "Service Blocked",
+                    description: `Cannot perform ${service.name} on teeth: ${blockedTeeth.join(", ")} as it has been done previously.`,
+                    variant: "destructive"
+                });
+            }
+
+            if (addedCount > 0) {
+                setSelectedServices(newSelections);
+                toast({ title: "Services Added", description: `Added ${service.name} for ${addedCount} teeth.` });
+                setSelectedTeeth([]); // Clear selection after successful add
+            }
+
+        } else {
+            // No tooth selected - general service? Or prompt?
+            // Assuming for now generic services can be added without tooth
+            // or asking user to select tooth.
+            // Let's allow generic, but notify user.
+            toast({ title: "General Service", description: "Added as general service (no tooth specified)." });
+            if (!selectedServices.find(s => s.service.id === serviceId && s.tooth_number === null)) {
+                setSelectedServices([...selectedServices, { service, tooth_number: null }]);
+            }
         }
     };
 
-    const removeService = (serviceId: string) => {
-        setSelectedServices(selectedServices.filter(s => s.id !== serviceId));
+    const removeService = (index: number) => {
+        const newServices = [...selectedServices];
+        newServices.splice(index, 1);
+        setSelectedServices(newServices);
     };
 
     const handleSaveDraft = async () => {
@@ -172,7 +230,7 @@ export default function Consultation() {
 
             if (error) throw error;
 
-            // Save dental records
+            // Save dental records (statuses)
             const recordsToUpsert = Object.entries(toothStatus).map(([tooth_number, status]) => ({
                 member_id: visit.member_id,
                 visit_id: visitId,
@@ -203,7 +261,7 @@ export default function Consultation() {
 
         setSubmitting(true);
         try {
-            // 1. Save Dental Records (if any changes were made)
+            // 1. Save Dental Records (Statuses)
             const recordsToUpsert = Object.entries(toothStatus).map(([tooth_number, status]) => ({
                 member_id: visit.member_id,
                 visit_id: visitId,
@@ -218,10 +276,10 @@ export default function Consultation() {
             }
 
             // 2. Calculate Bill Totals
-            const totalBenefit = selectedServices.reduce((acc, s) => acc + Number(s.benefit_cost), 0);
-            const totalCompensation = selectedServices.reduce((acc, s) => acc + Number(s.branch_compensation), 0);
-            const totalReal = selectedServices.reduce((acc, s) => acc + Number(s.real_cost), 0);
-            const totalProfitLoss = totalBenefit - totalCompensation; // Profit/Loss is benefit - compensation
+            const totalBenefit = selectedServices.reduce((acc, s) => acc + Number(s.service.benefit_cost), 0);
+            const totalCompensation = selectedServices.reduce((acc, s) => acc + Number(s.service.branch_compensation), 0);
+            const totalReal = selectedServices.reduce((acc, s) => acc + Number(s.service.real_cost), 0);
+            const totalProfitLoss = totalBenefit - totalCompensation;
 
             // 3. Create Bill
             const { data: bill, error: billError } = await supabase.from("bills").insert({
@@ -231,31 +289,48 @@ export default function Consultation() {
                 total_branch_compensation: totalCompensation,
                 total_real_cost: totalReal,
                 total_profit_loss: totalProfitLoss,
-                is_finalized: false, // Receptionist finalizes
+                is_finalized: false,
             }).select().single();
 
             if (billError) throw billError;
 
-            // 4. Add Bill Items
+            // 4. Add Bill Items AND Dental Chart Records for Services
             const itemsToInsert = selectedServices.map(s => ({
                 bill_id: bill.id,
-                service_id: s.id,
-                service_name: s.name,
-                benefit_cost: s.benefit_cost,
-                branch_compensation: s.branch_compensation,
-                real_cost: s.real_cost
+                service_id: s.service.id,
+                service_name: s.service.name,
+                benefit_cost: s.service.benefit_cost,
+                branch_compensation: s.service.branch_compensation,
+                real_cost: s.service.real_cost,
+                tooth_number: s.tooth_number ? s.tooth_number.toString() : null
             }));
 
             const { error: itemsError } = await supabase.from("bill_items").insert(itemsToInsert);
             if (itemsError) throw itemsError;
 
-            // 5. Update Visit Status and Doctor Notes
+            // Insert into dental_chart_records to LOCK this service for this tooth in future
+            const chartRecordsToInsert = selectedServices
+                .filter(s => s.tooth_number !== null)
+                .map(s => ({
+                    member_id: visit.member_id,
+                    bill_id: bill.id,
+                    service_id: s.service.id,
+                    tooth_number: s.tooth_number!.toString(),
+                    notes: `Procedure performed on visit ${visitId}`,
+                    // treated_by, treated_at...
+                }));
+
+            if (chartRecordsToInsert.length > 0) {
+                const { error: chartError } = await supabase.from("dental_chart_records").insert(chartRecordsToInsert);
+                if (chartError) throw chartError;
+            }
+
+            // 5. Update Visit Status
             const { error: visitUpdateError } = await supabase.from("visits").update({
-                status: 'billed', // Change status to 'billed'
+                status: 'billed',
                 diagnosis: diagnosis,
                 treatment_notes: treatmentNotes,
                 doctor_id: doctorId,
-                // These fields are now derived from the bill, so set to 0 or remove from visits table
                 benefit_deducted: 0,
                 branch_compensation: 0,
                 profit_loss: 0
@@ -267,6 +342,7 @@ export default function Consultation() {
             navigate("/doctor");
 
         } catch (error: any) {
+            console.error("Finalize error:", error);
             toast({ title: "Failed to finalize", description: error.message, variant: "destructive" });
         } finally {
             setSubmitting(false);
@@ -291,8 +367,8 @@ export default function Consultation() {
                 <div className="lg:col-span-2 space-y-6">
                     <Card>
                         <CardHeader>
-                            <CardTitle>Dental Chart</CardTitle>
-                            <CardDescription>Select teeth to update clinical status.</CardDescription>
+                            <CardTitle>Dental Chart (FDI)</CardTitle>
+                            <CardDescription>Select teeth to add services or update clinical status.</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <DentalChart
@@ -301,11 +377,31 @@ export default function Consultation() {
                                 toothStatus={toothStatus}
                             />
                             {selectedTeeth.length > 0 && (
-                                <div className="mt-4 p-4 border rounded bg-primary/5 flex gap-2 justify-center flex-wrap">
-                                    <Button size="sm" variant="destructive" onClick={() => handleStatusUpdate('decay')}>Mark Decay</Button>
-                                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={() => handleStatusUpdate('planned')}>Plan Treatment</Button>
-                                    <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleStatusUpdate('completed')}>Mark Completed</Button>
-                                    <Button size="sm" variant="outline" onClick={() => handleStatusUpdate('healthy')}>Mark Healthy</Button>
+                                <div className="mt-4 space-y-4">
+                                    <div className="p-4 border rounded bg-primary/5 flex gap-2 justify-center flex-wrap">
+                                        <span className="w-full text-center text-sm font-semibold mb-1">Update Status:</span>
+                                        <Button size="sm" variant="destructive" onClick={() => handleStatusUpdate('decay')}>Mark Decay</Button>
+                                        <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={() => handleStatusUpdate('planned')}>Plan Treatment</Button>
+                                        <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleStatusUpdate('completed')}>Mark Completed</Button>
+                                        <Button size="sm" variant="outline" onClick={() => handleStatusUpdate('healthy')}>Mark Healthy</Button>
+                                    </div>
+
+                                    <div className="p-4 border rounded bg-secondary/20">
+                                        <Label>Add Procedure for Selected Teeth ({selectedTeeth.join(", ")})</Label>
+                                        <select
+                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-2"
+                                            onChange={(e) => {
+                                                addService(e.target.value);
+                                                e.target.value = ""; // Reset
+                                            }}
+                                            defaultValue=""
+                                        >
+                                            <option value="" disabled>Select a procedure to perform on these teeth...</option>
+                                            {availableServices.map(s => (
+                                                <option key={s.id} value={s.id}>{s.name} (Benefit: KES {s.benefit_cost.toLocaleString()})</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
                             )}
                         </CardContent>
@@ -348,35 +444,23 @@ export default function Consultation() {
 
                     <Card>
                         <CardHeader>
-                            <CardTitle>Services Provided</CardTitle>
+                            <CardTitle>Billable Services</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="flex gap-2">
-                                <select
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                    onChange={(e) => addService(e.target.value)}
-                                    defaultValue=""
-                                >
-                                    <option value="" disabled>Select a service to add...</option>
-                                    {availableServices.map(s => (
-                                        <option key={s.id} value={s.id}>{s.name} (Benefit: KES {s.benefit_cost.toLocaleString()})</option>
-                                    ))}
-                                </select>
-                            </div>
-
                             <div className="border rounded-md divide-y">
                                 {selectedServices.length === 0 ? (
-                                    <div className="p-4 text-center text-muted-foreground">No services selected yet.</div>
+                                    <div className="p-4 text-center text-muted-foreground">No services added yet. Select teeth and choose a procedure.</div>
                                 ) : (
-                                    selectedServices.map(s => (
-                                        <div key={s.id} className="p-4 flex justify-between items-center bg-white">
+                                    selectedServices.map((s, index) => (
+                                        <div key={`${s.service.id}-${index}`} className="p-4 flex justify-between items-center bg-white">
                                             <div>
-                                                <div className="font-semibold">{s.name}</div>
+                                                <div className="font-semibold">{s.service.name}</div>
                                                 <div className="text-xs text-muted-foreground">
-                                                    Benefit: KES {s.benefit_cost.toLocaleString()} | Comp: KES {s.branch_compensation.toLocaleString()} | Real: KES {s.real_cost.toLocaleString()}
+                                                    {s.tooth_number ? <span className="font-bold text-primary mr-2">Tooth #{s.tooth_number}</span> : <span className="mr-2 italic">No tooth specified</span>}
+                                                    Benefit: KES {s.service.benefit_cost.toLocaleString()}
                                                 </div>
                                             </div>
-                                            <Button variant="ghost" size="icon" onClick={() => removeService(s.id)}>
+                                            <Button variant="ghost" size="icon" onClick={() => removeService(index)}>
                                                 <Trash2 className="h-4 w-4 text-destructive" />
                                             </Button>
                                         </div>
@@ -406,11 +490,11 @@ export default function Consultation() {
                                 <div className="mt-2 space-y-1">
                                     <div className="flex justify-between">
                                         <span>Total Benefit Cost:</span>
-                                        <span>KES {selectedServices.reduce((acc, s) => acc + Number(s.benefit_cost), 0).toLocaleString()}</span>
+                                        <span>KES {selectedServices.reduce((acc, s) => acc + Number(s.service.benefit_cost), 0).toLocaleString()}</span>
                                     </div>
                                     <div className="flex justify-between font-bold text-primary">
                                         <span>Estimated Coverage Deduction:</span>
-                                        <span>KES {Math.min(selectedServices.reduce((acc, s) => acc + Number(s.benefit_cost), 0), visit.members.coverage_balance || 0).toLocaleString()}</span>
+                                        <span>KES {Math.min(selectedServices.reduce((acc, s) => acc + Number(s.service.benefit_cost), 0), visit.members.coverage_balance || 0).toLocaleString()}</span>
                                     </div>
                                 </div>
                             </div>
@@ -425,9 +509,6 @@ export default function Consultation() {
                         {submitting ? <Loader2 className="animate-spin mr-2" /> : <Send className="mr-2 h-5 w-5" />}
                         Submit Consultation
                     </Button>
-                    <p className="text-center text-xs text-muted-foreground">
-                        Bill will be sent to Reception for finalization and deduction.
-                    </p>
                 </div>
             </div>
         </div>

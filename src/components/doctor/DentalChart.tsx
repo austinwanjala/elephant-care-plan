@@ -3,8 +3,28 @@ import { cn } from "@/lib/utils";
 
 // Simplified teeth representation (Universal Numbering System - 1-32)
 // This is a visual representation, not anatomically perfect but functional for UI
-const TEETH_UPPER = Array.from({ length: 16 }, (_, i) => i + 1); // 1-16
-const TEETH_LOWER = Array.from({ length: 16 }, (_, i) => 32 - i); // 32-17
+// FDI World Dental Federation notation
+const TEETH_Q1 = [18, 17, 16, 15, 14, 13, 12, 11]; // Upper Right
+const TEETH_Q2 = [21, 22, 23, 24, 25, 26, 27, 28]; // Upper Left
+const TEETH_Q3 = [48, 47, 46, 45, 44, 43, 42, 41]; // Lower Right (Note: Q3 is conventionally Lower Left in FDI, but for visual symmetry in chart: Q1 | Q2 \n Q4 | Q3. Wait.
+// Standard View: Patient's Right is Viewer's Left.
+// Q1 (Upper Right) - Viewer Left
+// Q2 (Upper Left) - Viewer Right
+// Q3 (Lower Left) - Viewer Right
+// Q4 (Lower Right) - Viewer Left
+// So layout:
+// Q1  Q2
+// Q4  Q3
+
+// Correct layout for UI (Viewer looking at patient):
+// Upper Right (18-11) | Upper Left (21-28)
+// ----------------------------------------
+// Lower Right (48-41) | Lower Left (31-38)
+
+const TEETH_UPPER_RIGHT = [18, 17, 16, 15, 14, 13, 12, 11];
+const TEETH_UPPER_LEFT = [21, 22, 23, 24, 25, 26, 27, 28];
+const TEETH_LOWER_RIGHT = [48, 47, 46, 45, 44, 43, 42, 41];
+const TEETH_LOWER_LEFT = [31, 32, 33, 34, 35, 36, 37, 38];
 
 interface DentalChartProps {
     onToothClick: (toothId: number) => void;
@@ -19,30 +39,35 @@ export function DentalChart({ onToothClick, selectedTeeth, toothStatus }: Dental
 
             <div className="flex flex-col gap-8">
                 {/* Upper Arch */}
-                <div className="flex justify-center gap-1 md:gap-2 flex-wrap">
-                    {TEETH_UPPER.map((id) => (
-                        <Tooth
-                            key={id}
-                            id={id}
-                            isSelected={selectedTeeth.includes(id)}
-                            status={toothStatus[id]}
-                            onClick={() => onToothClick(id)}
-                        />
-                    ))}
+                <div className="flex flex-col md:flex-row justify-center gap-4 md:gap-8">
+                    {/* Q1 Upper Right */}
+                    <div className="flex gap-1 justify-end">
+                        {TEETH_UPPER_RIGHT.map((id) => (
+                            <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} />
+                        ))}
+                    </div>
+                    {/* Q2 Upper Left */}
+                    <div className="flex gap-1 justify-start">
+                        {TEETH_UPPER_LEFT.map((id) => (
+                            <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} />
+                        ))}
+                    </div>
                 </div>
 
                 {/* Lower Arch */}
-                <div className="flex justify-center gap-1 md:gap-2 flex-wrap">
-                    {TEETH_LOWER.map((id) => (
-                        <Tooth
-                            key={id}
-                            id={id}
-                            isSelected={selectedTeeth.includes(id)}
-                            status={toothStatus[id]}
-                            onClick={() => onToothClick(id)}
-                            isLower
-                        />
-                    ))}
+                <div className="flex flex-col md:flex-row justify-center gap-4 md:gap-8">
+                    {/* Q4 Lower Right */}
+                    <div className="flex gap-1 justify-end">
+                        {TEETH_LOWER_RIGHT.map((id) => (
+                            <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} isLower />
+                        ))}
+                    </div>
+                    {/* Q3 Lower Left */}
+                    <div className="flex gap-1 justify-start">
+                        {TEETH_LOWER_LEFT.map((id) => (
+                            <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} isLower />
+                        ))}
+                    </div>
                 </div>
             </div>
 

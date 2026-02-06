@@ -23,24 +23,44 @@ serve(async (req) => {
         const consumerSecret = Deno.env.get("MPESA_CONSUMER_SECRET");
         const passkey = Deno.env.get("MPESA_PASSKEY");
         const shortcode = Deno.env.get("MPESA_BUSINESS_SHORTCODE");
-        const callbackUrl = Deno.env.get("MPESA_CALLBACK_URL"); // Your Supabase Function URL for callback
+        const callbackUrl = Deno.env.get("MPESA_CALLBACK_URL");
 
         if (!consumerKey || !consumerSecret || !shortcode || !passkey || !callbackUrl) {
+            console.error("Missing secrets:", { 
+                hasConsumerKey: !!consumerKey, 
+                hasConsumerSecret: !!consumerSecret, 
+                hasShortcode: !!shortcode, 
+                hasPasskey: !!passkey, 
+                hasCallbackUrl: !!callbackUrl 
+            });
             throw new Error("Server misconfiguration: Missing M-Pesa secrets");
         }
 
         const auth = btoa(`${consumerKey}:${consumerSecret}`);
+        console.log("[mpesa-stk-push] Fetching access token...");
+        
         const authResponse = await fetch("https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials", {
             headers: { "Authorization": `Basic ${auth}` }
         });
 
-        const authData = await authResponse.json();
+        const authText = await authResponse.text();
+        console.log("[mpesa-stk-push] Auth response status:", authResponse.status);
+        console.log("[mpesa-stk-push] Auth response:", authText);
+        
+        let authData;
+        try {
+            authData = JSON.parse(authText);
+        } catch {
+            throw new Error(`M-Pesa auth failed - invalid response: ${authText}`);
+        }
+
         if (!authData.access_token) {
             console.error("Auth failed:", authData);
-            throw new Error("Failed to authenticate with M-Pesa");
+            throw new Error(`Failed to authenticate with M-Pesa: ${authData.errorMessage || authText}`);
         }
 
         const accessToken = authData.access_token;
+        console.log("[mpesa-stk-push] Got access token");
 
         // 2. Prepare STK Push
         const timestamp = new Date().toISOString().replace(/[^0-9]/g, "").slice(0, 14);
@@ -51,7 +71,7 @@ serve(async (req) => {
             Password: password,
             Timestamp: timestamp,
             TransactionType: "CustomerPayBillOnline",
-            Amount: Math.ceil(amount), // Ensure integer
+            Amount: Math.ceil(amount),
             PartyA: phone,
             PartyB: shortcode,
             PhoneNumber: phone,
@@ -60,7 +80,7 @@ serve(async (req) => {
             TransactionDesc: "Membership Payment"
         };
 
-        console.log("Initiating STK Push for:", phone, "Amount:", amount);
+        console.log("[mpesa-stk-push] Initiating STK Push for:", phone, "Amount:", amount);
 
         // 3. Send STK Push Request
         const stkResponse = await fetch("https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest", {
@@ -72,11 +92,18 @@ serve(async (req) => {
             body: JSON.stringify(stkPayload)
         });
 
-        const stkData = await stkResponse.json();
-        console.log("STK Response:", stkData);
+        const stkText = await stkResponse.text();
+        console.log("[mpesa-stk-push] STK Response:", stkText);
+
+        let stkData;
+        try {
+            stkData = JSON.parse(stkText);
+        } catch {
+            throw new Error(`M-Pesa STK response invalid: ${stkText}`);
+        }
 
         if (stkData.ResponseCode !== "0") {
-            throw new Error(stkData.errorMessage || "STK Push failed to initiate");
+            throw new Error(stkData.errorMessage || stkData.CustomerMessage || "STK Push failed to initiate");
         }
 
         // 4. Record Payment as Pending in DB

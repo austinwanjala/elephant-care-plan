@@ -69,16 +69,26 @@ serve(async (req) => {
 
         // 2. Prepare STK Push
         const timestamp = new Date().toISOString().replace(/[^0-9]/g, "").slice(0, 14);
-        const password = btoa(`${shortcode}${passkey}${timestamp}`);
+        
+        // Debug: Log values being used for password generation
+        console.log("[mpesa-stk-push] Shortcode:", shortcode, "Length:", shortcode?.length);
+        console.log("[mpesa-stk-push] Passkey starts with:", passkey?.substring(0, 10), "Length:", passkey?.length);
+        console.log("[mpesa-stk-push] Timestamp:", timestamp);
+        
+        // Trim any whitespace from secrets
+        const cleanShortcode = shortcode?.trim();
+        const cleanPasskey = passkey?.trim();
+        
+        const password = btoa(`${cleanShortcode}${cleanPasskey}${timestamp}`);
 
         const stkPayload = {
-            BusinessShortCode: shortcode,
+            BusinessShortCode: cleanShortcode,
             Password: password,
             Timestamp: timestamp,
             TransactionType: "CustomerPayBillOnline",
             Amount: Math.ceil(amount),
             PartyA: phone,
-            PartyB: shortcode,
+            PartyB: cleanShortcode,
             PhoneNumber: phone,
             CallBackURL: callbackUrl,
             AccountReference: "ElephantCare",

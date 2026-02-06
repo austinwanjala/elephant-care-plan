@@ -18,61 +18,41 @@ serve(async (req) => {
             throw new Error("Missing required fields: amount, phone, member_id");
         }
 
-        // 1. Get Access Token
-        // TEMPORARY DEBUG: Hardcoding known working keys to bypass Secrets/Env issues
-        const consumerKey = "v1kPFlj2iuxDpeBP7EJ2aD2qushYsMUJHGXdBzhVdPqvvYiQ";
-        const consumerSecret = "cJlol8jez8DmYqikYljAyASTqEyFr4dNTi2F0HyPsgoDVW8fLKFObh3GJ5rQDfsP";
-        const passkey = "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919";
-        const shortcode = "174379";
-        const callbackUrl = "https://wtzdddcogjtzzmgjbbvz.supabase.co/functions/v1/mpesa-callback";
+        // 1. Get Configuration from Environment Variables
+        const consumerKey = Deno.env.get("MPESA_CONSUMER_KEY");
+        const consumerSecret = Deno.env.get("MPESA_CONSUMER_SECRET");
+        const passkey = Deno.env.get("MPESA_PASSKEY");
+        const shortcode = Deno.env.get("MPESA_BUSINESS_SHORTCODE") || "174379";
+        const callbackUrl = Deno.env.get("MPESA_CALLBACK_URL");
 
-        if (!consumerKey || !consumerSecret) {
-            throw new Error("Server misconfiguration: Hardcoded keys missing");
+        if (!consumerKey || !consumerSecret || !passkey || !callbackUrl) {
+            throw new Error("Server misconfiguration: M-Pesa credentials missing in environment variables.");
         }
 
-
-
-
-        // Sanitize Phone Number
+        // Sanitize Phone Number (Ensure 254 format)
         let formattedPhone = phone.replace(/[^0-9]/g, "");
         if (formattedPhone.startsWith("0")) {
             formattedPhone = "254" + formattedPhone.slice(1);
-        } else if (formattedPhone.startsWith("254")) {
-            // ok
-        } else {
-            // Assume it needs prefix if it's 9 digits? Safest to just prepend 254 if not present?
-            // But for Kenya standard is 254... 
-            // If length is 9 (e.g. 712345678), add 254.
-            if (formattedPhone.length === 9) formattedPhone = "254" + formattedPhone;
+        } else if (!formattedPhone.startsWith("254") && formattedPhone.length === 9) {
+            formattedPhone = "254" + formattedPhone;
         }
 
-        const auth = btoa(`${consumerKey}:${consumerSecret}`);
-        console.log("[mpesa-stk-push] Fetching access token...");
+        console.log(`[mpesa-stk-push] Initiating request for ${formattedPhone} - Amount: ${amount}`);
 
+        // 2. Get Access Token
+        const auth = btoa(`${consumerKey}:${consumerSecret}`);
         const authResponse = await fetch("https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials", {
             headers: { "Authorization": `Basic ${auth}` }
         });
 
-        const authText = await authResponse.text();
-        console.log("[mpesa-stk-push] Auth response status:", authResponse.status);
-        console.log("[mpesa-stk-push] Auth response:", authText);
-
-        let authData;
-        try {
-            authData = JSON.parse(authText);
-        } catch {
-            throw new Error(`M-Pesa auth failed - invalid response: ${authText}`);
-        }
-
+        const authData = await authResponse.json();
         if (!authData.access_token) {
-            console.error("Auth failed:", authData);
-            throw new Error(`Failed to authenticate with M-Pesa: ${JSON.stringify(authData)}`);
+            throw new Error(`M-Pesa Auth Failed: ${JSON.stringify(authData)}`);
         }
 
         const accessToken = authData.access_token;
-        console.log("[mpesa-stk-push] Got access token");
 
-        // 2. Prepare STK Push
+        // 3. Prepare STK Push
         const timestamp = new Date().toISOString().replace(/[^0-9]/g, "").slice(0, 14);
         const password = btoa(`${shortcode}${passkey}${timestamp}`);
 
@@ -90,9 +70,7 @@ serve(async (req) => {
             TransactionDesc: "Membership Payment"
         };
 
-        console.log("[mpesa-stk-push] Initiating STK Push for:", formattedPhone, "Amount:", amount);
-
-        // 3. Send STK Push Request
+        // 4. Send STK Push Request
         const stkResponse = await fetch("https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest", {
             method: "POST",
             headers: {
@@ -102,24 +80,15 @@ serve(async (req) => {
             body: JSON.stringify(stkPayload)
         });
 
-        const stkText = await stkResponse.text();
-        console.log("[mpesa-stk-push] STK Response:", stkText);
-
-        let stkData;
-        try {
-            stkData = JSON.parse(stkText);
-        } catch {
-            throw new Error(`M-Pesa STK response invalid: ${stkText}`);
-        }
-
+        const stkData = await stkResponse.json();
         if (stkData.ResponseCode !== "0") {
             throw new Error(`STK Push failed: ${stkData.errorMessage || stkData.ResponseDescription || "Unknown Error"}`);
         }
 
-        // 4. Record Payment as Pending in DB
+        // 5. Record Payment as Pending in DB
         const supabase = createClient(
-            (Deno.env.get("SUPABASE_URL") ?? "").trim(),
-            (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "").trim()
+            Deno.env.get("SUPABASE_URL") ?? "",
+            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
         );
 
         const { error: dbError } = await supabase.from("payments").insert({
@@ -132,26 +101,15 @@ serve(async (req) => {
             status: "pending"
         });
 
-        if (dbError) {
-            console.error("DB Error:", dbError);
-        }
+        if (dbError) console.error("[mpesa-stk-push] DB Error:", dbError);
 
         return new Response(JSON.stringify(stkData), {
             headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
 
     } catch (error: any) {
-        console.error("Error:", error);
-
-        // DEBUG: Return secret info in error
-        const consumerKey = (Deno.env.get("MPESA_CONSUMER_KEY") ?? "").trim();
-        const debugInfo = {
-            keyLen: consumerKey.length,
-            keyStart: consumerKey.substring(0, 3),
-            message: error.message || "Unknown error"
-        };
-
-        return new Response(JSON.stringify({ error: debugInfo }), {
+        console.error("[mpesa-stk-push] Error:", error);
+        return new Response(JSON.stringify({ error: error.message }), {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" }
         });

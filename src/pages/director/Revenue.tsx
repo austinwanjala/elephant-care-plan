@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -31,43 +31,18 @@ export default function DirectorRevenue() {
     const { toast } = useToast();
     const navigate = useNavigate();
 
-    useEffect(() => {
-        fetchDirectorInfo();
+    const fetchClaims = useCallback(async (branchId: string) => {
+        const { data, error } = await (supabase as any)
+            .from("revenue_claims")
+            .select("*")
+            .eq("branch_id", branchId)
+            .order("created_at", { ascending: false });
+
+        if (!error) setClaims(data || []);
     }, []);
 
-    useEffect(() => {
-        if (directorBranchId) {
-            fetchRevenueData(directorBranchId, currentMonth, currentYear);
-            fetchAccumulatedRevenue(directorBranchId);
-            fetchClaims(directorBranchId);
-        }
-    }, [directorBranchId, currentMonth, currentYear]);
-
-    const fetchDirectorInfo = async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-            navigate("/login");
-            return;
-        }
-
-        const { data: staffData, error: staffError } = await supabase
-            .from("staff")
-            .select("id, branch_id")
-            .eq("user_id", user.id)
-            .maybeSingle();
-
-        if (staffError || !staffData?.branch_id) {
-            toast({ title: "Access Denied", description: "You are not assigned to a branch.", variant: "destructive" });
-            navigate("/");
-            return;
-        }
-        setDirectorBranchId(staffData.branch_id);
-        setStaffId(staffData.id);
-    };
-
-    const fetchAccumulatedRevenue = async (branchId: string) => {
+    const fetchAccumulatedRevenue = useCallback(async (branchId: string) => {
         try {
-            // Sum from finalized bills for this branch
             const { data: bills, error: billsErr } = await supabase
                 .from("bills")
                 .select("total_branch_compensation")
@@ -98,48 +73,9 @@ export default function DirectorRevenue() {
         } catch (error: any) {
             console.error("Error fetching accumulated revenue:", error);
         }
-    };
+    }, []);
 
-    const fetchClaims = async (branchId: string) => {
-        const { data, error } = await (supabase as any)
-            .from("revenue_claims")
-            .select("*")
-            .eq("branch_id", branchId)
-            .order("created_at", { ascending: false });
-
-        if (!error) setClaims(data || []);
-    };
-
-    const handleSubmitClaim = async () => {
-        if (availableToClaim <= 0) {
-            toast({ title: "No Available Revenue", description: "All unpaid revenue is already tied to a pending claim.", variant: "destructive" });
-            return;
-        }
-
-        setClaiming(true);
-        try {
-            const { error: claimError } = await (supabase as any)
-                .from("revenue_claims")
-                .insert({
-                    branch_id: directorBranchId,
-                    director_id: staffId,
-                    amount: availableToClaim,
-                    status: 'pending'
-                });
-
-            if (claimError) throw claimError;
-
-            toast({ title: "Claim Submitted", description: `Claim for KES ${availableToClaim.toLocaleString()} submitted successfully.` });
-            fetchAccumulatedRevenue(directorBranchId!);
-            fetchClaims(directorBranchId!);
-        } catch (error: any) {
-            toast({ title: "Claim Failed", description: error.message, variant: "destructive" });
-        } finally {
-            setClaiming(false);
-        }
-    };
-
-    const fetchRevenueData = async (branchId: string, month: number, year: number) => {
+    const fetchRevenueData = useCallback(async (branchId: string, month: number, year: number) => {
         setLoading(true);
         const startOfMonthDate = format(new Date(year, month - 1, 1), "yyyy-MM-dd");
         const endOfMonthDate = format(new Date(year, month, 0), "yyyy-MM-dd") + "T23:59:59";
@@ -171,6 +107,71 @@ export default function DirectorRevenue() {
             toast({ title: "Error fetching revenue data", description: error.message, variant: "destructive" });
         } finally {
             setLoading(false);
+        }
+    }, [toast]);
+
+    const fetchDirectorInfo = useCallback(async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            navigate("/login");
+            return;
+        }
+
+        const { data: staffData, error: staffError } = await supabase
+            .from("staff")
+            .select("id, branch_id")
+            .eq("user_id", user.id)
+            .maybeSingle();
+
+        if (staffError || !staffData?.branch_id) {
+            toast({ title: "Access Denied", description: "You are not assigned to a branch.", variant: "destructive" });
+            navigate("/");
+            return;
+        }
+        setDirectorBranchId(staffData.branch_id);
+        setStaffId(staffData.id);
+    }, [navigate, toast]);
+
+    useEffect(() => {
+        fetchDirectorInfo();
+    }, [fetchDirectorInfo]);
+
+    useEffect(() => {
+        if (directorBranchId) {
+            fetchRevenueData(directorBranchId, currentMonth, currentYear);
+            fetchAccumulatedRevenue(directorBranchId);
+            fetchClaims(directorBranchId);
+        }
+    }, [directorBranchId, currentMonth, currentYear, fetchRevenueData, fetchAccumulatedRevenue, fetchClaims]);
+
+    const handleSubmitClaim = async () => {
+        if (availableToClaim <= 0) {
+            toast({ title: "No Available Revenue", description: "All unpaid revenue is already tied to a pending claim.", variant: "destructive" });
+            return;
+        }
+
+        setClaiming(true);
+        try {
+            const { error: claimError } = await (supabase as any)
+                .from("revenue_claims")
+                .insert({
+                    branch_id: directorBranchId,
+                    director_id: staffId,
+                    amount: availableToClaim,
+                    status: 'pending'
+                });
+
+            if (claimError) throw claimError;
+
+            toast({ title: "Claim Submitted", description: `Claim for KES ${availableToClaim.toLocaleString()} submitted successfully.` });
+            if (directorBranchId) {
+                fetchAccumulatedRevenue(directorBranchId);
+                fetchClaims(directorBranchId);
+            }
+        } catch (error: any) {
+            toast({ title: "Claim Failed", description: error.message, variant: "destructive" });
+        } finally {
+            setClaiming(false);
         }
     };
 

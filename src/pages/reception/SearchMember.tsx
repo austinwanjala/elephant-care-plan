@@ -5,21 +5,24 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Search, User, Phone, Mail, CreditCard, CalendarDays, ArrowLeft, Loader2 } from "lucide-react";
+import { Search, User, Phone, Mail, CreditCard, CalendarDays, ArrowLeft, Loader2, Fingerprint } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
+import { BiometricCapture } from "@/components/BiometricCapture";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export default function ReceptionSearchMember() {
     const [searchTerm, setSearchTerm] = useState("");
     const [searching, setSearching] = useState(false);
     const [member, setMember] = useState<any>(null);
+    const [biometricDialogOpen, setBiometricDialogOpen] = useState(false);
     const { toast } = useToast();
 
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
         const term = searchTerm.trim();
         if (!term) return;
-        
+
         setSearching(true);
         setMember(null);
 
@@ -88,9 +91,20 @@ export default function ReceptionSearchMember() {
                                 <CardTitle>{member.full_name}</CardTitle>
                                 <CardDescription>Member #{member.member_number}</CardDescription>
                             </div>
-                            <Badge variant={member.is_active ? "default" : "destructive"}>
-                                {member.is_active ? "Active" : "Inactive"}
-                            </Badge>
+                            <div className="flex gap-2">
+                                {!member.biometric_data ? (
+                                    <Button variant="outline" size="sm" onClick={() => setBiometricDialogOpen(true)}>
+                                        <Fingerprint className="mr-2 h-4 w-4" /> Capture Biometrics
+                                    </Button>
+                                ) : (
+                                    <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
+                                        <Fingerprint className="mr-1 h-3 w-3" /> Biometrics Registered
+                                    </Badge>
+                                )}
+                                <Badge variant={member.is_active ? "default" : "destructive"}>
+                                    {member.is_active ? "Active" : "Inactive"}
+                                </Badge>
+                            </div>
                         </div>
                     </CardHeader>
                     <CardContent className="pt-6 space-y-6">
@@ -126,7 +140,30 @@ export default function ReceptionSearchMember() {
                         </div>
                     </CardContent>
                 </Card>
-            )}
-        </div>
+            )
+            }
+
+            <Dialog open={biometricDialogOpen} onOpenChange={setBiometricDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Capture Member Biometrics</DialogTitle>
+                    </DialogHeader>
+                    {member && (
+                        <BiometricCapture
+                            mode="register"
+                            userId={member.id}
+                            userName={member.full_name}
+                            onCaptureComplete={async (data) => {
+                                await supabase.from("members").update({ biometric_data: data }).eq("id", member.id);
+                                setBiometricDialogOpen(false);
+                                toast({ title: "Biometrics Updated", description: "Member biometrics captured successfully." });
+                                // Refresh member data?
+                                setMember({ ...member, biometric_data: data });
+                            }}
+                        />
+                    )}
+                </DialogContent>
+            </Dialog>
+        </div >
     );
 }

@@ -49,7 +49,7 @@ export default function ReceptionBilling() {
         setLoading(true);
         const { data, error } = await supabase
             .from("visits")
-            .select("*, members(id, full_name, phone, member_number, coverage_balance), bills(*, bill_items(*))")
+            .select("*, members(id, full_name, phone, member_number, coverage_balance, biometric_data), bills(*, bill_items(*))")
             .eq("status", "billed")
             .order("updated_at", { ascending: false });
 
@@ -368,12 +368,11 @@ export default function ReceptionBilling() {
                                                                                     if (isVerified) {
                                                                                         setBiometricsVerified(visit.id);
                                                                                         toast({ title: "Biometrics Verified", description: "Identity confirmed via biometric scan." });
-                                                                                    } else {
-                                                                                        toast({ title: "Verification Failed", description: "Biometric match failed.", variant: "destructive" });
                                                                                     }
                                                                                 } catch (err: any) {
                                                                                     console.error("Biometric error:", err);
-                                                                                    toast({ title: "Error", description: err.message || "Biometric verification error", variant: "destructive" });
+                                                                                    // Differentiate between technical error and mismatch (though client-side match fail usually throws too)
+                                                                                    toast({ title: "Verification Error", description: err.message || "Biometric validation failed.", variant: "destructive" });
                                                                                 }
                                                                             }}
                                                                         >
@@ -461,6 +460,6 @@ export default function ReceptionBilling() {
                     </Card>
                 </TabsContent>
             </Tabs>
-        </div>
+        </div >
     );
 }

@@ -105,7 +105,7 @@ export default function AdminLogs() {
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="font-mono text-xs text-muted-foreground max-w-[150px] truncate" title={log.user_id}>
-                                            {log.user_id}
+                                            {log.auth_users?.email || log.user_id}
                                         </TableCell>
                                         <TableCell className="max-w-[400px]">
                                             <pre className="text-[10px] bg-slate-50 p-2 rounded overflow-auto max-h-[100px]">

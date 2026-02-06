@@ -63,8 +63,16 @@ export async function registerCredential(userId: string, userName: string): Prom
 
 export async function verifyCredential(storedCredentialData: string): Promise<boolean> {
     try {
-        const storedData = JSON.parse(storedCredentialData);
-        if (!storedData.credentialId) throw new Error("Invalid credential data");
+        // Handle legacy or malformed data gracefully
+        let storedData;
+        try {
+            storedData = JSON.parse(storedCredentialData);
+        } catch (e) {
+            console.warn("Failed to parse credential data, treating as invalid:", storedCredentialData);
+            throw new Error("Invalid biometric data format. Please re-register member biometrics.");
+        }
+
+        if (!storedData.credentialId) throw new Error("Invalid credential data structure");
 
         // Challenge should come from server
         const challenge = new Uint8Array(32);
@@ -76,7 +84,7 @@ export async function verifyCredential(storedCredentialData: string): Promise<bo
                 {
                     id: bufferDecode(storedData.credentialId),
                     type: "public-key",
-                    transports: ["internal"],
+                    // transports: ["internal"], // Removed to allow browser to auto-detect
                 },
             ],
             userVerification: "required",
@@ -91,14 +99,9 @@ export async function verifyCredential(storedCredentialData: string): Promise<bo
             return false;
         }
 
-        // Use the assertion to verify signature on server.
-        // Since we are doing client-side only verification logic (as permitted by the request constraints imply simplistic integration),
-        // purely getting the assertion successfully proves the user authenticated with the private key on the device.
-        // WARNING: This is less secure than server-side verification but fits the current architecture pattern requested.
-
         return true;
     } catch (error) {
         console.error("WebAuthn verification error:", error);
-        return false;
+        throw error; // Re-throw to let caller handle generic errors vs match failures
     }
 }

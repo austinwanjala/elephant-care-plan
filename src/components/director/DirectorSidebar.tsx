@@ -4,11 +4,10 @@ import { Button } from "@/components/ui/button";
 import { BarChart3, TrendingUp, Users, LogOut, LayoutDashboard, Building2, FileText, DollarSign, Stethoscope } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
-const menuItems = [
-    { title: "Dashboard", url: "/director", icon: LayoutDashboard },
-    { title: "Revenue", url: "/director/revenue", icon: DollarSign }, // Updated icon
-    { title: "Doctor Performance", url: "/director/performance", icon: Stethoscope }, // Updated icon
-    { title: "Branch Reports", url: "/director/reports", icon: FileText },
+{ title: "Dashboard", url: "/director", icon: LayoutDashboard },
+{ title: "Revenue", url: "/director/revenue", icon: DollarSign }, // Updated icon
+{ title: "Doctor Performance", url: "/director/performance", icon: Stethoscope }, // Updated icon
+{ title: "Branch Reports", url: "/director/reports", icon: FileText },
 ];
 
 export function DirectorSidebar() {

@@ -30,6 +30,8 @@ export default function AdminCommissionSettings() {
         const { data, error } = await (supabase as any)
             .from("marketer_commission_config")
             .select("*")
+            .order("updated_at", { ascending: false })
+            .limit(1)
             .maybeSingle();
 
         if (error) {

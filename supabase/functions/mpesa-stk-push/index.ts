@@ -38,9 +38,14 @@ serve(async (req) => {
 
         const auth = btoa(`${consumerKey}:${consumerSecret}`);
         console.log("[mpesa-stk-push] Fetching access token...");
+        console.log("[mpesa-stk-push] Using consumer key starting with:", consumerKey.substring(0, 5));
         
         const authResponse = await fetch("https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials", {
-            headers: { "Authorization": `Basic ${auth}` }
+            method: "GET",
+            headers: { 
+                "Authorization": `Basic ${auth}`,
+                "Accept": "application/json"
+            }
         });
 
         const authText = await authResponse.text();

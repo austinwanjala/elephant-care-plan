@@ -1092,6 +1092,33 @@ export type Database = {
         }
         Relationships: []
       }
+      otp_verifications: {
+        Row: {
+          code: string
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          phone: string
+          verified_at: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          phone: string
+          verified_at?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          phone?: string
+          verified_at?: string | null
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount: number
@@ -1099,7 +1126,11 @@ export type Database = {
           created_at: string
           id: string
           member_id: string
+          mpesa_checkout_request_id: string | null
+          mpesa_merchant_request_id: string | null
           mpesa_reference: string | null
+          mpesa_result_code: number | null
+          mpesa_result_desc: string | null
           payment_date: string | null
           phone_used: string | null
           status: Database["public"]["Enums"]["payment_status"] | null
@@ -1110,7 +1141,11 @@ export type Database = {
           created_at?: string
           id?: string
           member_id: string
+          mpesa_checkout_request_id?: string | null
+          mpesa_merchant_request_id?: string | null
           mpesa_reference?: string | null
+          mpesa_result_code?: number | null
+          mpesa_result_desc?: string | null
           payment_date?: string | null
           phone_used?: string | null
           status?: Database["public"]["Enums"]["payment_status"] | null
@@ -1121,7 +1156,11 @@ export type Database = {
           created_at?: string
           id?: string
           member_id?: string
+          mpesa_checkout_request_id?: string | null
+          mpesa_merchant_request_id?: string | null
           mpesa_reference?: string | null
+          mpesa_result_code?: number | null
+          mpesa_result_desc?: string | null
           payment_date?: string | null
           phone_used?: string | null
           status?: Database["public"]["Enums"]["payment_status"] | null
@@ -1360,6 +1399,30 @@ export type Database = {
           },
         ]
       }
+      system_logs: {
+        Row: {
+          action: string
+          created_at: string | null
+          details: Json | null
+          id: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       system_settings: {
         Row: {
           description: string | null
@@ -1420,6 +1483,7 @@ export type Database = {
           branch_compensation: number
           branch_id: string
           created_at: string
+          dependant_id: string | null
           diagnosis: string | null
           doctor_id: string | null
           id: string
@@ -1439,6 +1503,7 @@ export type Database = {
           branch_compensation: number
           branch_id: string
           created_at?: string
+          dependant_id?: string | null
           diagnosis?: string | null
           doctor_id?: string | null
           id?: string
@@ -1458,6 +1523,7 @@ export type Database = {
           branch_compensation?: number
           branch_id?: string
           created_at?: string
+          dependant_id?: string | null
           diagnosis?: string | null
           doctor_id?: string | null
           id?: string
@@ -1477,6 +1543,13 @@ export type Database = {
             columns: ["branch_id"]
             isOneToOne: false
             referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visits_dependant_id_fkey"
+            columns: ["dependant_id"]
+            isOneToOne: false
+            referencedRelation: "dependants"
             referencedColumns: ["id"]
           },
           {
@@ -1525,6 +1598,15 @@ export type Database = {
       finalize_bill: {
         Args: { _bill_id: string; _receptionist_id: string }
         Returns: undefined
+      }
+      get_auth_user_branch_id: { Args: never; Returns: string }
+      get_branch_doctors: {
+        Args: { branch_id_input: string }
+        Returns: {
+          full_name: string
+          id: string
+          user_id: string
+        }[]
       }
       get_user_role: {
         Args: { _user_id: string }

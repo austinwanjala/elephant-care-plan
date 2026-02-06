@@ -20,7 +20,7 @@ export default function AdminLogs() {
         setLoading(true);
         const { data, error } = await supabase
             .from("system_logs")
-            .select("*, auth_users:user_id(email)") // Attempt to join with auth users if possible, or we might need to fetch separately if foreign key isn't exposed to API nicely
+            .select("*")
             .order("created_at", { ascending: false })
             .limit(100);
 
@@ -105,7 +105,7 @@ export default function AdminLogs() {
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="font-mono text-xs text-muted-foreground max-w-[150px] truncate" title={log.user_id}>
-                                            {log.auth_users?.email || log.user_id}
+                                            {log.user_id || "System"}
                                         </TableCell>
                                         <TableCell className="max-w-[400px]">
                                             <pre className="text-[10px] bg-slate-50 p-2 rounded overflow-auto max-h-[100px]">

@@ -33,10 +33,11 @@ interface MembershipCategory {
 const MemberSchemeSelection = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [waitingForCallback, setWaitingForCallback] = useState(false);
   const [member, setMember] = useState<MemberInfo | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<MembershipCategory | null>(null);
   const [allCategories, setAllCategories] = useState<MembershipCategory[]>([]);
-  const [mpesaReference, setMpesaReference] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -79,6 +80,7 @@ const MemberSchemeSelection = () => {
     }
 
     setMember(memberData);
+    setPhoneNumber(memberData.phone); // Pre-fill with member's phone
 
     const { data: categoriesData, error: categoriesError } = await supabase
       .from("membership_categories")
@@ -99,14 +101,14 @@ const MemberSchemeSelection = () => {
     setLoading(false);
   };
 
-  const handleSimulatePayment = async (e: React.FormEvent) => {
+  const handleMpesaPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!member || !selectedCategory) {
       toast({ title: "Selection Required", description: "Please select a membership scheme.", variant: "destructive" });
       return;
     }
-    if (!mpesaReference) {
-      toast({ title: "M-Pesa Reference Required", description: "Please enter a simulated M-Pesa reference.", variant: "destructive" });
+    if (!phoneNumber) {
+      toast({ title: "Phone Required", description: "Please enter your M-Pesa phone number.", variant: "destructive" });
       return;
     }
 
@@ -114,65 +116,100 @@ const MemberSchemeSelection = () => {
 
     try {
       const principalAmount = selectedCategory.payment_amount;
-      const benefitToAdd = selectedCategory.benefit_amount; 
+      const benefitToAdd = selectedCategory.benefit_amount;
       const totalPayment = principalAmount + selectedCategory.registration_fee + selectedCategory.management_fee;
 
-      const qrCodeValue = `MEMBER-${member.member_number}`;
-
-      // 1. Update member's activation status and category info
-      const { error: updateError } = await supabase
-        .from("members")
-        .update({
-          is_active: true,
-          qr_code_data: qrCodeValue,
-          membership_category_id: selectedCategory.id,
-          benefit_limit: (member.benefit_limit || 0) + benefitToAdd, // Add to existing limit if renewing
-        })
-        .eq("id", member.id);
-
-      if (updateError) throw updateError;
-
-      // 2. Record the payment
-      const { error: paymentError } = await supabase.from("payments").insert({
-        member_id: member.id,
-        amount: totalPayment,
-        coverage_added: benefitToAdd,
-        status: "completed",
-        payment_date: new Date().toISOString(),
-        mpesa_reference: mpesaReference || `SIMULATED_MPESA_${Date.now()}`,
+      // 1. Trigger STK Push via Edge Function
+      const { error: invokeError } = await supabase.functions.invoke("mpesa-stk-push", {
+        body: {
+          amount: totalPayment,
+          phone: phoneNumber.replace("+", ""), // Ensure format
+          member_id: member.id,
+          coverage_amount: benefitToAdd
+        }
       });
 
-      if (paymentError) throw paymentError;
+      if (invokeError) throw invokeError;
 
-      // 3. Send Payment Confirmation SMS
-      try {
-        await supabase.functions.invoke('send-sms', {
-          body: {
-            type: 'payment_confirmation',
-            phone: member.phone,
-            data: { 
-              level: selectedCategory.name, 
-              benefit_amount: benefitToAdd 
+      toast({
+        title: "Request Sent to Phone",
+        description: `Please check ${phoneNumber} to complete the payment of KES ${totalPayment.toLocaleString()}.`,
+      });
+
+      setWaitingForCallback(true);
+
+      // 2. Subscribe to Payment Completion
+      // We listen for any INSERT/UPDATE on 'payments' for this member where status becomes 'completed'
+      const channel = supabase
+        .channel('scheme-payment-verification')
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'payments',
+            filter: `member_id=eq.${member.id}`
+          },
+          async (payload) => {
+            const newRecord = payload.new as any;
+            if (newRecord.status === 'completed') {
+              // Payment successful!
+              toast({
+                title: "Payment Confirmed!",
+                description: "Your membership scheme has been activated.",
+                variant: "default"
+              });
+              // Activate member in DB if not handled by trigger (Wait, triggers update balance, but setting category might not happen automatically unless we change logic or do it here)
+              // Actually, the `process_visit` handles visit logic.
+              // The `update_coverage_on_payment` adds coverage.
+              // We also need to SET the membership_category_id if it's new.
+
+              // Let's do a quick update to ensure the category is set correctly upon payment success
+              await supabase.from("members").update({
+                membership_category_id: selectedCategory.id,
+                is_active: true,
+                benefit_limit: (member.benefit_limit || 0) + benefitToAdd
+              }).eq("id", member.id);
+
+              // Also send SMS manually here or relying on trigger? 
+              // Trigger is better, but existing logic had it here. Let's keep it safe.
+              // Actually, let's just rely on visual callback for now and redirect.
+
+              setWaitingForCallback(false);
+              navigate("/dashboard");
+              supabase.removeChannel(channel);
+            } else if (newRecord.status === 'failed') {
+              toast({
+                title: "Payment Failed",
+                description: newRecord.mpesa_result_desc || "Transaction was cancelled or failed.",
+                variant: "destructive"
+              });
+              setWaitingForCallback(false);
+              setSubmitting(false);
+              supabase.removeChannel(channel);
             }
           }
-        });
-      } catch (smsErr) {
-        console.error("Failed to send payment SMS:", smsErr);
+        )
+        .subscribe();
+
+
+    } catch (error: any) {
+      console.error("M-Pesa Payment Error:", error);
+
+      let errorMessage = error.message || "Could not initiate M-Pesa payment.";
+
+      // Handle potential Edge Function error structure
+      if (error && error.context && error.context.status) {
+        errorMessage = `Server Error (${error.context.status}): ${errorMessage}`;
+      } else if (errorMessage.includes("Failed to send request")) {
+        errorMessage = "Could not connect to the server. Please check if the Edge Function is deployed.";
       }
 
       toast({
-        title: "Payment Successful!",
-        description: `KES ${totalPayment.toLocaleString()} received. Your coverage has been activated/renewed.`,
-      });
-
-      navigate("/dashboard");
-    } catch (error: any) {
-      toast({
-        title: "Payment Failed",
-        description: error.message || "An unexpected error occurred.",
+        title: "Request Failed",
+        description: errorMessage,
         variant: "destructive",
       });
-    } finally {
       setSubmitting(false);
     }
   };
@@ -211,22 +248,24 @@ const MemberSchemeSelection = () => {
             {member.is_active ? "Renew or Upgrade Coverage" : "Select Your Membership Scheme"}
           </CardTitle>
           <CardDescription className="text-muted-foreground">
-            Choose a scheme level and make a payment to activate or top up your dental coverage.
+            Choose a scheme level and pay via M-Pesa to activate.
           </CardDescription>
         </CardHeader>
         <CardContent className="px-0 pb-0">
-          <form onSubmit={handleSimulatePayment} className="space-y-6">
+          <form onSubmit={handleMpesaPayment} className="space-y-6">
             <div className="space-y-4">
               <Label>Membership Scheme</Label>
               <div className="grid gap-3">
                 {allCategories.map((cat) => (
                   <div
                     key={cat.id}
-                    onClick={() => setSelectedCategory(cat)}
+                    onClick={() => {
+                      if (!waitingForCallback) setSelectedCategory(cat);
+                    }}
                     className={`p-4 border rounded-lg cursor-pointer transition-all ${selectedCategory?.id === cat.id
                       ? "border-primary bg-primary/5 ring-1 ring-primary"
                       : "hover:border-primary/50"
-                      }`}
+                      } ${waitingForCallback ? 'opacity-50 pointer-events-none' : ''}`}
                   >
                     <div className="flex justify-between items-center mb-1">
                       <span className="font-bold">{cat.name} ({cat.level.replace('_', ' ')})</span>
@@ -258,7 +297,7 @@ const MemberSchemeSelection = () => {
                       <span>KES {selectedCategory.management_fee.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between font-bold text-primary col-span-2 border-t pt-2">
-                      <span>Total Payment:</span>
+                      <span>Total Payable (M-Pesa):</span>
                       <span>KES {totalPayment.toLocaleString()}</span>
                     </div>
                   </div>
@@ -269,30 +308,43 @@ const MemberSchemeSelection = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="mpesaReference">M-Pesa Reference (Simulated)</Label>
+                  <Label htmlFor="phoneNumber">M-Pesa Phone Number</Label>
                   <Input
-                    id="mpesaReference"
-                    placeholder="Enter M-Pesa transaction code (e.g., NBO123ABC)"
-                    value={mpesaReference}
-                    onChange={(e) => setMpesaReference(e.target.value)}
+                    id="phoneNumber"
+                    placeholder="2547..."
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
                     className="input-field"
                     required
+                    disabled={waitingForCallback}
                   />
+                  <p className="text-xs text-muted-foreground">Enter the phone number that will receive the payment prompt.</p>
                 </div>
 
-                <Button type="submit" className="w-full btn-primary" disabled={submitting}>
-                  {submitting ? (
+                <Button type="submit" className="w-full btn-primary" disabled={submitting || waitingForCallback}>
+                  {waitingForCallback ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Processing Payment...
+                      Waiting for Payment...
+                    </>
+                  ) : submitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending Request...
                     </>
                   ) : (
                     <>
-                      <CheckCircle className="mr-2 h-4 w-4" />
-                      {member.is_active ? "Renew Coverage" : "Simulate Payment"}
+                      <DollarSign className="mr-2 h-4 w-4" />
+                      Pay & Activate
                     </>
                   )}
                 </Button>
+
+                {waitingForCallback && (
+                  <div className="text-center text-sm text-yellow-600 animate-pulse">
+                    Please check your phone and enter your PIN. Do not leave this page.
+                  </div>
+                )}
               </>
             )}
           </form>

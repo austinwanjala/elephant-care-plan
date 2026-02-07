@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Loader2, CreditCard, Phone, CheckCircle2, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { mpesaService } from "@/services/mpesa";
 
 interface Payment {
   id: string;
@@ -30,31 +31,6 @@ export default function MemberPayments() {
   const { toast } = useToast();
   const [memberId, setMemberId] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchPayments();
-
-    // Subscribe to realtime updates for payments
-    const channel = supabase
-      .channel('schema-db-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // Listen to all changes (UPDATE especially)
-          schema: 'public',
-          table: 'payments'
-        },
-        (payload) => {
-          // Refresh logic - simplified to just refetch
-          fetchPayments();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
   const fetchPayments = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -71,7 +47,7 @@ export default function MemberPayments() {
     }
 
     setMemberId(member.id);
-    if (!phoneNumber) setPhoneNumber(member.phone); // Pre-fill phone
+    if (!phoneNumber) setPhoneNumber(member.phone);
 
     const { data } = await supabase
       .from("payments")
@@ -83,34 +59,68 @@ export default function MemberPayments() {
     setLoading(false);
   };
 
+  useEffect(() => {
+    fetchPayments();
+
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'payments'
+        },
+        () => {
+          fetchPayments();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   const handleMpesaPayment = async () => {
-    if (!amount || !phoneNumber) {
+    if (!amount || !phoneNumber || !memberId) {
       toast({ title: "Error", description: "Please enter amount and phone number", variant: "destructive" });
       return;
     }
 
     setProcessing(true);
     try {
-      const { data, error } = await supabase.functions.invoke("mpesa-stk-push", {
-        body: {
-          amount: parseFloat(amount),
-          phone: phoneNumber.replace("+", ""), // Ensure format
-          member_id: memberId,
-          coverage_amount: parseFloat(amount) // Assuming 1:1 for now, or update logic
-        }
+      await mpesaService.initiateStkPush({
+        amount: parseFloat(amount),
+        phone: phoneNumber.replace("+", ""),
+        member_id: memberId,
+        coverage_amount: parseFloat(amount)
       });
-
-      if (error) throw error;
 
       toast({
         title: "Request Sent",
         description: "Please check your phone to complete the M-Pesa payment."
       });
       setPayDialogOpen(false);
-      // The realtime subscription will handle the update once payment completes
     } catch (error: any) {
       console.error("Payment error:", error);
-      toast({ title: "Payment Failed", description: error.message || "Could not initiate payment", variant: "destructive" });
+      
+      // Try to extract the error message from the function response
+      let errorMessage = "Could not initiate payment. Please try again.";
+      if (error.message) {
+          try {
+              const parsed = JSON.parse(error.message);
+              errorMessage = parsed.error || errorMessage;
+          } catch (e) {
+              errorMessage = error.message;
+          }
+      }
+
+      toast({ 
+        title: "Payment Failed", 
+        description: errorMessage, 
+        variant: "destructive" 
+      });
     } finally {
       setProcessing(false);
     }

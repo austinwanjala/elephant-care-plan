@@ -15,10 +15,11 @@ serve(async (req) => {
         const { amount, phone, member_id, coverage_amount } = await req.json();
 
         if (!amount || !phone || !member_id) {
+            console.error("[mpesa-stk-push] Missing fields:", { amount, phone, member_id });
             throw new Error("Missing required fields: amount, phone, member_id");
         }
 
-        // 1. Get Configuration from Environment Variables
+        // 1. Get Configuration
         const consumerKey = Deno.env.get("MPESA_CONSUMER_KEY");
         const consumerSecret = Deno.env.get("MPESA_CONSUMER_SECRET");
         const passkey = Deno.env.get("MPESA_PASSKEY");
@@ -26,10 +27,16 @@ serve(async (req) => {
         const callbackUrl = Deno.env.get("MPESA_CALLBACK_URL");
 
         if (!consumerKey || !consumerSecret || !passkey || !callbackUrl) {
-            throw new Error("Server misconfiguration: M-Pesa credentials missing in environment variables.");
+            console.error("[mpesa-stk-push] Missing env vars:", { 
+                hasKey: !!consumerKey, 
+                hasSecret: !!consumerSecret, 
+                hasPasskey: !!passkey, 
+                hasCallback: !!callbackUrl 
+            });
+            throw new Error("Server misconfiguration: M-Pesa credentials missing.");
         }
 
-        // Sanitize Phone Number (Ensure 254 format)
+        // Sanitize Phone Number
         let formattedPhone = phone.replace(/[^0-9]/g, "");
         if (formattedPhone.startsWith("0")) {
             formattedPhone = "254" + formattedPhone.slice(1);
@@ -37,7 +44,7 @@ serve(async (req) => {
             formattedPhone = "254" + formattedPhone;
         }
 
-        console.log(`[mpesa-stk-push] Initiating request for ${formattedPhone} - Amount: ${amount}`);
+        console.log(`[mpesa-stk-push] Request for ${formattedPhone} - Amount: ${amount}`);
 
         // 2. Get Access Token
         const auth = btoa(`${consumerKey}:${consumerSecret}`);
@@ -45,11 +52,13 @@ serve(async (req) => {
             headers: { "Authorization": `Basic ${auth}` }
         });
 
-        const authData = await authResponse.json();
-        if (!authData.access_token) {
-            throw new Error(`M-Pesa Auth Failed: ${JSON.stringify(authData)}`);
+        if (!authResponse.ok) {
+            const errorText = await authResponse.text();
+            console.error("[mpesa-stk-push] Safaricom Auth Failed:", errorText);
+            throw new Error("Failed to authenticate with M-Pesa provider.");
         }
 
+        const authData = await authResponse.json();
         const accessToken = authData.access_token;
 
         // 3. Prepare STK Push
@@ -82,10 +91,11 @@ serve(async (req) => {
 
         const stkData = await stkResponse.json();
         if (stkData.ResponseCode !== "0") {
-            throw new Error(`STK Push failed: ${stkData.errorMessage || stkData.ResponseDescription || "Unknown Error"}`);
+            console.error("[mpesa-stk-push] STK Push Failed:", stkData);
+            throw new Error(stkData.errorMessage || stkData.ResponseDescription || "STK Push request failed.");
         }
 
-        // 5. Record Payment as Pending in DB
+        // 5. Record Payment
         const supabase = createClient(
             Deno.env.get("SUPABASE_URL") ?? "",
             Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
@@ -101,14 +111,17 @@ serve(async (req) => {
             status: "pending"
         });
 
-        if (dbError) console.error("[mpesa-stk-push] DB Error:", dbError);
+        if (dbError) {
+            console.error("[mpesa-stk-push] DB Insert Error:", dbError);
+            // We don't throw here because the STK push was already sent to the user
+        }
 
         return new Response(JSON.stringify(stkData), {
             headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
 
     } catch (error: any) {
-        console.error("[mpesa-stk-push] Error:", error);
+        console.error("[mpesa-stk-push] Fatal Error:", error.message);
         return new Response(JSON.stringify({ error: error.message }), {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" }

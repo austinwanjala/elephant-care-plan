@@ -3,13 +3,9 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createClient } from "@supabase/supabase-js";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Plus, X } from "lucide-react";
-import { supabase as mainSupabase } from "@/integrations/supabase/client";
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+import { supabase } from "@/integrations/supabase/client";
 
 interface Dependant {
     fullName: string;
@@ -58,15 +54,12 @@ export default function AddMember() {
             const ageInt = parseInt(formData.age);
             if (isNaN(ageInt)) throw new Error("Please enter a valid age.");
 
-            const authClient = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-                auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
-            });
-
-            const { error: authError } = await authClient.auth.signUp({
-                email: formData.email,
-                password: formData.password,
-                options: {
-                    data: {
+            // Call Edge Function to create user (bypasses rate limits)
+            const { data: authData, error: authError } = await supabase.functions.invoke("admin-create-user", {
+                body: {
+                    email: formData.email,
+                    password: formData.password,
+                    metadata: {
                         role: 'member',
                         full_name: formData.fullName,
                         phone: formData.phone,
@@ -77,23 +70,10 @@ export default function AddMember() {
             });
 
             if (authError) throw authError;
-
-            // Get the new user's ID (which is the member ID)
-            const newMemberId = authError ? null : (await authClient.auth.getUser()).data.user?.id; // Actually we can't get ID easily locally with signUp options without session, 
-            // BUT wait, signUp returns data.user if autoConfirm is on or if we just proceed.
-            // Actually better approach: The 'members' table entry is created via trigger on auth.users usually? 
-            // OR we rely on the fact we just signed up. 
-            // The trigger creates the public.members row.
-
-            // Wait a moment for trigger (not ideal but common in Supabase quick-starts) or better:
-            // Since we don't have the ID immediately if email confirmation is required, 
-            // but if not, we get it. Let's assume we get user object.
-
-            // Correction: The signUp response contains `data.user`.
-            const userId = (await authClient.auth.getSession()).data.session?.user.id || (await authClient.auth.getUser()).data.user?.id;
+            const userId = authData.user?.id;
 
             if (userId && dependants.length > 0) {
-                const { error: depError } = await mainSupabase
+                const { error: depError } = await supabase
                     .from("dependants")
                     .insert(
                         dependants.map(d => ({
@@ -114,7 +94,7 @@ export default function AddMember() {
 
             // Send Welcome SMS
             try {
-                await mainSupabase.functions.invoke('send-sms', {
+                await supabase.functions.invoke('send-sms', {
                     body: {
                         type: 'welcome',
                         phone: formData.phone,
@@ -174,7 +154,6 @@ export default function AddMember() {
                         </div>
                     </div>
 
-                    {/* Dependants Section */}
                     <div className="space-y-4 pt-4 border-t">
                         <div className="flex justify-between items-center">
                             <h3 className="text-lg font-semibold">Dependants ({dependants.length}/5)</h3>

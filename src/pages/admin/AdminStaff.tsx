@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -10,14 +9,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, Edit, Trash2, UserCog, Download, Loader2 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Plus, MoreHorizontal, Trash2, Download, Loader2 } from "lucide-react";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { createClient } from "@supabase/supabase-js";
 import { exportToCsv } from "@/utils/csvExport";
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 export default function AdminStaff() {
   const [users, setUsers] = useState<any[]>([]);
@@ -84,61 +79,24 @@ export default function AdminStaff() {
         throw new Error("Email, Password and Full Name are required.");
       }
 
-      const authClient = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
-      });
-
-      // We include id_number and age in metadata because the database triggers 
-      // might be expecting them for all new users regardless of role.
-      const { data: authData, error: authError } = await authClient.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
+      // Call the Edge Function instead of auth.signUp to bypass rate limits
+      const { data, error } = await supabase.functions.invoke("admin-create-user", {
+        body: {
+          email: formData.email,
+          password: formData.password,
+          metadata: {
             role: formData.role,
             full_name: formData.fullName,
             phone: formData.phone || null,
-            id_number: `STAFF-${Date.now()}`, // Dummy ID to satisfy potential triggers
-            age: 30, // Dummy age to satisfy potential triggers
+            id_number: `STAFF-${Date.now()}`,
+            age: 30,
             branch_id: formData.branchId || null,
             marketer_code: formData.marketerCode || null
           }
         }
       });
 
-      if (authError) throw authError;
-
-      const userId = authData.user?.id;
-      if (!userId) throw new Error("User creation failed: No ID returned.");
-
-      // Explicitly set the role to ensure it's correct even if trigger logic differs
-      await supabase.from("user_roles").upsert({ 
-        user_id: userId, 
-        role: formData.role as any 
-      }, { onConflict: 'user_id' });
-
-      // Create the specific profile if it's not a member
-      if (formData.role !== 'member') {
-        if (formData.role === 'marketer') {
-          await supabase.from("marketers").upsert({
-            user_id: userId,
-            full_name: formData.fullName,
-            email: formData.email,
-            phone: formData.phone || null,
-            code: formData.marketerCode || `MKT-${Math.random().toString(36).substring(2, 7).toUpperCase()}`,
-            is_active: true,
-          }, { onConflict: 'user_id' });
-        } else {
-          await supabase.from("staff").upsert({
-            user_id: userId,
-            full_name: formData.fullName,
-            email: formData.email,
-            phone: formData.phone || null,
-            branch_id: formData.branchId || null,
-            is_active: true,
-          }, { onConflict: 'user_id' });
-        }
-      }
+      if (error) throw error;
 
       toast({
         title: "Account Created",

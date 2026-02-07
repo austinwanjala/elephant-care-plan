@@ -1,6 +1,7 @@
-
 import https from 'https';
 
+// These are the keys you provided. 
+// Remember to also update them in your Supabase Dashboard -> Project Settings -> Edge Functions -> Manage Secrets
 const consumerKey = "v8BxQzwnjeMuddnQ3fCaiTT4Kz7S6qD0zAUcbIWwiDYWlEuM";
 const consumerSecret = "ezORYyIPAzFgXRGSTmIXXR96SNlfKNRCk9v6GDMqoDay35dOo21qxXvE8o9GpBuA";
 
@@ -15,7 +16,7 @@ const options = {
     }
 };
 
-console.log("Testing creds...");
+console.log("Testing M-Pesa credentials...");
 
 const req = https.request(options, (res) => {
     console.log(`Status: ${res.statusCode}`);
@@ -26,7 +27,7 @@ const req = https.request(options, (res) => {
 });
 
 req.on('error', (error) => {
-    console.error(error);
+    console.error("Connection Error:", error);
 });
 
 req.end();

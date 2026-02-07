@@ -5,21 +5,29 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ArrowLeft, Check } from "lucide-react";
+import { Loader2, ArrowLeft, Check, Save } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 const ForgotPasswordForm = () => {
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [sent, setSent] = useState(false);
+  const [success, setSuccess] = useState(false);
   const { toast } = useToast();
 
-  const handleResetRequest = async (e: React.FormEvent) => {
+  const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (password !== confirmPassword) {
+      toast({ title: "Error", description: "Passwords do not match.", variant: "destructive" });
+      return;
+    }
+
     setLoading(true);
     
     try {
-      // 1. Check if email exists in members or staff tables
+      // 1. Verify email exists
       const [{ data: member }, { data: staff }] = await Promise.all([
         supabase.from("members").select("id").eq("email", email).maybeSingle(),
         supabase.from("staff").select("id").eq("email", email).maybeSingle()
@@ -29,17 +37,17 @@ const ForgotPasswordForm = () => {
         throw new Error("This email is not registered in our system.");
       }
 
-      // 2. If exists, send reset link
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/update-password`,
+      // 2. Call Edge Function to override password
+      const { error } = await supabase.functions.invoke("admin-reset-password", {
+        body: { email, password }
       });
       
       if (error) throw error;
       
-      setSent(true);
+      setSuccess(true);
       toast({ 
-        title: "Reset link sent", 
-        description: "Check your email for the password reset link." 
+        title: "Password Updated", 
+        description: "Your new password has been saved. You can now log in." 
       });
     } catch (error: any) {
       toast({ 
@@ -52,7 +60,7 @@ const ForgotPasswordForm = () => {
     }
   };
 
-  if (sent) {
+  if (success) {
     return (
       <div className="py-6 text-center space-y-4">
         <div className="flex justify-center">
@@ -60,17 +68,20 @@ const ForgotPasswordForm = () => {
             <Check className="h-6 w-6 text-green-600" />
           </div>
         </div>
-        <p className="text-sm text-muted-foreground">
-          We've sent a password reset link to <strong>{email}</strong>.
+        <p className="text-sm text-muted-foreground font-medium">
+          Password updated successfully!
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Please close this window and log in with your new credentials.
         </p>
       </div>
     );
   }
 
   return (
-    <form onSubmit={handleResetRequest} className="space-y-4 py-2">
+    <form onSubmit={handleReset} className="space-y-4 py-2">
       <div className="space-y-2">
-        <Label htmlFor="reset-email">Email address</Label>
+        <Label htmlFor="reset-email">Registered Email</Label>
         <Input
           id="reset-email"
           type="email"
@@ -80,8 +91,32 @@ const ForgotPasswordForm = () => {
           required
         />
       </div>
+      <div className="space-y-2">
+        <Label htmlFor="new-password">New Password</Label>
+        <Input
+          id="new-password"
+          type="password"
+          placeholder="••••••••"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          minLength={6}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="confirm-password">Confirm New Password</Label>
+        <Input
+          id="confirm-password"
+          type="password"
+          placeholder="••••••••"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          required
+          minLength={6}
+        />
+      </div>
       <Button type="submit" className="w-full btn-primary" disabled={loading}>
-        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Send Reset Link"}
+        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <><Save className="mr-2 h-4 w-4" /> Save & Update</>}
       </Button>
     </form>
   );

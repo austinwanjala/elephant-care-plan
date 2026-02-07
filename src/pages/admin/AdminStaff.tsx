@@ -117,8 +117,7 @@ export default function AdminStaff() {
         throw new Error("Email, Password and Full Name are required.");
       }
 
-      // Call the Edge Function instead of auth.signUp to bypass rate limits
-      const { data, error } = await supabase.functions.invoke("admin-create-user", {
+      const { error } = await supabase.functions.invoke("admin-create-user", {
         body: {
           email: formData.email,
           password: formData.password,
@@ -152,15 +151,21 @@ export default function AdminStaff() {
     }
   };
 
-  const handleDelete = async (userId: string, type: string) => {
-    if (!confirm("Are you sure? This will remove the user's access profile.")) return;
+  const handleDelete = async (userId: string) => {
+    if (!confirm("Are you sure? This will permanently delete the user account and all associated records.")) return;
+    setLoading(true);
     try {
-      const table = type === 'marketer' ? 'marketers' : 'staff';
-      const { error } = await supabase.from(table).delete().eq("user_id", userId);
+      const { error } = await supabase.functions.invoke("admin-delete-user", {
+        body: { userId }
+      });
       if (error) throw error;
+      
+      toast({ title: "User Deleted", description: "The account has been permanently removed." });
       loadData();
     } catch (error: any) {
       toast({ title: "Error deleting", description: error.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -365,7 +370,7 @@ export default function AdminStaff() {
                         <DropdownMenuItem onClick={() => handleEditUser(u)}>
                           <Edit className="mr-2 h-4 w-4" /> Edit Details
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive font-medium" onClick={() => handleDelete(u.user_id, u.type)}>
+                        <DropdownMenuItem className="text-destructive font-medium" onClick={() => handleDelete(u.user_id)}>
                           <Trash2 className="mr-2 h-4 w-4" /> Revoke Access
                         </DropdownMenuItem>
                       </DropdownMenuContent>

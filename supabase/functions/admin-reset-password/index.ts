@@ -30,12 +30,10 @@ serve(async (req) => {
         }
 
         // 1. Find the user by email
-        // listUsers with a query is the standard admin way to search
         const { data: { users }, error: searchError } = await supabaseAdmin.auth.admin.listUsers();
 
         if (searchError) throw searchError;
 
-        // Filter manually because listUsers query matches partials too, we want exact
         const user = users.find(u => u.email?.toLowerCase() === email.toLowerCase());
 
         if (!user) {
@@ -43,7 +41,7 @@ serve(async (req) => {
         }
 
         // 2. Update the password
-        const { data, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+        const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
             user.id,
             { password: password }
         );

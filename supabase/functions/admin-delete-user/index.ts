@@ -29,14 +29,11 @@ serve(async (req) => {
             throw new Error("User ID is required");
         }
 
-        // Delete the user from Auth (this usually cascades to public tables if setup, 
-        // but we should check if we need to manual delete. 
-        // Usually ON DELETE CASCADE on the foreign key in public.staff handles it.)
-        const { data, error } = await supabaseAdmin.auth.admin.deleteUser(userId);
+        const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
 
         if (error) throw error;
 
-        return new Response(JSON.stringify(data), {
+        return new Response(JSON.stringify({ message: "User deleted successfully" }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
             status: 200,
         });

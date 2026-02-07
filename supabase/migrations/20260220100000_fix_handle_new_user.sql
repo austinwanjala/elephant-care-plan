@@ -2,7 +2,7 @@
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 DECLARE
-    _role public.app_role;
+    _role TEXT;
     _full_name TEXT;
     _phone TEXT;
     _id_number TEXT;
@@ -21,7 +21,7 @@ BEGIN
 
     -- Insert into user_roles
     INSERT INTO public.user_roles (user_id, role)
-    VALUES (NEW.id, _role);
+    VALUES (NEW.id, _role::public.app_role);
 
     IF _role = 'member' THEN
         -- Find marketer_id if code is provided

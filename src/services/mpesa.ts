@@ -17,16 +17,22 @@ export const mpesaService = {
         });
 
         if (error) {
-            // Extract the actual error message from the response body if available
+            // Lovable/Supabase Edge Function errors often wrap the actual response
             let errorMessage = error.message;
-            if (error.context && typeof error.context.json === 'function') {
+            
+            // Try to extract the custom error message we send from the Edge Function
+            if (error instanceof Error && 'context' in error) {
                 try {
+                    // @ts-ignore - accessing internal context if available
                     const body = await error.context.json();
-                    errorMessage = body.error || errorMessage;
+                    if (body && body.error) {
+                        errorMessage = body.error;
+                    }
                 } catch (e) {
-                    // Fallback to default error message
+                    // Fallback to default error
                 }
             }
+            
             throw new Error(errorMessage);
         }
         return data;

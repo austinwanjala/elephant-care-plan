@@ -10,25 +10,29 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 
 const ForgotPasswordForm = () => {
   const [email, setEmail] = useState("");
+  const [token, setToken] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [step, setStep] = useState<"email" | "otp">("email");
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
   const { toast } = useToast();
 
-  const handleReset = async (e: React.FormEvent) => {
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/update-password`,
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: { shouldCreateUser: false }
       });
 
       if (error) throw error;
 
-      setSuccess(true);
+      setStep("otp");
       toast({
-        title: "Check your email",
-        description: "We have sent a password reset link to your email address.",
+        title: "Code sent",
+        description: "Check your email for the reset code.",
       });
     } catch (error: any) {
       toast({
@@ -41,34 +45,123 @@ const ForgotPasswordForm = () => {
     }
   };
 
-  if (success) {
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (newPassword !== confirmPassword) {
+      toast({ title: "Passwords mismatch", description: "New passwords do not match.", variant: "destructive" });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // 1. Verify OTP - this logs the user in if successful
+      const { data, error: verifyError } = await supabase.auth.verifyOtp({
+        email,
+        token,
+        type: 'email'
+      });
+
+      if (verifyError) throw verifyError;
+      if (!data.session) throw new Error("Session not established. Please try again.");
+
+      // 2. Update Password
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (updateError) throw updateError;
+
+      toast({
+        title: "Success",
+        description: "Password reset successfully. You are now logged in.",
+      });
+
+      // Close dialog (handled by parent usually, but here we can just reload or redirect if needed, 
+      // but effectively they are logged in. The parent Login component might not know this. 
+      // Ideally we reload page to get into the app or redirect.)
+      window.location.href = '/dashboard';
+
+    } catch (error: any) {
+      toast({
+        title: "Reset failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (step === "email") {
     return (
-      <div className="bg-green-50 text-green-800 p-4 rounded-lg text-center">
-        <p className="font-semibold mb-2">Check your inbox!</p>
-        <p className="text-xs">Link sent to <span className="font-bold">{email}</span>.</p>
-        <Button variant="outline" size="sm" className="mt-4 w-full" onClick={() => setSuccess(false)}>
-          Try another email
+      <form onSubmit={handleSendOtp} className="space-y-4 py-2">
+        <div className="space-y-2">
+          <Label htmlFor="reset-email">Email address</Label>
+          <Input
+            id="reset-email"
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+        </div>
+        <Button type="submit" className="w-full btn-primary" disabled={loading}>
+          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <><Send className="mr-2 h-4 w-4" /> Send Code</>}
         </Button>
-      </div>
+      </form>
     );
   }
 
   return (
-    <form onSubmit={handleReset} className="space-y-4 py-2">
+    <form onSubmit={handleResetPassword} className="space-y-4 py-2">
+      <div className="bg-muted/50 p-3 rounded text-sm text-center mb-4">
+        Code sent to <strong>{email}</strong>
+      </div>
       <div className="space-y-2">
-        <Label htmlFor="reset-email">Email address</Label>
+        <Label htmlFor="otp">Security Code</Label>
         <Input
-          id="reset-email"
-          type="email"
-          placeholder="you@example.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          id="otp"
+          placeholder="123456"
+          value={token}
+          onChange={(e) => setToken(e.target.value)}
           required
         />
       </div>
-      <Button type="submit" className="w-full btn-primary" disabled={loading}>
-        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <><Send className="mr-2 h-4 w-4" /> Send Reset Link</>}
-      </Button>
+      <div className="space-y-2">
+        <Label htmlFor="new-pass">New Password</Label>
+        <Input
+          id="new-pass"
+          type="password"
+          placeholder="••••••••"
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+          required
+          minLength={6}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="conf-pass">Confirm Password</Label>
+        <Input
+          id="conf-pass"
+          type="password"
+          placeholder="••••••••"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          required
+          minLength={6}
+        />
+      </div>
+      <div className="flex gap-2">
+        <Button type="button" variant="outline" onClick={() => setStep("email")} disabled={loading}>
+          Back
+        </Button>
+        <Button type="submit" className="flex-1 btn-primary" disabled={loading}>
+          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Reset & Login"}
+        </Button>
+      </div>
     </form>
   );
 };

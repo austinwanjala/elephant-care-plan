@@ -9,6 +9,7 @@ import { Loader2 } from "lucide-react";
 
 export default function UpdatePassword() {
     const [password, setPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
     const { toast } = useToast();
@@ -23,6 +24,16 @@ export default function UpdatePassword() {
 
     const handleUpdate = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (password !== confirmPassword) {
+            toast({
+                title: "Passwords do not match",
+                description: "Please ensure both passwords match.",
+                variant: "destructive"
+            });
+            return;
+        }
+
         setLoading(true);
 
         try {
@@ -64,6 +75,19 @@ export default function UpdatePassword() {
                             placeholder="••••••••"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
+                            required
+                            minLength={6}
+                            className="input-field"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="confirmPassword">Confirm Password</Label>
+                        <Input
+                            id="confirmPassword"
+                            type="password"
+                            placeholder="••••••••"
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
                             required
                             minLength={6}
                             className="input-field"

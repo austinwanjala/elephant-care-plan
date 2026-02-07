@@ -5,7 +5,73 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft, Send } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+
+const ForgotPasswordForm = () => {
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const { toast } = useToast();
+
+  const handleReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/update-password`,
+      });
+
+      if (error) throw error;
+
+      setSuccess(true);
+      toast({
+        title: "Check your email",
+        description: "We have sent a password reset link to your email address.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (success) {
+    return (
+      <div className="bg-green-50 text-green-800 p-4 rounded-lg text-center">
+        <p className="font-semibold mb-2">Check your inbox!</p>
+        <p className="text-xs">Link sent to <span className="font-bold">{email}</span>.</p>
+        <Button variant="outline" size="sm" className="mt-4 w-full" onClick={() => setSuccess(false)}>
+          Try another email
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleReset} className="space-y-4 py-2">
+      <div className="space-y-2">
+        <Label htmlFor="reset-email">Email address</Label>
+        <Input
+          id="reset-email"
+          type="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+      </div>
+      <Button type="submit" className="w-full btn-primary" disabled={loading}>
+        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <><Send className="mr-2 h-4 w-4" /> Send Reset Link</>}
+      </Button>
+    </form>
+  );
+};
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -144,9 +210,19 @@ const Login = () => {
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <Label htmlFor="password">Password</Label>
-                <Link to="/forgot-password" class="text-xs text-primary hover:underline">
-                  Forgot Password?
-                </Link>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <button type="button" className="text-xs text-primary hover:underline bg-transparent border-0 p-0 h-auto">
+                      Forgot Password?
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Reset Password</DialogTitle>
+                    </DialogHeader>
+                    <ForgotPasswordForm />
+                  </DialogContent>
+                </Dialog>
               </div>
               <Input
                 id="password"

@@ -18,12 +18,12 @@ serve(async (req) => {
             throw new Error("Missing required fields: amount, phone, or member_id.");
         }
 
-        // 1. Get Configuration
+        // 1. Get Configuration and trim whitespace
         const consumerKey = Deno.env.get("MPESA_CONSUMER_KEY")?.trim();
         const consumerSecret = Deno.env.get("MPESA_CONSUMER_SECRET")?.trim();
         const passkey = Deno.env.get("MPESA_PASSKEY")?.trim();
-        const shortcode = Deno.env.get("MPESA_BUSINESS_SHORTCODE") || "174379";
-        const callbackUrl = Deno.env.get("MPESA_CALLBACK_URL");
+        const shortcode = Deno.env.get("MPESA_BUSINESS_SHORTCODE")?.trim() || "174379";
+        const callbackUrl = Deno.env.get("MPESA_CALLBACK_URL")?.trim();
 
         if (!consumerKey || !consumerSecret || !passkey || !callbackUrl) {
             throw new Error("M-Pesa configuration missing in Supabase Secrets. Please check MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET, and MPESA_PASSKEY.");
@@ -42,6 +42,8 @@ serve(async (req) => {
         }
 
         console.log(`[mpesa-stk-push] Request for ${formattedPhone} - Amount: ${amount}`);
+        // Debug log (safe): check if keys start with expected characters
+        console.log(`[mpesa-stk-push] Using Key starting with: ${consumerKey.substring(0, 3)}...`);
 
         // 2. Get Access Token
         const auth = btoa(`${consumerKey}:${consumerSecret}`);
@@ -53,7 +55,7 @@ serve(async (req) => {
             const errorData = await authResponse.json().catch(() => ({}));
             const errorMsg = errorData.errorMessage || "Wrong credentials";
             console.error("[mpesa-stk-push] Safaricom Auth Failed:", errorMsg);
-            throw new Error(`M-Pesa Auth Failed: ${errorMsg}. Please verify your Consumer Key and Secret in Supabase.`);
+            throw new Error(`M-Pesa Auth Failed: ${errorMsg}. Please verify your Consumer Key and Secret in Supabase Secrets.`);
         }
 
         const authData = await authResponse.json();

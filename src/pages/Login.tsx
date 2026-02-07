@@ -17,11 +17,25 @@ const ForgotPasswordForm = () => {
   const handleResetRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    
     try {
+      // 1. Check if email exists in members or staff tables
+      const [{ data: member }, { data: staff }] = await Promise.all([
+        supabase.from("members").select("id").eq("email", email).maybeSingle(),
+        supabase.from("staff").select("id").eq("email", email).maybeSingle()
+      ]);
+
+      if (!member && !staff) {
+        throw new Error("This email is not registered in our system.");
+      }
+
+      // 2. If exists, send reset link
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/update-password`,
       });
+      
       if (error) throw error;
+      
       setSent(true);
       toast({ 
         title: "Reset link sent", 

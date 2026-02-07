@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, Trash2, Download, Loader2 } from "lucide-react";
+import { Plus, MoreHorizontal, Trash2, Download, Loader2, Edit } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { exportToCsv } from "@/utils/csvExport";
@@ -29,6 +29,9 @@ export default function AdminStaff() {
     marketerCode: ""
   });
   const { toast } = useToast();
+
+  const [editingUser, setEditingUser] = useState<any>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -67,6 +70,41 @@ export default function AdminStaff() {
       if (branchesRes.data) setBranches(branchesRes.data);
     } catch (error: any) {
       toast({ title: "Error loading data", description: error.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditUser = (user: any) => {
+    setEditingUser({
+      ...user,
+      branchId: user.branch_id
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleUpdateUser = async () => {
+    setLoading(true);
+    try {
+      const table = editingUser.type === 'marketer' ? 'marketers' : 'staff';
+      const updates: any = {
+        full_name: editingUser.full_name,
+        phone: editingUser.phone,
+      };
+
+      if (editingUser.type !== 'marketer') {
+        updates.branch_id = editingUser.branchId;
+      }
+
+      const { error } = await supabase.from(table).update(updates).eq("user_id", editingUser.user_id);
+      if (error) throw error;
+
+      toast({ title: "User updated", description: "The user details have been updated." });
+      setEditDialogOpen(false);
+      setEditingUser(null);
+      loadData();
+    } catch (error: any) {
+      toast({ title: "Update failed", description: error.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -226,6 +264,49 @@ export default function AdminStaff() {
               </div>
             </DialogContent>
           </Dialog>
+
+          <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle className="font-serif text-xl">Edit User Details</DialogTitle>
+              </DialogHeader>
+              {editingUser && (
+                <div className="grid gap-4 py-4">
+                  <div className="space-y-2">
+                    <Label>Full Name</Label>
+                    <Input
+                      value={editingUser.full_name || ''}
+                      onChange={(e) => setEditingUser({ ...editingUser, full_name: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Phone</Label>
+                    <Input
+                      value={editingUser.phone || ''}
+                      onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })}
+                    />
+                  </div>
+                  {editingUser.type !== 'marketer' && editingUser.displayRole !== 'admin' && (
+                    <div className="space-y-2">
+                      <Label>Branch</Label>
+                      <Select
+                        value={editingUser.branchId || ''}
+                        onValueChange={(v) => setEditingUser({ ...editingUser, branchId: v })}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Select branch" /></SelectTrigger>
+                        <SelectContent>
+                          {branches.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  <Button onClick={handleUpdateUser} className="bg-blue-600 hover:bg-blue-700 mt-2 w-full" disabled={loading}>
+                    {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Save Changes"}
+                  </Button>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -281,6 +362,9 @@ export default function AdminStaff() {
                         <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleEditUser(u)}>
+                          <Edit className="mr-2 h-4 w-4" /> Edit Details
+                        </DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive font-medium" onClick={() => handleDelete(u.user_id, u.type)}>
                           <Trash2 className="mr-2 h-4 w-4" /> Revoke Access
                         </DropdownMenuItem>

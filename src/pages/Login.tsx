@@ -33,21 +33,21 @@ const Login = () => {
       const delayMs = 500; // 0.5 seconds
 
       while (attempts < maxAttempts && role === null) {
-          const { data: roleData } = await supabase
-              .from("user_roles")
-              .select("role")
-              .eq("user_id", data.user.id)
-              .maybeSingle();
+        const { data: roleData } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", data.user.id)
+          .maybeSingle();
 
-          if (roleData?.role) {
-              role = roleData.role;
-              break;
-          }
+        if (roleData?.role) {
+          role = roleData.role;
+          break;
+        }
 
-          attempts++;
-          if (attempts < maxAttempts) {
-              await new Promise(resolve => setTimeout(resolve, delayMs));
-          }
+        attempts++;
+        if (attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
       }
 
       if (!role) {
@@ -142,7 +142,12 @@ const Login = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <div className="flex justify-between items-center">
+                <Label htmlFor="password">Password</Label>
+                <Link to="/forgot-password" class="text-xs text-primary hover:underline">
+                  Forgot Password?
+                </Link>
+              </div>
               <Input
                 id="password"
                 type="password"

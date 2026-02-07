@@ -5,59 +5,56 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ArrowLeft, Send } from "lucide-react";
+import { Loader2, ArrowLeft, Check } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 const ForgotPasswordForm = () => {
   const [email, setEmail] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
   const { toast } = useToast();
 
-  const handleDirectReset = async (e: React.FormEvent) => {
+  const handleResetRequest = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (newPassword !== confirmPassword) {
-      toast({ title: "Passwords mismatch", description: "New passwords do not match.", variant: "destructive" });
-      return;
-    }
-
     setLoading(true);
-
     try {
-      const { error } = await supabase.functions.invoke('admin-reset-password', {
-        body: { email, password: newPassword }
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/update-password`,
       });
-
       if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Password has been reset. You can now login.",
+      setSent(true);
+      toast({ 
+        title: "Reset link sent", 
+        description: "Check your email for the password reset link." 
       });
-
-      // Close the dialog or just show success state? 
-      // The user stays on login page, so they can just close and login.
-      // We can reload to be safe and clear state.
-      window.location.reload();
-
     } catch (error: any) {
-      toast({
-        title: "Reset failed",
-        description: error.message || "Failed to reset password",
-        variant: "destructive",
+      toast({ 
+        title: "Error", 
+        description: error.message, 
+        variant: "destructive" 
       });
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <form onSubmit={handleDirectReset} className="space-y-4 py-2">
-      <div className="bg-yellow-50 text-yellow-800 p-3 rounded text-sm text-center mb-4 border border-yellow-200">
-        <strong>Admin Mode:</strong> This will directly reset the password for the specified email.
+  if (sent) {
+    return (
+      <div className="py-6 text-center space-y-4">
+        <div className="flex justify-center">
+          <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+            <Check className="h-6 w-6 text-green-600" />
+          </div>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          We've sent a password reset link to <strong>{email}</strong>.
+        </p>
       </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleResetRequest} className="space-y-4 py-2">
       <div className="space-y-2">
         <Label htmlFor="reset-email">Email address</Label>
         <Input
@@ -69,32 +66,8 @@ const ForgotPasswordForm = () => {
           required
         />
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="new-pass">New Password</Label>
-        <Input
-          id="new-pass"
-          type="password"
-          placeholder="••••••••"
-          value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
-          required
-          minLength={6}
-        />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="conf-pass">Confirm Password</Label>
-        <Input
-          id="conf-pass"
-          type="password"
-          placeholder="••••••••"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          required
-          minLength={6}
-        />
-      </div>
       <Button type="submit" className="w-full btn-primary" disabled={loading}>
-        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Reset Password"}
+        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Send Reset Link"}
       </Button>
     </form>
   );
@@ -119,11 +92,10 @@ const Login = () => {
 
       if (error) throw error;
 
-      // Check user role and redirect accordingly
       let role = null;
       let attempts = 0;
       const maxAttempts = 5;
-      const delayMs = 500; // 0.5 seconds
+      const delayMs = 500;
 
       while (attempts < maxAttempts && role === null) {
         const { data: roleData } = await supabase
@@ -146,10 +118,9 @@ const Login = () => {
       if (!role) {
         toast({
           title: "Setup Incomplete",
-          description: "Your account is authenticated but has no portal role assigned after multiple attempts. Please contact your administrator.",
+          description: "Your account has no portal role assigned. Please contact your administrator.",
           variant: "destructive",
         });
-        // logout to clear session
         await supabase.auth.signOut();
         setLoading(false);
         return;
@@ -171,23 +142,19 @@ const Login = () => {
       } else if (role === "marketer") {
         navigate("/marketer");
       } else if (role === "member") {
-        // For members, check if they have selected a scheme and made initial payment
-        const { data: memberProfile, error: memberProfileError } = await supabase
+        const { data: memberProfile } = await supabase
           .from("members")
           .select("is_active")
           .eq("user_id", data.user.id)
           .maybeSingle();
 
-        if (memberProfileError) throw memberProfileError;
-
         if (memberProfile && memberProfile.is_active) {
           navigate("/dashboard");
         } else {
-          // If not active, redirect to scheme selection/payment page
           navigate("/dashboard/scheme-selection");
         }
       } else {
-        navigate("/"); // Fallback to home if role is unknown
+        navigate("/");
       }
     } catch (error: any) {
       toast({
@@ -202,7 +169,6 @@ const Login = () => {
 
   return (
     <div className="min-h-screen bg-background flex">
-      {/* Left side - Form */}
       <div className="flex-1 flex flex-col justify-center px-4 sm:px-6 lg:px-20 xl:px-24">
         <div className="mx-auto w-full max-w-sm">
           <Link to="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-8">
@@ -210,15 +176,12 @@ const Login = () => {
             Back to home
           </Link>
 
-          <div className="flex items-center gap-2 mb-8">
+          <div className="flex items-center gap-2 mb-12">
             <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
               <span className="text-xl">🐘</span>
             </div>
             <span className="text-xl font-serif font-bold text-foreground">Elephant Dental</span>
           </div>
-
-          <h1 className="text-3xl font-serif font-bold text-foreground mb-2">Welcome back</h1>
-          <p className="text-muted-foreground mb-8">Sign in to access your insurance portal</p>
 
           <form onSubmit={handleLogin} className="space-y-6">
             <div className="space-y-2">
@@ -283,7 +246,6 @@ const Login = () => {
         </div>
       </div>
 
-      {/* Right side - Branding */}
       <div className="hidden lg:flex flex-1 hero-gradient items-center justify-center p-12">
         <div className="max-w-md text-center text-primary-foreground">
           <div className="w-24 h-24 rounded-full bg-primary-foreground/10 flex items-center justify-center mx-auto mb-8">

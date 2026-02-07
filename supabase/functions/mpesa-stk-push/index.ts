@@ -19,19 +19,14 @@ serve(async (req) => {
         }
 
         // 1. Get Configuration
-        const consumerKey = Deno.env.get("MPESA_CONSUMER_KEY");
-        const consumerSecret = Deno.env.get("MPESA_CONSUMER_SECRET");
-        const passkey = Deno.env.get("MPESA_PASSKEY");
+        const consumerKey = Deno.env.get("MPESA_CONSUMER_KEY")?.trim();
+        const consumerSecret = Deno.env.get("MPESA_CONSUMER_SECRET")?.trim();
+        const passkey = Deno.env.get("MPESA_PASSKEY")?.trim();
         const shortcode = Deno.env.get("MPESA_BUSINESS_SHORTCODE") || "174379";
         const callbackUrl = Deno.env.get("MPESA_CALLBACK_URL");
 
         if (!consumerKey || !consumerSecret || !passkey || !callbackUrl) {
-            const missing = [];
-            if (!consumerKey) missing.push("MPESA_CONSUMER_KEY");
-            if (!consumerSecret) missing.push("MPESA_CONSUMER_SECRET");
-            if (!passkey) missing.push("MPESA_PASSKEY");
-            if (!callbackUrl) missing.push("MPESA_CALLBACK_URL");
-            throw new Error(`M-Pesa configuration missing: ${missing.join(", ")}. Please set these in Supabase Project Settings -> Edge Functions -> Secrets.`);
+            throw new Error("M-Pesa configuration missing in Supabase Secrets. Please check MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET, and MPESA_PASSKEY.");
         }
 
         // Sanitize Phone Number
@@ -55,9 +50,10 @@ serve(async (req) => {
         });
 
         if (!authResponse.ok) {
-            const errorText = await authResponse.text();
-            console.error("[mpesa-stk-push] Safaricom Auth Failed:", errorText);
-            throw new Error("Failed to authenticate with Safaricom. Check your Consumer Key and Secret.");
+            const errorData = await authResponse.json().catch(() => ({}));
+            const errorMsg = errorData.errorMessage || "Wrong credentials";
+            console.error("[mpesa-stk-push] Safaricom Auth Failed:", errorMsg);
+            throw new Error(`M-Pesa Auth Failed: ${errorMsg}. Please verify your Consumer Key and Secret in Supabase.`);
         }
 
         const authData = await authResponse.json();

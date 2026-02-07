@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, ArrowLeft, CheckCircle, DollarSign } from "lucide-react";
+import { mpesaService } from "@/services/mpesa";
 
 interface MemberInfo {
   id: string;
@@ -80,7 +81,7 @@ const MemberSchemeSelection = () => {
     }
 
     setMember(memberData);
-    setPhoneNumber(memberData.phone); // Pre-fill with member's phone
+    setPhoneNumber(memberData.phone);
 
     const { data: categoriesData, error: categoriesError } = await supabase
       .from("membership_categories")
@@ -115,21 +116,15 @@ const MemberSchemeSelection = () => {
     setSubmitting(true);
 
     try {
-      const principalAmount = selectedCategory.payment_amount;
-      const benefitToAdd = selectedCategory.benefit_amount;
-      const totalPayment = principalAmount + selectedCategory.registration_fee + selectedCategory.management_fee;
+      const totalPayment = selectedCategory.payment_amount + selectedCategory.registration_fee + selectedCategory.management_fee;
 
-      // 1. Trigger STK Push via Edge Function
-      const { error: invokeError } = await supabase.functions.invoke("mpesa-stk-push", {
-        body: {
-          amount: totalPayment,
-          phone: phoneNumber.replace("+", ""), // Ensure format
-          member_id: member.id,
-          coverage_amount: benefitToAdd
-        }
+      // Use the mpesaService which has better error extraction logic
+      await mpesaService.initiateStkPush({
+        amount: totalPayment,
+        phone: phoneNumber.replace("+", ""),
+        member_id: member.id,
+        coverage_amount: selectedCategory.benefit_amount
       });
-
-      if (invokeError) throw invokeError;
 
       toast({
         title: "Request Sent to Phone",
@@ -138,8 +133,7 @@ const MemberSchemeSelection = () => {
 
       setWaitingForCallback(true);
 
-      // 2. Subscribe to Payment Completion
-      // We listen for any INSERT/UPDATE on 'payments' for this member where status becomes 'completed'
+      // Subscribe to Payment Completion
       const channel = supabase
         .channel('scheme-payment-verification')
         .on(
@@ -153,27 +147,17 @@ const MemberSchemeSelection = () => {
           async (payload) => {
             const newRecord = payload.new as any;
             if (newRecord.status === 'completed') {
-              // Payment successful!
               toast({
                 title: "Payment Confirmed!",
                 description: "Your membership scheme has been activated.",
-                variant: "default"
               });
-              // Activate member in DB if not handled by trigger (Wait, triggers update balance, but setting category might not happen automatically unless we change logic or do it here)
-              // Actually, the `process_visit` handles visit logic.
-              // The `update_coverage_on_payment` adds coverage.
-              // We also need to SET the membership_category_id if it's new.
 
-              // Let's do a quick update to ensure the category is set correctly upon payment success
+              // Update member category and status
               await supabase.from("members").update({
                 membership_category_id: selectedCategory.id,
                 is_active: true,
-                benefit_limit: (member.benefit_limit || 0) + benefitToAdd
+                benefit_limit: (member.benefit_limit || 0) + selectedCategory.benefit_amount
               }).eq("id", member.id);
-
-              // Also send SMS manually here or relying on trigger? 
-              // Trigger is better, but existing logic had it here. Let's keep it safe.
-              // Actually, let's just rely on visual callback for now and redirect.
 
               setWaitingForCallback(false);
               navigate("/dashboard");
@@ -192,22 +176,13 @@ const MemberSchemeSelection = () => {
         )
         .subscribe();
 
-
     } catch (error: any) {
       console.error("M-Pesa Payment Error:", error);
-
-      let errorMessage = error.message || "Could not initiate M-Pesa payment.";
-
-      // Handle potential Edge Function error structure
-      if (error && error.context && error.context.status) {
-        errorMessage = `Server Error (${error.context.status}): ${errorMessage}`;
-      } else if (errorMessage.includes("Failed to send request")) {
-        errorMessage = "Could not connect to the server. Please check if the Edge Function is deployed.";
-      }
-
+      
+      // The service now throws an Error with the extracted message
       toast({
         title: "Request Failed",
-        description: errorMessage,
+        description: error.message || "Could not initiate M-Pesa payment.",
         variant: "destructive",
       });
       setSubmitting(false);

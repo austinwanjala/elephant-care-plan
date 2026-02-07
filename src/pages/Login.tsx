@@ -10,42 +10,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 
 const ForgotPasswordForm = () => {
   const [email, setEmail] = useState("");
-  const [token, setToken] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [step, setStep] = useState<"email" | "otp">("email");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  const handleSendOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: { shouldCreateUser: false }
-      });
-
-      if (error) throw error;
-
-      setStep("otp");
-      toast({
-        title: "Code sent",
-        description: "Check your email for the reset code.",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResetPassword = async (e: React.FormEvent) => {
+  const handleDirectReset = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (newPassword !== confirmPassword) {
@@ -56,37 +26,26 @@ const ForgotPasswordForm = () => {
     setLoading(true);
 
     try {
-      // 1. Verify OTP - this logs the user in if successful
-      const { data, error: verifyError } = await supabase.auth.verifyOtp({
-        email,
-        token,
-        type: 'email'
+      const { error } = await supabase.functions.invoke('admin-reset-password', {
+        body: { email, password: newPassword }
       });
 
-      if (verifyError) throw verifyError;
-      if (!data.session) throw new Error("Session not established. Please try again.");
-
-      // 2. Update Password
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: newPassword
-      });
-
-      if (updateError) throw updateError;
+      if (error) throw error;
 
       toast({
         title: "Success",
-        description: "Password reset successfully. You are now logged in.",
+        description: "Password has been reset. You can now login.",
       });
 
-      // Close dialog (handled by parent usually, but here we can just reload or redirect if needed, 
-      // but effectively they are logged in. The parent Login component might not know this. 
-      // Ideally we reload page to get into the app or redirect.)
-      window.location.href = '/dashboard';
+      // Close the dialog or just show success state? 
+      // The user stays on login page, so they can just close and login.
+      // We can reload to be safe and clear state.
+      window.location.reload();
 
     } catch (error: any) {
       toast({
         title: "Reset failed",
-        description: error.message,
+        description: error.message || "Failed to reset password",
         variant: "destructive",
       });
     } finally {
@@ -94,39 +53,19 @@ const ForgotPasswordForm = () => {
     }
   };
 
-  if (step === "email") {
-    return (
-      <form onSubmit={handleSendOtp} className="space-y-4 py-2">
-        <div className="space-y-2">
-          <Label htmlFor="reset-email">Email address</Label>
-          <Input
-            id="reset-email"
-            type="email"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-        </div>
-        <Button type="submit" className="w-full btn-primary" disabled={loading}>
-          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <><Send className="mr-2 h-4 w-4" /> Send Code</>}
-        </Button>
-      </form>
-    );
-  }
-
   return (
-    <form onSubmit={handleResetPassword} className="space-y-4 py-2">
-      <div className="bg-muted/50 p-3 rounded text-sm text-center mb-4">
-        Code sent to <strong>{email}</strong>
+    <form onSubmit={handleDirectReset} className="space-y-4 py-2">
+      <div className="bg-yellow-50 text-yellow-800 p-3 rounded text-sm text-center mb-4 border border-yellow-200">
+        <strong>Admin Mode:</strong> This will directly reset the password for the specified email.
       </div>
       <div className="space-y-2">
-        <Label htmlFor="otp">Security Code</Label>
+        <Label htmlFor="reset-email">Email address</Label>
         <Input
-          id="otp"
-          placeholder="123456"
-          value={token}
-          onChange={(e) => setToken(e.target.value)}
+          id="reset-email"
+          type="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
           required
         />
       </div>
@@ -154,14 +93,9 @@ const ForgotPasswordForm = () => {
           minLength={6}
         />
       </div>
-      <div className="flex gap-2">
-        <Button type="button" variant="outline" onClick={() => setStep("email")} disabled={loading}>
-          Back
-        </Button>
-        <Button type="submit" className="flex-1 btn-primary" disabled={loading}>
-          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Reset & Login"}
-        </Button>
-      </div>
+      <Button type="submit" className="w-full btn-primary" disabled={loading}>
+        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Reset Password"}
+      </Button>
     </form>
   );
 };

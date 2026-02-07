@@ -104,21 +104,9 @@ export default function MemberPayments() {
       setPayDialogOpen(false);
     } catch (error: any) {
       console.error("Payment error:", error);
-      
-      // Try to extract the error message from the function response
-      let errorMessage = "Could not initiate payment. Please try again.";
-      if (error.message) {
-          try {
-              const parsed = JSON.parse(error.message);
-              errorMessage = parsed.error || errorMessage;
-          } catch (e) {
-              errorMessage = error.message;
-          }
-      }
-
       toast({ 
         title: "Payment Failed", 
-        description: errorMessage, 
+        description: error.message || "Could not initiate payment. Please try again.", 
         variant: "destructive" 
       });
     } finally {

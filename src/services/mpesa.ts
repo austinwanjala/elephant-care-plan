@@ -16,7 +16,19 @@ export const mpesaService = {
             body: request
         });
 
-        if (error) throw error;
+        if (error) {
+            // Extract the actual error message from the response body if available
+            let errorMessage = error.message;
+            if (error.context && typeof error.context.json === 'function') {
+                try {
+                    const body = await error.context.json();
+                    errorMessage = body.error || errorMessage;
+                } catch (e) {
+                    // Fallback to default error message
+                }
+            }
+            throw new Error(errorMessage);
+        }
         return data;
     },
 

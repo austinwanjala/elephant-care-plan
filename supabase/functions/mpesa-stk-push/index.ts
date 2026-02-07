@@ -15,8 +15,7 @@ serve(async (req) => {
         const { amount, phone, member_id, coverage_amount } = await req.json();
 
         if (!amount || !phone || !member_id) {
-            console.error("[mpesa-stk-push] Missing fields:", { amount, phone, member_id });
-            throw new Error("Missing required fields: amount, phone, member_id");
+            throw new Error("Missing required fields: amount, phone, or member_id.");
         }
 
         // 1. Get Configuration
@@ -27,13 +26,12 @@ serve(async (req) => {
         const callbackUrl = Deno.env.get("MPESA_CALLBACK_URL");
 
         if (!consumerKey || !consumerSecret || !passkey || !callbackUrl) {
-            console.error("[mpesa-stk-push] Missing env vars:", { 
-                hasKey: !!consumerKey, 
-                hasSecret: !!consumerSecret, 
-                hasPasskey: !!passkey, 
-                hasCallback: !!callbackUrl 
-            });
-            throw new Error("Server misconfiguration: M-Pesa credentials missing.");
+            const missing = [];
+            if (!consumerKey) missing.push("MPESA_CONSUMER_KEY");
+            if (!consumerSecret) missing.push("MPESA_CONSUMER_SECRET");
+            if (!passkey) missing.push("MPESA_PASSKEY");
+            if (!callbackUrl) missing.push("MPESA_CALLBACK_URL");
+            throw new Error(`M-Pesa configuration missing: ${missing.join(", ")}. Please set these in Supabase Project Settings -> Edge Functions -> Secrets.`);
         }
 
         // Sanitize Phone Number
@@ -42,6 +40,10 @@ serve(async (req) => {
             formattedPhone = "254" + formattedPhone.slice(1);
         } else if (!formattedPhone.startsWith("254") && formattedPhone.length === 9) {
             formattedPhone = "254" + formattedPhone;
+        }
+
+        if (formattedPhone.length !== 12) {
+            throw new Error("Invalid phone number format. Use 2547XXXXXXXX.");
         }
 
         console.log(`[mpesa-stk-push] Request for ${formattedPhone} - Amount: ${amount}`);
@@ -55,7 +57,7 @@ serve(async (req) => {
         if (!authResponse.ok) {
             const errorText = await authResponse.text();
             console.error("[mpesa-stk-push] Safaricom Auth Failed:", errorText);
-            throw new Error("Failed to authenticate with M-Pesa provider.");
+            throw new Error("Failed to authenticate with Safaricom. Check your Consumer Key and Secret.");
         }
 
         const authData = await authResponse.json();
@@ -92,7 +94,7 @@ serve(async (req) => {
         const stkData = await stkResponse.json();
         if (stkData.ResponseCode !== "0") {
             console.error("[mpesa-stk-push] STK Push Failed:", stkData);
-            throw new Error(stkData.errorMessage || stkData.ResponseDescription || "STK Push request failed.");
+            throw new Error(stkData.errorMessage || stkData.ResponseDescription || "M-Pesa STK Push request failed.");
         }
 
         // 5. Record Payment
@@ -113,7 +115,6 @@ serve(async (req) => {
 
         if (dbError) {
             console.error("[mpesa-stk-push] DB Insert Error:", dbError);
-            // We don't throw here because the STK push was already sent to the user
         }
 
         return new Response(JSON.stringify(stkData), {

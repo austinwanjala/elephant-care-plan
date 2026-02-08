@@ -138,12 +138,12 @@ const Register = () => {
       const ageInt = parseInt(formData.age);
       if (isNaN(ageInt)) throw new Error("Please enter a valid age.");
 
-      // 1. Sign up the user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
+      // 1. Sign up the user using the Admin Edge Function to bypass email confirmation
+      const { data: authData, error: authError } = await supabase.functions.invoke("admin-create-user", {
+        body: {
+          email: formData.email,
+          password: formData.password,
+          metadata: {
             role: 'member',
             full_name: formData.fullName,
             phone: formData.phone,
@@ -155,7 +155,11 @@ const Register = () => {
         }
       });
 
-      if (authError) throw authError;
+      if (authError) {
+        const errorData = await authError.context?.json().catch(() => ({}));
+        throw new Error(errorData?.error || authError.message);
+      }
+      
       if (!authData.user) throw new Error("Registration failed. Please try again.");
 
       // 2. Insert dependants
@@ -172,7 +176,7 @@ const Register = () => {
         if (depError) console.error("Error adding dependants:", depError);
       }
 
-      // 3. Send Welcome SMS (Optional)
+      // 3. Send Welcome SMS
       try {
         await supabase.functions.invoke('send-sms', {
           body: {
@@ -187,7 +191,7 @@ const Register = () => {
 
       toast({
         title: "Registration Successful",
-        description: "Your account has been created. Please log in.",
+        description: "Your account has been created. You can now log in.",
       });
 
       navigate("/login");

@@ -29,20 +29,21 @@ serve(async (req) => {
             throw new Error("Email and new password are required");
         }
 
-        // 1. Find the user by email
-        const { data: { users }, error: searchError } = await supabaseAdmin.auth.admin.listUsers();
+        // 1. Find the user in the public tables first (to verify they are our user)
+        const [{ data: member }, { data: staff }] = await Promise.all([
+            supabaseAdmin.from("members").select("user_id").eq("email", email).maybeSingle(),
+            supabaseAdmin.from("staff").select("user_id").eq("email", email).maybeSingle()
+        ]);
 
-        if (searchError) throw searchError;
+        const userId = member?.user_id || staff?.user_id;
 
-        const user = users.find(u => u.email?.toLowerCase() === email.toLowerCase());
-
-        if (!user) {
-            throw new Error("User not found");
+        if (!userId) {
+            throw new Error("This email is not registered in our system.");
         }
 
-        // 2. Update the password
+        // 2. Update the password in Auth using the ID
         const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-            user.id,
+            userId,
             { password: password }
         );
 

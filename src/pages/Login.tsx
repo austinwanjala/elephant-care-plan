@@ -27,22 +27,16 @@ const ForgotPasswordForm = () => {
     setLoading(true);
     
     try {
-      // 1. Verify email exists
-      const [{ data: member }, { data: staff }] = await Promise.all([
-        supabase.from("members").select("id").eq("email", email).maybeSingle(),
-        supabase.from("staff").select("id").eq("email", email).maybeSingle()
-      ]);
-
-      if (!member && !staff) {
-        throw new Error("This email is not registered in our system.");
-      }
-
-      // 2. Call Edge Function to override password
-      const { error } = await supabase.functions.invoke("admin-reset-password", {
+      // Call Edge Function to verify email and override password in one go
+      const { data, error } = await supabase.functions.invoke("admin-reset-password", {
         body: { email, password }
       });
       
-      if (error) throw error;
+      if (error) {
+        // Extract error message from function response
+        const errorData = await error.context?.json().catch(() => ({}));
+        throw new Error(errorData?.error || error.message);
+      }
       
       setSuccess(true);
       toast({ 

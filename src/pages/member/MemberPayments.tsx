@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Loader2, CreditCard, Phone, CheckCircle2, AlertCircle } from "lucide-react";
+import { Loader2, CreditCard, Phone, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { mpesaService } from "@/services/mpesa";
@@ -26,6 +26,7 @@ export default function MemberPayments() {
   const [loading, setLoading] = useState(true);
   const [payDialogOpen, setPayDialogOpen] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [amount, setAmount] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const { toast } = useToast();
@@ -62,8 +63,9 @@ export default function MemberPayments() {
   useEffect(() => {
     fetchPayments();
 
+    // Global listener for payment updates to refresh the list
     const channel = supabase
-      .channel('schema-db-changes')
+      .channel('payments-list-updates')
       .on(
         'postgres_changes',
         {
@@ -90,7 +92,7 @@ export default function MemberPayments() {
 
     setProcessing(true);
     try {
-      await mpesaService.initiateStkPush({
+      const response = await mpesaService.initiateStkPush({
         amount: parseFloat(amount),
         phone: phoneNumber.replace("+", ""),
         member_id: memberId,
@@ -98,18 +100,43 @@ export default function MemberPayments() {
       });
 
       toast({
-        title: "Request Sent",
-        description: "Please check your phone to complete the M-Pesa payment."
+        title: "Prompt Sent",
+        description: "Please enter your M-Pesa PIN on your phone."
       });
-      setPayDialogOpen(false);
+
+      setVerifying(true);
+
+      // Start listening for the specific status update
+      const channel = mpesaService.subscribeToPaymentStatus(memberId, (payload) => {
+        if (payload.status === 'completed') {
+          toast({
+            title: "Payment Verified!",
+            description: `KES ${parseFloat(amount).toLocaleString()} has been added to your coverage.`,
+          });
+          setVerifying(false);
+          setProcessing(false);
+          setPayDialogOpen(false);
+          setAmount("");
+          fetchPayments();
+          supabase.removeChannel(channel);
+        } else if (payload.status === 'failed') {
+          toast({
+            title: "Payment Failed",
+            description: payload.mpesa_result_desc || "The transaction was not completed.",
+            variant: "destructive"
+          });
+          setVerifying(false);
+          setProcessing(false);
+          supabase.removeChannel(channel);
+        }
+      });
+
     } catch (error: any) {
-      console.error("Payment error:", error);
       toast({ 
-        title: "Payment Failed", 
-        description: error.message || "Could not initiate payment. Please try again.", 
+        title: "Request Failed", 
+        description: error.message, 
         variant: "destructive" 
       });
-    } finally {
       setProcessing(false);
     }
   };
@@ -138,7 +165,7 @@ export default function MemberPayments() {
           <h1 className="text-2xl font-bold">Payments & Contributions</h1>
           <p className="text-muted-foreground">Manage your account coverage.</p>
         </div>
-        <Dialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>
+        <Dialog open={payDialogOpen} onOpenChange={(open) => !verifying && setPayDialogOpen(open)}>
           <DialogTrigger asChild>
             <Button className="bg-green-600 hover:bg-green-700">
               <CreditCard className="mr-2 h-4 w-4" /> Add Funds (M-Pesa)
@@ -151,35 +178,57 @@ export default function MemberPayments() {
                 Enter amount to top up your coverage balance.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Amount (KES)</Label>
-                <Input
-                  type="number"
-                  placeholder="e.g. 5000"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
+            
+            {verifying ? (
+              <div className="py-12 flex flex-col items-center justify-center space-y-4 text-center">
+                <div className="relative">
+                  <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                  <RefreshCw className="h-6 w-6 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="font-bold text-lg">Verifying Payment...</h3>
+                  <p className="text-sm text-muted-foreground px-8">
+                    We've sent a prompt to <strong>{phoneNumber}</strong>. Please enter your PIN. 
+                    This window will update automatically once confirmed.
+                  </p>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>M-Pesa Phone Number</Label>
-                <Input
-                  placeholder="2547..."
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                />
+            ) : (
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Amount (KES)</Label>
+                  <Input
+                    type="number"
+                    placeholder="e.g. 5000"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>M-Pesa Phone Number</Label>
+                  <Input
+                    placeholder="2547..."
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                  />
+                </div>
+                <div className="p-3 bg-blue-50 text-blue-700 text-sm rounded-md flex gap-2">
+                  <AlertCircle className="h-5 w-5 shrink-0" />
+                  <p>A prompt will be sent to your phone. Enter your M-Pesa PIN to complete the transaction.</p>
+                </div>
               </div>
-              <div className="p-3 bg-blue-50 text-blue-700 text-sm rounded-md flex gap-2">
-                <AlertCircle className="h-5 w-5 shrink-0" />
-                <p>A prompt will be sent to your phone. Enter your M-Pesa PIN to complete the transaction.</p>
-              </div>
-            </div>
+            )}
+
             <DialogFooter>
-              <Button variant="outline" onClick={() => setPayDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleMpesaPayment} disabled={processing} className="bg-green-600 hover:bg-green-700">
-                {processing ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Phone className="mr-2 h-4 w-4" />}
-                Send Request
-              </Button>
+              {!verifying && (
+                <>
+                  <Button variant="outline" onClick={() => setPayDialogOpen(false)}>Cancel</Button>
+                  <Button onClick={handleMpesaPayment} disabled={processing} className="bg-green-600 hover:bg-green-700">
+                    {processing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Phone className="mr-2 h-4 w-4" />}
+                    Send Request
+                  </Button>
+                </>
+              )}
             </DialogFooter>
           </DialogContent>
         </Dialog>

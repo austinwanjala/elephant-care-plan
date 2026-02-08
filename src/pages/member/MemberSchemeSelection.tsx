@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ArrowLeft, CheckCircle, DollarSign } from "lucide-react";
+import { Loader2, ArrowLeft, CheckCircle, DollarSign, RefreshCw } from "lucide-react";
 import { mpesaService } from "@/services/mpesa";
 
 interface MemberInfo {
@@ -118,7 +118,6 @@ const MemberSchemeSelection = () => {
     try {
       const totalPayment = selectedCategory.payment_amount + selectedCategory.registration_fee + selectedCategory.management_fee;
 
-      // Use the mpesaService which has better error extraction logic
       await mpesaService.initiateStkPush({
         amount: totalPayment,
         phone: phoneNumber.replace("+", ""),
@@ -127,62 +126,46 @@ const MemberSchemeSelection = () => {
       });
 
       toast({
-        title: "Request Sent to Phone",
-        description: `Please check ${phoneNumber} to complete the payment of KES ${totalPayment.toLocaleString()}.`,
+        title: "Request Sent",
+        description: `Please check your phone to pay KES ${totalPayment.toLocaleString()}.`,
       });
 
       setWaitingForCallback(true);
 
       // Subscribe to Payment Completion
-      const channel = supabase
-        .channel('scheme-payment-verification')
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'payments',
-            filter: `member_id=eq.${member.id}`
-          },
-          async (payload) => {
-            const newRecord = payload.new as any;
-            if (newRecord.status === 'completed') {
-              toast({
-                title: "Payment Confirmed!",
-                description: "Your membership scheme has been activated.",
-              });
+      const channel = mpesaService.subscribeToPaymentStatus(member.id, async (payload) => {
+        if (payload.status === 'completed') {
+          toast({
+            title: "Payment Confirmed!",
+            description: "Your membership scheme has been activated.",
+          });
 
-              // Update member category and status
-              await supabase.from("members").update({
-                membership_category_id: selectedCategory.id,
-                is_active: true,
-                benefit_limit: (member.benefit_limit || 0) + selectedCategory.benefit_amount
-              }).eq("id", member.id);
+          // Update member category and status
+          await supabase.from("members").update({
+            membership_category_id: selectedCategory.id,
+            is_active: true,
+            benefit_limit: (member.benefit_limit || 0) + selectedCategory.benefit_amount
+          }).eq("id", member.id);
 
-              setWaitingForCallback(false);
-              navigate("/dashboard");
-              supabase.removeChannel(channel);
-            } else if (newRecord.status === 'failed') {
-              toast({
-                title: "Payment Failed",
-                description: newRecord.mpesa_result_desc || "Transaction was cancelled or failed.",
-                variant: "destructive"
-              });
-              setWaitingForCallback(false);
-              setSubmitting(false);
-              supabase.removeChannel(channel);
-            }
-          }
-        )
-        .subscribe();
+          setWaitingForCallback(false);
+          navigate("/dashboard");
+          supabase.removeChannel(channel);
+        } else if (payload.status === 'failed') {
+          toast({
+            title: "Payment Failed",
+            description: payload.mpesa_result_desc || "Transaction was cancelled or failed.",
+            variant: "destructive"
+          });
+          setWaitingForCallback(false);
+          setSubmitting(false);
+          supabase.removeChannel(channel);
+        }
+      });
 
     } catch (error: any) {
-      console.error("M-Pesa Payment Error:", error);
-      
-      // The service now throws an Error with the extracted message
       toast({
         title: "Request Failed",
-        description: error.message || "Could not initiate M-Pesa payment.",
+        description: error.message,
         variant: "destructive",
       });
       setSubmitting(false);
@@ -227,102 +210,102 @@ const MemberSchemeSelection = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="px-0 pb-0">
-          <form onSubmit={handleMpesaPayment} className="space-y-6">
-            <div className="space-y-4">
-              <Label>Membership Scheme</Label>
-              <div className="grid gap-3">
-                {allCategories.map((cat) => (
-                  <div
-                    key={cat.id}
-                    onClick={() => {
-                      if (!waitingForCallback) setSelectedCategory(cat);
-                    }}
-                    className={`p-4 border rounded-lg cursor-pointer transition-all ${selectedCategory?.id === cat.id
-                      ? "border-primary bg-primary/5 ring-1 ring-primary"
-                      : "hover:border-primary/50"
-                      } ${waitingForCallback ? 'opacity-50 pointer-events-none' : ''}`}
-                  >
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="font-bold">{cat.name} ({cat.level.replace('_', ' ')})</span>
-                      <span className="text-primary font-bold">KES {(cat.payment_amount + cat.registration_fee + cat.management_fee).toLocaleString()}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Benefit: KES {cat.benefit_amount.toLocaleString()} | Fees: KES {(cat.registration_fee + cat.management_fee).toLocaleString()}
-                    </p>
-                  </div>
-                ))}
+          {waitingForCallback ? (
+            <div className="py-12 flex flex-col items-center justify-center space-y-6 text-center">
+              <div className="relative">
+                <Loader2 className="h-16 w-16 animate-spin text-primary" />
+                <RefreshCw className="h-8 w-8 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="font-bold text-xl">Verifying Your Payment...</h3>
+                <p className="text-muted-foreground">
+                  We've sent a prompt to <strong>{phoneNumber}</strong> for <strong>KES {totalPayment.toLocaleString()}</strong>. 
+                  Please enter your PIN on your phone.
+                </p>
+                <p className="text-xs text-yellow-600 font-medium animate-pulse">
+                  Do not refresh or leave this page.
+                </p>
               </div>
             </div>
-
-            {selectedCategory && (
-              <>
-                <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-2">
-                  <h4 className="font-semibold text-primary">Payment Summary for {selectedCategory.name}</h4>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div className="flex justify-between">
-                      <span>Membership Payment:</span>
-                      <span>KES {selectedCategory.payment_amount.toLocaleString()}</span>
+          ) : (
+            <form onSubmit={handleMpesaPayment} className="space-y-6">
+              <div className="space-y-4">
+                <Label>Membership Scheme</Label>
+                <div className="grid gap-3">
+                  {allCategories.map((cat) => (
+                    <div
+                      key={cat.id}
+                      onClick={() => setSelectedCategory(cat)}
+                      className={`p-4 border rounded-lg cursor-pointer transition-all ${selectedCategory?.id === cat.id
+                        ? "border-primary bg-primary/5 ring-1 ring-primary"
+                        : "hover:border-primary/50"
+                        }`}
+                    >
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="font-bold">{cat.name} ({cat.level.replace('_', ' ')})</span>
+                        <span className="text-primary font-bold">KES {(cat.payment_amount + cat.registration_fee + cat.management_fee).toLocaleString()}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Benefit: KES {cat.benefit_amount.toLocaleString()} | Fees: KES {(cat.registration_fee + cat.management_fee).toLocaleString()}
+                      </p>
                     </div>
-                    <div className="flex justify-between">
-                      <span>Registration Fee:</span>
-                      <span>KES {selectedCategory.registration_fee.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Management Fee:</span>
-                      <span>KES {selectedCategory.management_fee.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between font-bold text-primary col-span-2 border-t pt-2">
-                      <span>Total Payable (M-Pesa):</span>
-                      <span>KES {totalPayment.toLocaleString()}</span>
-                    </div>
-                  </div>
-                  <div className="flex justify-between font-bold text-success border-t pt-2">
-                    <span>Coverage to Add:</span>
-                    <span>KES {selectedCategory.benefit_amount.toLocaleString()}</span>
-                  </div>
+                  ))}
                 </div>
+              </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="phoneNumber">M-Pesa Phone Number</Label>
-                  <Input
-                    id="phoneNumber"
-                    placeholder="2547..."
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                    className="input-field"
-                    required
-                    disabled={waitingForCallback}
-                  />
-                  <p className="text-xs text-muted-foreground">Enter the phone number that will receive the payment prompt.</p>
-                </div>
-
-                <Button type="submit" className="w-full btn-primary" disabled={submitting || waitingForCallback}>
-                  {waitingForCallback ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Waiting for Payment...
-                    </>
-                  ) : submitting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Sending Request...
-                    </>
-                  ) : (
-                    <>
-                      <DollarSign className="mr-2 h-4 w-4" />
-                      Pay & Activate
-                    </>
-                  )}
-                </Button>
-
-                {waitingForCallback && (
-                  <div className="text-center text-sm text-yellow-600 animate-pulse">
-                    Please check your phone and enter your PIN. Do not leave this page.
+              {selectedCategory && (
+                <>
+                  <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-2">
+                    <h4 className="font-semibold text-primary">Payment Summary for {selectedCategory.name}</h4>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="flex justify-between">
+                        <span>Membership Payment:</span>
+                        <span>KES {selectedCategory.payment_amount.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Registration Fee:</span>
+                        <span>KES {selectedCategory.registration_fee.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Management Fee:</span>
+                        <span>KES {selectedCategory.management_fee.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between font-bold text-primary col-span-2 border-t pt-2">
+                        <span>Total Payable (M-Pesa):</span>
+                        <span>KES {totalPayment.toLocaleString()}</span>
+                      </div>
+                    </div>
                   </div>
-                )}
-              </>
-            )}
-          </form>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="phoneNumber">M-Pesa Phone Number</Label>
+                    <Input
+                      id="phoneNumber"
+                      placeholder="2547..."
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      className="input-field"
+                      required
+                    />
+                  </div>
+
+                  <Button type="submit" className="w-full btn-primary" disabled={submitting}>
+                    {submitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Sending Request...
+                      </>
+                    ) : (
+                      <>
+                        <DollarSign className="mr-2 h-4 w-4" />
+                        Pay & Activate
+                      </>
+                    )}
+                  </Button>
+                </>
+              )}
+            </form>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -136,7 +136,7 @@ export default function MemberPayments() {
 
       const checkoutId = response.CheckoutRequestID;
       setCurrentCheckoutId(checkoutId);
-      
+
       toast({
         title: "Prompt Sent",
         description: "Please enter your M-Pesa PIN on your phone."
@@ -197,7 +197,7 @@ export default function MemberPayments() {
                 Enter amount to top up your coverage balance.
               </DialogDescription>
             </DialogHeader>
-            
+
             {verifying ? (
               <div className="py-8 flex flex-col items-center justify-center space-y-6 text-center">
                 <div className="relative">
@@ -207,13 +207,13 @@ export default function MemberPayments() {
                 <div className="space-y-2">
                   <h3 className="font-bold text-lg">Verifying Payment...</h3>
                   <p className="text-sm text-muted-foreground px-8">
-                    We've sent a prompt to <strong>{phoneNumber}</strong>. Please enter your PIN. 
+                    We've sent a prompt to <strong>{phoneNumber}</strong>. Please enter your PIN.
                   </p>
                 </div>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handleManualCheck} 
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleManualCheck}
                   className="gap-2"
                 >
                   <Search className="h-4 w-4" />

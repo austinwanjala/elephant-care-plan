@@ -125,7 +125,7 @@ serve(async (req) => {
             mpesa_checkout_request_id: stkData.CheckoutRequestID,
             mpesa_merchant_request_id: stkData.MerchantRequestID,
             phone_used: formattedPhone,
-            status: "completed" // USER REQUEST: Mark as complete immediately
+            status: "pending"
         });
 
         if (dbError) {

@@ -273,21 +273,6 @@ export default function AdminMembers() {
             <div className="space-y-2"><Label>ID Number</Label><Input value={formData.idNumber} onChange={e => setFormData({ ...formData, idNumber: e.target.value })} /></div>
             <div className="space-y-2"><Label>Age</Label><Input type="number" value={formData.age} onChange={e => setFormData({ ...formData, age: e.target.value })} /></div>
 
-            <div className="pt-4 border-t mt-4">
-              <Label className="text-green-600 font-semibold flex items-center gap-2">
-                <Plus className="h-4 w-4" /> Add Coverage Balance
-              </Label>
-              <div className="text-xs text-muted-foreground mb-2">
-                Enter amount to manually add to the member's coverage balance. Leave empty if no change.
-              </div>
-              <Input
-                type="number"
-                placeholder="e.g. 5000"
-                value={formData.coverageAdjustment}
-                onChange={e => setFormData({ ...formData, coverageAdjustment: e.target.value })}
-              />
-            </div>
-
             <div className="pt-4 border-t">
               <Label className="text-green-600 font-semibold flex items-center gap-2">
                 <Plus className="h-4 w-4" /> Add Coverage Balance

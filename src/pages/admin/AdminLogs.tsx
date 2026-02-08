@@ -4,14 +4,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Loader2, Search, Filter } from "lucide-react";
+import { Loader2, Search, Filter, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AdminLogs() {
     const [logs, setLogs] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
+    const { toast } = useToast();
 
     useEffect(() => {
         fetchLogs();
@@ -33,38 +35,30 @@ export default function AdminLogs() {
         setLoading(false);
     };
 
-    // Debugging Tool: Simulate M-Pesa Callback
     const handleSimulateCallback = async () => {
-        const checkoutId = `TEST-${Date.now()}`;
-        const amount = 100;
+        // 1. Find a pending payment to simulate for
+        const { data: pendingPayment } = await supabase
+            .from('payments')
+            .select('mpesa_checkout_request_id, amount, phone_used')
+            .eq('status', 'pending')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
 
-        // 1. Create a dummy pending record
-        // We need a valid member_id. Let's try to get one from the logs or just any member.
-        // Actually, for a test, we might fail foreign key constraint if we don't use a valid member.
-        // Let's try to fetch one member first.
-        const { data: member } = await supabase.from('members').select('id').limit(1).maybeSingle();
-
-        if (!member) {
-            alert("Cannot simulate: No members found to attach payment to.");
+        if (!pendingPayment) {
+            toast({ 
+                title: "No Pending Payments", 
+                description: "Please initiate a payment from a member account first to test simulation.",
+                variant: "destructive"
+            });
             return;
         }
 
-        const { error: insertError } = await supabase.from("payments").insert({
-            member_id: member.id,
-            amount: amount,
-            coverage_added: amount,
-            mpesa_checkout_request_id: checkoutId,
-            status: 'pending',
-            phone_used: '254700000000'
-        });
+        const checkoutId = pendingPayment.mpesa_checkout_request_id;
+        const amount = pendingPayment.amount;
+        const receipt = `RC${Math.floor(Math.random() * 1000000000)}`;
 
-        if (insertError) {
-            console.error("Test setup failed:", insertError);
-            alert("Failed to create test payment record.");
-            return;
-        }
-
-        // 2. Invoke Callback
+        // 2. Construct realistic Safaricom payload
         const payload = {
             Body: {
                 stkCallback: {
@@ -72,32 +66,29 @@ export default function AdminLogs() {
                     CheckoutRequestID: checkoutId,
                     ResultCode: 0,
                     ResultDesc: "The service request is processed successfully.",
-                    Amount: amount,
-                    MpesaReceiptNumber: `RC-${checkoutId}`,
-                    Balance: 0,
-                    TransactionDate: format(new Date(), "yyyyMMddHHmmss"),
-                    PhoneNumber: 254700000000,
                     CallbackMetadata: {
                         Item: [
                             { Name: "Amount", Value: amount },
-                            { Name: "MpesaReceiptNumber", Value: `RC-${checkoutId}` },
+                            { Name: "MpesaReceiptNumber", Value: receipt },
                             { Name: "TransactionDate", Value: format(new Date(), "yyyyMMddHHmmss") },
-                            { Name: "PhoneNumber", Value: 254700000000 }
+                            { Name: "PhoneNumber", Value: pendingPayment.phone_used }
                         ]
                     }
                 }
             }
         };
 
+        toast({ title: "Simulating...", description: `Sending callback for ${checkoutId}` });
+
         const { error: invokeError } = await supabase.functions.invoke('mpesa-callback', {
             body: payload
         });
 
         if (invokeError) {
-            alert(`Simulation failed: ${invokeError.message}`);
+            toast({ title: "Simulation Failed", description: invokeError.message, variant: "destructive" });
         } else {
-            alert("Simulation sent! Check the logs table for 'MPESA_CALLBACK_SUCCESS'.");
-            fetchLogs();
+            toast({ title: "Simulation Sent", description: "Check the logs and payment status now." });
+            setTimeout(fetchLogs, 1000);
         }
     };
 
@@ -114,9 +105,14 @@ export default function AdminLogs() {
                     <h1 className="text-3xl font-bold tracking-tight">System Logs</h1>
                     <p className="text-muted-foreground">Audit trail of system activities and data changes.</p>
                 </div>
-                <Button variant="outline" onClick={handleSimulateCallback}>
-                    <Filter className="mr-2 h-4 w-4" /> Simulate M-Pesa Callback
-                </Button>
+                <div className="flex gap-2">
+                    <Button variant="outline" onClick={fetchLogs} disabled={loading}>
+                        <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Refresh
+                    </Button>
+                    <Button variant="secondary" onClick={handleSimulateCallback}>
+                        <Filter className="mr-2 h-4 w-4" /> Simulate M-Pesa Callback
+                    </Button>
+                </div>
             </div>
 
             <div className="flex items-center gap-4">
@@ -148,7 +144,7 @@ export default function AdminLogs() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {loading ? (
+                            {loading && logs.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={4} className="h-24 text-center">
                                         <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />

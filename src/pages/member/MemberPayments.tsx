@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Loader2, CreditCard, Phone, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
+import { Loader2, CreditCard, Phone, CheckCircle2, AlertCircle, RefreshCw, Search } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { mpesaService } from "@/services/mpesa";
@@ -27,10 +27,12 @@ export default function MemberPayments() {
   const [payDialogOpen, setPayDialogOpen] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [currentCheckoutId, setCurrentCheckoutId] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const { toast } = useToast();
   const [memberId, setMemberId] = useState<string | null>(null);
+  const channelRef = useRef<any>(null);
 
   const fetchPayments = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -62,27 +64,55 @@ export default function MemberPayments() {
 
   useEffect(() => {
     fetchPayments();
-
-    // Global listener for payment updates to refresh the list
-    const channel = supabase
-      .channel('payments-list-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'payments'
-        },
-        () => {
-          fetchPayments();
-        }
-      )
-      .subscribe();
-
     return () => {
-      supabase.removeChannel(channel);
+      if (channelRef.current) supabase.removeChannel(channelRef.current);
     };
   }, []);
+
+  const handleManualCheck = async () => {
+    if (!currentCheckoutId) return;
+    setProcessing(true);
+    try {
+      const payment = await mpesaService.checkPaymentStatus(currentCheckoutId);
+      if (payment && payment.status !== 'pending') {
+        handlePaymentResult(payment);
+      } else {
+        toast({ title: "Still Pending", description: "We haven't received the confirmation yet. Please wait a moment." });
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handlePaymentResult = (payment: any) => {
+    if (payment.status === 'completed') {
+      toast({
+        title: "Payment Verified!",
+        description: `KES ${payment.amount.toLocaleString()} has been added to your coverage.`,
+      });
+      setVerifying(false);
+      setProcessing(false);
+      setPayDialogOpen(false);
+      setAmount("");
+      setCurrentCheckoutId(null);
+      fetchPayments();
+    } else if (payment.status === 'failed') {
+      toast({
+        title: "Payment Failed",
+        description: payment.mpesa_result_desc || "The transaction was not completed.",
+        variant: "destructive"
+      });
+      setVerifying(false);
+      setProcessing(false);
+      setCurrentCheckoutId(null);
+    }
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+  };
 
   const handleMpesaPayment = async () => {
     if (!amount || !phoneNumber || !memberId) {
@@ -99,6 +129,9 @@ export default function MemberPayments() {
         coverage_amount: parseFloat(amount)
       });
 
+      const checkoutId = response.CheckoutRequestID;
+      setCurrentCheckoutId(checkoutId);
+      
       toast({
         title: "Prompt Sent",
         description: "Please enter your M-Pesa PIN on your phone."
@@ -106,37 +139,13 @@ export default function MemberPayments() {
 
       setVerifying(true);
 
-      // Start listening for the specific status update
-      const channel = mpesaService.subscribeToPaymentStatus(memberId, (payload) => {
-        if (payload.status === 'completed') {
-          toast({
-            title: "Payment Verified!",
-            description: `KES ${parseFloat(amount).toLocaleString()} has been added to your coverage.`,
-          });
-          setVerifying(false);
-          setProcessing(false);
-          setPayDialogOpen(false);
-          setAmount("");
-          fetchPayments();
-          supabase.removeChannel(channel);
-        } else if (payload.status === 'failed') {
-          toast({
-            title: "Payment Failed",
-            description: payload.mpesa_result_desc || "The transaction was not completed.",
-            variant: "destructive"
-          });
-          setVerifying(false);
-          setProcessing(false);
-          supabase.removeChannel(channel);
-        }
+      // Subscribe to specific checkout ID
+      channelRef.current = mpesaService.subscribeToCheckoutStatus(checkoutId, (payload) => {
+        handlePaymentResult(payload);
       });
 
     } catch (error: any) {
-      toast({ 
-        title: "Request Failed", 
-        description: error.message, 
-        variant: "destructive" 
-      });
+      toast({ title: "Request Failed", description: error.message, variant: "destructive" });
       setProcessing(false);
     }
   };
@@ -180,7 +189,7 @@ export default function MemberPayments() {
             </DialogHeader>
             
             {verifying ? (
-              <div className="py-12 flex flex-col items-center justify-center space-y-4 text-center">
+              <div className="py-8 flex flex-col items-center justify-center space-y-6 text-center">
                 <div className="relative">
                   <Loader2 className="h-12 w-12 animate-spin text-primary" />
                   <RefreshCw className="h-6 w-6 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
@@ -189,9 +198,18 @@ export default function MemberPayments() {
                   <h3 className="font-bold text-lg">Verifying Payment...</h3>
                   <p className="text-sm text-muted-foreground px-8">
                     We've sent a prompt to <strong>{phoneNumber}</strong>. Please enter your PIN. 
-                    This window will update automatically once confirmed.
                   </p>
                 </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleManualCheck} 
+                  disabled={processing}
+                  className="gap-2"
+                >
+                  {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                  Check Status Manually
+                </Button>
               </div>
             ) : (
               <div className="space-y-4 py-4">

@@ -17,43 +17,51 @@ export const mpesaService = {
         });
 
         if (error) {
-            // Lovable/Supabase Edge Function errors often wrap the actual response
             let errorMessage = error.message;
-            
-            // Try to extract the custom error message we send from the Edge Function
             if (error instanceof Error && 'context' in error) {
                 try {
-                    // @ts-ignore - accessing internal context if available
+                    // @ts-ignore
                     const body = await error.context.json();
                     if (body && body.error) {
                         errorMessage = body.error;
                     }
-                } catch (e) {
-                    // Fallback to default error
-                }
+                } catch (e) {}
             }
-            
             throw new Error(errorMessage);
         }
-        return data;
+        return data; // Contains CheckoutRequestID
     },
 
     /**
-     * Listens for payment status updates for a specific member.
+     * Listens for payment status updates for a specific transaction.
      */
-    subscribeToPaymentStatus: (memberId: string, onUpdate: (payload: any) => void) => {
+    subscribeToCheckoutStatus: (checkoutId: string, onUpdate: (payload: any) => void) => {
         return supabase
-            .channel(`payment-status-${memberId}`)
+            .channel(`payment-${checkoutId}`)
             .on(
                 'postgres_changes',
                 {
                     event: 'UPDATE',
                     schema: 'public',
                     table: 'payments',
-                    filter: `member_id=eq.${memberId}`
+                    filter: `mpesa_checkout_request_id=eq.${checkoutId}`
                 },
                 (payload) => onUpdate(payload.new)
             )
             .subscribe();
+    },
+
+    /**
+     * Manually check the status of a payment in the database.
+     */
+    checkPaymentStatus: async (checkoutId: string) => {
+        const { data, error } = await supabase
+            .from("payments")
+            .select("*")
+            .eq("mpesa_checkout_request_id", checkoutId)
+            .maybeSingle();
+        
+        if (error) throw error;
+        return data;
     }
 };

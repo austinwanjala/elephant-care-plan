@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ArrowLeft, CheckCircle, DollarSign, RefreshCw } from "lucide-react";
+import { Loader2, ArrowLeft, CheckCircle, DollarSign, RefreshCw, Search } from "lucide-react";
 import { mpesaService } from "@/services/mpesa";
 
 interface MemberInfo {
@@ -35,15 +35,20 @@ const MemberSchemeSelection = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [waitingForCallback, setWaitingForCallback] = useState(false);
+  const [currentCheckoutId, setCurrentCheckoutId] = useState<string | null>(null);
   const [member, setMember] = useState<MemberInfo | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<MembershipCategory | null>(null);
   const [allCategories, setAllCategories] = useState<MembershipCategory[]>([]);
   const [phoneNumber, setPhoneNumber] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
+  const channelRef = useRef<any>(null);
 
   useEffect(() => {
     fetchMemberAndCategories();
+    return () => {
+      if (channelRef.current) supabase.removeChannel(channelRef.current);
+    };
   }, []);
 
   const fetchMemberAndCategories = async () => {
@@ -61,21 +66,13 @@ const MemberSchemeSelection = () => {
       .maybeSingle();
 
     if (memberError) {
-      toast({
-        title: "Error loading member data",
-        description: memberError.message,
-        variant: "destructive",
-      });
+      toast({ title: "Error loading member data", description: memberError.message, variant: "destructive" });
       setLoading(false);
       return;
     }
 
     if (!memberData) {
-      toast({
-        title: "Member profile not found",
-        description: "Please contact support.",
-        variant: "destructive",
-      });
+      toast({ title: "Member profile not found", description: "Please contact support.", variant: "destructive" });
       navigate("/dashboard");
       return;
     }
@@ -90,16 +87,59 @@ const MemberSchemeSelection = () => {
       .order("level", { ascending: true });
 
     if (categoriesError) {
-      toast({
-        title: "Error loading membership categories",
-        description: categoriesError.message,
-        variant: "destructive",
-      });
+      toast({ title: "Error loading membership categories", description: categoriesError.message, variant: "destructive" });
     } else if (categoriesData) {
       setAllCategories(categoriesData);
     }
 
     setLoading(false);
+  };
+
+  const handleManualCheck = async () => {
+    if (!currentCheckoutId) return;
+    setSubmitting(true);
+    try {
+      const payment = await mpesaService.checkPaymentStatus(currentCheckoutId);
+      if (payment && payment.status !== 'pending') {
+        handlePaymentResult(payment);
+      } else {
+        toast({ title: "Still Pending", description: "We haven't received the confirmation yet. Please wait a moment." });
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handlePaymentResult = async (payment: any) => {
+    if (payment.status === 'completed') {
+      toast({ title: "Payment Confirmed!", description: "Your membership scheme has been activated." });
+
+      if (member && selectedCategory) {
+        await supabase.from("members").update({
+          membership_category_id: selectedCategory.id,
+          is_active: true,
+          benefit_limit: (member.benefit_limit || 0) + selectedCategory.benefit_amount
+        }).eq("id", member.id);
+      }
+
+      setWaitingForCallback(false);
+      navigate("/dashboard");
+    } else if (payment.status === 'failed') {
+      toast({
+        title: "Payment Failed",
+        description: payment.mpesa_result_desc || "Transaction was cancelled or failed.",
+        variant: "destructive"
+      });
+      setWaitingForCallback(false);
+      setSubmitting(false);
+      setCurrentCheckoutId(null);
+    }
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
   };
 
   const handleMpesaPayment = async (e: React.FormEvent) => {
@@ -118,12 +158,15 @@ const MemberSchemeSelection = () => {
     try {
       const totalPayment = selectedCategory.payment_amount + selectedCategory.registration_fee + selectedCategory.management_fee;
 
-      await mpesaService.initiateStkPush({
+      const response = await mpesaService.initiateStkPush({
         amount: totalPayment,
         phone: phoneNumber.replace("+", ""),
         member_id: member.id,
         coverage_amount: selectedCategory.benefit_amount
       });
+
+      const checkoutId = response.CheckoutRequestID;
+      setCurrentCheckoutId(checkoutId);
 
       toast({
         title: "Request Sent",
@@ -132,42 +175,12 @@ const MemberSchemeSelection = () => {
 
       setWaitingForCallback(true);
 
-      // Subscribe to Payment Completion
-      const channel = mpesaService.subscribeToPaymentStatus(member.id, async (payload) => {
-        if (payload.status === 'completed') {
-          toast({
-            title: "Payment Confirmed!",
-            description: "Your membership scheme has been activated.",
-          });
-
-          // Update member category and status
-          await supabase.from("members").update({
-            membership_category_id: selectedCategory.id,
-            is_active: true,
-            benefit_limit: (member.benefit_limit || 0) + selectedCategory.benefit_amount
-          }).eq("id", member.id);
-
-          setWaitingForCallback(false);
-          navigate("/dashboard");
-          supabase.removeChannel(channel);
-        } else if (payload.status === 'failed') {
-          toast({
-            title: "Payment Failed",
-            description: payload.mpesa_result_desc || "Transaction was cancelled or failed.",
-            variant: "destructive"
-          });
-          setWaitingForCallback(false);
-          setSubmitting(false);
-          supabase.removeChannel(channel);
-        }
+      channelRef.current = mpesaService.subscribeToCheckoutStatus(checkoutId, (payload) => {
+        handlePaymentResult(payload);
       });
 
     } catch (error: any) {
-      toast({
-        title: "Request Failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Request Failed", description: error.message, variant: "destructive" });
       setSubmitting(false);
     }
   };
@@ -176,15 +189,6 @@ const MemberSchemeSelection = () => {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!member) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-muted-foreground">Could not load member details. Please try again later.</p>
-        <Button onClick={() => navigate("/login")} className="mt-4">Go to Login</Button>
       </div>
     );
   }
@@ -203,7 +207,7 @@ const MemberSchemeSelection = () => {
       <Card className="card-elevated p-8">
         <CardHeader className="px-0 pt-0">
           <CardTitle className="text-3xl font-serif font-bold text-foreground mb-2">
-            {member.is_active ? "Renew or Upgrade Coverage" : "Select Your Membership Scheme"}
+            {member?.is_active ? "Renew or Upgrade Coverage" : "Select Your Membership Scheme"}
           </CardTitle>
           <CardDescription className="text-muted-foreground">
             Choose a scheme level and pay via M-Pesa to activate.
@@ -211,7 +215,7 @@ const MemberSchemeSelection = () => {
         </CardHeader>
         <CardContent className="px-0 pb-0">
           {waitingForCallback ? (
-            <div className="py-12 flex flex-col items-center justify-center space-y-6 text-center">
+            <div className="py-8 flex flex-col items-center justify-center space-y-6 text-center">
               <div className="relative">
                 <Loader2 className="h-16 w-16 animate-spin text-primary" />
                 <RefreshCw className="h-8 w-8 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
@@ -220,12 +224,17 @@ const MemberSchemeSelection = () => {
                 <h3 className="font-bold text-xl">Verifying Your Payment...</h3>
                 <p className="text-muted-foreground">
                   We've sent a prompt to <strong>{phoneNumber}</strong> for <strong>KES {totalPayment.toLocaleString()}</strong>. 
-                  Please enter your PIN on your phone.
-                </p>
-                <p className="text-xs text-yellow-600 font-medium animate-pulse">
-                  Do not refresh or leave this page.
                 </p>
               </div>
+              <Button 
+                variant="outline" 
+                onClick={handleManualCheck} 
+                disabled={submitting}
+                className="gap-2"
+              >
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                Check Status Manually
+              </Button>
             </div>
           ) : (
             <form onSubmit={handleMpesaPayment} className="space-y-6">

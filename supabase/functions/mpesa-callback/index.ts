@@ -20,34 +20,24 @@ serve(async (req) => {
             Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
         );
 
-        // Log the raw attempt for debugging
-        await supabase.from("system_logs").insert({
-            action: "MPESA_CALLBACK_RECEIVED",
-            details: body,
-        });
-
         const stkCallback = body.Body?.stkCallback;
-        if (!stkCallback) {
-            throw new Error("Invalid M-Pesa callback structure: Missing stkCallback");
-        }
+        if (!stkCallback) throw new Error("Invalid M-Pesa payload: Missing stkCallback");
 
         const { CheckoutRequestID, ResultCode, ResultDesc, CallbackMetadata } = stkCallback;
 
-        // Extract metadata values
-        let mpesaReceipt = null;
-        let amount = null;
-        let phoneNumber = null;
-
-        if (CallbackMetadata?.Item) {
-            const items = CallbackMetadata.Item;
-            mpesaReceipt = items.find((i: any) => i.Name === "MpesaReceiptNumber")?.Value;
-            amount = items.find((i: any) => i.Name === "Amount")?.Value;
-            phoneNumber = items.find((i: any) => i.Name === "PhoneNumber")?.Value;
-        }
+        // Log the attempt
+        await supabase.from("system_logs").insert({
+            action: "MPESA_CALLBACK_RECEIVED",
+            details: { checkoutId: CheckoutRequestID, code: ResultCode, desc: ResultDesc },
+        });
 
         if (ResultCode === 0) {
-            console.log(`[mpesa-callback] Success: ${CheckoutRequestID}, Receipt: ${mpesaReceipt}`);
-            
+            let mpesaReceipt = null;
+            if (CallbackMetadata?.Item) {
+                mpesaReceipt = CallbackMetadata.Item.find((i: any) => i.Name === "MpesaReceiptNumber")?.Value;
+            }
+
+            // Perform the update and check if any rows were affected
             const { data, error } = await supabase
                 .from("payments")
                 .update({
@@ -61,17 +51,22 @@ serve(async (req) => {
                 .select();
 
             if (error) throw error;
+
             if (!data || data.length === 0) {
-                console.warn(`[mpesa-callback] No pending payment found for CheckoutID: ${CheckoutRequestID}`);
+                const errorMsg = `No pending payment found in DB for CheckoutID: ${CheckoutRequestID}`;
+                console.error(`[mpesa-callback] ${errorMsg}`);
+                await supabase.from("system_logs").insert({
+                    action: "MPESA_CALLBACK_ERROR",
+                    details: { error: errorMsg, checkoutId: CheckoutRequestID },
+                });
+                throw new Error(errorMsg);
             }
 
             await supabase.from("system_logs").insert({
                 action: "MPESA_CALLBACK_SUCCESS",
-                details: { checkoutId: CheckoutRequestID, receipt: mpesaReceipt, amount },
+                details: { checkoutId: CheckoutRequestID, receipt: mpesaReceipt },
             });
         } else {
-            console.log(`[mpesa-callback] Failed/Cancelled: ${CheckoutRequestID}, Code: ${ResultCode}`);
-            
             await supabase
                 .from("payments")
                 .update({
@@ -80,11 +75,6 @@ serve(async (req) => {
                     mpesa_result_desc: ResultDesc
                 })
                 .eq("mpesa_checkout_request_id", CheckoutRequestID);
-
-            await supabase.from("system_logs").insert({
-                action: "MPESA_CALLBACK_FAILED",
-                details: { checkoutId: CheckoutRequestID, error: ResultDesc, code: ResultCode },
-            });
         }
 
         return new Response(JSON.stringify({ ResultCode: 0, ResultDesc: "Success" }), {
@@ -93,7 +83,7 @@ serve(async (req) => {
         });
 
     } catch (error: any) {
-        console.error("[mpesa-callback] Error:", error.message);
+        console.error("[mpesa-callback] Fatal Error:", error.message);
         return new Response(JSON.stringify({ error: error.message }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
             status: 400,

@@ -36,8 +36,10 @@ export const mpesaService = {
      * Listens for payment status updates for a specific transaction.
      */
     subscribeToCheckoutStatus: (checkoutId: string, onUpdate: (payload: any) => void) => {
+        console.log(`Subscribing to updates for checkout: ${checkoutId}`);
+        
         return supabase
-            .channel(`payment-${checkoutId}`)
+            .channel(`payment-tracking-${checkoutId}`)
             .on(
                 'postgres_changes',
                 {
@@ -47,11 +49,13 @@ export const mpesaService = {
                     filter: `mpesa_checkout_request_id=eq.${checkoutId}`
                 },
                 (payload) => {
-                    console.log("Realtime update received:", payload.new);
+                    console.log("Payment update detected:", payload.new);
                     onUpdate(payload.new);
                 }
             )
-            .subscribe();
+            .subscribe((status) => {
+                console.log(`Subscription status for ${checkoutId}:`, status);
+            });
     },
 
     /**

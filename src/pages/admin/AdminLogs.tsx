@@ -36,7 +36,7 @@ export default function AdminLogs() {
     };
 
     const handleSimulateCallback = async () => {
-        // 1. Find a pending payment to simulate for
+        // 1. Find the most recent pending payment
         const { data: pendingPayment } = await supabase
             .from('payments')
             .select('mpesa_checkout_request_id, amount, phone_used')
@@ -45,20 +45,18 @@ export default function AdminLogs() {
             .limit(1)
             .maybeSingle();
 
-        if (!pendingPayment) {
+        if (!pendingPayment || !pendingPayment.mpesa_checkout_request_id) {
             toast({ 
                 title: "No Pending Payments", 
-                description: "Please initiate a payment from a member account first to test simulation.",
+                description: "Please initiate a payment from a member account first.",
                 variant: "destructive"
             });
             return;
         }
 
         const checkoutId = pendingPayment.mpesa_checkout_request_id;
-        const amount = pendingPayment.amount;
         const receipt = `RC${Math.floor(Math.random() * 1000000000)}`;
 
-        // 2. Construct realistic Safaricom payload
         const payload = {
             Body: {
                 stkCallback: {
@@ -68,7 +66,7 @@ export default function AdminLogs() {
                     ResultDesc: "The service request is processed successfully.",
                     CallbackMetadata: {
                         Item: [
-                            { Name: "Amount", Value: amount },
+                            { Name: "Amount", Value: pendingPayment.amount },
                             { Name: "MpesaReceiptNumber", Value: receipt },
                             { Name: "TransactionDate", Value: format(new Date(), "yyyyMMddHHmmss") },
                             { Name: "PhoneNumber", Value: pendingPayment.phone_used }
@@ -78,17 +76,23 @@ export default function AdminLogs() {
             }
         };
 
-        toast({ title: "Simulating...", description: `Sending callback for ${checkoutId}` });
+        toast({ title: "Simulating...", description: `Processing ID: ${checkoutId}` });
 
-        const { error: invokeError } = await supabase.functions.invoke('mpesa-callback', {
-            body: payload
-        });
+        try {
+            const { data, error: invokeError } = await supabase.functions.invoke('mpesa-callback', {
+                body: payload
+            });
 
-        if (invokeError) {
-            toast({ title: "Simulation Failed", description: invokeError.message, variant: "destructive" });
-        } else {
-            toast({ title: "Simulation Sent", description: "Check the logs and payment status now." });
+            if (invokeError) {
+                // Try to parse the error from the function response
+                const errorData = await invokeError.context?.json().catch(() => ({}));
+                throw new Error(errorData?.error || invokeError.message);
+            }
+
+            toast({ title: "Success!", description: "Payment verified and database updated." });
             setTimeout(fetchLogs, 1000);
+        } catch (err: any) {
+            toast({ title: "Simulation Failed", description: err.message, variant: "destructive" });
         }
     };
 

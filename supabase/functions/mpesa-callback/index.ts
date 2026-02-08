@@ -41,6 +41,25 @@ serve(async (req) => {
 
             if (error) console.error("DB Update Error (Success):", error);
 
+            // Log to system_logs
+            await supabase.from("system_logs").insert({
+                action: "MPESA_CALLBACK_SUCCESS",
+                details: { checkoutId: CheckoutRequestID, receipt: mpesaReceipt, amount: stkCallback.Amount },
+            });
+
+            // Broadcast to client
+            const channel = supabase.channel(`payment-${CheckoutRequestID}`);
+            await channel.subscribe(async (status) => {
+                if (status === 'SUBSCRIBED') {
+                    await channel.send({
+                        type: 'broadcast',
+                        event: 'payment-update',
+                        payload: { status: 'completed', mpesa_reference: mpesaReceipt, amount: stkCallback.Amount }
+                    });
+                    supabase.removeChannel(channel);
+                }
+            });
+
         } else {
             // Failed / Cancelled
             console.log(`Payment Failed (${ResultCode}): ${ResultDesc}`);
@@ -55,6 +74,25 @@ serve(async (req) => {
                 .eq("mpesa_checkout_request_id", CheckoutRequestID);
 
             if (error) console.error("DB Update Error (Failure):", error);
+
+            // Log to system_logs
+            await supabase.from("system_logs").insert({
+                action: "MPESA_CALLBACK_FAILED",
+                details: { checkoutId: CheckoutRequestID, error: ResultDesc, code: ResultCode },
+            });
+
+            // Broadcast to client
+            const channel = supabase.channel(`payment-${CheckoutRequestID}`);
+            await channel.subscribe(async (status) => {
+                if (status === 'SUBSCRIBED') {
+                    await channel.send({
+                        type: 'broadcast',
+                        event: 'payment-update',
+                        payload: { status: 'failed', mpesa_result_desc: ResultDesc }
+                    });
+                    supabase.removeChannel(channel);
+                }
+            });
         }
 
         return new Response("ok", { status: 200 });

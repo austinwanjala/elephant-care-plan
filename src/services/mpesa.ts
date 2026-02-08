@@ -25,7 +25,7 @@ export const mpesaService = {
                     if (body && body.error) {
                         errorMessage = body.error;
                     }
-                } catch (e) {}
+                } catch (e) { }
             }
             throw new Error(errorMessage);
         }
@@ -36,8 +36,9 @@ export const mpesaService = {
      * Listens for payment status updates for a specific transaction.
      */
     subscribeToCheckoutStatus: (checkoutId: string, onUpdate: (payload: any) => void) => {
-        return supabase
-            .channel(`payment-${checkoutId}`)
+        const channel = supabase.channel(`payment-${checkoutId}`);
+
+        channel
             .on(
                 'postgres_changes',
                 {
@@ -48,7 +49,14 @@ export const mpesaService = {
                 },
                 (payload) => onUpdate(payload.new)
             )
+            .on(
+                'broadcast',
+                { event: 'payment-update' },
+                (payload) => onUpdate(payload.payload) // Payload is nested in event payload
+            )
             .subscribe();
+
+        return channel;
     },
 
     /**
@@ -60,7 +68,7 @@ export const mpesaService = {
             .select("*")
             .eq("mpesa_checkout_request_id", checkoutId)
             .maybeSingle();
-        
+
         if (error) throw error;
         return data;
     }

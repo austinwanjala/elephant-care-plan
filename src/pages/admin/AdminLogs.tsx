@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Loader2, Search, Filter } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -32,12 +33,73 @@ export default function AdminLogs() {
         setLoading(false);
     };
 
-    // Helper to try and get user identifier
-    // Note: direct join with auth schema table might not work over API unless exposed. 
-    // If it fails, we show user_id or need a different approach (e.g. edge function).
-    // For now, let's assume we might just see User ID or if we have public profile table support.
-    // Actually, we usually join with `staff` or `members` or checks `user_roles`. 
-    // Let's try to fetch referenced staff names if possible, but for raw logs, user_id is okay.
+    // Debugging Tool: Simulate M-Pesa Callback
+    const handleSimulateCallback = async () => {
+        const checkoutId = `TEST-${Date.now()}`;
+        const amount = 100;
+
+        // 1. Create a dummy pending record
+        // We need a valid member_id. Let's try to get one from the logs or just any member.
+        // Actually, for a test, we might fail foreign key constraint if we don't use a valid member.
+        // Let's try to fetch one member first.
+        const { data: member } = await supabase.from('members').select('id').limit(1).maybeSingle();
+
+        if (!member) {
+            alert("Cannot simulate: No members found to attach payment to.");
+            return;
+        }
+
+        const { error: insertError } = await supabase.from("payments").insert({
+            member_id: member.id,
+            amount: amount,
+            coverage_added: amount,
+            mpesa_checkout_request_id: checkoutId,
+            status: 'pending',
+            phone_used: '254700000000'
+        });
+
+        if (insertError) {
+            console.error("Test setup failed:", insertError);
+            alert("Failed to create test payment record.");
+            return;
+        }
+
+        // 2. Invoke Callback
+        const payload = {
+            Body: {
+                stkCallback: {
+                    MerchantRequestID: `MR-${checkoutId}`,
+                    CheckoutRequestID: checkoutId,
+                    ResultCode: 0,
+                    ResultDesc: "The service request is processed successfully.",
+                    Amount: amount,
+                    MpesaReceiptNumber: `RC-${checkoutId}`,
+                    Balance: 0,
+                    TransactionDate: format(new Date(), "yyyyMMddHHmmss"),
+                    PhoneNumber: 254700000000,
+                    CallbackMetadata: {
+                        Item: [
+                            { Name: "Amount", Value: amount },
+                            { Name: "MpesaReceiptNumber", Value: `RC-${checkoutId}` },
+                            { Name: "TransactionDate", Value: format(new Date(), "yyyyMMddHHmmss") },
+                            { Name: "PhoneNumber", Value: 254700000000 }
+                        ]
+                    }
+                }
+            }
+        };
+
+        const { error: invokeError } = await supabase.functions.invoke('mpesa-callback', {
+            body: payload
+        });
+
+        if (invokeError) {
+            alert(`Simulation failed: ${invokeError.message}`);
+        } else {
+            alert("Simulation sent! Check the logs table for 'MPESA_CALLBACK_SUCCESS'.");
+            fetchLogs();
+        }
+    };
 
     const filteredLogs = logs.filter(log =>
         log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -47,9 +109,14 @@ export default function AdminLogs() {
 
     return (
         <div className="space-y-6">
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight">System Logs</h1>
-                <p className="text-muted-foreground">Audit trail of system activities and data changes.</p>
+            <div className="flex justify-between items-start">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight">System Logs</h1>
+                    <p className="text-muted-foreground">Audit trail of system activities and data changes.</p>
+                </div>
+                <Button variant="outline" onClick={handleSimulateCallback}>
+                    <Filter className="mr-2 h-4 w-4" /> Simulate M-Pesa Callback
+                </Button>
             </div>
 
             <div className="flex items-center gap-4">

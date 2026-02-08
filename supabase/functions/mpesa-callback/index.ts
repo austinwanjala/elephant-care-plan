@@ -1,7 +1,17 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+
+const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
 serve(async (req) => {
+    // Handle CORS preflight requests
+    if (req.method === "OPTIONS") {
+        return new Response("ok", { headers: corsHeaders });
+    }
+
     try {
         const data = await req.json();
         console.log("Callback Data:", JSON.stringify(data));
@@ -17,16 +27,21 @@ serve(async (req) => {
 
         const supabase = createClient(
             Deno.env.get("SUPABASE_URL") ?? "",
-            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+            {
+                auth: {
+                    autoRefreshToken: false,
+                    persistSession: false,
+                },
+            }
         );
+
+        const callbackMetadata = stkCallback.CallbackMetadata?.Item;
+        const mpesaReceipt = callbackMetadata?.find((item: any) => item.Name === "MpesaReceiptNumber")?.Value;
 
         if (ResultCode === 0) {
             // Success
             console.log(`Payment Successful for CheckoutID: ${CheckoutRequestID}`);
-
-            // Extract M-Pesa Receipt Number (if needed)
-            const callbackMetadata = stkCallback.CallbackMetadata?.Item;
-            const mpesaReceipt = callbackMetadata?.find((item: any) => item.Name === "MpesaReceiptNumber")?.Value;
 
             // Update Database
             const { error } = await supabase
@@ -49,7 +64,7 @@ serve(async (req) => {
 
             // Broadcast to client
             const channel = supabase.channel(`payment-${CheckoutRequestID}`);
-            await channel.subscribe(async (status) => {
+            channel.subscribe(async (status) => {
                 if (status === 'SUBSCRIBED') {
                     await channel.send({
                         type: 'broadcast',
@@ -83,7 +98,7 @@ serve(async (req) => {
 
             // Broadcast to client
             const channel = supabase.channel(`payment-${CheckoutRequestID}`);
-            await channel.subscribe(async (status) => {
+            channel.subscribe(async (status) => {
                 if (status === 'SUBSCRIBED') {
                     await channel.send({
                         type: 'broadcast',
@@ -95,10 +110,16 @@ serve(async (req) => {
             });
         }
 
-        return new Response("ok", { status: 200 });
+        return new Response(JSON.stringify({ message: "Success" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+        });
 
     } catch (error) {
         console.error("Callback Error:", error);
-        return new Response("error", { status: 400 });
+        return new Response(JSON.stringify({ error: error.message }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 400,
+        });
     }
 });

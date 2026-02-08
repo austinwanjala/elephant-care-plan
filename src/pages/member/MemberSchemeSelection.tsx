@@ -43,13 +43,25 @@ const MemberSchemeSelection = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const channelRef = useRef<any>(null);
+  const pollingIntervalRef = useRef<any>(null);
 
   useEffect(() => {
     fetchMemberAndCategories();
     return () => {
-      if (channelRef.current) supabase.removeChannel(channelRef.current);
+      stopVerification();
     };
   }, []);
+
+  const stopVerification = () => {
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+  };
 
   const fetchMemberAndCategories = async () => {
     setLoading(true);
@@ -97,18 +109,13 @@ const MemberSchemeSelection = () => {
 
   const handleManualCheck = async () => {
     if (!currentCheckoutId) return;
-    setSubmitting(true);
     try {
       const payment = await mpesaService.checkPaymentStatus(currentCheckoutId);
       if (payment && payment.status !== 'pending') {
         handlePaymentResult(payment);
-      } else {
-        toast({ title: "Still Pending", description: "We haven't received the confirmation yet. Please wait a moment." });
       }
     } catch (err) {
-      console.error(err);
-    } finally {
-      setSubmitting(false);
+      console.error("Manual check error:", err);
     }
   };
 
@@ -124,6 +131,7 @@ const MemberSchemeSelection = () => {
         }).eq("id", member.id);
       }
 
+      stopVerification();
       setWaitingForCallback(false);
       navigate("/dashboard");
     } else if (payment.status === 'failed') {
@@ -132,13 +140,10 @@ const MemberSchemeSelection = () => {
         description: payment.mpesa_result_desc || "Transaction was cancelled or failed.",
         variant: "destructive"
       });
+      stopVerification();
       setWaitingForCallback(false);
       setSubmitting(false);
       setCurrentCheckoutId(null);
-    }
-    if (channelRef.current) {
-      supabase.removeChannel(channelRef.current);
-      channelRef.current = null;
     }
   };
 
@@ -175,9 +180,15 @@ const MemberSchemeSelection = () => {
 
       setWaitingForCallback(true);
 
+      // 1. Realtime Subscription
       channelRef.current = mpesaService.subscribeToCheckoutStatus(checkoutId, (payload) => {
         handlePaymentResult(payload);
       });
+
+      // 2. Polling Fallback
+      pollingIntervalRef.current = setInterval(() => {
+        handleManualCheck();
+      }, 3000);
 
     } catch (error: any) {
       toast({ title: "Request Failed", description: error.message, variant: "destructive" });
@@ -229,11 +240,10 @@ const MemberSchemeSelection = () => {
               <Button 
                 variant="outline" 
                 onClick={handleManualCheck} 
-                disabled={submitting}
                 className="gap-2"
               >
-                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                Check Status Manually
+                <Search className="h-4 w-4" />
+                Check Status Now
               </Button>
             </div>
           ) : (

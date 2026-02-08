@@ -33,6 +33,7 @@ export default function MemberPayments() {
   const { toast } = useToast();
   const [memberId, setMemberId] = useState<string | null>(null);
   const channelRef = useRef<any>(null);
+  const pollingIntervalRef = useRef<any>(null);
 
   const fetchPayments = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -65,24 +66,30 @@ export default function MemberPayments() {
   useEffect(() => {
     fetchPayments();
     return () => {
-      if (channelRef.current) supabase.removeChannel(channelRef.current);
+      stopVerification();
     };
   }, []);
 
+  const stopVerification = () => {
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+  };
+
   const handleManualCheck = async () => {
     if (!currentCheckoutId) return;
-    setProcessing(true);
     try {
       const payment = await mpesaService.checkPaymentStatus(currentCheckoutId);
       if (payment && payment.status !== 'pending') {
         handlePaymentResult(payment);
-      } else {
-        toast({ title: "Still Pending", description: "We haven't received the confirmation yet. Please wait a moment." });
       }
     } catch (err) {
-      console.error(err);
-    } finally {
-      setProcessing(false);
+      console.error("Manual check error:", err);
     }
   };
 
@@ -97,6 +104,7 @@ export default function MemberPayments() {
       setPayDialogOpen(false);
       setAmount("");
       setCurrentCheckoutId(null);
+      stopVerification();
       fetchPayments();
     } else if (payment.status === 'failed') {
       toast({
@@ -107,10 +115,7 @@ export default function MemberPayments() {
       setVerifying(false);
       setProcessing(false);
       setCurrentCheckoutId(null);
-    }
-    if (channelRef.current) {
-      supabase.removeChannel(channelRef.current);
-      channelRef.current = null;
+      stopVerification();
     }
   };
 
@@ -139,10 +144,15 @@ export default function MemberPayments() {
 
       setVerifying(true);
 
-      // Subscribe to specific checkout ID
+      // 1. Realtime Subscription
       channelRef.current = mpesaService.subscribeToCheckoutStatus(checkoutId, (payload) => {
         handlePaymentResult(payload);
       });
+
+      // 2. Automatic Polling Fallback (Every 3 seconds)
+      pollingIntervalRef.current = setInterval(() => {
+        handleManualCheck();
+      }, 3000);
 
     } catch (error: any) {
       toast({ title: "Request Failed", description: error.message, variant: "destructive" });
@@ -204,11 +214,10 @@ export default function MemberPayments() {
                   variant="outline" 
                   size="sm" 
                   onClick={handleManualCheck} 
-                  disabled={processing}
                   className="gap-2"
                 >
-                  {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                  Check Status Manually
+                  <Search className="h-4 w-4" />
+                  Check Status Now
                 </Button>
               </div>
             ) : (

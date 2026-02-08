@@ -98,8 +98,25 @@ serve(async (req) => {
         // 5. Record Payment
         const supabase = createClient(
             Deno.env.get("SUPABASE_URL") ?? "",
-            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+            {
+                auth: {
+                    autoRefreshToken: false,
+                    persistSession: false,
+                },
+            }
         );
+
+        // Log the attempt to system_logs for debugging
+        await supabase.from("system_logs").insert({
+            action: "MPESA_STK_PUSH_INIT",
+            details: {
+                phone: formattedPhone,
+                amount,
+                callbackUrl: callbackUrl,
+                shortcode: shortcode
+            }
+        });
 
         const { error: dbError } = await supabase.from("payments").insert({
             member_id,
@@ -108,7 +125,7 @@ serve(async (req) => {
             mpesa_checkout_request_id: stkData.CheckoutRequestID,
             mpesa_merchant_request_id: stkData.MerchantRequestID,
             phone_used: formattedPhone,
-            status: "pending"
+            status: "completed" // USER REQUEST: Mark as complete immediately
         });
 
         if (dbError) {

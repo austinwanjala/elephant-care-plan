@@ -71,6 +71,9 @@ import AdminSettings from "./pages/admin/AdminSettings";
 import AdminMembershipCategories from "./pages/admin/AdminMembershipCategories";
 import AdminLogs from "./pages/admin/AdminLogs";
 
+// Finance Pages
+import FinanceDashboard from "./pages/finance/Dashboard";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -166,8 +169,10 @@ const App = () => (
 
           {/* Finance Routes */}
           <Route path="/finance" element={<FinanceLayout />}>
-            <Route index element={<AdminDashboard />} />
-            {/* Add specific finance pages here as they are created */}
+            <Route index element={<FinanceDashboard />} />
+            <Route path="marketer-payments" element={<AdminMarketerClaims />} />
+            <Route path="branch-payments" element={<AdminBranchPayments />} />
+            <Route path="history" element={<AdminBranchPayments />} />
           </Route>
 
           {/* 404 Route */}

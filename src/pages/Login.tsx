@@ -27,13 +27,11 @@ const ForgotPasswordForm = () => {
     setLoading(true);
     
     try {
-      // Call Edge Function to verify email and override password in one go
       const { data, error } = await supabase.functions.invoke("admin-reset-password", {
         body: { email, password }
       });
       
       if (error) {
-        // Extract error message from function response
         const errorData = await error.context?.json().catch(() => ({}));
         throw new Error(errorData?.error || error.message);
       }
@@ -174,8 +172,13 @@ const Login = () => {
         description: "You have successfully logged in.",
       });
 
-      if (role === "admin") {
+      // Role-based navigation
+      if (role === "super_admin") {
+        navigate("/super-admin");
+      } else if (role === "admin") {
         navigate("/admin");
+      } else if (role === "finance") {
+        navigate("/finance");
       } else if (role === "receptionist") {
         navigate("/reception");
       } else if (role === "doctor") {

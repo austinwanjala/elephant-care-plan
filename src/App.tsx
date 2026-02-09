@@ -21,6 +21,8 @@ import { DoctorLayout } from "./components/doctor/DoctorLayout";
 import { DirectorLayout } from "./components/director/DirectorLayout";
 import { MarketerLayout } from "./components/marketer/MarketerLayout";
 import { AdminLayout } from "./components/admin/AdminLayout";
+import { SuperAdminLayout } from "./components/super-admin/SuperAdminLayout";
+import { FinanceLayout } from "./components/finance/FinanceLayout";
 
 // Member Pages
 import MemberDashboard from "./pages/member/MemberDashboard";
@@ -144,6 +146,28 @@ const App = () => (
             <Route path="settings" element={<AdminSettings />} />
             <Route path="membership-categories" element={<AdminMembershipCategories />} />
             <Route path="logs" element={<AdminLogs />} />
+          </Route>
+
+          {/* Super Admin Routes */}
+          <Route path="/super-admin" element={<SuperAdminLayout />}>
+            <Route index element={<AdminDashboard />} />
+            <Route path="members" element={<AdminMembers />} />
+            <Route path="branches" element={<AdminBranches />} />
+            <Route path="staff" element={<AdminStaff />} />
+            <Route path="visits" element={<AdminVisits />} />
+            <Route path="services" element={<AdminServices />} />
+            <Route path="branch-payments" element={<AdminBranchPayments />} />
+            <Route path="marketer-claims" element={<AdminMarketerClaims />} />
+            <Route path="commission-settings" element={<AdminCommissionSettings />} />
+            <Route path="settings" element={<AdminSettings />} />
+            <Route path="membership-categories" element={<AdminMembershipCategories />} />
+            <Route path="logs" element={<AdminLogs />} />
+          </Route>
+
+          {/* Finance Routes */}
+          <Route path="/finance" element={<FinanceLayout />}>
+            <Route index element={<AdminDashboard />} />
+            {/* Add specific finance pages here as they are created */}
           </Route>
 
           {/* 404 Route */}

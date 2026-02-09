@@ -242,11 +242,13 @@ export default function AdminStaff() {
                       <SelectItem value="doctor">Doctor</SelectItem>
                       <SelectItem value="branch_director">Branch Director</SelectItem>
                       <SelectItem value="marketer">Marketer</SelectItem>
+                      <SelectItem value="finance">Finance Officer</SelectItem>
                       <SelectItem value="admin">Administrator</SelectItem>
+                      <SelectItem value="super_admin">Super Administrator</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                {formData.role !== 'marketer' && formData.role !== 'admin' && (
+                {formData.role !== 'marketer' && formData.role !== 'admin' && formData.role !== 'super_admin' && formData.role !== 'finance' && (
                   <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
                     <Label>Assigned Branch</Label>
                     <Select value={formData.branchId} onValueChange={(v) => setFormData({ ...formData, branchId: v })}>
@@ -291,7 +293,7 @@ export default function AdminStaff() {
                       onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })}
                     />
                   </div>
-                  {editingUser.type !== 'marketer' && editingUser.displayRole !== 'admin' && (
+                  {editingUser.type !== 'marketer' && editingUser.displayRole !== 'admin' && editingUser.displayRole !== 'super_admin' && (
                     <div className="space-y-2">
                       <Label>Branch</Label>
                       <Select

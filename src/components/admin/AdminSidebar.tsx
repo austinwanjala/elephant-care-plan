@@ -29,43 +29,69 @@ import {
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 
+const menuItems = [
+  { title: "Dashboard", url: "/admin", icon: LayoutDashboard },
+  { title: "Members", url: "/admin/members", icon: Users },
+  { title: "Branches", url: "/admin/branches", icon: Building2 },
+  { title: "Staff", url: "/admin/staff", icon: UserCog },
+  { title: "Visits", url: "/admin/visits", icon: History },
+  { title: "Services", url: "/admin/services", icon: Stethoscope },
+  { title: "Branch Payments", url: "/admin/branch-payments", icon: DollarSign },
+  { title: "Marketer Claims", url: "/admin/marketer-claims", icon: ClipboardList },
+  { title: "System Logs", url: "/admin/logs", icon: FileText },
+];
+
+const settingsMenuItems = [
+  { title: "General Settings", url: "/admin/settings", icon: Settings },
+  { title: "Membership Categories", url: "/admin/membership-categories", icon: Users },
+  { title: "Commission Rates", url: "/admin/commission-settings", icon: DollarSign },
+];
+
 export function AdminSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
   const navigate = useNavigate();
-  const [role, setRole] = useState<string | null>(null);
+  const [pendingClaimsCount, setPendingClaimsCount] = useState(0);
 
   useEffect(() => {
-    const fetchRole = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data } = await supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
-        setRole(data?.role || null);
-      }
+    const fetchPendingClaims = async () => {
+      const { count } = await (supabase as any)
+        .from('marketer_claims')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending');
+      setPendingClaimsCount(count || 0);
     };
-    fetchRole();
+
+    fetchPendingClaims();
+
+    // Subscribe to changes for realtime updates
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'marketer_claims'
+        },
+        () => {
+          fetchPendingClaims();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
-  const isSuper = role === 'super_admin';
-
-  const menuItems = [
-    { title: "Dashboard", url: "/admin", icon: LayoutDashboard },
-    { title: "Members", url: "/admin/members", icon: Users },
-    { title: "Branches", url: "/admin/branches", icon: Building2 },
-    { title: "Staff", url: "/admin/staff", icon: UserCog },
-    { title: "Visits", url: "/admin/visits", icon: History },
-    { title: "Services", url: "/admin/services", icon: Stethoscope },
-    { title: "Branch Approvals", url: "/admin/branch-payments", icon: DollarSign },
-    { title: "Marketer Approvals", url: "/admin/marketer-claims", icon: ClipboardList },
-  ];
-
-  // Only Super Admin sees these
-  const superItems = [
-    { title: "System Logs", url: "/admin/logs", icon: FileText },
-    { title: "General Settings", url: "/admin/settings", icon: Settings },
-    { title: "Commission Rates", url: "/admin/commission-settings", icon: DollarSign },
-  ];
+  const isActive = (path: string) => {
+    if (path === "/admin") {
+      return location.pathname === "/admin";
+    }
+    return location.pathname.startsWith(path);
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -82,7 +108,7 @@ export function AdminSidebar() {
           {!collapsed && (
             <div>
               <span className="text-lg font-serif font-bold text-foreground">Elephant Dental</span>
-              <span className="ml-2 px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">{isSuper ? 'Super Admin' : 'Admin'}</span>
+              <span className="ml-2 px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">Admin</span>
             </div>
           )}
         </div>
@@ -94,8 +120,53 @@ export function AdminSidebar() {
           <SidebarMenu>
             {menuItems.map((item) => (
               <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton asChild isActive={location.pathname === item.url}>
-                  <a href={item.url} onClick={(e) => { e.preventDefault(); navigate(item.url); }}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive(item.url)}
+                  tooltip={item.title}
+                >
+                  <a
+                    href={item.url}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      navigate(item.url);
+                    }}
+                    className="flex items-center gap-3 justify-between"
+                  >
+                    <div className="flex items-center gap-3">
+                      <item.icon className="h-5 w-5" />
+                      <span>{item.title}</span>
+                    </div>
+                    {item.title === "Marketer Claims" && pendingClaimsCount > 0 && (
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white">
+                        {pendingClaimsCount}
+                      </span>
+                    )}
+                  </a>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Configuration</SidebarGroupLabel>
+          <SidebarMenu>
+            {settingsMenuItems.map((item) => (
+              <SidebarMenuItem key={item.title}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive(item.url)}
+                  tooltip={item.title}
+                >
+                  <a
+                    href={item.url}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      navigate(item.url);
+                    }}
+                    className="flex items-center gap-3"
+                  >
                     <item.icon className="h-5 w-5" />
                     <span>{item.title}</span>
                   </a>
@@ -104,28 +175,14 @@ export function AdminSidebar() {
             ))}
           </SidebarMenu>
         </SidebarGroup>
-
-        {isSuper && (
-          <SidebarGroup>
-            <SidebarGroupLabel>System</SidebarGroupLabel>
-            <SidebarMenu>
-              {superItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={location.pathname === item.url}>
-                    <a href={item.url} onClick={(e) => { e.preventDefault(); navigate(item.url); }}>
-                      <item.icon className="h-5 w-5" />
-                      <span>{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroup>
-        )}
       </SidebarContent>
 
       <SidebarFooter className="p-4 border-t border-border">
-        <Button variant="ghost" className="w-full justify-start gap-3" onClick={handleLogout}>
+        <Button
+          variant="ghost"
+          className="w-full justify-start gap-3"
+          onClick={handleLogout}
+        >
           <LogOut className="h-5 w-5" />
           {!collapsed && <span>Logout</span>}
         </Button>

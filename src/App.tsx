@@ -21,7 +21,6 @@ import { DoctorLayout } from "./components/doctor/DoctorLayout";
 import { DirectorLayout } from "./components/director/DirectorLayout";
 import { MarketerLayout } from "./components/marketer/MarketerLayout";
 import { AdminLayout } from "./components/admin/AdminLayout";
-import { FinanceLayout } from "./components/finance/FinanceLayout";
 
 // Member Pages
 import MemberDashboard from "./pages/member/MemberDashboard";
@@ -70,11 +69,6 @@ import AdminSettings from "./pages/admin/AdminSettings";
 import AdminMembershipCategories from "./pages/admin/AdminMembershipCategories";
 import AdminLogs from "./pages/admin/AdminLogs";
 
-// Finance Pages (To be created)
-import FinanceDashboard from "./pages/finance/Dashboard";
-import FinanceMarketerClaims from "./pages/finance/MarketerClaims";
-import FinanceBranchClaims from "./pages/finance/BranchClaims";
-
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -84,6 +78,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
+          {/* Public Routes */}
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
@@ -92,6 +87,7 @@ const App = () => (
           <Route path="/terms-of-service" element={<TermsOfService />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
 
+          {/* Member Routes */}
           <Route path="/dashboard" element={<MemberLayout />}>
             <Route index element={<MemberDashboard />} />
             <Route path="payments" element={<MemberPayments />} />
@@ -101,6 +97,7 @@ const App = () => (
             <Route path="dependants" element={<MemberDependants />} />
           </Route>
 
+          {/* Receptionist Routes */}
           <Route path="/reception" element={<ReceptionLayout />}>
             <Route index element={<ReceptionDashboard />} />
             <Route path="register-visit" element={<RegisterVisit />} />
@@ -109,6 +106,7 @@ const App = () => (
             <Route path="search" element={<ReceptionSearchMember />} />
           </Route>
 
+          {/* Doctor Routes */}
           <Route path="/doctor" element={<DoctorLayout />}>
             <Route index element={<DoctorDashboard />} />
             <Route path="queue" element={<DoctorQueue />} />
@@ -116,6 +114,7 @@ const App = () => (
             <Route path="history" element={<DoctorPatientHistory />} />
           </Route>
 
+          {/* Branch Director Routes */}
           <Route path="/director" element={<DirectorLayout />}>
             <Route index element={<DirectorDashboard />} />
             <Route path="revenue" element={<DirectorRevenue />} />
@@ -123,6 +122,7 @@ const App = () => (
             <Route path="reports" element={<DirectorReports />} />
           </Route>
 
+          {/* Marketer Routes */}
           <Route path="/marketer" element={<MarketerLayout />}>
             <Route index element={<MarketerDashboard />} />
             <Route path="referrals" element={<MarketerReferrals />} />
@@ -130,6 +130,7 @@ const App = () => (
             <Route path="links" element={<MarketerLinks />} />
           </Route>
 
+          {/* Admin Routes */}
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminDashboard />} />
             <Route path="members" element={<AdminMembers />} />
@@ -145,12 +146,7 @@ const App = () => (
             <Route path="logs" element={<AdminLogs />} />
           </Route>
 
-          <Route path="/finance" element={<FinanceLayout />}>
-            <Route index element={<FinanceDashboard />} />
-            <Route path="marketer-claims" element={<FinanceMarketerClaims />} />
-            <Route path="branch-claims" element={<FinanceBranchClaims />} />
-          </Route>
-
+          {/* 404 Route */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

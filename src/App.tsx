@@ -57,6 +57,7 @@ import MarketerDashboard from "./pages/marketer/Dashboard";
 import MarketerReferrals from "./pages/marketer/Referrals";
 import MarketerEarnings from "./pages/marketer/Earnings";
 import MarketerLinks from "./pages/marketer/Links";
+import MarketerAddMember from "./pages/marketer/AddMember";
 
 // Admin Pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -132,6 +133,7 @@ const App = () => (
           {/* Marketer Routes */}
           <Route path="/marketer" element={<MarketerLayout />}>
             <Route index element={<MarketerDashboard />} />
+            <Route path="add-member" element={<MarketerAddMember />} />
             <Route path="referrals" element={<MarketerReferrals />} />
             <Route path="earnings" element={<MarketerEarnings />} />
             <Route path="links" element={<MarketerLinks />} />

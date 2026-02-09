@@ -73,6 +73,7 @@ import AdminCommissionSettings from "./pages/admin/AdminCommissionSettings";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminMembershipCategories from "./pages/admin/AdminMembershipCategories";
 import AdminLogs from "./pages/admin/AdminLogs";
+import AdminPermissions from "./pages/admin/AdminPermissions";
 
 // Finance Pages
 import FinanceDashboard from "./pages/finance/Dashboard";
@@ -176,6 +177,7 @@ const App = () => (
             <Route path="commission-settings" element={<AdminCommissionSettings />} />
             <Route path="settings" element={<AdminSettings />} />
             <Route path="membership-categories" element={<AdminMembershipCategories />} />
+            <Route path="permissions" element={<AdminPermissions />} />
             <Route path="logs" element={<AdminLogs />} />
           </Route>
 

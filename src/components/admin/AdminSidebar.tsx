@@ -12,6 +12,7 @@ import {
   DollarSign,
   ClipboardList,
   FileText,
+  ShieldAlert,
 } from "lucide-react";
 import {
   Sidebar,
@@ -43,7 +44,7 @@ export function AdminSidebar() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data } = await supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
-        if (data?.role === 'super_admin') {
+        if ((data?.role as string) === 'super_admin') {
           setBasePath("/super-admin");
           setRoleLabel("Super Admin");
         } else {
@@ -72,6 +73,10 @@ export function AdminSidebar() {
     { title: "Membership Categories", url: `${basePath}/membership-categories`, icon: Users },
     { title: "Commission Rates", url: `${basePath}/commission-settings`, icon: DollarSign },
   ];
+
+  if (roleLabel === "Super Admin") {
+    settingsMenuItems.push({ title: "Permissions", url: `${basePath}/permissions`, icon: ShieldAlert });
+  }
 
   useEffect(() => {
     const fetchPendingClaims = async () => {

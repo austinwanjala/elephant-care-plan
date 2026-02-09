@@ -37,6 +37,7 @@ interface RevenueClaim {
   branches?: { name: string };
   approved_at?: string;
   paid_at?: string;
+  paid_by_staff?: { full_name: string };
 }
 
 export default function AdminBranchPayments() {
@@ -67,7 +68,7 @@ export default function AdminBranchPayments() {
     try {
       const { data, error } = await (supabase as any)
         .from("revenue_claims")
-        .select("*, staff:director_id(full_name), branches:branch_id(name)")
+        .select("*, staff:director_id(full_name), branches:branch_id(name), paid_by_staff:paid_by(full_name)")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -112,11 +113,11 @@ export default function AdminBranchPayments() {
 
       if (error) throw error;
 
-      toast({ 
-        title: isApproval ? "Claim Approved" : "Payment Recorded", 
-        description: isApproval ? "Sent to Finance for payment." : "Claim has been marked as paid." 
+      toast({
+        title: isApproval ? "Claim Approved" : "Payment Recorded",
+        description: isApproval ? "Sent to Finance for payment." : "Claim has been marked as paid."
       });
-      
+
       setActionDialogOpen(false);
       // Force a refresh of the data
       await loadData();
@@ -130,9 +131,9 @@ export default function AdminBranchPayments() {
   if (loading) return <div className="flex items-center justify-center min-h-[400px]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
   const isFinance = userRole === 'finance' || userRole === 'super_admin';
-  
+
   // Filter logic: Admin sees pending, Finance sees approved
-  const activeClaims = claims.filter(c => 
+  const activeClaims = claims.filter(c =>
     isFinance ? c.status === 'approved' : c.status === 'pending'
   );
 
@@ -181,9 +182,9 @@ export default function AdminBranchPayments() {
                         <TableCell>{claim.staff?.full_name}</TableCell>
                         <TableCell className="text-lg font-bold text-blue-700">KES {Number(claim.amount).toLocaleString()}</TableCell>
                         <TableCell>
-                          <Button 
-                            size="sm" 
-                            onClick={() => { setSelectedClaim(claim); setActionNotes(""); setActionDialogOpen(true); }} 
+                          <Button
+                            size="sm"
+                            onClick={() => { setSelectedClaim(claim); setActionNotes(""); setActionDialogOpen(true); }}
                             className={isFinance ? "bg-green-600 hover:bg-green-700" : "bg-primary"}
                           >
                             {isFinance ? <><DollarSign className="mr-2 h-4 w-4" /> Pay Claim</> : <><ShieldCheck className="mr-2 h-4 w-4" /> Approve</>}
@@ -207,6 +208,7 @@ export default function AdminBranchPayments() {
                     <TableHead>Date</TableHead>
                     <TableHead>Branch</TableHead>
                     <TableHead>Amount</TableHead>
+                    <TableHead>Paid By</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -216,11 +218,12 @@ export default function AdminBranchPayments() {
                       <TableCell>{format(new Date(claim.created_at), "MMM d, yyyy")}</TableCell>
                       <TableCell>{claim.branches?.name}</TableCell>
                       <TableCell className="font-bold">KES {Number(claim.amount).toLocaleString()}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{claim.paid_by_staff?.full_name || '-'}</TableCell>
                       <TableCell>
                         <Badge className={
-                          claim.status === 'paid' ? 'bg-green-100 text-green-800' : 
-                          claim.status === 'approved' ? 'bg-blue-100 text-blue-800' : 
-                          'bg-amber-100 text-amber-800'
+                          claim.status === 'paid' ? 'bg-green-100 text-green-800' :
+                            claim.status === 'approved' ? 'bg-blue-100 text-blue-800' :
+                              'bg-amber-100 text-amber-800'
                         }>
                           {claim.status.toUpperCase()}
                         </Badge>
@@ -241,7 +244,7 @@ export default function AdminBranchPayments() {
               {isFinance ? "Confirm Payout" : "Approve Branch Claim"}
             </DialogTitle>
             <DialogDescription>
-              {isFinance 
+              {isFinance
                 ? `Record the final payment of KES ${Number(selectedClaim?.amount).toLocaleString()} to ${selectedClaim?.branches?.name}.`
                 : `Verify and approve the revenue claim for ${selectedClaim?.branches?.name}.`
               }

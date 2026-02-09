@@ -123,20 +123,48 @@ const MemberDependants = () => {
               <DialogHeader><DialogTitle>Add New Dependant</DialogTitle></DialogHeader>
               <form onSubmit={handleAddDependant} className="grid gap-4 py-4">
                 <div className="flex justify-center mb-4">
-                  <div className="relative">
-                    <Avatar className="h-24 w-24 border-2 border-primary/20">
-                      <AvatarImage src={imageFile ? URL.createObjectURL(imageFile) : ""} />
-                      <AvatarFallback><User className="h-12 w-12 text-muted-foreground" /></AvatarFallback>
-                    </Avatar>
-                    <Label htmlFor="image-upload" className="absolute bottom-0 right-0 bg-primary text-white p-1.5 rounded-full cursor-pointer shadow-lg hover:bg-primary/90">
-                      <Camera className="h-4 w-4" />
-                      <Input id="image-upload" type="file" accept="image/*" className="hidden" onChange={(e) => setImageFile(e.target.files?.[0] || null)} />
-                    </Label>
+                  <div className="flex justify-center mb-4">
+                    {imageFile ? (
+                      <div className="relative">
+                        <Avatar className="h-24 w-24 border-2 border-primary/20">
+                          <AvatarImage src={URL.createObjectURL(imageFile)} />
+                          <AvatarFallback><User className="h-12 w-12 text-muted-foreground" /></AvatarFallback>
+                        </Avatar>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon"
+                          className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                          onClick={() => setImageFile(null)}
+                        >
+                          <Trash className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="h-24 w-24 rounded-full bg-muted flex items-center justify-center border-2 border-dashed border-muted-foreground/50">
+                          <Camera className="h-8 w-8 text-muted-foreground" />
+                        </div>
+                        <Label htmlFor="image-upload" className="cursor-pointer text-primary text-sm font-medium hover:underline">
+                          Upload Photo
+                        </Label>
+                        <Input
+                          id="image-upload"
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="space-y-2"><Label>Full Name</Label><Input value={newDependant.fullName} onChange={(e) => setNewDependant({ ...newDependant, fullName: e.target.value })} required /></div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2"><Label>Date of Birth</Label><Input type="date" value={newDependant.dob} onChange={(e) => setNewDependant({ ...newDependant, dob: e.target.value })} required /></div>
+                  <div className="space-y-2">
+                    <Label>Date of Birth</Label>
+                    <Input type="date" max={new Date().toISOString().split("T")[0]} value={newDependant.dob} onChange={e => setNewDependant({ ...newDependant, dob: e.target.value })} />
+                  </div>
                   <div className="space-y-2"><Label>Relationship</Label><Input value={newDependant.relationship} onChange={(e) => setNewDependant({ ...newDependant, relationship: e.target.value })} placeholder="e.g. Child" required /></div>
                 </div>
                 <div className="space-y-2"><Label>Birth Cert / Student ID</Label><Input value={newDependant.idNumber} onChange={(e) => setNewDependant({ ...newDependant, idNumber: e.target.value })} required /></div>
@@ -161,7 +189,7 @@ const MemberDependants = () => {
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="text-sm text-muted-foreground flex items-center gap-1"><CreditCard className="h-4 w-4" /> {dep.id_number}</div>
-                  <Button variant="ghost" size="icon" onClick={async () => { if(confirm("Remove?")) { await supabase.from("dependants").delete().eq("id", dep.id); fetchDependants(); } }}><Trash className="h-4 w-4 text-destructive" /></Button>
+                  <Button variant="ghost" size="icon" onClick={async () => { if (confirm("Remove?")) { await supabase.from("dependants").delete().eq("id", dep.id); fetchDependants(); } }}><Trash className="h-4 w-4 text-destructive" /></Button>
                 </div>
               </Card>
             ))}

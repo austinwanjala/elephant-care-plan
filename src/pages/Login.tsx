@@ -18,34 +18,34 @@ const ForgotPasswordForm = () => {
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (password !== confirmPassword) {
       toast({ title: "Error", description: "Passwords do not match.", variant: "destructive" });
       return;
     }
 
     setLoading(true);
-    
+
     try {
       const { data, error } = await supabase.functions.invoke("admin-reset-password", {
         body: { email, password }
       });
-      
+
       if (error) {
         const errorData = await error.context?.json().catch(() => ({}));
         throw new Error(errorData?.error || error.message);
       }
-      
+
       setSuccess(true);
-      toast({ 
-        title: "Password Updated", 
-        description: "Your new password has been saved. You can now log in." 
+      toast({
+        title: "Password Updated",
+        description: "Your new password has been saved. You can now log in."
       });
     } catch (error: any) {
-      toast({ 
-        title: "Error", 
-        description: error.message, 
-        variant: "destructive" 
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
@@ -185,6 +185,8 @@ const Login = () => {
         navigate("/doctor");
       } else if (role === "branch_director") {
         navigate("/director");
+      } else if (role === "auditor") {
+        navigate("/auditor");
       } else if (role === "marketer") {
         navigate("/marketer");
       } else if (role === "member") {

@@ -24,6 +24,7 @@ import { MarketerLayout } from "./components/marketer/MarketerLayout";
 import { AdminLayout } from "./components/admin/AdminLayout";
 import { SuperAdminLayout } from "./components/super-admin/SuperAdminLayout";
 import { FinanceLayout } from "./components/finance/FinanceLayout";
+import { AuditorLayout } from "./components/auditor/AuditorLayout";
 
 // Member Pages
 import MemberDashboard from "./pages/member/MemberDashboard";
@@ -75,6 +76,13 @@ import AdminLogs from "./pages/admin/AdminLogs";
 
 // Finance Pages
 import FinanceDashboard from "./pages/finance/Dashboard";
+
+// Auditor Pages
+import AuditorDashboard from "./pages/auditor/Dashboard";
+import AuditorMembers from "./pages/auditor/Members";
+import AuditorVisits from "./pages/auditor/Visits";
+import AuditorFinancials from "./pages/auditor/Financials";
+import AuditorLogs from "./pages/auditor/Logs";
 
 const queryClient = new QueryClient();
 
@@ -177,6 +185,15 @@ const App = () => (
             <Route path="marketer-payments" element={<AdminMarketerClaims />} />
             <Route path="branch-payments" element={<AdminBranchPayments />} />
             <Route path="history" element={<AdminBranchPayments />} />
+          </Route>
+
+          {/* Auditor Routes */}
+          <Route path="/auditor" element={<AuditorLayout />}>
+            <Route index element={<AuditorDashboard />} />
+            <Route path="members" element={<AuditorMembers />} />
+            <Route path="visits" element={<AuditorVisits />} />
+            <Route path="financials" element={<AuditorFinancials />} />
+            <Route path="logs" element={<AuditorLogs />} />
           </Route>
 
           {/* 404 Route */}

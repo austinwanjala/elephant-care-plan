@@ -5,10 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Search, UserCheck, UserX, Fingerprint, ArrowRight, Loader2, CheckCircle, ArrowLeft, Users } from "lucide-react";
+import { Search, UserCheck, UserX, Fingerprint, ArrowRight, Loader2, CheckCircle, ArrowLeft, Users, Info } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, Link } from "react-router-dom";
 import { BiometricCapture } from "@/components/BiometricCapture";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 import {
     Select,
@@ -31,6 +32,8 @@ export default function RegisterVisit() {
     const [receptionistBranchId, setReceptionistBranchId] = useState<string | null>(null);
     const [doctors, setDoctors] = useState<any[]>([]);
     const [selectedDoctorId, setSelectedDoctorId] = useState<string>("");
+    const [selectedDependant, setSelectedDependant] = useState<any>(null);
+    const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
     const { toast } = useToast();
     const navigate = useNavigate();
 
@@ -310,6 +313,19 @@ export default function RegisterVisit() {
                                                 <div className="font-medium">{dep.full_name}</div>
                                                 <div className="text-sm text-muted-foreground">{dep.relationship} • {dep.id_number}</div>
                                             </Label>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-8 w-8 p-0"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    setSelectedDependant(dep);
+                                                    setDetailsDialogOpen(true);
+                                                }}
+                                            >
+                                                <Info className="h-4 w-4 text-muted-foreground" />
+                                            </Button>
                                         </div>
                                     ))}
                                 </RadioGroup>
@@ -369,6 +385,51 @@ export default function RegisterVisit() {
                     )}
                 </div>
             )}
+
+            <Dialog open={detailsDialogOpen} onOpenChange={setDetailsDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Dependant Details</DialogTitle>
+                    </DialogHeader>
+                    {selectedDependant && (
+                        <div className="flex flex-col items-center gap-4 py-4">
+                            <div className="h-40 w-32 bg-muted rounded-md overflow-hidden border relative">
+                                {selectedDependant.image_url ? (
+                                    <img
+                                        src={selectedDependant.image_url}
+                                        alt={selectedDependant.full_name}
+                                        className="h-full w-full object-cover"
+                                    />
+                                ) : (
+                                    <div className="h-full w-full flex items-center justify-center bg-muted">
+                                        <Users className="h-12 w-12 text-muted-foreground/30" />
+                                    </div>
+                                )}
+                            </div>
+                            <div className="text-center space-y-2 w-full">
+                                <h3 className="text-xl font-bold">{selectedDependant.full_name}</h3>
+                                <Badge>{selectedDependant.relationship}</Badge>
+
+                                <div className="grid grid-cols-2 gap-4 text-sm text-left mt-4 w-full border-t pt-4">
+                                    <div>
+                                        <Label className="text-muted-foreground">Date of Birth</Label>
+                                        <p className="font-medium">
+                                            {new Date(selectedDependant.dob).toLocaleDateString()}
+                                            <span className="text-muted-foreground ml-1">
+                                                ({Math.abs(new Date(Date.now() - new Date(selectedDependant.dob).getTime()).getUTCFullYear() - 1970)} yrs)
+                                            </span>
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <Label className="text-muted-foreground">ID / Birth Cert</Label>
+                                        <p className="font-medium">{selectedDependant.id_number}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

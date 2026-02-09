@@ -13,6 +13,7 @@ interface MemberProfile {
   phone: string;
   id_number: string;
   age: number | null;
+  dob: string | null;
   coverage_balance: number | null;
   benefit_limit: number | null;
   total_contributions: number | null;
@@ -149,7 +150,9 @@ export default function MemberProfile() {
             <Cake className="h-5 w-5 text-muted-foreground" />
             <div>
               <p className="text-sm text-muted-foreground">Age</p>
-              <p>{profile.age || "N/A"}</p>
+              <p>
+                {profile.dob ? Math.abs(new Date(Date.now() - new Date(profile.dob).getTime()).getUTCFullYear() - 1970) : (profile.age || "N/A")}
+              </p>
             </div>
           </div>
           {profile.marketers && (

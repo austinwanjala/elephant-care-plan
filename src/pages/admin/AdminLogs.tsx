@@ -22,7 +22,7 @@ export default function AdminLogs() {
     const fetchLogs = async () => {
         setLoading(true);
         const { data, error } = await supabase
-            .from("system_logs")
+            .from("audit_logs")
             .select("*")
             .order("created_at", { ascending: false })
             .limit(100);
@@ -46,8 +46,8 @@ export default function AdminLogs() {
             .maybeSingle();
 
         if (!pendingPayment || !pendingPayment.mpesa_checkout_request_id) {
-            toast({ 
-                title: "No Pending Payments", 
+            toast({
+                title: "No Pending Payments",
                 description: "Please initiate a payment from a member account first.",
                 variant: "destructive"
             });

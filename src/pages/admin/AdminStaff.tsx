@@ -172,7 +172,7 @@ export default function AdminStaff() {
         body: { userId }
       });
       if (error) throw error;
-      
+
       toast({ title: "User Deleted", description: "The account has been permanently removed." });
       loadData();
     } catch (error: any) {
@@ -264,6 +264,7 @@ export default function AdminStaff() {
                       <SelectItem value="branch_director">Branch Director</SelectItem>
                       <SelectItem value="marketer">Marketer</SelectItem>
                       <SelectItem value="finance">Finance Officer</SelectItem>
+                      {isSuperAdmin && <SelectItem value="auditor">Auditor</SelectItem>}
                       {isSuperAdmin && <SelectItem value="admin">Administrator</SelectItem>}
                       {isSuperAdmin && <SelectItem value="super_admin">Super Administrator</SelectItem>}
                     </SelectContent>

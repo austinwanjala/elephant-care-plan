@@ -29,7 +29,7 @@ export default function ReceptionSearchMember() {
         try {
             const { data, error } = await supabase
                 .from("members")
-                .select("*, membership_categories(name), branches(name)")
+                .select("*, membership_categories(name), branches(name), dependants(*)")
                 .or(`phone.ilike."%${term}%",id_number.ilike."%${term}%",member_number.ilike."%${term}%",full_name.ilike."%${term}%"`)
                 .maybeSingle();
 
@@ -140,8 +140,44 @@ export default function ReceptionSearchMember() {
                         </div>
                     </CardContent>
                 </Card>
-            )
-            }
+            )}
+
+            {member && member.dependants && member.dependants.length > 0 && (
+                <Card className="border-primary/50">
+                    <CardHeader className="bg-primary/5">
+                        <CardTitle className="flex items-center gap-2"><div className="h-2 w-2 rounded-full bg-primary" /> Registered Dependants</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                            {member.dependants.map((dep: any) => (
+                                <div key={dep.id} className="flex flex-col items-center p-4 border rounded-lg bg-card shadow-sm">
+                                    <div className="mb-4 relative h-[180px] w-[150px] bg-muted rounded-md overflow-hidden border">
+                                        {dep.image_url ? (
+                                            <img
+                                                src={dep.image_url}
+                                                alt={dep.full_name}
+                                                className="h-full w-full object-cover"
+                                            />
+                                        ) : (
+                                            <div className="h-full w-full flex items-center justify-center bg-muted">
+                                                <User className="h-12 w-12 text-muted-foreground/30" />
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="text-center w-full">
+                                        <p className="font-semibold truncate" title={dep.full_name}>{dep.full_name}</p>
+                                        <Badge variant="outline" className="mt-1 mb-2">{dep.relationship}</Badge>
+                                        <div className="text-xs text-muted-foreground grid gap-1 text-left w-full pl-2">
+                                            <p>DOB: {new Date(dep.dob).toLocaleDateString()}</p>
+                                            <p>ID: {dep.id_number}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             <Dialog open={biometricDialogOpen} onOpenChange={setBiometricDialogOpen}>
                 <DialogContent>

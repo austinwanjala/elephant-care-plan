@@ -46,6 +46,7 @@ interface Member {
   email: string;
   id_number: string;
   age: number | null;
+  dob: string | null;
   coverage_balance: number;
   total_contributions: number;
   benefit_limit: number;
@@ -80,7 +81,7 @@ export default function AdminMembers() {
     email: "",
     phone: "",
     idNumber: "",
-    age: "",
+    dob: "",
     password: "",
     branchId: "",
     membershipCategoryId: "",
@@ -107,8 +108,12 @@ export default function AdminMembers() {
   const handleRegisterMember = async () => {
     setLoading(true);
     try {
-      const ageInt = parseInt(formData.age);
-      if (isNaN(ageInt)) throw new Error("Valid age is required.");
+      if (!formData.dob) throw new Error("Date of Birth is required.");
+
+      const dobDate = new Date(formData.dob);
+      const ageDiffMs = Date.now() - dobDate.getTime();
+      const ageDate = new Date(ageDiffMs);
+      const calculatedAge = Math.abs(ageDate.getUTCFullYear() - 1970);
 
       const { data, error } = await supabase.functions.invoke("admin-create-user", {
         body: {
@@ -119,7 +124,8 @@ export default function AdminMembers() {
             full_name: formData.fullName,
             phone: formData.phone,
             id_number: formData.idNumber,
-            age: ageInt,
+            age: calculatedAge,
+            dob: formData.dob,
             branch_id: formData.branchId || null,
           }
         }
@@ -129,7 +135,7 @@ export default function AdminMembers() {
 
       toast({ title: "Member registered successfully" });
       setDialogOpen(false);
-      setFormData({ fullName: "", email: "", phone: "", idNumber: "", age: "", password: "", branchId: "", membershipCategoryId: "" });
+      setFormData({ fullName: "", email: "", phone: "", idNumber: "", dob: "", password: "", branchId: "", membershipCategoryId: "" });
       loadData();
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -146,11 +152,21 @@ export default function AdminMembers() {
       const selectedCategory = categories.find(c => c.id === formData.membershipCategoryId);
 
       // 1. Prepare updates
+      let age = selectedMember.age;
+
+      if (formData.dob) {
+        const dobDate = new Date(formData.dob);
+        const ageDiffMs = Date.now() - dobDate.getTime();
+        const ageDate = new Date(ageDiffMs);
+        age = Math.abs(ageDate.getUTCFullYear() - 1970);
+      }
+
       const updates: any = {
         full_name: formData.fullName,
         phone: formData.phone,
         id_number: formData.idNumber,
-        age: parseInt(formData.age),
+        age: age,
+        dob: formData.dob || null,
         branch_id: formData.branchId || null,
         membership_category_id: formData.membershipCategoryId || null,
       };
@@ -170,7 +186,7 @@ export default function AdminMembers() {
       if (categoryChanged && selectedCategory) {
         const { error: payError } = await supabase.from("payments").insert({
           member_id: selectedMember.id,
-          amount: selectedCategory.payment_amount, 
+          amount: selectedCategory.payment_amount,
           coverage_added: selectedCategory.benefit_amount,
           status: "completed",
           mpesa_reference: "Admin Scheme Assignment",
@@ -234,7 +250,7 @@ export default function AdminMembers() {
                 <div className="space-y-2"><Label>Email *</Label><Input type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} required /></div>
                 <div className="space-y-2"><Label>Phone *</Label><Input value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} required /></div>
                 <div className="space-y-2"><Label>ID Number *</Label><Input value={formData.idNumber} onChange={e => setFormData({ ...formData, idNumber: e.target.value })} required /></div>
-                <div className="space-y-2"><Label>Age *</Label><Input type="number" value={formData.age} onChange={e => setFormData({ ...formData, age: e.target.value })} required /></div>
+                <div className="space-y-2"><Label>Date of Birth *</Label><Input type="date" max={new Date().toISOString().split("T")[0]} value={formData.dob} onChange={e => setFormData({ ...formData, dob: e.target.value })} required /></div>
                 <div className="space-y-2"><Label>Password *</Label><Input type="password" value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} required /></div>
                 <div className="space-y-2 md:col-span-2">
                   <Label>Branch</Label>
@@ -287,7 +303,7 @@ export default function AdminMembers() {
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => { setSelectedMember(m); setFormData({ ...formData, fullName: m.full_name, phone: m.phone, idNumber: m.id_number, age: m.age?.toString() || "", branchId: m.branch_id || "", membershipCategoryId: m.membership_category_id || "" }); setEditDialogOpen(true); }}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => { setSelectedMember(m); setFormData({ ...formData, fullName: m.full_name, phone: m.phone, idNumber: m.id_number, dob: m.dob || "", branchId: m.branch_id || "", membershipCategoryId: m.membership_category_id || "" }); setEditDialogOpen(true); }}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
                       <DropdownMenuItem onClick={() => { setSelectedMember(m); setBiometricDialogOpen(true); }}><Fingerprint className="mr-2 h-4 w-4" /> Biometric</DropdownMenuItem>
                       <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteMember(m.id)}><Trash2 className="mr-2 h-4 w-4" /> Deactivate</DropdownMenuItem>
                     </DropdownMenuContent>
@@ -306,7 +322,7 @@ export default function AdminMembers() {
             <div className="space-y-2"><Label>Full Name</Label><Input value={formData.fullName} onChange={e => setFormData({ ...formData, fullName: e.target.value })} /></div>
             <div className="space-y-2"><Label>Phone</Label><Input value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} /></div>
             <div className="space-y-2"><Label>ID Number</Label><Input value={formData.idNumber} onChange={e => setFormData({ ...formData, idNumber: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Age</Label><Input type="number" value={formData.age} onChange={e => setFormData({ ...formData, age: e.target.value })} /></div>
+            <div className="space-y-2"><Label>Date of Birth</Label><Input type="date" max={new Date().toISOString().split("T")[0]} value={formData.dob} onChange={e => setFormData({ ...formData, dob: e.target.value })} /></div>
 
             <div className="pt-4 border-t space-y-4">
               <div className="space-y-2">

@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -7,6 +7,7 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+    // Handle CORS preflight requests
     if (req.method === "OPTIONS") {
         return new Response("ok", { headers: corsHeaders });
     }
@@ -25,7 +26,7 @@ serve(async (req) => {
 
         const { CheckoutRequestID, ResultCode, ResultDesc, CallbackMetadata } = stkCallback;
 
-        // Log the attempt
+        // Log the callback receipt
         await supabase.from("system_logs").insert({
             action: "MPESA_CALLBACK_RECEIVED",
             details: { checkoutId: CheckoutRequestID, code: ResultCode, desc: ResultDesc },
@@ -37,7 +38,7 @@ serve(async (req) => {
                 mpesaReceipt = CallbackMetadata.Item.find((i: any) => i.Name === "MpesaReceiptNumber")?.Value;
             }
 
-            // Perform the update and check if any rows were affected
+            // Update the payment record
             const { data, error } = await supabase
                 .from("payments")
                 .update({
@@ -53,20 +54,15 @@ serve(async (req) => {
             if (error) throw error;
 
             if (!data || data.length === 0) {
-                const errorMsg = `No pending payment found in DB for CheckoutID: ${CheckoutRequestID}`;
-                console.error(`[mpesa-callback] ${errorMsg}`);
+                console.error(`[mpesa-callback] No pending payment found for CheckoutID: ${CheckoutRequestID}`);
+            } else {
                 await supabase.from("system_logs").insert({
-                    action: "MPESA_CALLBACK_ERROR",
-                    details: { error: errorMsg, checkoutId: CheckoutRequestID },
+                    action: "MPESA_CALLBACK_SUCCESS",
+                    details: { checkoutId: CheckoutRequestID, receipt: mpesaReceipt },
                 });
-                throw new Error(errorMsg);
             }
-
-            await supabase.from("system_logs").insert({
-                action: "MPESA_CALLBACK_SUCCESS",
-                details: { checkoutId: CheckoutRequestID, receipt: mpesaReceipt },
-            });
         } else {
+            // Mark as failed if ResultCode is not 0
             await supabase
                 .from("payments")
                 .update({
@@ -85,8 +81,8 @@ serve(async (req) => {
     } catch (error: any) {
         console.error("[mpesa-callback] Fatal Error:", error.message);
         return new Response(JSON.stringify({ error: error.message }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
             status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
     }
 });

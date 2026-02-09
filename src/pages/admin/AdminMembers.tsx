@@ -130,21 +130,29 @@ export default function AdminMembers() {
     if (!selectedMember) return;
     setLoading(true);
     try {
-      // 1. Update Profile Details
-      const { error } = await supabase.from("members").update({
+      const adjustment = parseFloat(formData.coverageAdjustment);
+      const hasAdjustment = !isNaN(adjustment) && adjustment > 0;
+
+      // 1. Update Profile Details & Coverage directly
+      const updates: any = {
         full_name: formData.fullName,
         phone: formData.phone,
         id_number: formData.idNumber,
         age: parseInt(formData.age),
         branch_id: formData.branchId || null,
-      }).eq("id", selectedMember.id);
+      };
+
+      if (hasAdjustment) {
+        updates.coverage_balance = (selectedMember.coverage_balance || 0) + adjustment;
+        updates.is_active = true; // Ensure they are marked as covered
+      }
+
+      const { error } = await supabase.from("members").update(updates).eq("id", selectedMember.id);
 
       if (error) throw error;
 
-      // 2. Handle Coverage Adjustment
-      const adjustment = parseFloat(formData.coverageAdjustment);
-      if (!isNaN(adjustment) && adjustment > 0) {
-        // Create payment record (Trigger update_coverage_on_payment will update member balance and set is_active = true)
+      // 2. Record in payments table for history if adjustment was made
+      if (hasAdjustment) {
         const { error: payError } = await supabase.from("payments").insert({
           member_id: selectedMember.id,
           amount: 0, 

@@ -189,6 +189,7 @@ export default function DirectorRevenue() {
     if (loading) return <div className="flex items-center justify-center min-h-[400px]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
     const hasApprovedClaim = claims.some(c => c.status === 'approved');
+    const hasPendingClaim = claims.some(c => c.status === 'pending');
 
     return (
         <div className="space-y-6">
@@ -240,6 +241,12 @@ export default function DirectorRevenue() {
                                         <span className="font-bold text-center">Approved, waiting for payment</span>
                                         <p className="text-[10px] text-center opacity-80">Finance is currently processing your payout.</p>
                                     </div>
+                                ) : hasPendingClaim ? (
+                                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex flex-col items-center gap-2 text-amber-700">
+                                        <Clock className="h-6 w-6 animate-pulse" />
+                                        <span className="font-bold text-center">Claim Pending Approval</span>
+                                        <p className="text-[10px] text-center opacity-80">Admin is reviewing your revenue claim.</p>
+                                    </div>
                                 ) : (
                                     <Button
                                         className="w-full h-14 text-lg font-bold shadow-md hover:shadow-lg transition-all"
@@ -251,10 +258,10 @@ export default function DirectorRevenue() {
                                     </Button>
                                 )}
                                 
-                                {availableToClaim < accumulatedRevenue && accumulatedRevenue > 0 && !hasApprovedClaim && (
+                                {availableToClaim < accumulatedRevenue && accumulatedRevenue > 0 && !hasApprovedClaim && !hasPendingClaim && (
                                     <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-lg">
                                         <p className="text-xs text-blue-700 text-center font-medium">
-                                            KES {(accumulatedRevenue - availableToClaim).toLocaleString()} pending approval
+                                            KES {(accumulatedRevenue - availableToClaim).toLocaleString()} tied to other claims
                                         </p>
                                     </div>
                                 )}

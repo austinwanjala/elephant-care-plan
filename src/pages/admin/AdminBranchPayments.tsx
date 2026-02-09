@@ -23,7 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { DollarSign, Loader2, History, ClipboardList, ShieldCheck, CheckCircle2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format, getMonth, getYear } from "date-fns";
+import { format } from "date-fns";
 
 interface RevenueClaim {
   id: string;
@@ -118,7 +118,8 @@ export default function AdminBranchPayments() {
       });
       
       setActionDialogOpen(false);
-      loadData();
+      // Force a refresh of the data
+      await loadData();
     } catch (error: any) {
       toast({ title: "Action Failed", description: error.message, variant: "destructive" });
     } finally {

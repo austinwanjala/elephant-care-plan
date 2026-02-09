@@ -29,30 +29,49 @@ import {
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 
-const menuItems = [
-  { title: "Dashboard", url: "/admin", icon: LayoutDashboard },
-  { title: "Members", url: "/admin/members", icon: Users },
-  { title: "Branches", url: "/admin/branches", icon: Building2 },
-  { title: "Staff", url: "/admin/staff", icon: UserCog },
-  { title: "Visits", url: "/admin/visits", icon: History },
-  { title: "Services", url: "/admin/services", icon: Stethoscope },
-  { title: "Branch Payments", url: "/admin/branch-payments", icon: DollarSign },
-  { title: "Marketer Claims", url: "/admin/marketer-claims", icon: ClipboardList },
-  { title: "System Logs", url: "/admin/logs", icon: FileText },
-];
-
-const settingsMenuItems = [
-  { title: "General Settings", url: "/admin/settings", icon: Settings },
-  { title: "Membership Categories", url: "/admin/membership-categories", icon: Users },
-  { title: "Commission Rates", url: "/admin/commission-settings", icon: DollarSign },
-];
-
 export function AdminSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
   const navigate = useNavigate();
   const [pendingClaimsCount, setPendingClaimsCount] = useState(0);
+  const [basePath, setBasePath] = useState("/admin");
+  const [roleLabel, setRoleLabel] = useState("Admin");
+
+  useEffect(() => {
+    const checkRole = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
+        if (data?.role === 'super_admin') {
+          setBasePath("/super-admin");
+          setRoleLabel("Super Admin");
+        } else {
+          setBasePath("/admin");
+          setRoleLabel("Admin");
+        }
+      }
+    };
+    checkRole();
+  }, []);
+
+  const menuItems = [
+    { title: "Dashboard", url: basePath, icon: LayoutDashboard },
+    { title: "Members", url: `${basePath}/members`, icon: Users },
+    { title: "Branches", url: `${basePath}/branches`, icon: Building2 },
+    { title: "Staff", url: `${basePath}/staff`, icon: UserCog },
+    { title: "Visits", url: `${basePath}/visits`, icon: History },
+    { title: "Services", url: `${basePath}/services`, icon: Stethoscope },
+    { title: "Branch Payments", url: `${basePath}/branch-payments`, icon: DollarSign },
+    { title: "Marketer Claims", url: `${basePath}/marketer-claims`, icon: ClipboardList },
+    { title: "System Logs", url: `${basePath}/logs`, icon: FileText },
+  ];
+
+  const settingsMenuItems = [
+    { title: "General Settings", url: `${basePath}/settings`, icon: Settings },
+    { title: "Membership Categories", url: `${basePath}/membership-categories`, icon: Users },
+    { title: "Commission Rates", url: `${basePath}/commission-settings`, icon: DollarSign },
+  ];
 
   useEffect(() => {
     const fetchPendingClaims = async () => {
@@ -65,7 +84,6 @@ export function AdminSidebar() {
 
     fetchPendingClaims();
 
-    // Subscribe to changes for realtime updates
     const channel = supabase
       .channel('schema-db-changes')
       .on(
@@ -87,8 +105,8 @@ export function AdminSidebar() {
   }, []);
 
   const isActive = (path: string) => {
-    if (path === "/admin") {
-      return location.pathname === "/admin";
+    if (path === basePath) {
+      return location.pathname === basePath;
     }
     return location.pathname.startsWith(path);
   };
@@ -108,7 +126,7 @@ export function AdminSidebar() {
           {!collapsed && (
             <div>
               <span className="text-lg font-serif font-bold text-foreground">Elephant Dental</span>
-              <span className="ml-2 px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">Admin</span>
+              <span className="ml-2 px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">{roleLabel}</span>
             </div>
           )}
         </div>

@@ -19,6 +19,7 @@ export default function AdminStaff() {
   const [branches, setBranches] = useState<any[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -35,7 +36,16 @@ export default function AdminStaff() {
 
   useEffect(() => {
     loadData();
+    fetchCurrentUserRole();
   }, []);
+
+  const fetchCurrentUserRole = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data } = await supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
+      setCurrentUserRole(data?.role || null);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -192,6 +202,8 @@ export default function AdminStaff() {
     exportToCsv("staff_export.csv", dataToExport);
   };
 
+  const isSuperAdmin = currentUserRole === 'super_admin';
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between gap-4">
@@ -243,8 +255,8 @@ export default function AdminStaff() {
                       <SelectItem value="branch_director">Branch Director</SelectItem>
                       <SelectItem value="marketer">Marketer</SelectItem>
                       <SelectItem value="finance">Finance Officer</SelectItem>
-                      <SelectItem value="admin">Administrator</SelectItem>
-                      <SelectItem value="super_admin">Super Administrator</SelectItem>
+                      {isSuperAdmin && <SelectItem value="admin">Administrator</SelectItem>}
+                      {isSuperAdmin && <SelectItem value="super_admin">Super Administrator</SelectItem>}
                     </SelectContent>
                   </Select>
                 </div>

@@ -518,7 +518,7 @@ export default function Consultation() {
                         disabled={submitting || selectedServices.length === 0}
                     >
                         {submitting ? <Loader2 className="animate-spin mr-2" /> : <Send className="mr-2 h-5 w-5" />}
-                        Submit Consultation
+                        Submit Bill
                     </Button>
                 </div>
             </div>

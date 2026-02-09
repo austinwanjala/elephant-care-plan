@@ -1,16 +1,13 @@
 import { cn } from "@/lib/utils";
 
-// FDI Adult Numbering
-const ADULT_Q1 = [18, 17, 16, 15, 14, 13, 12, 11];
-const ADULT_Q2 = [21, 22, 23, 24, 25, 26, 27, 28];
-const ADULT_Q3 = [31, 32, 33, 34, 35, 36, 37, 38];
-const ADULT_Q4 = [48, 47, 46, 45, 44, 43, 42, 41];
+// FDI Adult Numbering - Upper Jaw (Right to Left then Left to Right)
+const ADULT_UPPER = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
+// FDI Adult Numbering - Lower Jaw (Right to Left then Left to Right)
+const ADULT_LOWER = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
 
-// FDI Child Numbering (Deciduous)
-const CHILD_Q5 = [55, 54, 53, 52, 51];
-const CHILD_Q6 = [61, 62, 63, 64, 65];
-const CHILD_Q7 = [71, 72, 73, 74, 75];
-const CHILD_Q8 = [85, 84, 83, 82, 81];
+// FDI Child Numbering
+const CHILD_UPPER = [55, 54, 53, 52, 51, 61, 62, 63, 64, 65];
+const CHILD_LOWER = [85, 84, 83, 82, 81, 71, 72, 73, 74, 75];
 
 interface DentalChartProps {
     onToothClick: (toothId: number) => void;
@@ -20,76 +17,74 @@ interface DentalChartProps {
 }
 
 export function DentalChart({ onToothClick, selectedTeeth, toothStatus, isChild = false }: DentalChartProps) {
-    const quadrants = isChild 
-        ? { q1: CHILD_Q5, q2: CHILD_Q6, q3: CHILD_Q7, q4: CHILD_Q8, labels: ['Q5', 'Q6', 'Q7', 'Q8'] }
-        : { q1: ADULT_Q1, q2: ADULT_Q2, q3: ADULT_Q3, q4: ADULT_Q4, labels: ['Q1', 'Q2', 'Q3', 'Q4'] };
+    const upperJaw = isChild ? CHILD_UPPER : ADULT_UPPER;
+    const lowerJaw = isChild ? CHILD_LOWER : ADULT_LOWER;
 
     return (
-        <div className="w-full max-w-4xl mx-auto p-6 border rounded-xl bg-slate-50/50 shadow-inner">
-            <h3 className="text-center font-serif font-bold text-lg mb-6 text-slate-800">
-                {isChild ? "Pediatric Dental Chart (20 Teeth)" : "Adult Dental Chart (32 Teeth)"}
+        <div className="w-full max-w-5xl mx-auto p-4 sm:p-8 border rounded-2xl bg-slate-50/30 shadow-sm">
+            <h3 className="text-center font-serif font-bold text-xl mb-8 text-slate-800">
+                {isChild ? "Pediatric Dental Map" : "Anatomical Dental Map"}
             </h3>
 
-            <div className="relative bg-white p-8 rounded-lg border shadow-sm">
-                {/* Cross/Divider lines */}
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="w-[90%] h-px bg-slate-200"></div>
+            <div className="space-y-12 bg-white p-6 sm:p-10 rounded-xl border shadow-inner overflow-x-auto">
+                {/* Upper Jaw */}
+                <div className="space-y-4 min-w-[600px]">
+                    <div className="flex justify-between px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        <span>Right</span>
+                        <span className="text-primary/60">Upper Jaw</span>
+                        <span>Left</span>
+                    </div>
+                    <div className="flex justify-center gap-1 sm:gap-2">
+                        {upperJaw.map((id) => (
+                            <Tooth 
+                                key={id} 
+                                id={id} 
+                                isSelected={selectedTeeth.includes(id)} 
+                                status={toothStatus[id]} 
+                                onClick={() => onToothClick(id)} 
+                            />
+                        ))}
+                    </div>
                 </div>
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="h-[90%] w-px bg-slate-200"></div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-x-12 gap-y-16 relative">
-                    {/* Upper Right (Q1/Q5) */}
-                    <div className="flex justify-end items-end gap-1 flex-wrap-reverse max-w-[240px] ml-auto">
-                        {quadrants.q1.map((id) => (
-                            <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} />
-                        ))}
-                        <span className="text-[10px] font-bold text-slate-400 w-full text-right pr-2">{quadrants.labels[0]}</span>
-                    </div>
-
-                    {/* Upper Left (Q2/Q6) */}
-                    <div className="flex justify-start items-end gap-1 flex-wrap max-w-[240px] mr-auto">
-                        {quadrants.q2.map((id) => (
-                            <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} />
-                        ))}
-                        <span className="text-[10px] font-bold text-slate-400 w-full text-left pl-2">{quadrants.labels[1]}</span>
-                    </div>
-
-                    {/* Lower Right (Q4/Q8) */}
-                    <div className="flex justify-end items-start gap-1 flex-wrap-reverse max-w-[240px] ml-auto">
-                        <span className="text-[10px] font-bold text-slate-400 w-full text-right pr-2">{quadrants.labels[3]}</span>
-                        {quadrants.q4.map((id) => (
-                            <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} isLower />
+                {/* Lower Jaw */}
+                <div className="space-y-4 min-w-[600px]">
+                    <div className="flex justify-center gap-1 sm:gap-2">
+                        {lowerJaw.map((id) => (
+                            <Tooth 
+                                key={id} 
+                                id={id} 
+                                isSelected={selectedTeeth.includes(id)} 
+                                status={toothStatus[id]} 
+                                onClick={() => onToothClick(id)} 
+                                isLower 
+                            />
                         ))}
                     </div>
-
-                    {/* Lower Left (Q3/Q7) */}
-                    <div className="flex justify-start items-start gap-1 flex-wrap max-w-[240px] mr-auto">
-                        <span className="text-[10px] font-bold text-slate-400 w-full text-left pl-2">{quadrants.labels[2]}</span>
-                        {quadrants.q3.map((id) => (
-                            <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} isLower />
-                        ))}
+                    <div className="flex justify-between px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        <span>Right</span>
+                        <span className="text-primary/60">Lower Jaw</span>
+                        <span>Left</span>
                     </div>
                 </div>
             </div>
 
-            <div className="mt-8 pt-4 border-t flex flex-wrap justify-center gap-6 text-xs font-medium">
-                <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-red-100 border-2 border-red-400 rounded-sm"></div>
-                    <span className="text-slate-600">Decay</span>
+            <div className="mt-8 pt-6 border-t flex flex-wrap justify-center gap-6 text-xs font-semibold">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-50 border border-red-100">
+                    <div className="w-3 h-3 bg-red-400 rounded-full"></div>
+                    <span className="text-red-700">Decay</span>
                 </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-blue-100 border-2 border-blue-400 rounded-sm"></div>
-                    <span className="text-slate-600">Planned</span>
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-100">
+                    <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
+                    <span className="text-blue-700">Planned</span>
                 </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-green-100 border-2 border-green-400 rounded-sm"></div>
-                    <span className="text-slate-600">Completed</span>
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 border border-green-100">
+                    <div className="w-3 h-3 bg-green-400 rounded-full"></div>
+                    <span className="text-green-700">Completed</span>
                 </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-primary text-primary-foreground flex items-center justify-center rounded-sm text-[8px]">✓</div>
-                    <span className="text-slate-600">Selected</span>
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20">
+                    <div className="w-3 h-3 bg-primary rounded-full"></div>
+                    <span className="text-primary">Selected</span>
                 </div>
             </div>
         </div>
@@ -105,11 +100,10 @@ interface ToothProps {
 }
 
 function Tooth({ id, isSelected, status, onClick, isLower }: ToothProps) {
-    // Determine tooth type based on FDI number for realistic shape
     const lastDigit = id % 10;
     let toothPath = "";
     
-    // Simplified realistic SVG paths for different tooth types
+    // Anatomical SVG paths
     if (lastDigit <= 2) { // Incisors
         toothPath = isLower 
             ? "M4,2 C4,2 2,10 2,15 C2,20 5,22 10,22 C15,22 18,20 18,15 C18,10 16,2 16,2 L4,2" 
@@ -129,9 +123,9 @@ function Tooth({ id, isSelected, status, onClick, isLower }: ToothProps) {
     }
 
     let colorClass = "fill-white stroke-slate-300 hover:stroke-slate-500";
-    if (status === 'decay') colorClass = "fill-red-50 stroke-red-400";
-    if (status === 'planned') colorClass = "fill-blue-50 stroke-blue-400";
-    if (status === 'completed') colorClass = "fill-green-50 stroke-green-400";
+    if (status === 'decay') colorClass = "fill-red-100 stroke-red-500";
+    if (status === 'planned') colorClass = "fill-blue-100 stroke-blue-500";
+    if (status === 'completed') colorClass = "fill-green-100 stroke-green-500";
     if (isSelected) colorClass = "fill-primary stroke-primary-foreground";
 
     return (
@@ -141,20 +135,12 @@ function Tooth({ id, isSelected, status, onClick, isLower }: ToothProps) {
                 "group relative flex flex-col items-center cursor-pointer transition-all duration-200",
                 isSelected ? "scale-110 z-10" : "hover:-translate-y-1"
             )}
-            title={`Tooth #${id}`}
         >
-            <span className={cn(
-                "text-[9px] font-bold mb-1 transition-colors",
-                isSelected ? "text-primary" : "text-slate-400 group-hover:text-slate-600"
-            )}>
-                {id}
-            </span>
-            <svg width="24" height="28" viewBox="0 0 20 24" className={cn("transition-all", colorClass)}>
+            {!isLower && <span className={cn("text-[8px] font-bold mb-1", isSelected ? "text-primary" : "text-slate-400")}>{id}</span>}
+            <svg width="28" height="32" viewBox="0 0 20 24" className={cn("transition-all drop-shadow-sm", colorClass)}>
                 <path d={toothPath} strokeWidth="1.5" />
-                {isSelected && (
-                    <circle cx="10" cy="12" r="3" className="fill-white animate-pulse" />
-                )}
             </svg>
+            {isLower && <span className={cn("text-[8px] font-bold mt-1", isSelected ? "text-primary" : "text-slate-400")}>{id}</span>}
         </div>
     );
 }

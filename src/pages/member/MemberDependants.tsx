@@ -6,8 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ArrowLeft, Plus, Trash, Users, CalendarDays, CreditCard, Camera, User } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Loader2, ArrowLeft, Plus, Trash, Users, Camera, User, ImagePlus } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface Dependant {
@@ -72,11 +72,18 @@ const MemberDependants = () => {
       if (imageFile) {
         const fileExt = imageFile.name.split('.').pop();
         const fileName = `${memberId}-${Math.random()}.${fileExt}`;
+        
         const { error: uploadError } = await supabase.storage
           .from('dependant-images')
           .upload(fileName, imageFile);
 
-        if (uploadError) throw uploadError;
+        if (uploadError) {
+          if (uploadError.message.includes("bucket not found")) {
+            throw new Error("Storage bucket 'dependant-images' not found. Please contact administrator to create it.");
+          }
+          throw uploadError;
+        }
+        
         const { data: { publicUrl } } = supabase.storage.from('dependant-images').getPublicUrl(fileName);
         imageUrl = publicUrl;
       }
@@ -119,80 +126,116 @@ const MemberDependants = () => {
           <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5" /> Registered Dependants</CardTitle>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild><Button className="btn-primary" disabled={dependants.length >= 5}><Plus className="mr-2 h-4 w-4" /> Add Dependant</Button></DialogTrigger>
-            <DialogContent>
-              <DialogHeader><DialogTitle>Add New Dependant</DialogTitle></DialogHeader>
-              <form onSubmit={handleAddDependant} className="grid gap-4 py-4">
-                <div className="flex justify-center mb-4">
-                  <div className="flex justify-center mb-4">
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Add New Dependant</DialogTitle>
+                <DialogDescription>Enter the details of your family member to add them to your scheme.</DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleAddDependant} className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Full Name *</Label>
+                  <Input value={newDependant.fullName} onChange={(e) => setNewDependant({ ...newDependant, fullName: e.target.value })} required placeholder="e.g. Jane Doe" />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Date of Birth *</Label>
+                    <Input type="date" max={new Date().toISOString().split("T")[0]} value={newDependant.dob} onChange={e => setNewDependant({ ...newDependant, dob: e.target.value })} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Relationship *</Label>
+                    <Input value={newDependant.relationship} onChange={(e) => setNewDependant({ ...newDependant, relationship: e.target.value })} placeholder="e.g. Child" required />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Birth Cert / ID Number *</Label>
+                  <Input value={newDependant.idNumber} onChange={(e) => setNewDependant({ ...newDependant, idNumber: e.target.value })} required placeholder="Enter identification number" />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Dependant Photo (Optional)</Label>
+                  <div className="flex items-center gap-4 p-3 border rounded-lg bg-muted/30">
                     {imageFile ? (
                       <div className="relative">
-                        <Avatar className="h-24 w-24 border-2 border-primary/20">
+                        <Avatar className="h-16 w-16 border">
                           <AvatarImage src={URL.createObjectURL(imageFile)} />
-                          <AvatarFallback><User className="h-12 w-12 text-muted-foreground" /></AvatarFallback>
+                          <AvatarFallback><User /></AvatarFallback>
                         </Avatar>
                         <Button
                           type="button"
                           variant="destructive"
                           size="icon"
-                          className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                          className="absolute -top-1 -right-1 h-5 w-5 rounded-full"
                           onClick={() => setImageFile(null)}
                         >
                           <Trash className="h-3 w-3" />
                         </Button>
                       </div>
                     ) : (
-                      <div className="flex flex-col items-center gap-2">
-                        <div className="h-24 w-24 rounded-full bg-muted flex items-center justify-center border-2 border-dashed border-muted-foreground/50">
-                          <Camera className="h-8 w-8 text-muted-foreground" />
-                        </div>
-                        <Label htmlFor="image-upload" className="cursor-pointer text-primary text-sm font-medium hover:underline">
-                          Upload Photo
-                        </Label>
-                        <Input
-                          id="image-upload"
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-                        />
+                      <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center border-2 border-dashed">
+                        <Camera className="h-6 w-6 text-muted-foreground" />
                       </div>
                     )}
+                    <div className="flex-1">
+                      <Label htmlFor="image-upload" className="cursor-pointer inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">
+                        <ImagePlus className="h-4 w-4" />
+                        {imageFile ? "Change Photo" : "Choose Image"}
+                      </Label>
+                      <p className="text-[10px] text-muted-foreground mt-1">JPG, PNG or WebP. Max 2MB.</p>
+                      <Input
+                        id="image-upload"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                      />
+                    </div>
                   </div>
                 </div>
-                <div className="space-y-2"><Label>Full Name</Label><Input value={newDependant.fullName} onChange={(e) => setNewDependant({ ...newDependant, fullName: e.target.value })} required /></div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Date of Birth</Label>
-                    <Input type="date" max={new Date().toISOString().split("T")[0]} value={newDependant.dob} onChange={e => setNewDependant({ ...newDependant, dob: e.target.value })} />
-                  </div>
-                  <div className="space-y-2"><Label>Relationship</Label><Input value={newDependant.relationship} onChange={(e) => setNewDependant({ ...newDependant, relationship: e.target.value })} placeholder="e.g. Child" required /></div>
-                </div>
-                <div className="space-y-2"><Label>Birth Cert / Student ID</Label><Input value={newDependant.idNumber} onChange={(e) => setNewDependant({ ...newDependant, idNumber: e.target.value })} required /></div>
-                <DialogFooter><Button type="submit" disabled={submitting}>{submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Add Dependant"}</Button></DialogFooter>
+
+                <DialogFooter className="pt-4">
+                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+                  <Button type="submit" disabled={submitting}>
+                    {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                    Add Dependant
+                  </Button>
+                </DialogFooter>
               </form>
             </DialogContent>
           </Dialog>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4">
-            {dependants.map((dep) => (
-              <Card key={dep.id} className="flex items-center justify-between p-4">
-                <div className="flex items-center gap-4">
-                  <Avatar className="h-12 w-12">
-                    <AvatarImage src={dep.image_url || ""} />
-                    <AvatarFallback>{dep.full_name.charAt(0)}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-semibold">{dep.full_name}</p>
-                    <p className="text-sm text-muted-foreground">{dep.relationship}</p>
+            {dependants.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Users className="h-12 w-12 mx-auto mb-2 opacity-20" />
+                <p>No dependants registered yet.</p>
+              </div>
+            ) : (
+              dependants.map((dep) => (
+                <Card key={dep.id} className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center gap-4">
+                    <Avatar className="h-12 w-12 border">
+                      <AvatarImage src={dep.image_url || ""} />
+                      <AvatarFallback>{dep.full_name.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-semibold">{dep.full_name}</p>
+                      <p className="text-xs text-muted-foreground">{dep.relationship} • ID: {dep.id_number}</p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-sm text-muted-foreground flex items-center gap-1"><CreditCard className="h-4 w-4" /> {dep.id_number}</div>
-                  <Button variant="ghost" size="icon" onClick={async () => { if (confirm("Remove?")) { await supabase.from("dependants").delete().eq("id", dep.id); fetchDependants(); } }}><Trash className="h-4 w-4 text-destructive" /></Button>
-                </div>
-              </Card>
-            ))}
+                  <Button variant="ghost" size="icon" onClick={async () => { 
+                    if (confirm(`Are you sure you want to remove ${dep.full_name}?`)) { 
+                      await supabase.from("dependants").delete().eq("id", dep.id); 
+                      fetchDependants(); 
+                    } 
+                  }}>
+                    <Trash className="h-4 w-4 text-destructive" />
+                  </Button>
+                </Card>
+              ))
+            )}
           </div>
         </CardContent>
       </Card>

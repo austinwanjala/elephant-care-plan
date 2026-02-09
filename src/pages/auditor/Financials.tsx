@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2 } from "lucide-react";
+import { Loader2, Building2, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function AuditorFinancials() {
@@ -16,25 +16,21 @@ export default function AuditorFinancials() {
 
     useEffect(() => {
         fetchData();
-    }, [filterStatus]); // Re-fetch when filter changes
+        fetchBranches();
+    }, [filterStatus]);
 
     const fetchBranches = async () => {
-        // Fetch branches and their revenue aggregates
         const { data: branchData } = await supabase.from("branches").select("id, name");
 
         if (branchData) {
-            // Fetch revenue stats for all branches
             const { data: revenueData } = await supabase
                 .from("branch_revenue")
                 .select("branch_id, total_compensation, total_profit_loss");
 
-            // Aggregate
             const enhancedBranches = branchData.map(b => {
                 const branchRevenues = revenueData?.filter(r => r.branch_id === b.id) || [];
                 const totalComp = branchRevenues.reduce((sum, r) => sum + (r.total_compensation || 0), 0);
                 const totalPL = branchRevenues.reduce((sum, r) => sum + (r.total_profit_loss || 0), 0);
-                // Assuming Revenue = Comp + PL (simplified logic for estimation)
-                // Or if we have a direct revenue field. Let's use PL + Comp for now as 'Revenue' generated
                 const totalRev = totalComp + totalPL;
 
                 return {
@@ -51,7 +47,7 @@ export default function AuditorFinancials() {
 
     const fetchBranchRevenue = async (branchId: string) => {
         setRevenueLoading(true);
-        setSelectedRevenue([]); // Reset while loading
+        setSelectedRevenue([]);
         const { data } = await supabase
             .from("branch_revenue")
             .select("*")
@@ -156,10 +152,10 @@ export default function AuditorFinancials() {
                 <TabsContent value="branch_revenue" className="space-y-4">
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between">
-                            <CardTitle>Branch Revenue Reports</CardTitle>
+                            <CardTitle className="flex items-center gap-2"><Building2 className="h-5 w-5 text-primary" /> Branch Revenue Reports</CardTitle>
                             <div className="w-[250px]">
                                 <select
-                                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
                                     onChange={(e) => fetchBranchRevenue(e.target.value)}
                                     defaultValue=""
                                 >
@@ -173,7 +169,7 @@ export default function AuditorFinancials() {
                         <CardContent>
                             {!selectedRevenue ? (
                                 <div className="text-center py-10 text-muted-foreground">
-                                    Please select a branch to view its revenue report.
+                                    Please select a branch from the dropdown to view its revenue report.
                                 </div>
                             ) : (
                                 <Table>

@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Loader2, User, Phone, Mail, CreditCard, Cake, Users } from "lucide-react"; // Added Cake icon for age and Users for marketer
+import { Loader2, User, Phone, Mail, CreditCard, Cake, Users } from "lucide-react";
 import { InsuranceCard } from "@/components/member/InsuranceCard";
+import { differenceInYears, parseISO } from "date-fns";
 
 interface MemberProfile {
   id: string;
@@ -68,6 +69,10 @@ export default function MemberProfile() {
     ? ((profile.coverage_balance || 0) / profile.benefit_limit) * 100
     : 0;
 
+  const displayAge = profile.dob 
+    ? differenceInYears(new Date(), parseISO(profile.dob)) 
+    : (profile.age || "N/A");
+
   return (
     <div className="space-y-6">
       <div>
@@ -76,7 +81,6 @@ export default function MemberProfile() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        {/* Member Card - Replaced with InsuranceCard */}
         {profile && (
           <div className="md:col-span-1">
             <InsuranceCard member={{
@@ -92,7 +96,6 @@ export default function MemberProfile() {
           </div>
         )}
 
-        {/* Coverage Card - This remains as is */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -119,7 +122,6 @@ export default function MemberProfile() {
         </Card>
       </div>
 
-      {/* Personal Info */}
       <Card>
         <CardHeader>
           <CardTitle>Personal Information</CardTitle>
@@ -150,9 +152,7 @@ export default function MemberProfile() {
             <Cake className="h-5 w-5 text-muted-foreground" />
             <div>
               <p className="text-sm text-muted-foreground">Age</p>
-              <p>
-                {profile.dob ? Math.abs(new Date(Date.now() - new Date(profile.dob).getTime()).getUTCFullYear() - 1970) : (profile.age || "N/A")}
-              </p>
+              <p>{displayAge}</p>
             </div>
           </div>
           {profile.marketers && (

@@ -1,8 +1,34 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Shield, CreditCard, QrCode, Building2, Users, ArrowRight, CheckCircle } from "lucide-react";
+import { Shield, CreditCard, QrCode, Building2, Users, ArrowRight, CheckCircle, Phone, Mail } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const Index = () => {
+  const [settings, setSettings] = useState<Record<string, string>>({
+    app_name: "Elephant Dental",
+    hero_title: "Dental Insurance That Doubles Your Investment",
+    hero_subtitle: "Pay KES 500, get KES 1,000 coverage. Simple, affordable dental care for you and your family at Elephant Dental Hospital.",
+    footer_text: "Providing accessible oral healthcare for everyone across Kenya.",
+    copyright_text: "© 2024 Elephant Dental Hospital. All rights reserved.",
+    contact_phone: "+254 700 000 000",
+    contact_email: "info@elephantdental.co.ke"
+  });
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      const { data } = await supabase.from("system_settings").select("key, value");
+      if (data) {
+        const settingsMap: Record<string, string> = { ...settings };
+        data.forEach(s => {
+          settingsMap[s.key] = s.value;
+        });
+        setSettings(settingsMap);
+      }
+    };
+    fetchSettings();
+  }, []);
+
   const features = [
     {
       icon: CreditCard,
@@ -44,7 +70,7 @@ const Index = () => {
             <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
               <span className="text-xl">🐘</span>
             </div>
-            <span className="text-xl font-serif font-bold text-foreground">Elephant Dental</span>
+            <span className="text-xl font-serif font-bold text-foreground">{settings.app_name}</span>
           </div>
           <div className="hidden md:flex items-center gap-6">
             <a href="#features" className="nav-link">Features</a>
@@ -67,10 +93,10 @@ const Index = () => {
         <div className="container mx-auto">
           <div className="max-w-3xl mx-auto text-center animate-slide-up">
             <h1 className="text-4xl md:text-6xl font-serif font-bold text-primary-foreground mb-6 leading-tight">
-              Dental Insurance That <span className="text-accent">Doubles</span> Your Investment
+              {settings.hero_title}
             </h1>
             <p className="text-xl text-primary-foreground/80 mb-8">
-              Pay KES 500, get KES 1,000 coverage. Simple, affordable dental care for you and your family at Elephant Dental Hospital.
+              {settings.hero_subtitle}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link to="/register">
@@ -107,7 +133,7 @@ const Index = () => {
         <div className="container mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-serif font-bold text-foreground mb-4">
-              Why Choose Elephant Dental?
+              Why Choose {settings.app_name}?
             </h2>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
               We've designed the simplest dental insurance scheme in Kenya. No complicated terms, just straightforward coverage.
@@ -169,7 +195,7 @@ const Index = () => {
                 Member Benefits
               </h2>
               <p className="text-muted-foreground text-lg mb-8">
-                Join thousands of Kenyans who trust Elephant Dental for their dental care needs.
+                Join thousands of Kenyans who trust {settings.app_name} for their dental care needs.
               </p>
               <div className="grid sm:grid-cols-2 gap-4">
                 {benefits.map((benefit, index) => (
@@ -204,7 +230,7 @@ const Index = () => {
             Ready to Get Started?
           </h2>
           <p className="text-primary-foreground/80 text-lg mb-8 max-w-2xl mx-auto">
-            Join Elephant Dental today and give your family the dental care they deserve.
+            Join {settings.app_name} today and give your family the dental care they deserve.
           </p>
           <Link to="/register">
             <Button size="lg" className="btn-accent text-lg px-8 py-6">
@@ -217,19 +243,45 @@ const Index = () => {
       {/* Footer */}
       <footer className="bg-card border-t border-border py-12 px-4">
         <div className="container mx-auto">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
-                <span className="text-xl">🐘</span>
+          <div className="grid md:grid-cols-3 gap-8 mb-8">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
+                  <span className="text-xl">🐘</span>
+                </div>
+                <span className="text-xl font-serif font-bold text-foreground">{settings.app_name}</span>
               </div>
-              <span className="text-xl font-serif font-bold text-foreground">Elephant Dental</span>
+              <p className="text-muted-foreground text-sm max-w-xs">
+                {settings.footer_text}
+              </p>
             </div>
-            <p className="text-muted-foreground text-sm">
-              © 2024 Elephant Dental Hospital. All rights reserved.
+            
+            <div className="space-y-4">
+              <h4 className="font-bold text-foreground">Contact Us</h4>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p className="flex items-center gap-2"><Phone className="h-4 w-4" /> {settings.contact_phone}</p>
+                <p className="flex items-center gap-2"><Mail className="h-4 w-4" /> {settings.contact_email}</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h4 className="font-bold text-foreground">Quick Links</h4>
+              <div className="flex flex-col gap-2 text-sm text-muted-foreground">
+                <Link to="/login" className="hover:text-primary">Member Login</Link>
+                <Link to="/register" className="hover:text-primary">Join Scheme</Link>
+                <Link to="/terms-of-service" className="hover:text-primary">Terms of Service</Link>
+                <Link to="/privacy-policy" className="hover:text-primary">Privacy Policy</Link>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-8 border-t border-border flex flex-col md:flex-row justify-between items-center gap-4">
+            <p className="text-muted-foreground text-xs">
+              {settings.copyright_text}
             </p>
             <div className="flex items-center gap-4">
-              <Users className="h-5 w-5 text-muted-foreground" />
-              <span className="text-muted-foreground">5,000+ Members</span>
+              <Users className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground text-xs">5,000+ Members</span>
             </div>
           </div>
         </div>

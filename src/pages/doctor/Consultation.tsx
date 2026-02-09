@@ -137,15 +137,6 @@ export default function Consultation() {
         }
     };
 
-    const handleStatusUpdate = (status: string) => {
-        const newStatus = { ...toothStatus };
-        selectedTeeth.forEach(id => {
-            newStatus[id] = status;
-        });
-        setToothStatus(newStatus);
-        toast({ title: "Chart Updated", description: `${selectedTeeth.length} teeth marked as ${status}` });
-    };
-
     const addService = (serviceId: string) => {
         if (!serviceId) return;
         const service = availableServices.find(s => s.id === serviceId);
@@ -389,14 +380,6 @@ export default function Consultation() {
                             />
                             {selectedTeeth.length > 0 && (
                                 <div className="mt-4 space-y-4">
-                                    <div className="p-4 border rounded bg-primary/5 flex gap-2 justify-center flex-wrap">
-                                        <span className="w-full text-center text-sm font-semibold mb-1">Update Status:</span>
-                                        <Button size="sm" variant="destructive" onClick={() => handleStatusUpdate('decay')}>Mark Decay</Button>
-                                        <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={() => handleStatusUpdate('planned')}>Plan Treatment</Button>
-                                        <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleStatusUpdate('completed')}>Mark Completed</Button>
-                                        <Button size="sm" variant="outline" onClick={() => handleStatusUpdate('healthy')}>Mark Healthy</Button>
-                                    </div>
-
                                     <div className="p-4 border rounded bg-secondary/20">
                                         <Label>Add Procedure for Selected Teeth ({selectedTeeth.join(", ")})</Label>
                                         <select

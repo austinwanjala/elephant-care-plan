@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Loader2, CreditCard, Phone, CheckCircle2, AlertCircle, RefreshCw, Search } from "lucide-react";
+import { Loader2, CreditCard, Phone, CheckCircle2, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { mpesaService } from "@/services/mpesa";
@@ -26,14 +26,10 @@ export default function MemberPayments() {
   const [loading, setLoading] = useState(true);
   const [payDialogOpen, setPayDialogOpen] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const [verifying, setVerifying] = useState(false);
-  const [currentCheckoutId, setCurrentCheckoutId] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const { toast } = useToast();
   const [memberId, setMemberId] = useState<string | null>(null);
-  const channelRef = useRef<any>(null);
-  const pollingIntervalRef = useRef<any>(null);
 
   const fetchPayments = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -65,59 +61,7 @@ export default function MemberPayments() {
 
   useEffect(() => {
     fetchPayments();
-    return () => {
-      stopVerification();
-    };
   }, []);
-
-  const stopVerification = () => {
-    if (channelRef.current) {
-      supabase.removeChannel(channelRef.current);
-      channelRef.current = null;
-    }
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current);
-      pollingIntervalRef.current = null;
-    }
-  };
-
-  const handleManualCheck = async () => {
-    if (!currentCheckoutId) return;
-    try {
-      const payment = await mpesaService.checkPaymentStatus(currentCheckoutId);
-      if (payment && payment.status !== 'pending') {
-        handlePaymentResult(payment);
-      }
-    } catch (err) {
-      console.error("Manual check error:", err);
-    }
-  };
-
-  const handlePaymentResult = (payment: any) => {
-    if (payment.status === 'completed') {
-      toast({
-        title: "Payment Verified!",
-        description: `KES ${payment.amount.toLocaleString()} has been added to your coverage.`,
-      });
-      setVerifying(false);
-      setProcessing(false);
-      setPayDialogOpen(false);
-      setAmount("");
-      setCurrentCheckoutId(null);
-      stopVerification();
-      fetchPayments();
-    } else if (payment.status === 'failed') {
-      toast({
-        title: "Payment Failed",
-        description: payment.mpesa_result_desc || "The transaction was not completed.",
-        variant: "destructive"
-      });
-      setVerifying(false);
-      setProcessing(false);
-      setCurrentCheckoutId(null);
-      stopVerification();
-    }
-  };
 
   const handleMpesaPayment = async () => {
     if (!amount || !phoneNumber || !memberId) {
@@ -135,24 +79,28 @@ export default function MemberPayments() {
       });
 
       const checkoutId = response.CheckoutRequestID;
-      setCurrentCheckoutId(checkoutId);
+
+      // TEST MODE: Immediately mark as completed
+      const { error: updateError } = await supabase
+        .from("payments")
+        .update({ 
+            status: 'completed', 
+            mpesa_reference: `TEST-${Math.random().toString(36).substring(7).toUpperCase()}`,
+            payment_date: new Date().toISOString()
+        })
+        .eq("mpesa_checkout_request_id", checkoutId);
+
+      if (updateError) throw updateError;
 
       toast({
-        title: "Prompt Sent",
-        description: "Please enter your M-Pesa PIN on your phone."
+        title: "Payment Successful (Test Mode)",
+        description: `KES ${parseFloat(amount).toLocaleString()} has been added to your coverage.`,
       });
 
-      setVerifying(true);
-
-      // 1. Realtime Subscription
-      channelRef.current = mpesaService.subscribeToCheckoutStatus(checkoutId, (payload) => {
-        handlePaymentResult(payload);
-      });
-
-      // 2. Automatic Polling Fallback (Every 3 seconds)
-      pollingIntervalRef.current = setInterval(() => {
-        handleManualCheck();
-      }, 3000);
+      setProcessing(false);
+      setPayDialogOpen(false);
+      setAmount("");
+      fetchPayments();
 
     } catch (error: any) {
       toast({ title: "Request Failed", description: error.message, variant: "destructive" });
@@ -184,7 +132,7 @@ export default function MemberPayments() {
           <h1 className="text-2xl font-bold">Payments & Contributions</h1>
           <p className="text-muted-foreground">Manage your account coverage.</p>
         </div>
-        <Dialog open={payDialogOpen} onOpenChange={(open) => !verifying && setPayDialogOpen(open)}>
+        <Dialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>
           <DialogTrigger asChild>
             <Button className="bg-green-600 hover:bg-green-700">
               <CreditCard className="mr-2 h-4 w-4" /> Add Funds (M-Pesa)
@@ -198,64 +146,36 @@ export default function MemberPayments() {
               </DialogDescription>
             </DialogHeader>
 
-            {verifying ? (
-              <div className="py-8 flex flex-col items-center justify-center space-y-6 text-center">
-                <div className="relative">
-                  <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                  <RefreshCw className="h-6 w-6 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
-                </div>
-                <div className="space-y-2">
-                  <h3 className="font-bold text-lg">Verifying Payment...</h3>
-                  <p className="text-sm text-muted-foreground px-8">
-                    We've sent a prompt to <strong>{phoneNumber}</strong>. Please enter your PIN.
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleManualCheck}
-                  className="gap-2"
-                >
-                  <Search className="h-4 w-4" />
-                  Check Status Now
-                </Button>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Amount (KES)</Label>
+                <Input
+                  type="number"
+                  placeholder="e.g. 5000"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                />
               </div>
-            ) : (
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label>Amount (KES)</Label>
-                  <Input
-                    type="number"
-                    placeholder="e.g. 5000"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>M-Pesa Phone Number</Label>
-                  <Input
-                    placeholder="2547..."
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                  />
-                </div>
-                <div className="p-3 bg-blue-50 text-blue-700 text-sm rounded-md flex gap-2">
-                  <AlertCircle className="h-5 w-5 shrink-0" />
-                  <p>A prompt will be sent to your phone. Enter your M-Pesa PIN to complete the transaction.</p>
-                </div>
+              <div className="space-y-2">
+                <Label>M-Pesa Phone Number</Label>
+                <Input
+                  placeholder="2547..."
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                />
               </div>
-            )}
+              <div className="p-3 bg-blue-50 text-blue-700 text-sm rounded-md flex gap-2">
+                <AlertCircle className="h-5 w-5 shrink-0" />
+                <p><b>Test Mode:</b> Payment will be marked as successful immediately after the prompt is sent.</p>
+              </div>
+            </div>
 
             <DialogFooter>
-              {!verifying && (
-                <>
-                  <Button variant="outline" onClick={() => setPayDialogOpen(false)}>Cancel</Button>
-                  <Button onClick={handleMpesaPayment} disabled={processing} className="bg-green-600 hover:bg-green-700">
-                    {processing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Phone className="mr-2 h-4 w-4" />}
-                    Send Request
-                  </Button>
-                </>
-              )}
+              <Button variant="outline" onClick={() => setPayDialogOpen(false)}>Cancel</Button>
+              <Button onClick={handleMpesaPayment} disabled={processing} className="bg-green-600 hover:bg-green-700">
+                {processing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Phone className="mr-2 h-4 w-4" />}
+                Send Request
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

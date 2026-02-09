@@ -30,6 +30,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 
+import { usePermissions } from "@/hooks/usePermissions";
+
 export function AdminSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
@@ -38,6 +40,7 @@ export function AdminSidebar() {
   const [pendingClaimsCount, setPendingClaimsCount] = useState(0);
   const [basePath, setBasePath] = useState("/admin");
   const [roleLabel, setRoleLabel] = useState("Admin");
+  const { hasPermission, loading: permsLoading } = usePermissions();
 
   useEffect(() => {
     const checkRole = async () => {
@@ -65,8 +68,12 @@ export function AdminSidebar() {
     { title: "Services", url: `${basePath}/services`, icon: Stethoscope },
     { title: "Branch Payments", url: `${basePath}/branch-payments`, icon: DollarSign },
     { title: "Marketer Claims", url: `${basePath}/marketer-claims`, icon: ClipboardList },
-    { title: "System Logs", url: `${basePath}/logs`, icon: FileText },
   ];
+
+  // Conditionally add System Logs
+  if (hasPermission('audit_logs', 'view') || roleLabel === 'Super Admin') {
+    menuItems.push({ title: "System Logs", url: `${basePath}/logs`, icon: FileText });
+  }
 
   const settingsMenuItems = [
     { title: "General Settings", url: `${basePath}/settings`, icon: Settings },

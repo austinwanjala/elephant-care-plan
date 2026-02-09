@@ -1,11 +1,12 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { useSidebar, Sidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Stethoscope, ClipboardList, LogOut, History } from "lucide-react";
+import { Stethoscope, ClipboardList, LogOut, History, LayoutDashboard } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 const menuItems = [
-    { title: "Today's Queue", url: "/doctor", icon: ClipboardList },
+    { title: "Dashboard", url: "/doctor", icon: LayoutDashboard },
+    { title: "Today's Queue", url: "/doctor/queue", icon: ClipboardList },
     { title: "Patient History", url: "/doctor/history", icon: History },
 ];
 

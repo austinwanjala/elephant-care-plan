@@ -34,13 +34,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, MoreHorizontal, Edit, Trash2, Fingerprint, Download } from "lucide-react";
+import { Search, Plus, MoreHorizontal, Edit, Trash2, Fingerprint, Download, Loader2 } from "lucide-react";
 import { BiometricCapture } from "@/components/BiometricCapture";
-import { createClient } from "@supabase/supabase-js";
 import { exportToCsv } from "@/utils/csvExport";
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 interface Member {
   id: string;
@@ -68,6 +64,7 @@ export default function AdminMembers() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [biometricDialogOpen, setBiometricDialogOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -85,26 +82,27 @@ export default function AdminMembers() {
   }, []);
 
   const loadData = async () => {
+    setLoading(true);
     const [membersRes, branchesRes] = await Promise.all([
       supabase.from("members").select("*, branches(name), membership_categories(id, name)").order("created_at", { ascending: false }),
       supabase.from("branches").select("id, name").eq("is_active", true),
     ]);
     if (membersRes.data) setMembers(membersRes.data as any);
     if (branchesRes.data) setBranches(branchesRes.data);
+    setLoading(false);
   };
 
   const handleRegisterMember = async () => {
+    setLoading(true);
     try {
       const ageInt = parseInt(formData.age);
       if (isNaN(ageInt)) throw new Error("Valid age is required.");
 
-      const authClient = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, { auth: { persistSession: false } });
-
-      const { error: authError } = await authClient.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
+      const { data, error } = await supabase.functions.invoke("admin-create-user", {
+        body: {
+          email: formData.email,
+          password: formData.password,
+          metadata: {
             role: 'member',
             full_name: formData.fullName,
             phone: formData.phone,
@@ -115,7 +113,7 @@ export default function AdminMembers() {
         }
       });
 
-      if (authError) throw authError;
+      if (error) throw error;
 
       toast({ title: "Member registered successfully" });
       setDialogOpen(false);
@@ -123,11 +121,14 @@ export default function AdminMembers() {
       loadData();
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleEditMember = async () => {
     if (!selectedMember) return;
+    setLoading(true);
     try {
       // 1. Update Profile Details
       const { error } = await supabase.from("members").update({
@@ -143,14 +144,14 @@ export default function AdminMembers() {
       // 2. Handle Coverage Adjustment
       const adjustment = parseFloat(formData.coverageAdjustment);
       if (!isNaN(adjustment) && adjustment > 0) {
-
-        // Create payment record (Trigger will update member balance)
+        // Create payment record (Trigger update_coverage_on_payment will update member balance and set is_active = true)
         const { error: payError } = await supabase.from("payments").insert({
           member_id: selectedMember.id,
-          amount: 0, // No cash contribution recorded for manual adjustment usually
+          amount: 0, 
           coverage_added: adjustment,
           status: "completed",
-          mpesa_reference: "Manual Admin Adjustment"
+          mpesa_reference: "Admin Adjustment",
+          payment_date: new Date().toISOString()
         });
 
         if (payError) throw payError;
@@ -171,6 +172,8 @@ export default function AdminMembers() {
       loadData();
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -217,7 +220,9 @@ export default function AdminMembers() {
                   </Select>
                 </div>
               </div>
-              <Button onClick={handleRegisterMember} className="w-full btn-primary">Register Member</Button>
+              <Button onClick={handleRegisterMember} className="w-full btn-primary" disabled={loading}>
+                {loading ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : "Register Member"}
+              </Button>
             </DialogContent>
           </Dialog>
         </div>
@@ -241,18 +246,24 @@ export default function AdminMembers() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredMembers.map(m => (
+            {loading && members.length === 0 ? (
+              <TableRow><TableCell colSpan={6} className="text-center py-8"><Loader2 className="animate-spin h-6 w-6 mx-auto text-primary" /></TableCell></TableRow>
+            ) : filteredMembers.map(m => (
               <TableRow key={m.id}>
                 <TableCell className="font-mono">{m.member_number}</TableCell>
                 <TableCell className="font-medium">{m.full_name}</TableCell>
                 <TableCell>{m.phone}</TableCell>
                 <TableCell>KES {m.coverage_balance.toLocaleString()}</TableCell>
-                <TableCell><Badge variant={m.is_active ? "default" : "destructive"}>{m.is_active ? "Active" : "Inactive"}</Badge></TableCell>
+                <TableCell>
+                  <Badge variant={m.is_active ? "default" : "destructive"}>
+                    {m.is_active ? "Covered" : "Uncovered"}
+                  </Badge>
+                </TableCell>
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => { setSelectedMember(m); setFormData({ ...formData, fullName: m.full_name, phone: m.phone, idNumber: m.id_number, age: m.age?.toString() || "", branchId: "", coverageAdjustment: "" }); setEditDialogOpen(true); }}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => { setSelectedMember(m); setFormData({ ...formData, fullName: m.full_name, phone: m.phone, idNumber: m.id_number, age: m.age?.toString() || "", branchId: m.branch_id || "", coverageAdjustment: "" }); setEditDialogOpen(true); }}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
                       <DropdownMenuItem onClick={() => { setSelectedMember(m); setBiometricDialogOpen(true); }}><Fingerprint className="mr-2 h-4 w-4" /> Biometric</DropdownMenuItem>
                       <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteMember(m.id)}><Trash2 className="mr-2 h-4 w-4" /> Deactivate</DropdownMenuItem>
                     </DropdownMenuContent>
@@ -278,7 +289,7 @@ export default function AdminMembers() {
                 <Plus className="h-4 w-4" /> Add Coverage Balance
               </Label>
               <div className="text-xs text-muted-foreground mb-2">
-                Enter amount to manually add to the member's coverage balance. Leave empty if no change.
+                Enter amount to manually add to the member's coverage balance. This will also activate the account.
               </div>
               <Input
                 type="number"
@@ -287,7 +298,9 @@ export default function AdminMembers() {
                 onChange={e => setFormData({ ...formData, coverageAdjustment: e.target.value })}
               />
             </div>
-            <Button onClick={handleEditMember} className="btn-primary">Update Member</Button>
+            <Button onClick={handleEditMember} className="btn-primary" disabled={loading}>
+              {loading ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : "Update Member"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

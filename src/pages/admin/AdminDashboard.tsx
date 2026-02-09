@@ -13,7 +13,8 @@ import {
   Calendar,
   AlertCircle,
   CheckCircle,
-  Activity
+  Activity,
+  History
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -84,6 +85,7 @@ export default function AdminDashboard() {
   const [recentMembers, setRecentMembers] = useState<any[]>([]);
   const [chartData, setChartData] = useState<ChartData[]>([]);
   const [pendingClaims, setPendingClaims] = useState<any[]>([]);
+  const [showAllTime, setShowAllTime] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -91,7 +93,7 @@ export default function AdminDashboard() {
     loadRecentMembers();
     loadChartData();
     loadPendingClaims();
-  }, []);
+  }, [showAllTime]);
 
   const loadStats = async () => {
     const startOfMonth = new Date();
@@ -101,21 +103,29 @@ export default function AdminDashboard() {
     const [membersRes, branchesRes, revenueRes, categoriesRes, visitsRes, marketersRes, newMembersRes] = await Promise.all([
       supabase.from("members").select("coverage_balance, total_contributions, is_active"),
       supabase.from("branches").select("id").eq("is_active", true),
-      supabase.from("branch_revenue").select("total_compensation, total_profit_loss"),
+      supabase.from("branch_revenue").select("total_compensation, total_profit_loss, date"),
       supabase.from("members").select("membership_category_id, membership_categories(name)"),
-      supabase.from("visits").select("id"),
+      supabase.from("visits").select("id, created_at"),
       supabase.from("marketers").select("id").eq("is_active", true),
       supabase.from("members").select("id").gte("created_at", startOfMonth.toISOString()),
     ]);
 
     if (membersRes.data && branchesRes.data && visitsRes.data && marketersRes.data) {
-      const revenueData = revenueRes.data || [];
+      let revenueData = revenueRes.data || [];
+      let visitData = visitsRes.data || [];
+
+      if (!showAllTime) {
+        const monthStartStr = startOfMonth.toISOString().split('T')[0];
+        revenueData = revenueData.filter((r: any) => r.date >= monthStartStr);
+        visitData = visitData.filter((v: any) => v.created_at >= startOfMonth.toISOString());
+      }
+
       setStats({
         totalMembers: membersRes.data.length,
         activeMembers: membersRes.data.filter(m => m.is_active).length,
         totalContributions: membersRes.data.reduce((sum, m) => sum + (m.total_contributions || 0), 0),
         totalCoverage: membersRes.data.reduce((sum, m) => sum + (m.coverage_balance || 0), 0),
-        totalVisits: visitsRes.data.length,
+        totalVisits: visitData.length,
         totalBranches: branchesRes.data.length,
         totalRevenue: revenueData.reduce((sum, r) => sum + (r.total_compensation || 0), 0),
         totalProfitLoss: revenueData.reduce((sum, r) => sum + (r.total_profit_loss || 0), 0),
@@ -150,31 +160,32 @@ export default function AdminDashboard() {
   };
 
   const loadChartData = async () => {
-    // Fetch last 6 months of data
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
-    sixMonthsAgo.setDate(1); // Start of that month
+    // Fetch last 12 months if showAllTime, else 6
+    const monthsToFetch = showAllTime ? 12 : 6;
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - (monthsToFetch - 1));
+    startDate.setDate(1);
 
     // Fetch Revenue
     const { data: revenueData } = await supabase
       .from("branch_revenue")
       .select("date, total_compensation")
-      .gte("date", sixMonthsAgo.toISOString().split('T')[0]);
+      .gte("date", startDate.toISOString().split('T')[0]);
 
     // Fetch Visits
     const { data: visitData } = await supabase
       .from("visits")
       .select("created_at")
-      .gte("created_at", sixMonthsAgo.toISOString());
+      .gte("created_at", startDate.toISOString());
 
     // Aggregate by Month
     const months: Record<string, { revenue: number; visits: number }> = {};
 
-    // Initialize last 6 months
-    for (let i = 0; i < 6; i++) {
-      const d = new Date(sixMonthsAgo);
+    // Initialize months
+    for (let i = 0; i < monthsToFetch; i++) {
+      const d = new Date(startDate);
       d.setMonth(d.getMonth() + i);
-      const key = d.toLocaleString('default', { month: 'short', year: '2-digit' }); // e.g., "Jan 24"
+      const key = d.toLocaleString('default', { month: 'short', year: '2-digit' });
       months[key] = { revenue: 0, visits: 0 };
     }
 
@@ -224,10 +235,19 @@ export default function AdminDashboard() {
             Admin Dashboard
           </h1>
           <p className="text-muted-foreground mt-1">
-            Welcome back! Here's an overview of your dental insurance system.
+            {showAllTime ? "Viewing historical system performance." : "Viewing performance for the current month."}
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <Button 
+            variant={showAllTime ? "default" : "outline"} 
+            size="sm" 
+            onClick={() => setShowAllTime(!showAllTime)}
+            className="gap-2"
+          >
+            {showAllTime ? <Calendar className="h-4 w-4" /> : <History className="h-4 w-4" />}
+            {showAllTime ? "Show Current Month" : "Show All Time"}
+          </Button>
           <Badge variant="outline" className="px-3 py-1.5 text-sm bg-primary/5 border-primary/20">
             <Calendar className="h-3.5 w-3.5 mr-1.5" />
             {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
@@ -263,13 +283,15 @@ export default function AdminDashboard() {
 
         <Card className="relative overflow-hidden border-0 shadow-md bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950 dark:to-emerald-900/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Total Contributions</CardTitle>
+            <CardTitle className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
+              {showAllTime ? "Total Contributions" : "Monthly Contributions"}
+            </CardTitle>
             <div className="h-9 w-9 rounded-full bg-emerald-500/10 flex items-center justify-center">
               <CreditCard className="h-4 w-4 text-emerald-600" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-emerald-900 dark:text-emerald-100">
+            <div className="text-3xl font-bold text-emerald-900 dark:text-blue-100">
               {formatCurrency(stats.totalContributions)}
             </div>
             <p className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-2">
@@ -280,17 +302,19 @@ export default function AdminDashboard() {
 
         <Card className="relative overflow-hidden border-0 shadow-md bg-gradient-to-br from-violet-50 to-violet-100/50 dark:from-violet-950 dark:to-violet-900/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-violet-700 dark:text-violet-300">Active Coverage</CardTitle>
+            <CardTitle className="text-sm font-medium text-violet-700 dark:text-violet-300">
+              {showAllTime ? "Total Visits" : "Monthly Visits"}
+            </CardTitle>
             <div className="h-9 w-9 rounded-full bg-violet-500/10 flex items-center justify-center">
-              <Shield className="h-4 w-4 text-violet-600" />
+              <Activity className="h-4 w-4 text-violet-600" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-violet-900 dark:text-violet-100">
-              {formatCurrency(stats.totalCoverage)}
+            <div className="text-3xl font-bold text-violet-900 dark:text-blue-100">
+              {stats.totalVisits}
             </div>
             <p className="text-xs text-violet-600/80 dark:text-violet-400/80 mt-2">
-              Available benefit pool
+              Processed consultations
             </p>
           </CardContent>
         </Card>
@@ -302,7 +326,7 @@ export default function AdminDashboard() {
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className={`text-sm font-medium ${stats.totalProfitLoss >= 0 ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'
               }`}>
-              Net Profit/Loss
+              {showAllTime ? "Net Profit/Loss" : "Monthly Profit/Loss"}
             </CardTitle>
             <div className={`h-9 w-9 rounded-full flex items-center justify-center ${stats.totalProfitLoss >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'
               }`}>
@@ -335,7 +359,9 @@ export default function AdminDashboard() {
         <Card className="lg:col-span-2 shadow-md">
           <CardHeader>
             <CardTitle>Trend Analytics</CardTitle>
-            <CardDescription>Revenue and Visit trends over last 6 months</CardDescription>
+            <CardDescription>
+              {showAllTime ? "Revenue and Visit trends over last 12 months" : "Revenue and Visit trends over last 6 months"}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[300px] w-full">

@@ -22,9 +22,8 @@ export default function Consultation() {
     const [diagnosis, setDiagnosis] = useState("");
     const [treatmentNotes, setTreatmentNotes] = useState("");
     const [availableServices, setAvailableServices] = useState<any[]>([]);
-    // selectedServices now stores object with service and specific tooth info
     const [selectedServices, setSelectedServices] = useState<{ service: any, tooth_number: number | null }[]>([]);
-    const [serviceHistory, setServiceHistory] = useState<any[]>([]); // To check for duplicates
+    const [serviceHistory, setServiceHistory] = useState<any[]>([]);
     const [doctorId, setDoctorId] = useState<string | null>(null);
     const [doctorBranchId, setDoctorBranchId] = useState<string | null>(null);
 
@@ -76,7 +75,6 @@ export default function Consultation() {
         } else {
             setVisit(data);
 
-            // Load existing dental records (status)
             const { data: records } = await supabase.from("dental_records").select("tooth_number, status").eq("member_id", data.member_id);
             if (records) {
                 const statuses: any = {};
@@ -84,7 +82,6 @@ export default function Consultation() {
                 setToothStatus(statuses);
             }
 
-            // Load service history (dental_chart_records)
             const { data: history } = await supabase
                 .from("dental_chart_records")
                 .select("tooth_number, service_id, created_at")
@@ -97,11 +94,10 @@ export default function Consultation() {
             if (data.treatment_notes) setTreatmentNotes(data.treatment_notes);
 
             if (data.status === 'registered' && doctorId) {
-                const { error: updateStatusError } = await supabase
+                await supabase
                     .from("visits")
                     .update({ status: 'with_doctor', doctor_id: doctorId })
                     .eq("id", visitId);
-                if (updateStatusError) console.error("Error updating visit status:", updateStatusError);
             }
         }
         setLoading(false);
@@ -118,16 +114,11 @@ export default function Consultation() {
             return;
         }
 
-        const { data: branchData, error: branchError } = await supabase
+        const { data: branchData } = await supabase
             .from("branches")
             .select("is_globally_preapproved_for_services")
             .eq("id", branchId)
             .single();
-
-        if (branchError) {
-            toast({ title: "Error loading branch info", description: branchError.message, variant: "destructive" });
-            return;
-        }
 
         const filteredServices = servicesData?.filter(service => {
             if (service.approval_type === 'all_branches') return true;
@@ -152,7 +143,6 @@ export default function Consultation() {
             newStatus[id] = status;
         });
         setToothStatus(newStatus);
-        // Don't clear selected teeth here, might want to add service too
         toast({ title: "Chart Updated", description: `${selectedTeeth.length} teeth marked as ${status}` });
     };
 
@@ -161,20 +151,16 @@ export default function Consultation() {
         const service = availableServices.find(s => s.id === serviceId);
         if (!service) return;
 
-        // If teeth are selected, add service for EACH selected tooth
-        // checking valid history locking
         if (selectedTeeth.length > 0) {
             let addedCount = 0;
             const newSelections = [...selectedServices];
             const blockedTeeth: number[] = [];
 
             selectedTeeth.forEach(tooth => {
-                // Check if already selected locally
                 if (newSelections.find(s => s.service.id === serviceId && s.tooth_number === tooth)) {
-                    return; // Skip duplicate draft
+                    return;
                 }
 
-                // Check history locking
                 const hasExistingRecord = serviceHistory.some(h =>
                     h.tooth_number == tooth && h.service_id === serviceId
                 );
@@ -198,14 +184,10 @@ export default function Consultation() {
             if (addedCount > 0) {
                 setSelectedServices(newSelections);
                 toast({ title: "Services Added", description: `Added ${service.name} for ${addedCount} teeth.` });
-                setSelectedTeeth([]); // Clear selection after successful add
+                setSelectedTeeth([]);
             }
 
         } else {
-            // No tooth selected - general service? Or prompt?
-            // Assuming for now generic services can be added without tooth
-            // or asking user to select tooth.
-            // Let's allow generic, but notify user.
             toast({ title: "General Service", description: "Added as general service (no tooth specified)." });
             if (!selectedServices.find(s => s.service.id === serviceId && s.tooth_number === null)) {
                 setSelectedServices([...selectedServices, { service, tooth_number: null }]);
@@ -230,7 +212,6 @@ export default function Consultation() {
 
             if (error) throw error;
 
-            // Save dental records (statuses)
             const recordsToUpsert = Object.entries(toothStatus).map(([tooth_number, status]) => ({
                 member_id: visit.member_id,
                 visit_id: visitId,
@@ -259,7 +240,6 @@ export default function Consultation() {
             return;
         }
 
-        // Check for daily claim limit
         const todayStart = new Date();
         todayStart.setHours(0, 0, 0, 0);
         const todayEnd = new Date();
@@ -288,7 +268,6 @@ export default function Consultation() {
 
         setSubmitting(true);
         try {
-            // 1. Save Dental Records (Statuses)
             const recordsToUpsert = Object.entries(toothStatus).map(([tooth_number, status]) => ({
                 member_id: visit.member_id,
                 visit_id: visitId,
@@ -302,13 +281,11 @@ export default function Consultation() {
                 if (dentalError) throw dentalError;
             }
 
-            // 2. Calculate Bill Totals
             const totalBenefit = selectedServices.reduce((acc, s) => acc + Number(s.service.benefit_cost), 0);
             const totalCompensation = selectedServices.reduce((acc, s) => acc + Number(s.service.branch_compensation), 0);
             const totalReal = selectedServices.reduce((acc, s) => acc + Number(s.service.real_cost), 0);
             const totalProfitLoss = totalBenefit - totalCompensation;
 
-            // 3. Create Bill
             const { data: bill, error: billError } = await supabase.from("bills").insert({
                 visit_id: visitId,
                 branch_id: doctorBranchId,
@@ -321,7 +298,6 @@ export default function Consultation() {
 
             if (billError) throw billError;
 
-            // 4. Add Bill Items AND Dental Chart Records for Services
             const itemsToInsert = selectedServices.map(s => ({
                 bill_id: bill.id,
                 service_id: s.service.id,
@@ -335,7 +311,6 @@ export default function Consultation() {
             const { error: itemsError } = await supabase.from("bill_items").insert(itemsToInsert);
             if (itemsError) throw itemsError;
 
-            // Insert into dental_chart_records to LOCK this service for this tooth in future
             const chartRecordsToInsert = selectedServices
                 .filter(s => s.tooth_number !== null)
                 .map(s => ({
@@ -344,7 +319,6 @@ export default function Consultation() {
                     service_id: s.service.id,
                     tooth_number: s.tooth_number!.toString(),
                     notes: `Procedure performed on visit ${visitId}`,
-                    // treated_by, treated_at...
                 }));
 
             if (chartRecordsToInsert.length > 0) {
@@ -352,7 +326,6 @@ export default function Consultation() {
                 if (chartError) throw chartError;
             }
 
-            // 5. Update Visit Status
             const { error: visitUpdateError } = await supabase.from("visits").update({
                 status: 'billed',
                 diagnosis: diagnosis,
@@ -367,7 +340,6 @@ export default function Consultation() {
 
             toast({ title: "Consultation Completed", description: "Bill generated and sent to reception for finalization." });
 
-            // Log System Action
             await (supabase as any).from("system_logs").insert({
                 action: "Consultation Submitted",
                 details: { visit_id: visitId, doctor_id: doctorId, services_count: selectedServices.length, bill_id: bill.id },
@@ -386,6 +358,9 @@ export default function Consultation() {
 
     if (loading || !visit || !doctorId || !doctorBranchId) return <div className="p-8 text-center"><Loader2 className="animate-spin h-8 w-8 text-primary mx-auto" /></div>;
 
+    // Determine if patient is a child (under 13)
+    const isChild = visit.members?.age && visit.members.age < 13;
+
     return (
         <div className="space-y-6 max-w-7xl mx-auto">
             <div className="flex items-center gap-4 mb-6">
@@ -394,7 +369,7 @@ export default function Consultation() {
                 </Button>
                 <div>
                     <h1 className="text-2xl font-bold">Consultation - {visit.members.full_name}</h1>
-                    <p className="text-muted-foreground">Visit #{visitId?.slice(0, 8)} • ID: {visit.members.id_number}</p>
+                    <p className="text-muted-foreground">Visit #{visitId?.slice(0, 8)} • ID: {visit.members.id_number} • Age: {visit.members.age || 'N/A'}</p>
                 </div>
             </div>
 
@@ -410,6 +385,7 @@ export default function Consultation() {
                                 onToothClick={handleToothClick}
                                 selectedTeeth={selectedTeeth}
                                 toothStatus={toothStatus}
+                                isChild={isChild}
                             />
                             {selectedTeeth.length > 0 && (
                                 <div className="mt-4 space-y-4">
@@ -427,7 +403,7 @@ export default function Consultation() {
                                             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-2"
                                             onChange={(e) => {
                                                 addService(e.target.value);
-                                                e.target.value = ""; // Reset
+                                                e.target.value = "";
                                             }}
                                             defaultValue=""
                                         >

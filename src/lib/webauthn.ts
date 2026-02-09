@@ -1,4 +1,3 @@
-
 // Helper to convert Base64URL to ArrayBuffer
 function bufferDecode(value: string): ArrayBuffer {
     return Uint8Array.from(atob(value.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0)).buffer;
@@ -13,9 +12,6 @@ function bufferEncode(value: ArrayBuffer): string {
 }
 
 export async function registerCredential(userId: string, userName: string): Promise<string> {
-    // Challenge should ideally come from the server to prevent replay attacks.
-    // For this client-heavy implementation without a dedicated auth server for WebAuthn,
-    // we generate a random challenge here.
     const challenge = new Uint8Array(32);
     window.crypto.getRandomValues(challenge);
 
@@ -23,7 +19,7 @@ export async function registerCredential(userId: string, userName: string): Prom
         challenge,
         rp: {
             name: "Elephant Care Plan",
-            // id: window.location.hostname, // Don't set ID if testing on localhost vs production with different domains initially
+            id: window.location.hostname,
         },
         user: {
             id: Uint8Array.from(userId, c => c.charCodeAt(0)),
@@ -35,56 +31,55 @@ export async function registerCredential(userId: string, userName: string): Prom
             { alg: -257, type: "public-key" }, // RS256
         ],
         authenticatorSelection: {
-            authenticatorAttachment: "platform", // Forces built-in authenticator (Fingerprint, FaceID)
-            userVerification: "required", // Forces biometric verify
+            authenticatorAttachment: "platform",
+            userVerification: "required",
             requireResidentKey: false,
         },
         timeout: 60000,
         attestation: "none",
     };
 
-    const credential = (await navigator.credentials.create({
-        publicKey,
-    })) as PublicKeyCredential;
+    try {
+        const credential = (await navigator.credentials.create({
+            publicKey,
+        })) as PublicKeyCredential;
 
-    if (!credential) {
-        throw new Error("Failed to create credential");
+        if (!credential) {
+            throw new Error("Failed to create credential");
+        }
+
+        return JSON.stringify({
+            credentialId: credential.id,
+        });
+    } catch (error: any) {
+        if (error.name === "SecurityError") {
+            throw new Error("Biometrics are blocked in this environment (likely due to being inside an iframe). Please test the app in a full browser window.");
+        }
+        throw error;
     }
-
-    // We only need to store enough info to identify the credential later.
-    // In a full implementation, we'd send the attestationObject to the server.
-    // Here we store the credential ID to use in the 'allowCredentials' list during verification.
-
-    return JSON.stringify({
-        credentialId: credential.id,
-        // In a real backend scenario, we would store public key from response.response.getPublicKey() if available or parse attestation
-    });
 }
 
 export async function verifyCredential(storedCredentialData: string): Promise<boolean> {
     try {
-        // Handle legacy or malformed data gracefully
         let storedData;
         try {
             storedData = JSON.parse(storedCredentialData);
         } catch (e) {
-            console.warn("Failed to parse credential data, treating as invalid:", storedCredentialData);
             throw new Error("Invalid biometric data format. Please re-register member biometrics.");
         }
 
         if (!storedData.credentialId) throw new Error("Invalid credential data structure");
 
-        // Challenge should come from server
         const challenge = new Uint8Array(32);
         window.crypto.getRandomValues(challenge);
 
         const publicKey: PublicKeyCredentialRequestOptions = {
             challenge,
+            rpId: window.location.hostname,
             allowCredentials: [
                 {
                     id: bufferDecode(storedData.credentialId),
                     type: "public-key",
-                    // transports: ["internal"], // Removed to allow browser to auto-detect
                 },
             ],
             userVerification: "required",
@@ -95,13 +90,12 @@ export async function verifyCredential(storedCredentialData: string): Promise<bo
             publicKey,
         })) as PublicKeyCredential;
 
-        if (!assertion) {
-            return false;
-        }
-
-        return true;
-    } catch (error) {
+        return !!assertion;
+    } catch (error: any) {
         console.error("WebAuthn verification error:", error);
-        throw error; // Re-throw to let caller handle generic errors vs match failures
+        if (error.name === "SecurityError") {
+            throw new Error("Biometric verification is blocked in this preview. This feature requires a direct secure connection (HTTPS) and cannot run inside an iframe.");
+        }
+        throw error;
     }
 }

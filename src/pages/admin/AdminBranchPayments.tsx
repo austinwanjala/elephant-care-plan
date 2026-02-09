@@ -20,18 +20,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DollarSign, CheckCircle, Loader2, History, ClipboardList, CheckCircle2, ShieldCheck } from "lucide-react";
+import { DollarSign, Loader2, History, ClipboardList, ShieldCheck, CheckCircle2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format, getMonth, getYear, subMonths } from "date-fns";
-
-interface Branch {
-  id: string;
-  name: string;
-  location: string;
-}
+import { format, getMonth, getYear } from "date-fns";
 
 interface RevenueClaim {
   id: string;
@@ -41,124 +33,122 @@ interface RevenueClaim {
   notes: string | null;
   created_at: string;
   director_id: string;
-  director_name?: string;
-  branch_name?: string;
+  staff?: { full_name: string };
+  branches?: { name: string };
   approved_at?: string;
   paid_at?: string;
 }
 
 export default function AdminBranchPayments() {
-  const [branches, setBranches] = useState<Branch[]>([]);
-  const [revenueSummaries, setRevenueSummaries] = useState<Record<string, number>>({});
   const [claims, setClaims] = useState<RevenueClaim[]>([]);
   const [loading, setLoading] = useState(true);
-  const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [actionDialogOpen, setActionDialogOpen] = useState(false);
   const [selectedClaim, setSelectedClaim] = useState<RevenueClaim | null>(null);
-  const [currentMonth, setCurrentMonth] = useState(getMonth(new Date()) + 1);
-  const [currentYear, setCurrentYear] = useState(getYear(new Date()));
-  const [approvalNotes, setApprovalNotes] = useState("");
+  const [actionNotes, setActionNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    loadData(currentMonth, currentYear);
-  }, [currentMonth, currentYear]);
+    loadData();
+    fetchUserRole();
+  }, []);
 
-  const loadData = async (month: number, year: number) => {
+  const fetchUserRole = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data } = await supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
+      setUserRole(data?.role || null);
+    }
+  };
+
+  const loadData = async () => {
     setLoading(true);
     try {
-      const [branchesRes, revenueRes, claimsRes] = await Promise.all([
-        supabase.from("branches").select("id, name, location").eq("is_active", true).order("name"),
-        (supabase as any)
-          .from("branch_revenue")
-          .select("branch_id, total_compensation")
-          .gte("date", format(new Date(year, month - 1, 1), "yyyy-MM-dd"))
-          .lt("date", format(new Date(year, month, 1), "yyyy-MM-dd")),
-        (supabase as any)
-          .from("revenue_claims")
-          .select("*, staff:director_id(full_name), branches:branch_id(name)")
-          .order("created_at", { ascending: false }),
-      ]);
+      const { data, error } = await (supabase as any)
+        .from("revenue_claims")
+        .select("*, staff:director_id(full_name), branches:branch_id(name)")
+        .order("created_at", { ascending: false });
 
-      if (branchesRes.error) throw branchesRes.error;
-
-      if (branchesRes.data) setBranches(branchesRes.data);
-
-      if (revenueRes.data) {
-        const summary: Record<string, number> = {};
-        branchesRes.data?.forEach(branch => summary[branch.id] = 0);
-        revenueRes.data.forEach((r: any) => {
-          summary[r.branch_id] = (summary[r.branch_id] || 0) + r.total_compensation;
-        });
-        setRevenueSummaries(summary);
-      }
-
-      if (claimsRes.data) setClaims(claimsRes.data as any);
-
+      if (error) throw error;
+      setClaims(data || []);
     } catch (error: any) {
-      console.error("Error loading admin data:", error);
       toast({ title: "Load Error", description: error.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleApproveClaim = async () => {
-    if (!selectedClaim) return;
+  const handleProcessAction = async () => {
+    if (!selectedClaim || !userRole) return;
 
     setSubmitting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("User not authenticated.");
+      const { data: staffMember } = await supabase.from("staff").select("id").eq("user_id", user?.id).single();
 
-      const { data: adminStaff } = await supabase.from("staff").select("id").eq("user_id", user.id).single();
+      const isFinance = userRole === 'finance' || userRole === 'super_admin';
+      const isApproval = selectedClaim.status === 'pending' && !isFinance;
+
+      const updates: any = {
+        notes: actionNotes || selectedClaim.notes,
+        updated_at: new Date().toISOString()
+      };
+
+      if (isApproval) {
+        updates.status = 'approved';
+        updates.approved_at = new Date().toISOString();
+        updates.approved_by = staffMember?.id;
+      } else {
+        updates.status = 'paid';
+        updates.paid_at = new Date().toISOString();
+        updates.paid_by = staffMember?.id;
+      }
 
       const { error } = await (supabase as any)
         .from("revenue_claims")
-        .update({
-          status: 'approved',
-          approved_at: new Date().toISOString(),
-          approved_by: adminStaff?.id,
-          notes: approvalNotes || null
-        })
+        .update(updates)
         .eq("id", selectedClaim.id);
 
       if (error) throw error;
 
-      toast({ title: "Claim Approved", description: "Claim sent to Finance for payment." });
-      setApprovalDialogOpen(false);
-      loadData(currentMonth, currentYear);
+      toast({ 
+        title: isApproval ? "Claim Approved" : "Payment Recorded", 
+        description: isApproval ? "Sent to Finance for payment." : "Claim has been marked as paid." 
+      });
+      
+      setActionDialogOpen(false);
+      loadData();
     } catch (error: any) {
-      toast({ title: "Approval Failed", description: error.message, variant: "destructive" });
+      toast({ title: "Action Failed", description: error.message, variant: "destructive" });
     } finally {
       setSubmitting(false);
     }
   };
 
-  const getMonthOptions = () => {
-    const options = [];
-    let date = new Date();
-    for (let i = 0; i < 12; i++) {
-      options.push(date);
-      date = subMonths(date, 1);
-    }
-    return options.reverse();
-  };
-
   if (loading) return <div className="flex items-center justify-center min-h-[400px]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+
+  const isFinance = userRole === 'finance' || userRole === 'super_admin';
+  
+  // Filter logic: Admin sees pending, Finance sees approved
+  const activeClaims = claims.filter(c => 
+    isFinance ? c.status === 'approved' : c.status === 'pending'
+  );
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-serif font-bold text-foreground">Branch Claims</h1>
-        <p className="text-muted-foreground">Review and approve revenue claims from branch directors</p>
+        <h1 className="text-3xl font-serif font-bold text-foreground">Branch Revenue Claims</h1>
+        <p className="text-muted-foreground">
+          {isFinance ? "Process payments for approved branch claims" : "Review and approve revenue claims from branch directors"}
+        </p>
       </div>
 
-      <Tabs defaultValue="pending" className="space-y-6">
+      <Tabs defaultValue="active" className="space-y-6">
         <TabsList className="bg-muted p-1 rounded-lg">
-          <TabsTrigger value="pending" className="flex items-center gap-2">
+          <TabsTrigger value="active" className="flex items-center gap-2">
             <ClipboardList className="h-4 w-4" />
-            Pending Approval
+            {isFinance ? "Awaiting Payment" : "Awaiting Approval"} ({activeClaims.length})
           </TabsTrigger>
           <TabsTrigger value="history" className="flex items-center gap-2">
             <History className="h-4 w-4" />
@@ -166,12 +156,8 @@ export default function AdminBranchPayments() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="pending">
+        <TabsContent value="active">
           <Card className="card-elevated p-6">
-            <CardTitle className="mb-6 flex items-center gap-2">
-              <ClipboardList className="h-5 w-5 text-amber-600" />
-              Claims Awaiting Approval
-            </CardTitle>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -184,18 +170,22 @@ export default function AdminBranchPayments() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {claims.filter(c => c.status === 'pending').length === 0 ? (
-                    <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No pending claims.</TableCell></TableRow>
+                  {activeClaims.length === 0 ? (
+                    <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No claims requiring action.</TableCell></TableRow>
                   ) : (
-                    claims.filter(c => c.status === 'pending').map((claim) => (
+                    activeClaims.map((claim) => (
                       <TableRow key={claim.id}>
                         <TableCell>{format(new Date(claim.created_at), "MMM d, yyyy")}</TableCell>
-                        <TableCell className="font-bold">{(claim as any).branches?.name}</TableCell>
-                        <TableCell>{(claim as any).staff?.full_name}</TableCell>
+                        <TableCell className="font-bold">{claim.branches?.name}</TableCell>
+                        <TableCell>{claim.staff?.full_name}</TableCell>
                         <TableCell className="text-lg font-bold text-blue-700">KES {Number(claim.amount).toLocaleString()}</TableCell>
                         <TableCell>
-                          <Button size="sm" onClick={() => { setSelectedClaim(claim); setApprovalNotes(""); setApprovalDialogOpen(true); }} className="bg-primary">
-                            <ShieldCheck className="mr-2 h-4 w-4" /> Approve
+                          <Button 
+                            size="sm" 
+                            onClick={() => { setSelectedClaim(claim); setActionNotes(""); setActionDialogOpen(true); }} 
+                            className={isFinance ? "bg-green-600 hover:bg-green-700" : "bg-primary"}
+                          >
+                            {isFinance ? <><DollarSign className="mr-2 h-4 w-4" /> Pay Claim</> : <><ShieldCheck className="mr-2 h-4 w-4" /> Approve</>}
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -209,10 +199,6 @@ export default function AdminBranchPayments() {
 
         <TabsContent value="history">
           <Card className="card-elevated p-6">
-            <CardTitle className="mb-6 flex items-center gap-2">
-              <History className="h-5 w-5 text-blue-600" />
-              All Claims
-            </CardTitle>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -227,7 +213,7 @@ export default function AdminBranchPayments() {
                   {claims.map((claim) => (
                     <TableRow key={claim.id}>
                       <TableCell>{format(new Date(claim.created_at), "MMM d, yyyy")}</TableCell>
-                      <TableCell>{(claim as any).branches?.name}</TableCell>
+                      <TableCell>{claim.branches?.name}</TableCell>
                       <TableCell className="font-bold">KES {Number(claim.amount).toLocaleString()}</TableCell>
                       <TableCell>
                         <Badge className={
@@ -247,30 +233,36 @@ export default function AdminBranchPayments() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={approvalDialogOpen} onOpenChange={setApprovalDialogOpen}>
+      <Dialog open={actionDialogOpen} onOpenChange={setActionDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="font-serif">Approve Branch Claim</DialogTitle>
+            <DialogTitle className="font-serif">
+              {isFinance ? "Confirm Payout" : "Approve Branch Claim"}
+            </DialogTitle>
             <DialogDescription>
-              Verify and approve the revenue claim for {(selectedClaim as any)?.branches?.name}.
+              {isFinance 
+                ? `Record the final payment of KES ${Number(selectedClaim?.amount).toLocaleString()} to ${selectedClaim?.branches?.name}.`
+                : `Verify and approve the revenue claim for ${selectedClaim?.branches?.name}.`
+              }
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="p-4 bg-blue-50 rounded-lg">
-              <Label className="text-xs text-blue-600 uppercase font-bold">Claim Amount</Label>
-              <div className="text-2xl font-bold text-blue-900">KES {Number(selectedClaim?.amount).toLocaleString()}</div>
+            <div className={`p-4 rounded-lg ${isFinance ? 'bg-green-50' : 'bg-blue-50'}`}>
+              <Label className={`text-xs uppercase font-bold ${isFinance ? 'text-green-600' : 'text-blue-600'}`}>Amount</Label>
+              <div className={`text-2xl font-bold ${isFinance ? 'text-green-900' : 'text-blue-900'}`}>KES {Number(selectedClaim?.amount).toLocaleString()}</div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="approvalNotes">Approval Notes (Optional)</Label>
+              <Label htmlFor="actionNotes">Notes (Optional)</Label>
               <Textarea
-                id="approvalNotes"
-                value={approvalNotes}
-                onChange={(e) => setApprovalNotes(e.target.value)}
-                placeholder="e.g., Verified against monthly revenue report"
+                id="actionNotes"
+                value={actionNotes}
+                onChange={(e) => setActionNotes(e.target.value)}
+                placeholder={isFinance ? "e.g., Bank transfer reference" : "e.g., Verified against monthly revenue report"}
               />
             </div>
-            <Button onClick={handleApproveClaim} className="btn-primary" disabled={submitting}>
-              {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Approve & Send to Finance"}
+            <Button onClick={handleProcessAction} className="btn-primary" disabled={submitting}>
+              {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : isFinance ? <CheckCircle2 className="mr-2 h-4 w-4" /> : "Approve & Send to Finance"}
+              {isFinance ? "Confirm Payment" : "Approve Claim"}
             </Button>
           </div>
         </DialogContent>

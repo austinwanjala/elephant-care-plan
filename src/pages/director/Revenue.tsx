@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ArrowLeft, DollarSign, TrendingUp, CalendarDays, CheckCircle2 } from "lucide-react";
+import { Loader2, ArrowLeft, DollarSign, CalendarDays, CheckCircle2, Clock, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format, getMonth, getYear, subMonths } from "date-fns";
 
@@ -57,7 +57,7 @@ export default function DirectorRevenue() {
                 .from("revenue_claims")
                 .select("amount, status")
                 .eq("branch_id", branchId)
-                .in("status", ["pending", "paid"]);
+                .in("status", ["pending", "approved", "paid"]);
 
             if (claimErr) {
                 setAccumulatedRevenue(totalMade);
@@ -67,9 +67,10 @@ export default function DirectorRevenue() {
 
             const totalPaid = (claimsData || []).filter((c: any) => c.status === 'paid').reduce((sum: number, c: any) => sum + Number(c.amount), 0);
             const totalPending = (claimsData || []).filter((c: any) => c.status === 'pending').reduce((sum: number, c: any) => sum + Number(c.amount), 0);
+            const totalApproved = (claimsData || []).filter((c: any) => c.status === 'approved').reduce((sum: number, c: any) => sum + Number(c.amount), 0);
 
             setAccumulatedRevenue(Math.max(0, totalMade - totalPaid));
-            setAvailableToClaim(Math.max(0, totalMade - (totalPaid + totalPending)));
+            setAvailableToClaim(Math.max(0, totalMade - (totalPaid + totalPending + totalApproved)));
         } catch (error: any) {
             console.error("Error fetching accumulated revenue:", error);
         }
@@ -146,7 +147,7 @@ export default function DirectorRevenue() {
 
     const handleSubmitClaim = async () => {
         if (availableToClaim <= 0) {
-            toast({ title: "No Available Revenue", description: "All unpaid revenue is already tied to a pending claim.", variant: "destructive" });
+            toast({ title: "No Available Revenue", description: "All unpaid revenue is already tied to a pending or approved claim.", variant: "destructive" });
             return;
         }
 
@@ -186,6 +187,8 @@ export default function DirectorRevenue() {
     };
 
     if (loading) return <div className="flex items-center justify-center min-h-[400px]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+
+    const hasApprovedClaim = claims.some(c => c.status === 'approved');
 
     return (
         <div className="space-y-6">
@@ -231,15 +234,24 @@ export default function DirectorRevenue() {
                             <h3 className="text-4xl font-extrabold text-primary mb-1">KES {accumulatedRevenue.toLocaleString()}</h3>
                             <p className="text-base text-muted-foreground font-semibold mb-6">Unclaimed Branch Revenue</p>
                             <div className="w-full max-w-sm">
-                                <Button
-                                    className="w-full h-14 text-lg font-bold shadow-md hover:shadow-lg transition-all"
-                                    disabled={claiming || availableToClaim <= 0}
-                                    onClick={handleSubmitClaim}
-                                >
-                                    {claiming ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CheckCircle2 className="mr-2 h-5 w-5" />}
-                                    {availableToClaim > 0 ? `Submit Claim (KES ${availableToClaim.toLocaleString()})` : 'All Revenue Claimed'}
-                                </Button>
-                                {availableToClaim < accumulatedRevenue && accumulatedRevenue > 0 && (
+                                {hasApprovedClaim ? (
+                                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl flex flex-col items-center gap-2 text-blue-700">
+                                        <Clock className="h-6 w-6 animate-pulse" />
+                                        <span className="font-bold text-center">Approved, waiting for payment</span>
+                                        <p className="text-[10px] text-center opacity-80">Finance is currently processing your payout.</p>
+                                    </div>
+                                ) : (
+                                    <Button
+                                        className="w-full h-14 text-lg font-bold shadow-md hover:shadow-lg transition-all"
+                                        disabled={claiming || availableToClaim <= 0}
+                                        onClick={handleSubmitClaim}
+                                    >
+                                        {claiming ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CheckCircle2 className="mr-2 h-5 w-5" />}
+                                        {availableToClaim > 0 ? `Submit Claim (KES ${availableToClaim.toLocaleString()})` : 'All Revenue Claimed'}
+                                    </Button>
+                                )}
+                                
+                                {availableToClaim < accumulatedRevenue && accumulatedRevenue > 0 && !hasApprovedClaim && (
                                     <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-lg">
                                         <p className="text-xs text-blue-700 text-center font-medium">
                                             KES {(accumulatedRevenue - availableToClaim).toLocaleString()} pending approval
@@ -314,8 +326,12 @@ export default function DirectorRevenue() {
                                         <TableCell>{format(new Date(claim.created_at), 'MMM d, yyyy')}</TableCell>
                                         <TableCell className="font-bold text-blue-700">KES {claim.amount.toLocaleString()}</TableCell>
                                         <TableCell>
-                                            <Badge className={claim.status === 'paid' ? 'bg-green-100 text-green-800' : claim.status === 'pending' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'}>
-                                                {claim.status.toUpperCase()}
+                                            <Badge className={
+                                                claim.status === 'paid' ? 'bg-green-100 text-green-800' : 
+                                                claim.status === 'approved' ? 'bg-blue-100 text-blue-800' : 
+                                                'bg-amber-100 text-amber-800'
+                                            }>
+                                                {claim.status === 'approved' ? 'APPROVED (WAITING FOR PAYMENT)' : claim.status.toUpperCase()}
                                             </Badge>
                                         </TableCell>
                                         <TableCell>{claim.paid_at ? format(new Date(claim.paid_at), 'MMM d, yyyy') : '-'}</TableCell>

@@ -34,7 +34,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, MoreHorizontal, Edit, Trash2, Fingerprint, Download, Loader2 } from "lucide-react";
+import { Search, Plus, MoreHorizontal, Edit, Trash2, Fingerprint, Download, Loader2, ShieldCheck } from "lucide-react";
 import { BiometricCapture } from "@/components/BiometricCapture";
 import { exportToCsv } from "@/utils/csvExport";
 
@@ -51,14 +51,24 @@ interface Member {
   benefit_limit: number;
   is_active: boolean;
   biometric_data: string | null;
+  branch_id: string | null;
+  membership_category_id: string | null;
   branches: { name: string } | null;
   membership_categories: { id: string; name: string; payment_amount: number; benefit_amount: number } | null;
   created_at: string;
 }
 
+interface Category {
+  id: string;
+  name: string;
+  benefit_amount: number;
+  payment_amount: number;
+}
+
 export default function AdminMembers() {
   const [members, setMembers] = useState<Member[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -73,7 +83,7 @@ export default function AdminMembers() {
     age: "",
     password: "",
     branchId: "",
-    coverageAdjustment: "",
+    membershipCategoryId: "",
   });
   const { toast } = useToast();
 
@@ -83,12 +93,14 @@ export default function AdminMembers() {
 
   const loadData = async () => {
     setLoading(true);
-    const [membersRes, branchesRes] = await Promise.all([
-      supabase.from("members").select("*, branches(name), membership_categories(id, name)").order("created_at", { ascending: false }),
+    const [membersRes, branchesRes, categoriesRes] = await Promise.all([
+      supabase.from("members").select("*, branches(name), membership_categories(*)").order("created_at", { ascending: false }),
       supabase.from("branches").select("id, name").eq("is_active", true),
+      supabase.from("membership_categories").select("id, name, benefit_amount, payment_amount").eq("is_active", true),
     ]);
     if (membersRes.data) setMembers(membersRes.data as any);
     if (branchesRes.data) setBranches(branchesRes.data);
+    if (categoriesRes.data) setCategories(categoriesRes.data);
     setLoading(false);
   };
 
@@ -117,7 +129,7 @@ export default function AdminMembers() {
 
       toast({ title: "Member registered successfully" });
       setDialogOpen(false);
-      setFormData({ fullName: "", email: "", phone: "", idNumber: "", age: "", password: "", branchId: "", coverageAdjustment: "" });
+      setFormData({ fullName: "", email: "", phone: "", idNumber: "", age: "", password: "", branchId: "", membershipCategoryId: "" });
       loadData();
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -130,35 +142,38 @@ export default function AdminMembers() {
     if (!selectedMember) return;
     setLoading(true);
     try {
-      const adjustment = parseFloat(formData.coverageAdjustment);
-      const hasAdjustment = !isNaN(adjustment) && adjustment > 0;
+      const categoryChanged = formData.membershipCategoryId !== selectedMember.membership_category_id;
+      const selectedCategory = categories.find(c => c.id === formData.membershipCategoryId);
 
-      // 1. Update Profile Details & Coverage directly
+      // 1. Prepare updates
       const updates: any = {
         full_name: formData.fullName,
         phone: formData.phone,
         id_number: formData.idNumber,
         age: parseInt(formData.age),
         branch_id: formData.branchId || null,
+        membership_category_id: formData.membershipCategoryId || null,
       };
 
-      if (hasAdjustment) {
-        updates.coverage_balance = (selectedMember.coverage_balance || 0) + adjustment;
-        updates.is_active = true; // Ensure they are marked as covered
+      // 2. If scheme changed, update limits and balance
+      if (categoryChanged && selectedCategory) {
+        updates.benefit_limit = selectedCategory.benefit_amount;
+        updates.coverage_balance = (selectedMember.coverage_balance || 0) + selectedCategory.benefit_amount;
+        updates.is_active = true;
       }
 
       const { error } = await supabase.from("members").update(updates).eq("id", selectedMember.id);
 
       if (error) throw error;
 
-      // 2. Record in payments table for history if adjustment was made
-      if (hasAdjustment) {
+      // 3. Record in payments table if scheme was assigned/changed
+      if (categoryChanged && selectedCategory) {
         const { error: payError } = await supabase.from("payments").insert({
           member_id: selectedMember.id,
-          amount: 0, 
-          coverage_added: adjustment,
+          amount: selectedCategory.payment_amount, 
+          coverage_added: selectedCategory.benefit_amount,
           status: "completed",
-          mpesa_reference: "Admin Adjustment",
+          mpesa_reference: "Admin Scheme Assignment",
           payment_date: new Date().toISOString()
         });
 
@@ -166,10 +181,11 @@ export default function AdminMembers() {
 
         // Log system action
         await supabase.from("system_logs").insert({
-          action: "ADMIN_ADD_COVERAGE",
+          action: "ADMIN_ASSIGN_SCHEME",
           details: {
             member_id: selectedMember.id,
-            amount_added: adjustment,
+            scheme_name: selectedCategory.name,
+            benefit_added: selectedCategory.benefit_amount,
             admin_id: (await supabase.auth.getUser()).data.user?.id
           }
         });
@@ -271,7 +287,7 @@ export default function AdminMembers() {
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => { setSelectedMember(m); setFormData({ ...formData, fullName: m.full_name, phone: m.phone, idNumber: m.id_number, age: m.age?.toString() || "", branchId: m.branch_id || "", coverageAdjustment: "" }); setEditDialogOpen(true); }}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => { setSelectedMember(m); setFormData({ ...formData, fullName: m.full_name, phone: m.phone, idNumber: m.id_number, age: m.age?.toString() || "", branchId: m.branch_id || "", membershipCategoryId: m.membership_category_id || "" }); setEditDialogOpen(true); }}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
                       <DropdownMenuItem onClick={() => { setSelectedMember(m); setBiometricDialogOpen(true); }}><Fingerprint className="mr-2 h-4 w-4" /> Biometric</DropdownMenuItem>
                       <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteMember(m.id)}><Trash2 className="mr-2 h-4 w-4" /> Deactivate</DropdownMenuItem>
                     </DropdownMenuContent>
@@ -292,19 +308,27 @@ export default function AdminMembers() {
             <div className="space-y-2"><Label>ID Number</Label><Input value={formData.idNumber} onChange={e => setFormData({ ...formData, idNumber: e.target.value })} /></div>
             <div className="space-y-2"><Label>Age</Label><Input type="number" value={formData.age} onChange={e => setFormData({ ...formData, age: e.target.value })} /></div>
 
-            <div className="pt-4 border-t">
-              <Label className="text-green-600 font-semibold flex items-center gap-2">
-                <Plus className="h-4 w-4" /> Add Coverage Balance
-              </Label>
-              <div className="text-xs text-muted-foreground mb-2">
-                Enter amount to manually add to the member's coverage balance. This will also activate the account.
+            <div className="pt-4 border-t space-y-4">
+              <div className="space-y-2">
+                <Label className="text-primary font-semibold flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4" /> Membership Scheme
+                </Label>
+                <Select value={formData.membershipCategoryId} onValueChange={v => setFormData({ ...formData, membershipCategoryId: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a scheme to activate/upgrade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map(cat => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.name} (Benefit: KES {cat.benefit_amount.toLocaleString()})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[10px] text-muted-foreground">
+                  Changing the scheme will add the new benefit amount to the member's balance and activate their account.
+                </p>
               </div>
-              <Input
-                type="number"
-                placeholder="e.g. 5000"
-                value={formData.coverageAdjustment}
-                onChange={e => setFormData({ ...formData, coverageAdjustment: e.target.value })}
-              />
             </div>
             <Button onClick={handleEditMember} className="btn-primary" disabled={loading}>
               {loading ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : "Update Member"}

@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 
 interface MemberLayoutProps {
-  children?: ReactNode; // Children is optional when using Outlet
+  children?: ReactNode;
 }
 
 interface MemberInfo {
@@ -22,19 +22,29 @@ export function MemberLayout({ children }: MemberLayoutProps) {
   const { toast } = useToast();
 
   useEffect(() => {
-    checkAuth();
+    checkAuthAndMaintenance();
   }, []);
 
-  const checkAuth = async () => {
-    setLoading(true); // Ensure loading starts
+  const checkAuthAndMaintenance = async () => {
+    setLoading(true);
+    
+    // 1. Check Maintenance Mode
+    const { data: maintenanceData } = await supabase
+      .from("system_settings")
+      .select("value")
+      .eq("key", "maintenance_mode")
+      .maybeSingle();
+
+    const isMaintenance = maintenanceData?.value === "true";
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       navigate("/login");
-      setLoading(false); // IMPORTANT: Set loading to false here
+      setLoading(false);
       return;
     }
 
-    // First check if user has a role
+    // 2. Check Role
     const { data: roleData, error: roleError } = await supabase
       .from("user_roles")
       .select("role")
@@ -42,46 +52,27 @@ export function MemberLayout({ children }: MemberLayoutProps) {
       .maybeSingle();
 
     if (roleError) {
-      toast({
-        title: "Error fetching role",
-        description: roleError.message,
-        variant: "destructive",
-      });
+      toast({ title: "Error fetching role", description: roleError.message, variant: "destructive" });
       navigate("/");
       setLoading(false);
       return;
     }
 
-    // If user is staff (not member or admin), redirect to staff portal
-    if (roleData?.role === "staff") {
-      navigate("/staff"); // Assuming /staff is a valid route for generic staff
+    // If maintenance is ON and user is NOT admin/super_admin, redirect to maintenance page
+    if (isMaintenance && roleData?.role !== "admin" && roleData?.role !== "super_admin") {
+      navigate("/maintenance");
       setLoading(false);
       return;
     }
-    // Also check for other specific roles that are not 'member' or 'admin'
-    if (roleData?.role === "receptionist") {
-        navigate("/reception");
-        setLoading(false);
-        return;
-    }
-    if (roleData?.role === "doctor") {
-        navigate("/doctor");
-        setLoading(false);
-        return;
-    }
-    if (roleData?.role === "branch_director") {
-        navigate("/director");
-        setLoading(false);
-        return;
-    }
-    if (roleData?.role === "marketer") {
-        navigate("/marketer");
-        setLoading(false);
-        return;
-    }
 
+    // Role-based redirects for non-members
+    if (roleData?.role === "receptionist") { navigate("/reception"); setLoading(false); return; }
+    if (roleData?.role === "doctor") { navigate("/doctor"); setLoading(false); return; }
+    if (roleData?.role === "branch_director") { navigate("/director"); setLoading(false); return; }
+    if (roleData?.role === "marketer") { navigate("/marketer"); setLoading(false); return; }
+    if (roleData?.role === "finance") { navigate("/finance"); setLoading(false); return; }
 
-    // Check if user exists in members table (primary authorization)
+    // 3. Load Member Details
     const { data: memberDetails, error: memberError } = await supabase
       .from("members")
       .select("full_name")
@@ -89,22 +80,13 @@ export function MemberLayout({ children }: MemberLayoutProps) {
       .maybeSingle();
 
     if (memberError) {
-      toast({
-        title: "Error loading member details",
-        description: memberError.message,
-        variant: "destructive",
-      });
+      toast({ title: "Error loading member details", description: memberError.message, variant: "destructive" });
       setLoading(false);
       return;
     }
 
-    // User must either be in members table OR have admin role
-    if (!memberDetails && roleData?.role !== "admin") {
-      toast({
-        title: "Access denied",
-        description: "You don't have member privileges",
-        variant: "destructive",
-      });
+    if (!memberDetails && roleData?.role !== "admin" && roleData?.role !== "super_admin") {
+      toast({ title: "Access denied", description: "You don't have member privileges", variant: "destructive" });
       navigate("/");
       setLoading(false);
       return;
@@ -115,17 +97,9 @@ export function MemberLayout({ children }: MemberLayoutProps) {
     setLoading(false);
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+  if (loading) return <div className="min-h-screen bg-background flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
-  if (!authorized) {
-    return null;
-  }
+  if (!authorized) return null;
 
   return (
     <SidebarProvider>
@@ -141,7 +115,7 @@ export function MemberLayout({ children }: MemberLayoutProps) {
             )}
           </header>
           <main className="p-6">
-            {children || <Outlet />} {/* Render children or nested routes */}
+            {children || <Outlet />}
           </main>
         </SidebarInset>
       </div>

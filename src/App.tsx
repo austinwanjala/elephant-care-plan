@@ -13,6 +13,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import UpdatePassword from "./pages/UpdatePassword";
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
+import Maintenance from "./pages/Maintenance";
 
 // Layouts
 import { MemberLayout } from "./components/member/MemberLayout";
@@ -91,6 +92,7 @@ const App = () => (
           <Route path="/update-password" element={<UpdatePassword />} />
           <Route path="/terms-of-service" element={<TermsOfService />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/maintenance" element={<Maintenance />} />
 
           {/* Member Routes */}
           <Route path="/dashboard" element={<MemberLayout />}>

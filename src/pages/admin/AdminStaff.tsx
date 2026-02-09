@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, Trash2, Download, Loader2, Edit } from "lucide-react";
+import { Plus, MoreHorizontal, Trash2, Download, Loader2, Edit, ShieldAlert } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { exportToCsv } from "@/utils/csvExport";
@@ -194,7 +194,7 @@ export default function AdminStaff() {
   };
 
   const handleExport = () => {
-    const dataToExport = users.map(u => ({
+    const dataToExport = filteredUsers.map(u => ({
       "Full Name": u.full_name,
       "Email": u.email || "",
       "Phone": u.phone || "",
@@ -206,6 +206,12 @@ export default function AdminStaff() {
   };
 
   const isSuperAdmin = currentUserRole === 'super_admin';
+
+  // Filter out Super Admins if the current user is just an Admin
+  const filteredUsers = users.filter(u => {
+    if (isSuperAdmin) return true;
+    return u.displayRole !== 'super_admin';
+  });
 
   return (
     <div className="space-y-6">
@@ -346,17 +352,20 @@ export default function AdminStaff() {
           <TableBody>
             {loading && users.length === 0 ? (
               <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground">Refreshing staff records...</TableCell></TableRow>
-            ) : users.length === 0 ? (
+            ) : filteredUsers.length === 0 ? (
               <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground">No staff members found. Create your first portal user above.</TableCell></TableRow>
             ) : (
-              users.map((u) => (
+              filteredUsers.map((u) => (
                 <TableRow key={u.user_id}>
                   <TableCell>
-                    <div className="font-bold text-slate-900">{u.full_name}</div>
+                    <div className="font-bold text-slate-900 flex items-center gap-2">
+                      {u.full_name}
+                      {u.displayRole === 'super_admin' && <ShieldAlert className="h-3 w-3 text-red-600" />}
+                    </div>
                     <div className="text-xs text-muted-foreground">{u.email || u.phone}</div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className="capitalize bg-blue-50 text-blue-700 border-blue-200">
+                    <Badge variant="outline" className={`capitalize ${u.displayRole === 'super_admin' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
                       {u.displayRole.replace('_', ' ')}
                     </Badge>
                   </TableCell>
@@ -372,6 +381,7 @@ export default function AdminStaff() {
                       <Switch
                         checked={u.is_active}
                         onCheckedChange={() => handleToggleActive(u.user_id, u.type, u.is_active)}
+                        disabled={!isSuperAdmin && u.displayRole === 'admin'} // Regular admins can't deactivate other admins
                       />
                       <span className={`text-xs font-medium ${u.is_active ? 'text-green-600' : 'text-slate-400'}`}>
                         {u.is_active ? 'Active' : 'Paused'}

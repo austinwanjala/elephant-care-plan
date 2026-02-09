@@ -6,11 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Plus, MoreHorizontal, Trash2, Download, Loader2, Edit } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { exportToCsv } from "@/utils/csvExport";
 
@@ -127,7 +127,7 @@ export default function AdminStaff() {
         throw new Error("Email, Password and Full Name are required.");
       }
 
-      const { error } = await supabase.functions.invoke("admin-create-user", {
+      const { data, error } = await supabase.functions.invoke("admin-create-user", {
         body: {
           email: formData.email,
           password: formData.password,
@@ -143,7 +143,10 @@ export default function AdminStaff() {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        const errorData = await error.context?.json().catch(() => ({}));
+        throw new Error(errorData?.error || error.message);
+      }
 
       toast({
         title: "Account Created",
@@ -224,7 +227,7 @@ export default function AdminStaff() {
             <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle className="font-serif text-xl">Create Portal Access</DialogTitle>
-                <CardDescription>All fields marked with * are required.</CardDescription>
+                <DialogDescription>All fields marked with * are required.</DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="space-y-2">

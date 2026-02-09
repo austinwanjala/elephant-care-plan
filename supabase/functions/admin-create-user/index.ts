@@ -29,22 +29,27 @@ serve(async (req) => {
       throw new Error("Email and password are required");
     }
 
+    console.log(`[admin-create-user] Creating user: ${email} with role: ${metadata?.role}`);
+
     // Create the user using the Admin API
-    // This bypasses IP-based rate limits and email confirmation if email_confirm is set
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      email_confirm: true, // Auto-confirm user
+      email_confirm: true,
       user_metadata: metadata,
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error("[admin-create-user] Auth Error:", error.message);
+      throw error;
+    }
 
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
-  } catch (error) {
+  } catch (error: any) {
+    console.error("[admin-create-user] Fatal Error:", error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 400,

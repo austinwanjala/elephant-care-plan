@@ -6,7 +6,7 @@ const corsHeaders = {
 };
 
 interface SmsPayload {
-    type: 'welcome' | 'payment_confirmation' | 'billing_completion' | 'low_balance' | 'payment_failed' | 'otp';
+    type: 'welcome' | 'payment_confirmation' | 'billing_completion' | 'low_balance' | 'payment_failed' | 'otp' | 'appointment_booked' | 'appointment_reminder' | 'appointment_cancelled' | 'appointment_rescheduled';
     phone: string;
     email?: string;
     data: any;
@@ -57,6 +57,22 @@ serve(async (req) => {
             case 'billing_completion':
                 message = `Your visit has been processed. Ksh ${data.benefit_cost} has been deducted from your coverage. Remaining balance: Ksh ${data.balance}.`;
                 subject = "Visit Processed - Billing Summary";
+                break;
+            case 'appointment_booked':
+                message = `Appointment Confirmed: You are booked with ${data.doctor_name} at ${data.branch_name} on ${data.date} at ${data.time}. Please arrive 10 min early.`;
+                subject = "Appointment Confirmation - Elephant Dental";
+                break;
+            case 'appointment_reminder':
+                message = `Reminder: You have an appointment with ${data.doctor_name} at ${data.branch_name} tomorrow, ${data.date} at ${data.time}.`;
+                subject = "Appointment Reminder - Elephant Dental";
+                break;
+            case 'appointment_cancelled':
+                message = `Your appointment on ${data.date} with ${data.doctor_name} has been cancelled. Please contact us to reschedule.`;
+                subject = "Appointment Cancelled - Elephant Dental";
+                break;
+            case 'appointment_rescheduled':
+                message = `Your appointment has been rescheduled to ${data.date} at ${data.time} with ${data.doctor_name}.`;
+                subject = "Appointment Rescheduled - Elephant Dental";
                 break;
             default:
                 message = `Notification from Elephant Dental: ${JSON.stringify(data)}`;

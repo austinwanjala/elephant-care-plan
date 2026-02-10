@@ -44,6 +44,7 @@ import ReceptionSearchMember from "./pages/reception/SearchMember";
 // Doctor Pages
 import DoctorDashboard from "./pages/doctor/Dashboard";
 import DoctorQueue from "./pages/doctor/Queue";
+import DoctorSchedule from "./pages/doctor/DoctorSchedule";
 import Consultation from "./pages/doctor/Consultation";
 import DoctorPatientHistory from "./pages/doctor/PatientHistory";
 
@@ -70,6 +71,7 @@ import AdminServices from "./pages/admin/AdminServices";
 import AdminBranchPayments from "./pages/admin/AdminBranchPayments";
 import AdminMarketerClaims from "./pages/admin/AdminMarketerClaims";
 import AdminCommissionSettings from "./pages/admin/AdminCommissionSettings";
+import AppointmentSettings from "./pages/admin/AppointmentSettings";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminMembershipCategories from "./pages/admin/AdminMembershipCategories";
 import AdminLogs from "./pages/admin/AdminLogs";
@@ -127,6 +129,7 @@ const App = () => (
           <Route path="/doctor" element={<DoctorLayout />}>
             <Route index element={<DoctorDashboard />} />
             <Route path="queue" element={<DoctorQueue />} />
+            <Route path="schedule" element={<DoctorSchedule />} />
             <Route path="consultation/:visitId" element={<Consultation />} />
             <Route path="history" element={<DoctorPatientHistory />} />
           </Route>
@@ -159,6 +162,7 @@ const App = () => (
             <Route path="branch-payments" element={<AdminBranchPayments />} />
             <Route path="marketer-claims" element={<AdminMarketerClaims />} />
             <Route path="commission-settings" element={<AdminCommissionSettings />} />
+            <Route path="appointment-settings" element={<AppointmentSettings />} />
             <Route path="settings" element={<AdminSettings />} />
             <Route path="membership-categories" element={<AdminMembershipCategories />} />
             <Route path="logs" element={<AdminLogs />} />

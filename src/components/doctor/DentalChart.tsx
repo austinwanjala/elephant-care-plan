@@ -92,17 +92,17 @@ export function DentalChart({ onToothClick, selectedTeeth, toothStatus, isChild 
                     <div className="w-3 h-3 bg-red-400 rounded-full"></div>
                     <span className="text-red-700">Decay</span>
                 </div>
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-cyan-50 border border-cyan-100">
+                    <div className="w-3 h-3 bg-cyan-400 rounded-full"></div>
+                    <span className="text-cyan-700">Planned</span>
+                </div>
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-100">
                     <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
-                    <span className="text-blue-700">Planned</span>
+                    <span className="text-blue-700">Completed</span>
                 </div>
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 border border-green-100">
-                    <div className="w-3 h-3 bg-green-400 rounded-full"></div>
-                    <span className="text-green-700">Completed</span>
-                </div>
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20">
-                    <div className="w-3 h-3 bg-primary rounded-full"></div>
-                    <span className="text-primary">Selected</span>
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-50 border border-orange-200">
+                    <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                    <span className="text-orange-700">Selected</span>
                 </div>
             </div>
         </div>
@@ -143,9 +143,9 @@ function Tooth({ id, isSelected, status, onClick, isLower, imageSrc }: ToothProp
 
     let colorClass = "fill-white stroke-slate-300 hover:stroke-slate-500";
     if (status === 'decay') colorClass = "fill-red-100 stroke-red-500";
-    if (status === 'planned') colorClass = "fill-blue-100 stroke-blue-500";
-    if (status === 'completed') colorClass = "fill-green-100 stroke-green-500";
-    if (isSelected) colorClass = "fill-primary stroke-primary-foreground";
+    if (status === 'planned') colorClass = "fill-cyan-100 stroke-cyan-500";
+    if (status === 'completed') colorClass = "fill-blue-100 stroke-blue-500";
+    if (isSelected) colorClass = "fill-orange-100 stroke-orange-500";
 
     // For images, we might want different overlay/border styles when selected
     const imageContainerClass = cn(
@@ -161,7 +161,7 @@ function Tooth({ id, isSelected, status, onClick, isLower, imageSrc }: ToothProp
                 !imageSrc && (isSelected ? "scale-110 z-10" : "hover:-translate-y-1")
             )}
         >
-            {!isLower && <span className={cn("text-[8px] font-bold mb-1", isSelected ? "text-primary" : "text-slate-400")}>{id}</span>}
+            {!isLower && <span className={cn("text-[8px] font-bold mb-1", isSelected ? "text-orange-600" : "text-slate-400")}>{id}</span>}
 
             {imageSrc ? (
                 <div className={imageContainerClass}>
@@ -173,9 +173,9 @@ function Tooth({ id, isSelected, status, onClick, isLower, imageSrc }: ToothProp
                             // Apply filters based on status? Or just borders?
                             // For now, let's use borders/overlays for status on images
                             status === 'decay' && "drop-shadow-[0_0_2px_rgba(239,68,68,0.8)]",
-                            status === 'planned' && "drop-shadow-[0_0_2px_rgba(59,130,246,0.8)]",
-                            status === 'completed' && "drop-shadow-[0_0_2px_rgba(34,197,94,0.8)]",
-                            isSelected && "drop-shadow-[0_0_4px_rgba(var(--primary),0.8)]"
+                            status === 'planned' && "drop-shadow-[0_0_2px_rgba(6,182,212,0.8)]",
+                            status === 'completed' && "drop-shadow-[0_0_2px_rgba(59,130,246,0.8)]",
+                            isSelected && "drop-shadow-[0_0_4px_rgba(249,115,22,0.9)]"
                         )}
                     />
                     {/* Status Overlays for images if needed */}
@@ -183,8 +183,8 @@ function Tooth({ id, isSelected, status, onClick, isLower, imageSrc }: ToothProp
                         <div className={cn(
                             "absolute inset-0 opacity-20 rounded-sm",
                             status === 'decay' && "bg-red-500",
-                            status === 'planned' && "bg-blue-500",
-                            status === 'completed' && "bg-green-500",
+                            status === 'planned' && "bg-cyan-500",
+                            status === 'completed' && "bg-blue-500",
                         )} />
                     )}
                 </div>
@@ -194,7 +194,7 @@ function Tooth({ id, isSelected, status, onClick, isLower, imageSrc }: ToothProp
                 </svg>
             )}
 
-            {isLower && <span className={cn("text-[8px] font-bold mt-1", isSelected ? "text-primary" : "text-slate-400")}>{id}</span>}
+            {isLower && <span className={cn("text-[8px] font-bold mt-1", isSelected ? "text-orange-600" : "text-slate-400")}>{id}</span>}
         </div>
     );
 }

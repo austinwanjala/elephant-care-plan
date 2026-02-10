@@ -8,10 +8,10 @@ import {
   LayoutDashboard,
   LogOut,
   Settings,
-  History,
   DollarSign,
   ClipboardList,
   FileText,
+  ShieldCheck,
 } from "lucide-react";
 import {
   Sidebar,
@@ -72,6 +72,14 @@ export function AdminSidebar() {
     { title: "Membership Categories", url: `${basePath}/membership-categories`, icon: Users },
     { title: "Commission Rates", url: `${basePath}/commission-settings`, icon: DollarSign },
   ];
+
+  if (roleLabel === "Super Admin") {
+    settingsMenuItems.push({
+      title: "Role Permissions",
+      url: `${basePath}/permissions`,
+      icon: ShieldCheck,
+    });
+  }
 
   useEffect(() => {
     const fetchPendingClaims = async () => {

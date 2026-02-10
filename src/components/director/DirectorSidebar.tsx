@@ -1,14 +1,15 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { useSidebar, Sidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { BarChart3, TrendingUp, Users, LogOut, LayoutDashboard, Building2, FileText, DollarSign, Stethoscope } from "lucide-react";
+import { BarChart3, TrendingUp, Users, LogOut, LayoutDashboard, Building2, FileText, DollarSign, Stethoscope, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 const menuItems = [
-  { title: "Dashboard", url: "/director", icon: LayoutDashboard },
-  { title: "Revenue", url: "/director/revenue", icon: DollarSign },
-  { title: "Doctor Performance", url: "/director/performance", icon: Stethoscope },
-  { title: "Branch Reports", url: "/director/reports", icon: FileText },
+    { title: "Dashboard", url: "/director", icon: LayoutDashboard },
+    { title: "Approvals", url: "/director/appointments", icon: CheckCircle2 },
+    { title: "Revenue", url: "/director/revenue", icon: DollarSign },
+    { title: "Doctor Performance", url: "/director/performance", icon: Stethoscope },
+    { title: "Branch Reports", url: "/director/reports", icon: FileText },
 ];
 
 export function DirectorSidebar() {

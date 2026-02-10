@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Calendar, Clock, MapPin, User, Plus } from "lucide-react";
 import { format } from "date-fns";
 import BookingWizard from "@/components/member/appointments/BookingWizard";
+import { RescheduleDialog } from "@/components/member/appointments/RescheduleDialog";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
@@ -32,13 +33,11 @@ const MemberAppointments = () => {
                 .from("appointments")
                 .select(`
           *,
-          doctor:staff(first_name, last_name),
+          doctor:staff(full_name),
           branch:branches(name),
-          dependants(first_name, last_name)
+          dependants(full_name)
         `)
-                .eq("member_id", member.id) // This assumes appointments are linked to the principal member ID even for dependants? 
-                // Or if appointment has a dependant_id, we should also check that.
-                // RLS should handle visibility ideally.
+                .eq("member_id", member.id)
                 .order("appointment_date", { ascending: true });
 
             if (error) throw error;
@@ -75,6 +74,8 @@ const MemberAppointments = () => {
 
     const upcomingAppointments = appointments?.filter(a => new Date(a.appointment_date) >= new Date().setHours(0, 0, 0, 0)) || [];
     const pastAppointments = appointments?.filter(a => new Date(a.appointment_date) < new Date().setHours(0, 0, 0, 0)) || [];
+
+    const [rescheduleData, setRescheduleData] = useState<any>(null); // Appointment object to reschedule
 
     return (
         <div className="space-y-6">
@@ -122,7 +123,7 @@ const MemberAppointments = () => {
                                             <div className="flex items-center gap-2">
                                                 <h4 className="font-semibold text-lg">
                                                     {appt.dependants
-                                                        ? `${appt.dependants.first_name} ${appt.dependants.last_name}`
+                                                        ? appt.dependants.full_name
                                                         : "Self"}
                                                 </h4>
                                                 <Badge variant="outline" className={getStatusColor(appt.status)}>
@@ -136,20 +137,20 @@ const MemberAppointments = () => {
                                                 </div>
                                                 <div className="flex items-center gap-1">
                                                     <Clock className="h-4 w-4" />
-                                                    {appt.start_time.slice(0, 5)}
+                                                    {appt.start_time?.slice(0, 5)}
                                                 </div>
                                                 <div className="flex items-center gap-1">
                                                     <MapPin className="h-4 w-4" />
-                                                    {appt.branch.name}
+                                                    {appt.branch?.name}
                                                 </div>
                                                 <div className="flex items-center gap-1">
                                                     <User className="h-4 w-4" />
-                                                    Dr. {appt.doctor.first_name} {appt.doctor.last_name}
+                                                    Dr. {appt.doctor?.full_name}
                                                 </div>
                                             </div>
                                         </div>
                                         <div className="flex gap-2">
-                                            <Button variant="outline" size="sm" onClick={() => toast.info("To reschedule, please cancel and book a new appointment.")}>Reschedule</Button>
+                                            <Button variant="outline" size="sm" onClick={() => setRescheduleData(appt)}>Reschedule</Button>
                                             <Button
                                                 variant="destructive"
                                                 size="sm"
@@ -186,7 +187,7 @@ const MemberAppointments = () => {
                                             <div className="flex items-center gap-2">
                                                 <h4 className="font-semibold">
                                                     {appt.dependants
-                                                        ? `${appt.dependants.first_name} ${appt.dependants.last_name}`
+                                                        ? appt.dependants.full_name
                                                         : "Self"}
                                                 </h4>
                                                 <Badge variant="outline" className="bg-gray-200">
@@ -195,8 +196,8 @@ const MemberAppointments = () => {
                                             </div>
                                             <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                                                 <span>{format(new Date(appt.appointment_date), "MMM do, yyyy")}</span>
-                                                <span>{appt.branch.name}</span>
-                                                <span>Dr. {appt.doctor.first_name} {appt.doctor.last_name}</span>
+                                                <span>{appt.branch?.name}</span>
+                                                <span>Dr. {appt.doctor?.full_name}</span>
                                             </div>
                                         </div>
                                     </CardContent>
@@ -205,6 +206,14 @@ const MemberAppointments = () => {
                         </div>
                     )}
                 </TabsContent>
+
+                {rescheduleData && (
+                    <RescheduleDialog
+                        open={!!rescheduleData}
+                        onOpenChange={(open) => !open && setRescheduleData(null)}
+                        appointment={rescheduleData}
+                    />
+                )}
             </Tabs>
         </div>
     );

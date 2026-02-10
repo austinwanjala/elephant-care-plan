@@ -62,12 +62,9 @@ const DoctorScheduleManager = () => {
 
             const { data, error } = await supabase
                 .from("staff")
-                .select("id, first_name, last_name")
+                .select("id, full_name")
                 .eq("branch_id", selectedBranchId)
-                .in("user_id", doctorIds); // Checking user_id might be wrong if staff table uses same ID as auth. 
-            // Let's check schema. staff.id is likely different from auth.uid. 
-            // user_roles links user_id (auth). staff links user_id (auth).
-            // So we filter staff where user_id is in doctorIds.
+                .in("user_id", doctorIds);
 
             if (error) throw error;
             return data;
@@ -187,7 +184,7 @@ const DoctorScheduleManager = () => {
                         </SelectTrigger>
                         <SelectContent>
                             {doctors?.map(d => (
-                                <SelectItem key={d.id} value={d.id}>Dr. {d.first_name} {d.last_name}</SelectItem>
+                                <SelectItem key={d.id} value={d.id}>Dr. {d.full_name}</SelectItem>
                             ))}
                         </SelectContent>
                     </Select>

@@ -41,6 +41,7 @@ const DoctorSchedule = () => {
                 `)
                 .eq("doctor_id", doctorId)
                 .eq("appointment_date", formattedDate)
+                .neq("status", "pending") // Doctor only sees approved (confirmed) or processed appointments
                 .order("start_time", { ascending: true });
 
             if (error) throw error;
@@ -68,8 +69,8 @@ const DoctorSchedule = () => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-                <div className="md:col-span-4 lg:col-span-3">
+            <div className="flex flex-col lg:flex-row gap-6">
+                <div className="w-full lg:w-80 shrink-0 space-y-4">
                     <Card>
                         <CardHeader>
                             <CardTitle>Select Date</CardTitle>
@@ -79,13 +80,13 @@ const DoctorSchedule = () => {
                                 mode="single"
                                 selected={date}
                                 onSelect={setDate}
-                                className="rounded-md border shadow-sm"
+                                className="rounded-md border shadow-sm w-full"
                             />
                         </CardContent>
                     </Card>
                 </div>
 
-                <div className="md:col-span-8 lg:col-span-9">
+                <div className="flex-1 min-w-0">
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">

@@ -50,6 +50,8 @@ import DoctorSchedule from "./pages/doctor/DoctorSchedule";
 import Consultation from "./pages/doctor/Consultation";
 import DoctorPatientHistory from "./pages/doctor/PatientHistory";
 
+import DirectorAppointments from "./pages/director/Appointments";
+
 // Director Pages
 import DirectorDashboard from "./pages/director/Dashboard";
 import DirectorRevenue from "./pages/director/Revenue";
@@ -141,6 +143,7 @@ const App = () => (
           {/* Branch Director Routes */}
           <Route path="/director" element={<DirectorLayout />}>
             <Route index element={<DirectorDashboard />} />
+            <Route path="appointments" element={<DirectorAppointments />} />
             <Route path="revenue" element={<DirectorRevenue />} />
             <Route path="performance" element={<DirectorPerformance />} />
             <Route path="reports" element={<DirectorReports />} />
@@ -183,6 +186,7 @@ const App = () => (
             <Route path="branch-payments" element={<AdminBranchPayments />} />
             <Route path="marketer-claims" element={<AdminMarketerClaims />} />
             <Route path="commission-settings" element={<AdminCommissionSettings />} />
+            <Route path="appointment-settings" element={<AppointmentSettings />} />
             <Route path="settings" element={<AdminSettings />} />
             <Route path="membership-categories" element={<AdminMembershipCategories />} />
             <Route path="logs" element={<AdminLogs />} />

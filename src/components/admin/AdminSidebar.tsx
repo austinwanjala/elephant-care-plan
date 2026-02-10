@@ -77,6 +77,7 @@ export function AdminSidebar() {
 
   const settingsMenuItems = [
     { title: "General Settings", url: `${basePath}/settings`, icon: Settings },
+    { title: "Appointment Settings", url: `${basePath}/appointment-settings`, icon: ClipboardList },
     { title: "Membership Categories", url: `${basePath}/membership-categories`, icon: Users },
     { title: "Commission Rates", url: `${basePath}/commission-settings`, icon: DollarSign },
   ];

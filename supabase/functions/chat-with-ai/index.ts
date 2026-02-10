@@ -56,13 +56,15 @@ If the user asks something outside this scope, politely say you can only answer 
 
         // If no OpenAI key, return mock response
         if (!openAiKey) {
-            console.log("No OPENAI_API_KEY found. Returning mock response.");
+            console.log("No OPENAI_API_KEY found in environment variables.");
             return new Response(JSON.stringify({
                 reply: "I'm currently running in demo mode (no API key set). Here is a sample response: 'Our plans range from Level 1 to Level 5, offering coverage up to KES 100,000.'"
             }), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
         }
+
+        console.log(`OpenAI Key found. Length: ${openAiKey.length}`);
 
         // Call OpenAI
         const openAiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -80,6 +82,12 @@ If the user asks something outside this scope, politely say you can only answer 
                 temperature: 0.7,
             }),
         });
+
+        if (!openAiResponse.ok) {
+            const errText = await openAiResponse.text();
+            console.error("OpenAI API Error:", errText);
+            throw new Error(`OpenAI API Error: ${openAiResponse.status} ${openAiResponse.statusText}`);
+        }
 
         const aiData = await openAiResponse.json();
 

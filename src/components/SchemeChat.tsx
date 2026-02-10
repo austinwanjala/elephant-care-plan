@@ -41,12 +41,25 @@ export function SchemeChat() {
                 body: { query: userMessage }
             });
 
-            if (error) throw error;
+            if (error) {
+                let errorMessage = "Sorry, I'm having trouble connecting to the server.";
+                try {
+                    // Attempt to parse structured error from Edge Function
+                    const errorBody = await error.context.json();
+                    if (errorBody && errorBody.error) {
+                        errorMessage = `Error: ${errorBody.error}`;
+                    }
+                } catch (e) {
+                    // Fallback to error message string
+                    errorMessage = `Error: ${error.message}`;
+                }
+                throw new Error(errorMessage);
+            }
 
             setMessages(prev => [...prev, { role: "assistant", content: data.reply || "I'm sorry, I couldn't process that request." }]);
-        } catch (error) {
+        } catch (error: any) {
             console.error("Chat error:", error);
-            setMessages(prev => [...prev, { role: "assistant", content: "Sorry, I'm having trouble connecting to the server. Please try again later." }]);
+            setMessages(prev => [...prev, { role: "assistant", content: error.message || "Sorry, an unexpected error occurred." }]);
         } finally {
             setIsLoading(false);
         }

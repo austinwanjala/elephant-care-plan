@@ -9,15 +9,34 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
+import { useNavigate } from "react-router-dom";
+import { usePermissions } from "@/hooks/usePermissions";
+
 export default function AdminLogs() {
     const [logs, setLogs] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const { toast } = useToast();
 
+    const { hasPermission, loading: permsLoading } = usePermissions();
+    const navigate = useNavigate();
+
     useEffect(() => {
-        fetchLogs();
-    }, []);
+        if (!permsLoading && !hasPermission('audit_logs', 'view')) {
+            // Double check super admin via role logic or assume hasPermission covers it if super_admin is granted everything
+            // For now, let's rely on hasPermission which should be true for super_admin if seeded correctly
+            // But let's be safe and check if it's strictly denied
+        }
+    }, [permsLoading, hasPermission]);
+
+    useEffect(() => {
+        if (!permsLoading && !hasPermission('audit_logs', 'view')) {
+            toast({ title: "Access Denied", description: "You do not have permission to view audit logs.", variant: "destructive" });
+            navigate("/admin");
+        } else if (!permsLoading) {
+            fetchLogs();
+        }
+    }, [permsLoading, hasPermission]);
 
     const fetchLogs = async () => {
         setLoading(true);
@@ -35,66 +54,7 @@ export default function AdminLogs() {
         setLoading(false);
     };
 
-    const handleSimulateCallback = async () => {
-        // 1. Find the most recent pending payment
-        const { data: pendingPayment } = await supabase
-            .from('payments')
-            .select('mpesa_checkout_request_id, amount, phone_used')
-            .eq('status', 'pending')
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
 
-        if (!pendingPayment || !pendingPayment.mpesa_checkout_request_id) {
-            toast({
-                title: "No Pending Payments",
-                description: "Please initiate a payment from a member account first.",
-                variant: "destructive"
-            });
-            return;
-        }
-
-        const checkoutId = pendingPayment.mpesa_checkout_request_id;
-        const receipt = `RC${Math.floor(Math.random() * 1000000000)}`;
-
-        const payload = {
-            Body: {
-                stkCallback: {
-                    MerchantRequestID: `MR-${checkoutId}`,
-                    CheckoutRequestID: checkoutId,
-                    ResultCode: 0,
-                    ResultDesc: "The service request is processed successfully.",
-                    CallbackMetadata: {
-                        Item: [
-                            { Name: "Amount", Value: pendingPayment.amount },
-                            { Name: "MpesaReceiptNumber", Value: receipt },
-                            { Name: "TransactionDate", Value: format(new Date(), "yyyyMMddHHmmss") },
-                            { Name: "PhoneNumber", Value: pendingPayment.phone_used }
-                        ]
-                    }
-                }
-            }
-        };
-
-        toast({ title: "Simulating...", description: `Processing ID: ${checkoutId}` });
-
-        try {
-            const { data, error: invokeError } = await supabase.functions.invoke('mpesa-callback', {
-                body: payload
-            });
-
-            if (invokeError) {
-                // Try to parse the error from the function response
-                const errorData = await invokeError.context?.json().catch(() => ({}));
-                throw new Error(errorData?.error || invokeError.message);
-            }
-
-            toast({ title: "Success!", description: "Payment verified and database updated." });
-            setTimeout(fetchLogs, 1000);
-        } catch (err: any) {
-            toast({ title: "Simulation Failed", description: err.message, variant: "destructive" });
-        }
-    };
 
     const filteredLogs = logs.filter(log =>
         log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -183,6 +143,6 @@ export default function AdminLogs() {
                     </Table>
                 </CardContent>
             </Card>
-        </div >
+        </div>
     );
 }

@@ -65,7 +65,7 @@ export default function Consultation() {
         setLoading(true);
         const { data, error } = await supabase
             .from("visits")
-            .select("*, members(*), dependants(*)")
+            .select("*, members(*)")
             .eq("id", visitId)
             .single();
 
@@ -349,20 +349,8 @@ export default function Consultation() {
 
     if (loading || !visit || !doctorId || !doctorBranchId) return <div className="p-8 text-center"><Loader2 className="animate-spin h-8 w-8 text-primary mx-auto" /></div>;
 
-    // Determine patient details (Principal or Dependant)
-    const patientName = visit.dependants?.full_name || visit.members.full_name;
-    const patientDob = visit.dependants?.dob || visit.members.dob;
-
-    // Calculate age (approximation)
-    const calculateAge = (dob: string) => {
-        if (!dob) return 0;
-        const diffMs = Date.now() - new Date(dob).getTime();
-        const ageDt = new Date(diffMs);
-        return Math.abs(ageDt.getUTCFullYear() - 1970);
-    };
-
-    const patientAge = calculateAge(patientDob);
-    const isChild = patientAge < 13;
+    // Determine if patient is a child (under 13)
+    const isChild = visit.members?.age && visit.members.age < 13;
 
     return (
         <div className="space-y-6 max-w-7xl mx-auto">
@@ -371,13 +359,8 @@ export default function Consultation() {
                     <ArrowLeft className="h-4 w-4" />
                 </Button>
                 <div>
-                    <h1 className="text-2xl font-bold">Consultation - {patientName} {isChild && <span className="text-sm font-normal text-amber-600 ml-2">(Pediatric)</span>}</h1>
-                    <div className="flex flex-col gap-1">
-                        <p className="text-muted-foreground">Visit #{visitId?.slice(0, 8)} • ID: {visit.dependants?.document_number || visit.members.id_number || 'N/A'} • Age: {patientAge} yrs</p>
-                        {visit.dependants && (
-                            <p className="text-sm text-muted-foreground">Principal Member: <span className="font-medium text-foreground">{visit.members.full_name}</span> ({visit.members.member_number})</p>
-                        )}
-                    </div>
+                    <h1 className="text-2xl font-bold">Consultation - {visit.members.full_name}</h1>
+                    <p className="text-muted-foreground">Visit #{visitId?.slice(0, 8)} • ID: {visit.members.id_number} • Age: {visit.members.age || 'N/A'}</p>
                 </div>
             </div>
 

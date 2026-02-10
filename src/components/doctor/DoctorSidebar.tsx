@@ -3,37 +3,18 @@ import { useSidebar, Sidebar, SidebarHeader, SidebarContent, SidebarGroup, Sideb
 import { Button } from "@/components/ui/button";
 import { Stethoscope, ClipboardList, LogOut, History, LayoutDashboard } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { usePermissions } from "@/hooks/usePermissions";
+
+const menuItems = [
+    { title: "Dashboard", url: "/doctor", icon: LayoutDashboard },
+    { title: "Today's Queue", url: "/doctor/queue", icon: ClipboardList },
+    { title: "Patient History", url: "/doctor/history", icon: History },
+];
 
 export function DoctorSidebar() {
     const { state } = useSidebar();
     const collapsed = state === "collapsed";
     const navigate = useNavigate();
     const location = useLocation();
-    const { hasPermission, loading } = usePermissions();
-
-    const allMenuItems = [
-        {
-            title: "Dashboard",
-            url: "/doctor",
-            icon: LayoutDashboard,
-            show: hasPermission('dashboard', 'view')
-        },
-        {
-            title: "Today's Queue",
-            url: "/doctor/queue",
-            icon: ClipboardList,
-            show: hasPermission('visits', 'view')
-        },
-        {
-            title: "Patient History",
-            url: "/doctor/history",
-            icon: History,
-            show: hasPermission('visits', 'process')
-        },
-    ];
-
-    const menuItems = allMenuItems.filter(item => item.show);
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
@@ -43,18 +24,6 @@ export function DoctorSidebar() {
     const isActive = (path: string) => {
         if (path === "/doctor") return location.pathname === "/doctor";
         return location.pathname.startsWith(path);
-    }
-
-    if (loading) {
-        return (
-            <Sidebar collapsible="icon" className="border-r border-border">
-                <SidebarHeader className="p-4 border-b border-border">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-muted animate-pulse" />
-                    </div>
-                </SidebarHeader>
-            </Sidebar>
-        );
     }
 
     return (

@@ -105,7 +105,7 @@ export default function AdminPermissions() {
 
             // 2. Find removals
             const toRemove = originalRolePermissions.filter(orp =>
-                !rolePermissions.some(rp => rp.role === orp.role && rp.permission_id === rp.permission_id)
+                !rolePermissions.some(rp => rp.role === orp.role && rp.permission_id === orp.permission_id)
             );
 
             if (toAdd.length === 0 && toRemove.length === 0) {
@@ -117,22 +117,41 @@ export default function AdminPermissions() {
             // Execute Updates
             if (toRemove.length > 0) {
                 for (const rp of toRemove) {
-                    await (supabase as any).from("role_permissions").delete().match({ role: rp.role, permission_id: rp.permission_id });
+                    const { error, count } = await (supabase as any)
+                        .from("role_permissions")
+                        .delete({ count: 'exact' })
+                        .match({ role: rp.role, permission_id: rp.permission_id });
+
+                    if (error) {
+                        console.error("Delete error:", error);
+                        throw error;
+                    }
+                    if (count === 0) {
+                        console.warn("Delete affected 0 rows for:", rp);
+                        // RLS might be blocking it, or it doesn't exist
+                    } else {
+                        console.log("Deleted:", rp);
+                    }
                 }
             }
 
             if (toAdd.length > 0) {
                 const { error } = await (supabase as any).from("role_permissions").insert(toAdd);
-                if (error) throw error;
+                if (error) {
+                    console.error("Insert error:", error);
+                    throw error;
+                }
+                console.log("Inserted:", toAdd.length);
             }
 
-            toast({ title: "Permissions Updated", description: "Role capabilities saved successfully." });
+            toast({ title: "Permissions Updated", description: `Saved: -${toRemove.length} / +${toAdd.length} permissions.` });
 
             // Refresh state
-            setOriginalRolePermissions(rolePermissions);
-            setHasChanges(false);
+            // Re-fetch to be sure
+            await loadData();
 
         } catch (error: any) {
+            console.error("Save failed:", error);
             toast({ title: "Save failed", description: error.message, variant: "destructive" });
         } finally {
             setSaving(false);

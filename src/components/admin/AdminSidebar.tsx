@@ -12,7 +12,6 @@ import {
   DollarSign,
   ClipboardList,
   FileText,
-  ShieldAlert,
 } from "lucide-react";
 import {
   Sidebar,
@@ -30,8 +29,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 
-import { usePermissions } from "@/hooks/usePermissions";
-
 export function AdminSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
@@ -40,14 +37,13 @@ export function AdminSidebar() {
   const [pendingClaimsCount, setPendingClaimsCount] = useState(0);
   const [basePath, setBasePath] = useState("/admin");
   const [roleLabel, setRoleLabel] = useState("Admin");
-  const { hasPermission, loading: permsLoading } = usePermissions();
 
   useEffect(() => {
     const checkRole = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data } = await supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
-        if ((data?.role as string) === 'super_admin') {
+        if (data?.role === 'super_admin') {
           setBasePath("/super-admin");
           setRoleLabel("Super Admin");
         } else {
@@ -68,22 +64,14 @@ export function AdminSidebar() {
     { title: "Services", url: `${basePath}/services`, icon: Stethoscope },
     { title: "Branch Payments", url: `${basePath}/branch-payments`, icon: DollarSign },
     { title: "Marketer Claims", url: `${basePath}/marketer-claims`, icon: ClipboardList },
+    { title: "System Logs", url: `${basePath}/logs`, icon: FileText },
   ];
-
-  // Conditionally add System Logs
-  if (hasPermission('audit_logs', 'view') || roleLabel === 'Super Admin') {
-    menuItems.push({ title: "System Logs", url: `${basePath}/logs`, icon: FileText });
-  }
 
   const settingsMenuItems = [
     { title: "General Settings", url: `${basePath}/settings`, icon: Settings },
     { title: "Membership Categories", url: `${basePath}/membership-categories`, icon: Users },
     { title: "Commission Rates", url: `${basePath}/commission-settings`, icon: DollarSign },
   ];
-
-  if (roleLabel === "Super Admin") {
-    settingsMenuItems.push({ title: "Permissions", url: `${basePath}/permissions`, icon: ShieldAlert });
-  }
 
   useEffect(() => {
     const fetchPendingClaims = async () => {

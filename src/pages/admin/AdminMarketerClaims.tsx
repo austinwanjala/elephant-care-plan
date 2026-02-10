@@ -33,7 +33,6 @@ interface MarketerClaim {
     created_at: string;
     paid_at: string | null;
     notes: string | null;
-    paid_by_staff?: { full_name: string };
     marketers: {
         full_name: string;
         code: string;
@@ -58,7 +57,7 @@ export default function AdminMarketerClaims() {
         setLoading(true);
         const { data, error } = await (supabase as any)
             .from("marketer_claims")
-            .select("*, marketers(full_name, code, email), paid_by_staff:paid_by(full_name)")
+            .select("*, marketers(full_name, code, email)")
             .order("created_at", { ascending: false });
 
         if (error) {
@@ -212,14 +211,13 @@ export default function AdminMarketerClaims() {
                                         <TableHead>Marketer</TableHead>
                                         <TableHead>Referrals</TableHead>
                                         <TableHead>Amount</TableHead>
-                                        <TableHead>Paid By</TableHead>
                                         <TableHead>Notes</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {paidClaims.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                                            <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                                                 No paid claims found.
                                             </TableCell>
                                         </TableRow>
@@ -236,9 +234,6 @@ export default function AdminMarketerClaims() {
                                                 <TableCell>{claim.referral_count} members</TableCell>
                                                 <TableCell className="font-bold text-green-700">
                                                     KES {claim.amount.toLocaleString()}
-                                                </TableCell>
-                                                <TableCell className="text-sm text-muted-foreground">
-                                                    {claim.paid_by_staff?.full_name || 'System/Admin'}
                                                 </TableCell>
                                                 <TableCell className="text-sm">{claim.notes || 'N/A'}</TableCell>
                                             </TableRow>

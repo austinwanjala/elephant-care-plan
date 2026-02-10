@@ -177,8 +177,8 @@ const App = () => (
             <Route path="commission-settings" element={<AdminCommissionSettings />} />
             <Route path="settings" element={<AdminSettings />} />
             <Route path="membership-categories" element={<AdminMembershipCategories />} />
-            <Route path="permissions" element={<AdminPermissions />} />
             <Route path="logs" element={<AdminLogs />} />
+            <Route path="permissions" element={<AdminPermissions />} />
           </Route>
 
           {/* Finance Routes */}

@@ -35,49 +35,31 @@ export function DentalChart({ onToothClick, selectedTeeth, toothStatus, isChild 
                         <span>Left</span>
                     </div>
                     <div className="flex justify-center gap-1 sm:gap-2">
-                        {upperJaw.map((id) => {
-                            const lastDigit = id % 10;
-                            let imgSrc = "/img/incisor.png";
-                            if (lastDigit === 3) imgSrc = "/img/canine.png";
-                            else if (lastDigit >= 4 && lastDigit <= 5) imgSrc = "/img/premolar.jpg";
-                            else if (lastDigit >= 6) imgSrc = "/img/molar.png";
-
-                            return (
-                                <Tooth
-                                    key={id}
-                                    id={id}
-                                    isSelected={selectedTeeth.includes(id)}
-                                    status={toothStatus[id]}
-                                    onClick={() => onToothClick(id)}
-                                    imageSrc={imgSrc}
-                                />
-                            );
-                        })}
+                        {upperJaw.map((id) => (
+                            <Tooth 
+                                key={id} 
+                                id={id} 
+                                isSelected={selectedTeeth.includes(id)} 
+                                status={toothStatus[id]} 
+                                onClick={() => onToothClick(id)} 
+                            />
+                        ))}
                     </div>
                 </div>
 
                 {/* Lower Jaw */}
                 <div className="space-y-4 min-w-[600px]">
                     <div className="flex justify-center gap-1 sm:gap-2">
-                        {lowerJaw.map((id) => {
-                            const lastDigit = id % 10;
-                            let imgSrc = "/img/incisor.png";
-                            if (lastDigit === 3) imgSrc = "/img/canine.png";
-                            else if (lastDigit >= 4 && lastDigit <= 5) imgSrc = "/img/premolar.jpg";
-                            else if (lastDigit >= 6) imgSrc = "/img/molar.png";
-
-                            return (
-                                <Tooth
-                                    key={id}
-                                    id={id}
-                                    isSelected={selectedTeeth.includes(id)}
-                                    status={toothStatus[id]}
-                                    onClick={() => onToothClick(id)}
-                                    isLower
-                                    imageSrc={imgSrc}
-                                />
-                            );
-                        })}
+                        {lowerJaw.map((id) => (
+                            <Tooth 
+                                key={id} 
+                                id={id} 
+                                isSelected={selectedTeeth.includes(id)} 
+                                status={toothStatus[id]} 
+                                onClick={() => onToothClick(id)} 
+                                isLower 
+                            />
+                        ))}
                     </div>
                     <div className="flex justify-between px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                         <span>Right</span>
@@ -115,17 +97,16 @@ interface ToothProps {
     status?: string;
     onClick: () => void;
     isLower?: boolean;
-    imageSrc?: string;
 }
 
-function Tooth({ id, isSelected, status, onClick, isLower, imageSrc }: ToothProps) {
+function Tooth({ id, isSelected, status, onClick, isLower }: ToothProps) {
     const lastDigit = id % 10;
     let toothPath = "";
-
-    // Anatomical SVG paths (fallback/others)
+    
+    // Anatomical SVG paths
     if (lastDigit <= 2) { // Incisors
-        toothPath = isLower
-            ? "M4,2 C4,2 2,10 2,15 C2,20 5,22 10,22 C15,22 18,20 18,15 C18,10 16,2 16,2 L4,2"
+        toothPath = isLower 
+            ? "M4,2 C4,2 2,10 2,15 C2,20 5,22 10,22 C15,22 18,20 18,15 C18,10 16,2 16,2 L4,2" 
             : "M2,20 C2,20 4,12 4,7 C4,2 7,0 10,0 C13,0 16,2 16,7 C16,12 18,20 18,20 L2,20";
     } else if (lastDigit === 3) { // Canines
         toothPath = isLower
@@ -147,53 +128,18 @@ function Tooth({ id, isSelected, status, onClick, isLower, imageSrc }: ToothProp
     if (status === 'completed') colorClass = "fill-green-100 stroke-green-500";
     if (isSelected) colorClass = "fill-primary stroke-primary-foreground";
 
-    // For images, we might want different overlay/border styles when selected
-    const imageContainerClass = cn(
-        "relative w-7 h-8 flex items-center justify-center transition-all duration-200",
-        isSelected ? "scale-110 z-10 drop-shadow-md" : "hover:-translate-y-1"
-    );
-
     return (
         <div
             onClick={onClick}
             className={cn(
                 "group relative flex flex-col items-center cursor-pointer transition-all duration-200",
-                !imageSrc && (isSelected ? "scale-110 z-10" : "hover:-translate-y-1")
+                isSelected ? "scale-110 z-10" : "hover:-translate-y-1"
             )}
         >
             {!isLower && <span className={cn("text-[8px] font-bold mb-1", isSelected ? "text-primary" : "text-slate-400")}>{id}</span>}
-
-            {imageSrc ? (
-                <div className={imageContainerClass}>
-                    <img
-                        src={imageSrc}
-                        alt={`Tooth ${id}`}
-                        className={cn(
-                            "w-full h-full object-contain filter",
-                            // Apply filters based on status? Or just borders?
-                            // For now, let's use borders/overlays for status on images
-                            status === 'decay' && "drop-shadow-[0_0_2px_rgba(239,68,68,0.8)]",
-                            status === 'planned' && "drop-shadow-[0_0_2px_rgba(59,130,246,0.8)]",
-                            status === 'completed' && "drop-shadow-[0_0_2px_rgba(34,197,94,0.8)]",
-                            isSelected && "drop-shadow-[0_0_4px_rgba(var(--primary),0.8)]"
-                        )}
-                    />
-                    {/* Status Overlays for images if needed */}
-                    {status && (
-                        <div className={cn(
-                            "absolute inset-0 opacity-20 rounded-sm",
-                            status === 'decay' && "bg-red-500",
-                            status === 'planned' && "bg-blue-500",
-                            status === 'completed' && "bg-green-500",
-                        )} />
-                    )}
-                </div>
-            ) : (
-                <svg width="28" height="32" viewBox="0 0 20 24" className={cn("transition-all drop-shadow-sm", colorClass)}>
-                    <path d={toothPath} strokeWidth="1.5" />
-                </svg>
-            )}
-
+            <svg width="28" height="32" viewBox="0 0 20 24" className={cn("transition-all drop-shadow-sm", colorClass)}>
+                <path d={toothPath} strokeWidth="1.5" />
+            </svg>
             {isLower && <span className={cn("text-[8px] font-bold mt-1", isSelected ? "text-primary" : "text-slate-400")}>{id}</span>}
         </div>
     );

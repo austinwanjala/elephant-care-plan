@@ -35,14 +35,13 @@ export default function DoctorQueue() {
 
         const today = new Date().toISOString().split('T')[0];
 
-        // Fetch visits: 
-        // 1. Registered (Waiting) - Created Today
-        // 2. With Doctor (In Progress) - Assigned to this doctor (ANY date to persist)
         const { data, error } = await supabase
             .from("visits")
-            .select("*, members(full_name, member_number, age, dob), dependants(*)")
+            .select("*, members(full_name, member_number, age)")
             .eq('branch_id', staffData.branch_id)
-            .or(`and(status.eq.registered,created_at.gte.${today}),and(status.eq.with_doctor,doctor_id.eq.${staffData.id})`)
+            .or(`doctor_id.eq.${staffData.id},doctor_id.is.null`)
+            .or('status.eq.registered,status.eq.with_doctor')
+            .gte('created_at', today)
             .order('created_at', { ascending: true });
 
         if (error) {
@@ -107,54 +106,31 @@ export default function DoctorQueue() {
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                visits.map((visit) => {
-                                    const patientName = visit.dependants?.full_name || visit.members?.full_name;
-                                    const patientDob = visit.dependants?.dob || visit.members?.dob;
-
-                                    let patientAge = visit.members?.age;
-                                    if (visit.dependants?.dob) {
-                                        const diffMs = Date.now() - new Date(visit.dependants.dob).getTime();
-                                        const ageDt = new Date(diffMs);
-                                        patientAge = Math.abs(ageDt.getUTCFullYear() - 1970);
-                                    }
-
-                                    const isDependant = !!visit.dependants;
-
-                                    return (
-                                        <TableRow key={visit.id}>
-                                            <TableCell className="font-mono text-xs">
-                                                {new Date(visit.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                <div className="text-[10px] text-muted-foreground">{new Date(visit.created_at).toLocaleDateString()}</div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div>
-                                                    <p className="font-medium flex items-center gap-2">
-                                                        {patientName}
-                                                        {isDependant && <Badge variant="outline" className="text-[10px] h-4 px-1">Dependant</Badge>}
-                                                    </p>
-                                                    <p className="text-xs text-muted-foreground">{patientAge} yrs</p>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex flex-col">
-                                                    <span>{visit.dependants?.document_number ? `ID: ${visit.dependants.document_number}` : (visit.members?.member_number || '-')}</span>
-                                                    {isDependant && <span className="text-[10px] text-muted-foreground">Principal: {visit.members?.full_name}</span>}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge variant={visit.status === 'with_doctor' ? 'default' : 'secondary'}>
-                                                    {visit.status === 'with_doctor' ? 'In Progress' : 'Waiting'}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Button size="sm" onClick={() => handleStartConsultation(visit.id, visit.status)}>
-                                                    {visit.status === 'with_doctor' ? 'Continue' : 'Start Consultation'}
-                                                    <ArrowRight className="ml-2 h-4 w-4" />
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    );
-                                })
+                                visits.map((visit) => (
+                                    <TableRow key={visit.id}>
+                                        <TableCell className="font-mono text-xs">
+                                            {new Date(visit.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </TableCell>
+                                        <TableCell>
+                                            <div>
+                                                <p className="font-medium">{visit.members?.full_name}</p>
+                                                <p className="text-xs text-muted-foreground">{visit.members?.age} yrs</p>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>{visit.members?.member_number}</TableCell>
+                                        <TableCell>
+                                            <Badge variant={visit.status === 'with_doctor' ? 'default' : 'secondary'}>
+                                                {visit.status === 'with_doctor' ? 'In Progress' : 'Waiting'}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Button size="sm" onClick={() => handleStartConsultation(visit.id, visit.status)}>
+                                                {visit.status === 'with_doctor' ? 'Continue' : 'Start Consultation'}
+                                                <ArrowRight className="ml-2 h-4 w-4" />
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
                             )}
                         </TableBody>
                     </Table>

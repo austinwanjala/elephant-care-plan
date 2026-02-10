@@ -23,7 +23,7 @@ export default function AuditorVisits() {
 
         const { data, count } = await supabase
             .from("visits")
-            .select("*, members(full_name), branches(name)", { count: "exact" })
+            .select("*, members(full_name), branches(name), doctor:doctor_id(full_name)", { count: "exact" })
             .order("created_at", { ascending: false })
             .range(from, to);
 
@@ -41,6 +41,7 @@ export default function AuditorVisits() {
             Date: format(new Date(v.created_at), "yyyy-MM-dd HH:mm"),
             Patient: v.members?.full_name,
             Branch: v.branches?.name,
+            Doctor: v.doctor?.full_name,
             Status: v.status,
             Deducted: v.benefit_deducted,
             Compensation: v.branch_compensation
@@ -71,15 +72,16 @@ export default function AuditorVisits() {
                                 <TableHead>Date</TableHead>
                                 <TableHead>Patient / Member</TableHead>
                                 <TableHead>Branch</TableHead>
+                                <TableHead>Doctor</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead>Financials</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {loading ? (
-                                <TableRow><TableCell colSpan={5} className="text-center h-24"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></TableCell></TableRow>
+                                <TableRow><TableCell colSpan={6} className="text-center h-24"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></TableCell></TableRow>
                             ) : visits.length === 0 ? (
-                                <TableRow><TableCell colSpan={5} className="text-center h-24">No visits recorded.</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={6} className="text-center h-24">No visits recorded.</TableCell></TableRow>
                             ) : (
                                 visits.map((visit) => (
                                     <TableRow key={visit.id}>
@@ -89,6 +91,7 @@ export default function AuditorVisits() {
                                             {visit.dependant_id && <Badge variant="outline" className="text-[10px]">Dependant Visit</Badge>}
                                         </TableCell>
                                         <TableCell>{visit.branches?.name}</TableCell>
+                                        <TableCell className="text-sm text-muted-foreground">{visit.doctor?.full_name || "-"}</TableCell>
                                         <TableCell><Badge variant="secondary" className="capitalize">{visit.status}</Badge></TableCell>
                                         <TableCell className="text-xs font-mono">
                                             <div>Deducted: {visit.benefit_deducted}</div>

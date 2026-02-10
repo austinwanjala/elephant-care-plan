@@ -34,7 +34,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, MoreHorizontal, Edit, Trash2, Fingerprint, Download, Loader2, ShieldCheck, History, Users } from "lucide-react";
+import { Search, Plus, MoreHorizontal, Edit, Trash2, Fingerprint, Download, Loader2, ShieldCheck } from "lucide-react";
 import { BiometricCapture } from "@/components/BiometricCapture";
 import { exportToCsv } from "@/utils/csvExport";
 
@@ -74,8 +74,6 @@ export default function AdminMembers() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [biometricDialogOpen, setBiometricDialogOpen] = useState(false);
-  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
-  const [dependantsDialogOpen, setDependantsDialogOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -134,22 +132,6 @@ export default function AdminMembers() {
       });
 
       if (error) throw error;
-
-      if (error) throw error;
-
-      // Send Welcome SMS
-      try {
-        await supabase.functions.invoke('send-sms', {
-          body: {
-            type: 'welcome',
-            phone: formData.phone,
-            data: { name: formData.fullName }
-          }
-        });
-      } catch (smsErr) {
-        console.error("Failed to send Welcome SMS:", smsErr);
-        // Don't block success UI if SMS fails
-      }
 
       toast({ title: "Member registered successfully" });
       setDialogOpen(false);
@@ -322,8 +304,6 @@ export default function AdminMembers() {
                     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={() => { setSelectedMember(m); setFormData({ ...formData, fullName: m.full_name, phone: m.phone, idNumber: m.id_number, dob: m.dob || "", branchId: m.branch_id || "", membershipCategoryId: m.membership_category_id || "" }); setEditDialogOpen(true); }}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => { setSelectedMember(m); setDependantsDialogOpen(true); }}><Users className="mr-2 h-4 w-4" /> View Dependants</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => { setSelectedMember(m); setHistoryDialogOpen(true); }}><History className="mr-2 h-4 w-4" /> View History</DropdownMenuItem>
                       <DropdownMenuItem onClick={() => { setSelectedMember(m); setBiometricDialogOpen(true); }}><Fingerprint className="mr-2 h-4 w-4" /> Biometric</DropdownMenuItem>
                       <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteMember(m.id)}><Trash2 className="mr-2 h-4 w-4" /> Deactivate</DropdownMenuItem>
                     </DropdownMenuContent>
@@ -379,173 +359,6 @@ export default function AdminMembers() {
           {selectedMember && <BiometricCapture mode="register" userId={selectedMember.id} userName={selectedMember.full_name} onCaptureComplete={handleBiometricCaptureComplete} />}
         </DialogContent>
       </Dialog>
-
-      {selectedMember && (
-        <MemberHistoryDialog
-          open={!!historyDialogOpen}
-          onOpenChange={(open) => !open && setHistoryDialogOpen(false)}
-          member={selectedMember}
-        />
-      )}
-
-      {selectedMember && (
-        <MemberDependantsDialog
-          open={!!dependantsDialogOpen}
-          onOpenChange={(open) => !open && setDependantsDialogOpen(false)}
-          member={selectedMember}
-        />
-      )}
     </div>
-  );
-}
-
-function MemberHistoryDialog({ open, onOpenChange, member }: { open: boolean, onOpenChange: (open: boolean) => void, member: Member }) {
-  const [visits, setVisits] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (open && member) {
-      fetchHistory();
-    }
-  }, [open, member]);
-
-  const fetchHistory = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("visits")
-      .select(`
-            *,
-            branches(name),
-            doctor:doctor_id(full_name),
-            bills(total_benefit_cost)
-        `)
-      .eq("member_id", member.id)
-      .order("created_at", { ascending: false });
-
-    if (!error && data) {
-      setVisits(data);
-    }
-    setLoading(false);
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Medical History: {member.full_name}</DialogTitle>
-          <DialogDescription>Member #: {member.member_number}</DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          {loading ? (
-            <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
-          ) : visits.length === 0 ? (
-            <div className="text-center p-8 text-muted-foreground">No visits recorded.</div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Branch</TableHead>
-                  <TableHead>Doctor</TableHead>
-                  <TableHead>Diagnosis</TableHead>
-                  <TableHead>Cost</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {visits.map((visit) => (
-                  <TableRow key={visit.id}>
-                    <TableCell className="whitespace-nowrap">{new Date(visit.created_at).toLocaleDateString()}</TableCell>
-                    <TableCell>{visit.branches?.name || 'N/A'}</TableCell>
-                    <TableCell>{visit.doctor?.full_name || 'N/A'}</TableCell>
-                    <TableCell className="max-w-[150px] truncate" title={visit.diagnosis || ''}>{visit.diagnosis || '-'}</TableCell>
-                    <TableCell>KES {(visit.bills?.[0]?.total_benefit_cost || 0).toLocaleString()}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{visit.status}</Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function MemberDependantsDialog({ open, onOpenChange, member }: { open: boolean, onOpenChange: (open: boolean) => void, member: Member }) {
-  const [dependants, setDependants] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (open && member) {
-      fetchDependants();
-    }
-  }, [open, member]);
-
-  const fetchDependants = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("dependants")
-      .select("*")
-      .eq("member_id", member.id)
-      .eq("is_active", true);
-
-    if (!error && data) {
-      setDependants(data);
-    }
-    setLoading(false);
-  };
-
-  const calculateAge = (dob: string) => {
-    const diffMs = Date.now() - new Date(dob).getTime();
-    const ageDt = new Date(diffMs);
-    return Math.abs(ageDt.getUTCFullYear() - 1970);
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Dependants: {member.full_name}</DialogTitle>
-          <DialogDescription>Registered dependants under this member</DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          {loading ? (
-            <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
-          ) : dependants.length === 0 ? (
-            <div className="text-center p-8 text-muted-foreground border-2 border-dashed rounded-md">
-              No dependants registered.
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Full Name</TableHead>
-                  <TableHead>Relationship</TableHead>
-                  <TableHead>Age</TableHead>
-                  <TableHead>DOB</TableHead>
-                  <TableHead>ID / Birth Cert</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {dependants.map((dep) => (
-                  <TableRow key={dep.id}>
-                    <TableCell className="font-medium">{dep.full_name}</TableCell>
-                    <TableCell className="capitalize">{dep.relationship}</TableCell>
-                    <TableCell>{calculateAge(dep.dob)} yrs</TableCell>
-                    <TableCell>{new Date(dep.dob).toLocaleDateString()}</TableCell>
-                    <TableCell className="font-mono text-xs">{dep.document_number || dep.id_number || '-'}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
   );
 }

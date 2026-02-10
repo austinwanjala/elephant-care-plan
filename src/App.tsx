@@ -73,7 +73,6 @@ import AdminCommissionSettings from "./pages/admin/AdminCommissionSettings";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminMembershipCategories from "./pages/admin/AdminMembershipCategories";
 import AdminLogs from "./pages/admin/AdminLogs";
-import AdminPermissions from "./pages/admin/AdminPermissions";
 
 // Finance Pages
 import FinanceDashboard from "./pages/finance/Dashboard";
@@ -85,8 +84,6 @@ import AuditorVisits from "./pages/auditor/Visits";
 import AuditorFinancials from "./pages/auditor/Financials";
 import AuditorLogs from "./pages/auditor/Logs";
 
-import { SchemeChat } from "@/components/SchemeChat";
-
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -95,7 +92,6 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <SchemeChat />
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Index />} />
@@ -181,7 +177,6 @@ const App = () => (
             <Route path="settings" element={<AdminSettings />} />
             <Route path="membership-categories" element={<AdminMembershipCategories />} />
             <Route path="logs" element={<AdminLogs />} />
-            <Route path="permissions" element={<AdminPermissions />} />
           </Route>
 
           {/* Finance Routes */}

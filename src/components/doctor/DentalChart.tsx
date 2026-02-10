@@ -9,21 +9,51 @@ const ADULT_LOWER = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37,
 const CHILD_UPPER = [55, 54, 53, 52, 51, 61, 62, 63, 64, 65];
 const CHILD_LOWER = [85, 84, 83, 82, 81, 71, 72, 73, 74, 75];
 
+// FDI Mixed Dentition (Early Mixed Stage: Primary + Permanent 1st Molars)
+const MIXED_UPPER = [16, 55, 54, 53, 52, 51, 61, 62, 63, 64, 65, 26];
+const MIXED_LOWER = [46, 85, 84, 83, 82, 81, 71, 72, 73, 74, 75, 36];
+
+export type DentalChartMode = 'adult' | 'child' | 'mixed';
+
 interface DentalChartProps {
     onToothClick: (toothId: number) => void;
     selectedTeeth: number[];
     toothStatus: Record<number, string>;
-    isChild?: boolean;
+    isChild?: boolean; // Deprecated in favor of mode, kept for backward compatibility
+    mode?: DentalChartMode;
 }
 
-export function DentalChart({ onToothClick, selectedTeeth, toothStatus, isChild = false }: DentalChartProps) {
-    const upperJaw = isChild ? CHILD_UPPER : ADULT_UPPER;
-    const lowerJaw = isChild ? CHILD_LOWER : ADULT_LOWER;
+export function DentalChart({ onToothClick, selectedTeeth, toothStatus, isChild = false, mode }: DentalChartProps) {
+    // Determine effective mode
+    const effectiveMode: DentalChartMode = mode || (isChild ? 'child' : 'adult');
+
+    let upperJaw = ADULT_UPPER;
+    let lowerJaw = ADULT_LOWER;
+    let title = "Anatomical Dental Map";
+
+    switch (effectiveMode) {
+        case 'child':
+            upperJaw = CHILD_UPPER;
+            lowerJaw = CHILD_LOWER;
+            title = "Pediatric Dental Map";
+            break;
+        case 'mixed':
+            upperJaw = MIXED_UPPER;
+            lowerJaw = MIXED_LOWER;
+            title = "Mixed Dentition Dental Map";
+            break;
+        case 'adult':
+        default:
+            upperJaw = ADULT_UPPER;
+            lowerJaw = ADULT_LOWER;
+            title = "Anatomical Dental Map";
+            break;
+    }
 
     return (
         <div className="w-full max-w-5xl mx-auto p-4 sm:p-8 border rounded-2xl bg-slate-50/30 shadow-sm">
             <h3 className="text-center font-serif font-bold text-xl mb-8 text-slate-800">
-                {isChild ? "Pediatric Dental Map" : "Anatomical Dental Map"}
+                {title}
             </h3>
 
             <div className="space-y-12 bg-white p-6 sm:p-10 rounded-xl border shadow-inner overflow-x-auto">
@@ -105,7 +135,7 @@ export function DentalChart({ onToothClick, selectedTeeth, toothStatus, isChild 
                     <span className="text-orange-700">Selected</span>
                 </div>
             </div>
-        </div>
+        </div >
     );
 }
 

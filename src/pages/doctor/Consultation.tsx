@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Save, Send, ArrowLeft, Trash2, Plus, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { DentalChart } from "@/components/doctor/DentalChart";
+import { DentalChart, DentalChartMode } from "@/components/doctor/DentalChart";
 
 export default function Consultation() {
     const { visitId } = useParams();
@@ -26,6 +26,7 @@ export default function Consultation() {
     const [serviceHistory, setServiceHistory] = useState<any[]>([]);
     const [doctorId, setDoctorId] = useState<string | null>(null);
     const [doctorBranchId, setDoctorBranchId] = useState<string | null>(null);
+    const [chartMode, setChartMode] = useState<DentalChartMode>('adult');
 
     useEffect(() => {
         if (visitId) {
@@ -102,6 +103,17 @@ export default function Consultation() {
         }
         setLoading(false);
     };
+
+    // Auto-set chart mode based on age when visit loads
+    useEffect(() => {
+        if (!visit) return;
+        const dob = visit.dependants?.dob || visit.members.dob;
+        const age = calculateAge(dob);
+
+        if (age < 6) setChartMode('child');
+        else if (age < 13) setChartMode('mixed'); // 6-12 years
+        else setChartMode('adult');
+    }, [visit]);
 
     const loadServices = async (branchId: string) => {
         const { data: servicesData, error: servicesError } = await supabase
@@ -385,15 +397,45 @@ export default function Consultation() {
                 <div className="lg:col-span-2 space-y-6">
                     <Card>
                         <CardHeader>
-                            <CardTitle>Dental Chart (FDI)</CardTitle>
-                            <CardDescription>Select teeth to add services or update clinical status.</CardDescription>
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <CardTitle>Dental Chart (FDI)</CardTitle>
+                                    <CardDescription>Select teeth to add services or update clinical status.</CardDescription>
+                                </div>
+                                <div className="flex gap-1 bg-secondary/20 p-1 rounded-lg">
+                                    <Button
+                                        variant={chartMode === 'child' ? 'secondary' : 'ghost'}
+                                        size="sm"
+                                        className="h-7 text-xs"
+                                        onClick={() => setChartMode('child')}
+                                    >
+                                        Child
+                                    </Button>
+                                    <Button
+                                        variant={chartMode === 'mixed' ? 'secondary' : 'ghost'}
+                                        size="sm"
+                                        className="h-7 text-xs"
+                                        onClick={() => setChartMode('mixed')}
+                                    >
+                                        Mixed
+                                    </Button>
+                                    <Button
+                                        variant={chartMode === 'adult' ? 'secondary' : 'ghost'}
+                                        size="sm"
+                                        className="h-7 text-xs"
+                                        onClick={() => setChartMode('adult')}
+                                    >
+                                        Adult
+                                    </Button>
+                                </div>
+                            </div>
                         </CardHeader>
                         <CardContent>
                             <DentalChart
                                 onToothClick={handleToothClick}
                                 selectedTeeth={selectedTeeth}
                                 toothStatus={toothStatus}
-                                isChild={isChild}
+                                mode={chartMode}
                             />
                             {selectedTeeth.length > 0 && (
                                 <div className="mt-4 space-y-4">

@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Search, User, History, Loader2, ArrowLeft, Stethoscope, FileText, CalendarDays } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
-import { DentalChart } from "@/components/doctor/DentalChart";
+import { DentalChart, DentalChartMode } from "@/components/doctor/DentalChart";
 import { format } from "date-fns";
 
 export default function DoctorPatientHistory() {
@@ -86,6 +86,20 @@ export default function DoctorPatientHistory() {
         }
     };
 
+    const calculateAge = (dob: string) => {
+        if (!dob) return 0;
+        const diffMs = Date.now() - new Date(dob).getTime();
+        const ageDt = new Date(diffMs);
+        return Math.abs(ageDt.getUTCFullYear() - 1970);
+    };
+
+    let chartMode: DentalChartMode = 'adult';
+    if (member?.dob) {
+        const age = calculateAge(member.dob);
+        if (age < 6) chartMode = 'child';
+        else if (age < 13) chartMode = 'mixed';
+    }
+
     return (
         <div className="max-w-4xl mx-auto space-y-6">
             <div className="flex items-center gap-4 mb-6">
@@ -160,9 +174,10 @@ export default function DoctorPatientHistory() {
                         </CardHeader>
                         <CardContent>
                             <DentalChart
-                                onToothClick={() => {}} // Not interactive in history view
+                                onToothClick={() => { }} // Not interactive in history view
                                 selectedTeeth={[]}
                                 toothStatus={dentalRecords}
+                                mode={chartMode}
                             />
                         </CardContent>
                     </Card>

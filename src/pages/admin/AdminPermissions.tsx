@@ -133,9 +133,12 @@ export default function AdminPermissions() {
                 title: "Permissions saved",
                 description: "Role policies have been updated.",
             });
-            await loadData(); // Reload to be safe
+
+            // Force reload to verify state matches DB
+            await loadData();
 
         } catch (error: any) {
+            console.error("Save error:", error);
             toast({
                 title: "Error saving changes",
                 description: error.message,

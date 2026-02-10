@@ -113,9 +113,6 @@ export default function AdminLogs() {
                     <Button variant="outline" onClick={fetchLogs} disabled={loading}>
                         <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Refresh
                     </Button>
-                    <Button variant="secondary" onClick={handleSimulateCallback}>
-                        <Filter className="mr-2 h-4 w-4" /> Simulate M-Pesa Callback
-                    </Button>
                 </div>
             </div>
 
@@ -186,6 +183,6 @@ export default function AdminLogs() {
                     </Table>
                 </CardContent>
             </Card>
-        </div>
+        </div >
     );
 }

@@ -67,6 +67,7 @@ serve(async (req) => {
         // 1. Try SMS via Africa's Talking
         const AT_USERNAME = Deno.env.get("AFRICASTALKING_USERNAME");
         const AT_API_KEY = Deno.env.get("AFRICASTALKING_API_KEY");
+
         let smsResult = { success: false, message: "Provider not configured" };
 
         if (AT_USERNAME && AT_API_KEY) {
@@ -93,9 +94,18 @@ serve(async (req) => {
                     body: formData.toString()
                 });
 
-                const result = await response.json();
-                console.log("[send-sms] Africa's Talking Response:", result);
-                smsResult = { success: true, ...result };
+                const rawText = await response.text();
+                console.log("[send-sms] Africa's Talking Raw Response:", rawText);
+
+                let result;
+                try {
+                    result = JSON.parse(rawText);
+                } catch (e) {
+                    // If not JSON, treat the text as the message/error
+                    result = { message: rawText };
+                }
+
+                smsResult = { success: response.ok, ...result };
             } catch (err) {
                 console.error("[send-sms] SMS Provider Error:", err);
             }

@@ -104,13 +104,19 @@ BEGIN
     END IF;
 
     -- Staff policies
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'appointments' AND policyname = 'Staff view branch appointments') THEN
-        CREATE POLICY "Staff view branch appointments" ON public.appointments FOR SELECT USING (
-            EXISTS (SELECT 1 FROM public.staff WHERE user_id = auth.uid() AND branch_id = appointments.branch_id)
-            OR
-            EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role IN ('admin', 'super_admin', 'receptionist', 'doctor'))
-        );
-    END IF;
+    -- Staff policies
+    DROP POLICY IF EXISTS "Staff view branch appointments" ON public.appointments;
+
+    CREATE POLICY "Staff view branch appointments" ON public.appointments FOR SELECT USING (
+        -- Admin/Super Admin can see all
+        EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role IN ('admin', 'super_admin'))
+        OR
+        -- Staff can see appointments in their branch (Receptionists, Directors, etc)
+        EXISTS (SELECT 1 FROM public.staff WHERE user_id = auth.uid() AND branch_id = appointments.branch_id)
+        OR
+        -- Doctors can see their own appointments (even if branch context is complex, though usually matches)
+        EXISTS (SELECT 1 FROM public.staff WHERE user_id = auth.uid() AND id = appointments.doctor_id)
+    );
 
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'appointments' AND policyname = 'Staff manage branch appointments') THEN
         CREATE POLICY "Staff manage branch appointments" ON public.appointments FOR ALL USING (

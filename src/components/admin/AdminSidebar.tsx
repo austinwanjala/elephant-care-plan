@@ -12,7 +12,7 @@ import {
   DollarSign,
   ClipboardList,
   FileText,
-  Lock,
+  ShieldAlert,
 } from "lucide-react";
 import {
   Sidebar,
@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+
 import { usePermissions } from "@/hooks/usePermissions";
 
 export function AdminSidebar() {
@@ -39,115 +40,52 @@ export function AdminSidebar() {
   const [pendingClaimsCount, setPendingClaimsCount] = useState(0);
   const [basePath, setBasePath] = useState("/admin");
   const [roleLabel, setRoleLabel] = useState("Admin");
-
-  const { role, hasPermission, loading } = usePermissions();
+  const { hasPermission, loading: permsLoading } = usePermissions();
 
   useEffect(() => {
-    if (role === 'super_admin') {
-      setBasePath("/super-admin");
-      setRoleLabel("Super Admin");
-    } else {
-      setBasePath("/admin");
-      setRoleLabel("Admin");
-    }
-  }, [role]);
+    const checkRole = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
+        if ((data?.role as string) === 'super_admin') {
+          setBasePath("/super-admin");
+          setRoleLabel("Super Admin");
+        } else {
+          setBasePath("/admin");
+          setRoleLabel("Admin");
+        }
+      }
+    };
+    checkRole();
+  }, []);
 
-  const allMenuItems = [
-    {
-      title: "Dashboard",
-      url: basePath,
-      icon: LayoutDashboard,
-      show: hasPermission('dashboard', 'view')
-    },
-    {
-      title: "Members",
-      url: `${basePath}/members`,
-      icon: Users,
-      show: hasPermission('members', 'view')
-    },
-    {
-      title: "Branches",
-      url: `${basePath}/branches`,
-      icon: Building2,
-      show: hasPermission('settings', 'manage') // Or branches.view if added later
-    },
-    {
-      title: "Staff",
-      url: `${basePath}/staff`,
-      icon: UserCog,
-      show: hasPermission('staff', 'view')
-    },
-    {
-      title: "Visits",
-      url: `${basePath}/visits`,
-      icon: History,
-      show: hasPermission('visits', 'view')
-    },
-    {
-      title: "Services",
-      url: `${basePath}/services`,
-      icon: Stethoscope,
-      show: hasPermission('settings', 'manage')
-    },
-    {
-      title: "Branch Payments",
-      url: `${basePath}/branch-payments`,
-      icon: DollarSign,
-      show: hasPermission('financials', 'view')
-    },
-    {
-      title: "Marketer Claims",
-      url: `${basePath}/marketer-claims`,
-      icon: ClipboardList,
-      show: hasPermission('financials', 'manage')
-    },
-    {
-      title: "System Logs",
-      url: `${basePath}/logs`,
-      icon: FileText,
-      show: hasPermission('system_logs', 'view')
-    },
+  const menuItems = [
+    { title: "Dashboard", url: basePath, icon: LayoutDashboard },
+    { title: "Members", url: `${basePath}/members`, icon: Users },
+    { title: "Branches", url: `${basePath}/branches`, icon: Building2 },
+    { title: "Staff", url: `${basePath}/staff`, icon: UserCog },
+    { title: "Visits", url: `${basePath}/visits`, icon: History },
+    { title: "Services", url: `${basePath}/services`, icon: Stethoscope },
+    { title: "Branch Payments", url: `${basePath}/branch-payments`, icon: DollarSign },
+    { title: "Marketer Claims", url: `${basePath}/marketer-claims`, icon: ClipboardList },
   ];
 
-  const allSettingsItems = [
-    {
-      title: "General Settings",
-      url: `${basePath}/settings`,
-      icon: Settings,
-      show: hasPermission('settings', 'manage')
-    },
-    {
-      title: "Membership Categories",
-      url: `${basePath}/membership-categories`,
-      icon: Users,
-      show: hasPermission('settings', 'manage')
-    },
-    {
-      title: "Commission Rates",
-      url: `${basePath}/commission-settings`,
-      icon: DollarSign,
-      show: hasPermission('settings', 'manage')
-    },
-  ];
-
-  // Super Admin specific items
-  if (role === 'super_admin') {
-    allSettingsItems.push({
-      title: "Role Permissions",
-      url: `${basePath}/permissions`,
-      icon: Lock,
-      show: true
-    });
+  // Conditionally add System Logs
+  if (hasPermission('audit_logs', 'view') || roleLabel === 'Super Admin') {
+    menuItems.push({ title: "System Logs", url: `${basePath}/logs`, icon: FileText });
   }
 
-  // Filter visible items
-  const menuItems = allMenuItems.filter(item => item.show);
-  const settingsMenuItems = allSettingsItems.filter(item => item.show);
+  const settingsMenuItems = [
+    { title: "General Settings", url: `${basePath}/settings`, icon: Settings },
+    { title: "Membership Categories", url: `${basePath}/membership-categories`, icon: Users },
+    { title: "Commission Rates", url: `${basePath}/commission-settings`, icon: DollarSign },
+  ];
+
+  if (roleLabel === "Super Admin") {
+    settingsMenuItems.push({ title: "Permissions", url: `${basePath}/permissions`, icon: ShieldAlert });
+  }
 
   useEffect(() => {
-    // Only fetch if has permission to manage financials
-    if (!hasPermission('financials', 'manage')) return;
-
     const fetchPendingClaims = async () => {
       const { count } = await (supabase as any)
         .from('marketer_claims')
@@ -176,7 +114,7 @@ export function AdminSidebar() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [hasPermission]);
+  }, []);
 
   const isActive = (path: string) => {
     if (path === basePath) {
@@ -189,19 +127,6 @@ export function AdminSidebar() {
     await supabase.auth.signOut();
     navigate("/");
   };
-
-  if (loading) {
-    // Optional: Skeleton loader for sidebar or just null
-    return (
-      <Sidebar collapsible="icon" className="border-r border-border">
-        <SidebarHeader className="p-4 border-b border-border">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-muted animate-pulse" />
-          </div>
-        </SidebarHeader>
-      </Sidebar>
-    );
-  }
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border">
@@ -295,3 +220,4 @@ export function AdminSidebar() {
     </Sidebar>
   );
 }
+

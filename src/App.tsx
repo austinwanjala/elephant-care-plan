@@ -33,12 +33,14 @@ import MemberVisits from "./pages/member/MemberVisits";
 import MemberProfile from "./pages/member/MemberProfile";
 import MemberSchemeSelection from "./pages/member/MemberSchemeSelection";
 import MemberDependants from "./pages/member/MemberDependants";
+import MemberAppointments from "./pages/member/MemberAppointments";
 
 // Reception Pages
 import ReceptionDashboard from "./pages/reception/Dashboard";
 import RegisterVisit from "./pages/reception/RegisterVisit";
 import ReceptionAddMember from "./pages/reception/AddMember";
 import ReceptionBilling from "./pages/reception/Billing";
+import ReceptionAppointments from "./pages/reception/ReceptionAppointments";
 import ReceptionSearchMember from "./pages/reception/SearchMember";
 
 // Doctor Pages
@@ -114,6 +116,7 @@ const App = () => (
             <Route path="profile" element={<MemberProfile />} />
             <Route path="scheme-selection" element={<MemberSchemeSelection />} />
             <Route path="dependants" element={<MemberDependants />} />
+            <Route path="appointments" element={<MemberAppointments />} />
           </Route>
 
           {/* Receptionist Routes */}
@@ -122,6 +125,7 @@ const App = () => (
             <Route path="register-visit" element={<RegisterVisit />} />
             <Route path="add-member" element={<ReceptionAddMember />} />
             <Route path="billing" element={<ReceptionBilling />} />
+            <Route path="appointments" element={<ReceptionAppointments />} />
             <Route path="search" element={<ReceptionSearchMember />} />
           </Route>
 

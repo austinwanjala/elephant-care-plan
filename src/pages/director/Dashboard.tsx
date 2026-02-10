@@ -26,6 +26,10 @@ export default function DirectorDashboard() {
         newMembers: 0,
         profitLoss: 0,
         totalServices: 0,
+        totalAppts: 0,
+        completedAppts: 0,
+        cancelledAppts: 0,
+        noShowAppts: 0
     });
     const [recentVisits, setRecentVisits] = useState<any[]>([]);
     const [branchName, setBranchName] = useState("Loading...");
@@ -102,7 +106,7 @@ export default function DirectorDashboard() {
             }
         });
 
-        // Fetch new members for this branch (simplified, could be more complex with join dates)
+        // Fetch new members for this branch
         const { count: newMembersCount } = await supabase
             .from("members")
             .select('*', { count: 'exact', head: true })
@@ -110,12 +114,29 @@ export default function DirectorDashboard() {
             .gte("created_at", startOfMonthDate)
             .lte("created_at", endOfMonthDate);
 
+        // Fetch Appointments Analytics
+        const { data: apptData } = await supabase
+            .from("appointments")
+            .select("status")
+            .eq("branch_id", branchId)
+            .gte("appointment_date", startOfMonthDate)
+            .lte("appointment_date", endOfMonthDate);
+
+        const totalAppts = apptData?.length || 0;
+        const completedAppts = apptData?.filter(a => a.status === 'completed' || a.status === 'checked_in').length || 0;
+        const cancelledAppts = apptData?.filter(a => a.status === 'cancelled').length || 0;
+        const noShowAppts = apptData?.filter(a => a.status === 'no_show').length || 0;
+
         setStats({
             totalRevenue: totalRevenue,
             visitCount: totalVisitsCount,
             newMembers: newMembersCount || 0,
             profitLoss: totalProfitLoss,
             totalServices: totalServicesCount,
+            totalAppts,
+            completedAppts,
+            cancelledAppts,
+            noShowAppts
         });
     };
 
@@ -153,7 +174,7 @@ export default function DirectorDashboard() {
 
                 <Card className="border-l-4 border-l-emerald-600 shadow-sm">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Total Visits</CardTitle>
+                        <CardTitle className="text-sm font-medium">Active Visits</CardTitle>
                         <ClipboardList className="h-4 w-4 text-emerald-600" />
                     </CardHeader>
                     <CardContent>
@@ -194,8 +215,24 @@ export default function DirectorDashboard() {
                 </Card>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-                <Card className="col-span-4 shadow-sm border-blue-50">
+            {/* Appointment Analytics Section */}
+            <div className="grid gap-4 md:grid-cols-3">
+                <Card className="shadow-sm">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">Appointment Overview</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{stats.totalAppts}</div>
+                        <p className="text-xs text-muted-foreground">Total appointments this month</p>
+                        <div className="mt-4 flex gap-2 text-xs">
+                            <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-green-500"></div> Done: {stats.completedAppts}</div>
+                            <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-500"></div> Cancel: {stats.cancelledAppts}</div>
+                            <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-gray-500"></div> No-Show: {stats.noShowAppts}</div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="md:col-span-2 shadow-sm">
                     <CardHeader>
                         <CardTitle>Recent Patient Visits</CardTitle>
                         <CardDescription>Last active consultations in this branch.</CardDescription>
@@ -205,7 +242,7 @@ export default function DirectorDashboard() {
                             {recentVisits.length === 0 ? (
                                 <p className="text-center text-muted-foreground py-8">No recent visits recorded.</p>
                             ) : (
-                                recentVisits.map((visit) => (
+                                recentVisits.slice(0, 5).map((visit) => (
                                     <div key={visit.id} className="flex items-center justify-between p-3 rounded-lg border bg-blue-50/30">
                                         <div className="flex items-center gap-4">
                                             <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-700">
@@ -229,20 +266,6 @@ export default function DirectorDashboard() {
                                     </div>
                                 ))
                             )}
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card className="col-span-3 shadow-sm border-slate-100">
-                    <CardHeader>
-                        <CardTitle>Top Services Offered</CardTitle>
-                        <CardDescription>By frequency this month.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-6 mt-2">
-                            <div className="text-center text-muted-foreground py-8">
-                                Service distribution data will be displayed here.
-                            </div>
                         </div>
                     </CardContent>
                 </Card>

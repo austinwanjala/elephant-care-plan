@@ -6,6 +6,7 @@ import {
   User,
   LogOut,
   Users, // Added for Dependants
+  CalendarClock,
 } from "lucide-react";
 import {
   Sidebar,
@@ -27,6 +28,7 @@ const menuItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Payments", url: "/dashboard/payments", icon: CreditCard },
   { title: "Visits", url: "/dashboard/visits", icon: History },
+  { title: "Appointments", url: "/dashboard/appointments", icon: CalendarClock },
   { title: "Dependants", url: "/dashboard/dependants", icon: Users }, // New item
   { title: "Profile", url: "/dashboard/profile", icon: User },
 ];

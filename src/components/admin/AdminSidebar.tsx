@@ -8,10 +8,12 @@ import {
   LayoutDashboard,
   LogOut,
   Settings,
+  History,
   DollarSign,
   ClipboardList,
   FileText,
   ShieldCheck,
+  Lock,
 } from "lucide-react";
 import {
   Sidebar,
@@ -77,7 +79,7 @@ export function AdminSidebar() {
     settingsMenuItems.push({
       title: "Role Permissions",
       url: `${basePath}/permissions`,
-      icon: ShieldCheck,
+      icon: Lock,
     });
   }
 

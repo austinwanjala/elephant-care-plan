@@ -34,7 +34,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, MoreHorizontal, Edit, Trash2, Fingerprint, Download, Loader2, ShieldCheck, History } from "lucide-react";
+import { Search, Plus, MoreHorizontal, Edit, Trash2, Fingerprint, Download, Loader2, ShieldCheck, History, Users } from "lucide-react";
 import { BiometricCapture } from "@/components/BiometricCapture";
 import { exportToCsv } from "@/utils/csvExport";
 
@@ -75,6 +75,7 @@ export default function AdminMembers() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [biometricDialogOpen, setBiometricDialogOpen] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [dependantsDialogOpen, setDependantsDialogOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -305,6 +306,7 @@ export default function AdminMembers() {
                     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={() => { setSelectedMember(m); setFormData({ ...formData, fullName: m.full_name, phone: m.phone, idNumber: m.id_number, dob: m.dob || "", branchId: m.branch_id || "", membershipCategoryId: m.membership_category_id || "" }); setEditDialogOpen(true); }}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => { setSelectedMember(m); setDependantsDialogOpen(true); }}><Users className="mr-2 h-4 w-4" /> View Dependants</DropdownMenuItem>
                       <DropdownMenuItem onClick={() => { setSelectedMember(m); setHistoryDialogOpen(true); }}><History className="mr-2 h-4 w-4" /> View History</DropdownMenuItem>
                       <DropdownMenuItem onClick={() => { setSelectedMember(m); setBiometricDialogOpen(true); }}><Fingerprint className="mr-2 h-4 w-4" /> Biometric</DropdownMenuItem>
                       <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteMember(m.id)}><Trash2 className="mr-2 h-4 w-4" /> Deactivate</DropdownMenuItem>
@@ -366,6 +368,14 @@ export default function AdminMembers() {
         <MemberHistoryDialog
           open={!!historyDialogOpen}
           onOpenChange={(open) => !open && setHistoryDialogOpen(false)}
+          member={selectedMember}
+        />
+      )}
+
+      {selectedMember && (
+        <MemberDependantsDialog
+          open={!!dependantsDialogOpen}
+          onOpenChange={(open) => !open && setDependantsDialogOpen(false)}
           member={selectedMember}
         />
       )}
@@ -438,6 +448,81 @@ function MemberHistoryDialog({ open, onOpenChange, member }: { open: boolean, on
                     <TableCell>
                       <Badge variant="outline">{visit.status}</Badge>
                     </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function MemberDependantsDialog({ open, onOpenChange, member }: { open: boolean, onOpenChange: (open: boolean) => void, member: Member }) {
+  const [dependants, setDependants] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (open && member) {
+      fetchDependants();
+    }
+  }, [open, member]);
+
+  const fetchDependants = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("dependants")
+      .select("*")
+      .eq("member_id", member.id)
+      .eq("is_active", true);
+
+    if (!error && data) {
+      setDependants(data);
+    }
+    setLoading(false);
+  };
+
+  const calculateAge = (dob: string) => {
+    const diffMs = Date.now() - new Date(dob).getTime();
+    const ageDt = new Date(diffMs);
+    return Math.abs(ageDt.getUTCFullYear() - 1970);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Dependants: {member.full_name}</DialogTitle>
+          <DialogDescription>Registered dependants under this member</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {loading ? (
+            <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
+          ) : dependants.length === 0 ? (
+            <div className="text-center p-8 text-muted-foreground border-2 border-dashed rounded-md">
+              No dependants registered.
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Full Name</TableHead>
+                  <TableHead>Relationship</TableHead>
+                  <TableHead>Age</TableHead>
+                  <TableHead>DOB</TableHead>
+                  <TableHead>ID / Birth Cert</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {dependants.map((dep) => (
+                  <TableRow key={dep.id}>
+                    <TableCell className="font-medium">{dep.full_name}</TableCell>
+                    <TableCell className="capitalize">{dep.relationship}</TableCell>
+                    <TableCell>{calculateAge(dep.dob)} yrs</TableCell>
+                    <TableCell>{new Date(dep.dob).toLocaleDateString()}</TableCell>
+                    <TableCell className="font-mono text-xs">{dep.document_number || dep.id_number || '-'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

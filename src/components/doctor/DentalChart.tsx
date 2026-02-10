@@ -40,7 +40,7 @@ export function DentalChart({ onToothClick, selectedTeeth, toothStatus, isChild 
         case 'mixed':
             upperJaw = MIXED_UPPER;
             lowerJaw = MIXED_LOWER;
-            title = "Mixed Dentition Dental Map";
+            title = "Pediatric / Mixed Dentition Dental Map";
             break;
         case 'adult':
         default:
@@ -50,71 +50,98 @@ export function DentalChart({ onToothClick, selectedTeeth, toothStatus, isChild 
             break;
     }
 
+    const getToothImage = (id: number) => {
+        const lastDigit = id % 10;
+        if (lastDigit === 3) return "/img/canine.png";
+        else if (lastDigit >= 4 && lastDigit <= 5) return "/img/premolar.jpg";
+        else if (lastDigit >= 6) return "/img/molar.png";
+        return "/img/incisor.png";
+    };
+
     return (
         <div className="w-full max-w-5xl mx-auto p-4 sm:p-8 border rounded-2xl bg-slate-50/30 shadow-sm">
             <h3 className="text-center font-serif font-bold text-xl mb-8 text-slate-800">
                 {title}
             </h3>
 
-            <div className="space-y-12 bg-white p-6 sm:p-10 rounded-xl border shadow-inner overflow-x-auto">
-                {/* Upper Jaw */}
-                <div className="space-y-4 min-w-[600px]">
-                    <div className="flex justify-between px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                        <span>Right</span>
-                        <span className="text-primary/60">Upper Jaw</span>
-                        <span>Left</span>
-                    </div>
-                    <div className="flex justify-center gap-1 sm:gap-2">
-                        {upperJaw.map((id) => {
-                            const lastDigit = id % 10;
-                            let imgSrc = "/img/incisor.png";
-                            if (lastDigit === 3) imgSrc = "/img/canine.png";
-                            else if (lastDigit >= 4 && lastDigit <= 5) imgSrc = "/img/premolar.jpg";
-                            else if (lastDigit >= 6) imgSrc = "/img/molar.png";
+            <div className="space-y-12 bg-white/50 p-6 sm:p-10 rounded-xl border shadow-inner overflow-x-auto relative">
+                {/* Background decorative elements to suggest jaw arch */}
+                <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px bg-slate-200/50 w-full" />
 
-                            return (
-                                <Tooth
-                                    key={id}
-                                    id={id}
-                                    isSelected={selectedTeeth.includes(id)}
-                                    status={toothStatus[id]}
-                                    onClick={() => onToothClick(id)}
-                                    imageSrc={imgSrc}
-                                />
-                            );
-                        })}
-                    </div>
-                </div>
+                {effectiveMode === 'mixed' ? (
+                    <div className="flex flex-col items-center gap-12 min-w-[600px] relative">
+                        {/* Upper Jaw Group */}
+                        <div className="relative p-6 rounded-[2.5rem] bg-gradient-to-b from-orange-50/80 to-red-50/20 border border-orange-100 shadow-sm">
+                            <h4 className="absolute -top-3 left-1/2 -translate-x-1/2 bg-white px-3 py-0.5 text-[10px] font-bold text-orange-400 uppercase tracking-widest border border-orange-100 rounded-full shadow-sm">Upper Jaw</h4>
 
-                {/* Lower Jaw */}
-                <div className="space-y-4 min-w-[600px]">
-                    <div className="flex justify-center gap-1 sm:gap-2">
-                        {lowerJaw.map((id) => {
-                            const lastDigit = id % 10;
-                            let imgSrc = "/img/incisor.png";
-                            if (lastDigit === 3) imgSrc = "/img/canine.png";
-                            else if (lastDigit >= 4 && lastDigit <= 5) imgSrc = "/img/premolar.jpg";
-                            else if (lastDigit >= 6) imgSrc = "/img/molar.png";
+                            <div className="flex flex-col items-center gap-2">
+                                {/* Upper Permanent (Outer) */}
+                                <div className="flex justify-center gap-0.5 pb-2 border-b border-dashed border-orange-200/50 w-full">
+                                    {[17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27].map(id => (
+                                        <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} imageSrc={getToothImage(id)} />
+                                    ))}
+                                </div>
 
-                            return (
-                                <Tooth
-                                    key={id}
-                                    id={id}
-                                    isSelected={selectedTeeth.includes(id)}
-                                    status={toothStatus[id]}
-                                    onClick={() => onToothClick(id)}
-                                    isLower
-                                    imageSrc={imgSrc}
-                                />
-                            );
-                        })}
+                                {/* Upper Primary (Inner) */}
+                                <div className="flex justify-center gap-0.5 bg-yellow-50/50 px-4 py-2 rounded-full border border-yellow-100/50">
+                                    {[55, 54, 53, 52, 51, 61, 62, 63, 64, 65].map(id => (
+                                        <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} imageSrc={getToothImage(id)} small />
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Lower Jaw Group */}
+                        <div className="relative p-6 rounded-[2.5rem] bg-gradient-to-t from-orange-50/80 to-red-50/20 border border-orange-100 shadow-sm">
+                            <h4 className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-white px-3 py-0.5 text-[10px] font-bold text-orange-400 uppercase tracking-widest border border-orange-100 rounded-full shadow-sm">Lower Jaw</h4>
+
+                            <div className="flex flex-col items-center gap-2">
+                                {/* Lower Primary (Inner) */}
+                                <div className="flex justify-center gap-0.5 bg-yellow-50/50 px-4 py-2 rounded-full border border-yellow-100/50">
+                                    {[85, 84, 83, 82, 81, 71, 72, 73, 74, 75].map(id => (
+                                        <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} isLower imageSrc={getToothImage(id)} small />
+                                    ))}
+                                </div>
+
+                                {/* Lower Permanent (Outer) */}
+                                <div className="flex justify-center gap-0.5 pt-2 border-t border-dashed border-orange-200/50 w-full">
+                                    {[47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37].map(id => (
+                                        <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} isLower imageSrc={getToothImage(id)} />
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div className="flex justify-between px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                        <span>Right</span>
-                        <span className="text-primary/60">Lower Jaw</span>
-                        <span>Left</span>
-                    </div>
-                </div>
+                ) : (
+                    <>
+                        {/* Standard Layout (Adult/Child) */}
+                        <div className="space-y-4 min-w-[600px]">
+                            <div className="flex justify-between px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                <span>Right</span>
+                                <span className="text-primary/60">Upper Jaw</span>
+                                <span>Left</span>
+                            </div>
+                            <div className="flex justify-center gap-1 sm:gap-2">
+                                {upperJaw.map((id) => (
+                                    <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} imageSrc={getToothImage(id)} />
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="space-y-4 min-w-[600px]">
+                            <div className="flex justify-center gap-1 sm:gap-2">
+                                {lowerJaw.map((id) => (
+                                    <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} isLower imageSrc={getToothImage(id)} />
+                                ))}
+                            </div>
+                            <div className="flex justify-between px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                <span>Right</span>
+                                <span className="text-primary/60">Lower Jaw</span>
+                                <span>Left</span>
+                            </div>
+                        </div>
+                    </>
+                )}
             </div>
 
             <div className="mt-8 pt-6 border-t flex flex-wrap justify-center gap-6 text-xs font-semibold">
@@ -146,9 +173,10 @@ interface ToothProps {
     onClick: () => void;
     isLower?: boolean;
     imageSrc?: string;
+    small?: boolean;
 }
 
-function Tooth({ id, isSelected, status, onClick, isLower, imageSrc }: ToothProps) {
+function Tooth({ id, isSelected, status, onClick, isLower, imageSrc, small }: ToothProps) {
     const lastDigit = id % 10;
     let toothPath = "";
 
@@ -179,7 +207,8 @@ function Tooth({ id, isSelected, status, onClick, isLower, imageSrc }: ToothProp
 
     // For images, we might want different overlay/border styles when selected
     const imageContainerClass = cn(
-        "relative w-7 h-8 flex items-center justify-center transition-all duration-200",
+        "relative flex items-center justify-center transition-all duration-200",
+        small ? "w-5 h-6" : "w-7 h-8",
         isSelected ? "scale-110 z-10 drop-shadow-md" : "hover:-translate-y-1"
     );
 
@@ -200,6 +229,8 @@ function Tooth({ id, isSelected, status, onClick, isLower, imageSrc }: ToothProp
                         alt={`Tooth ${id}`}
                         className={cn(
                             "w-full h-full object-contain filter",
+                            // Invert upper jaw images (Crown Down) if not lower
+                            !isLower && "rotate-180",
                             // Apply filters based on status? Or just borders?
                             // For now, let's use borders/overlays for status on images
                             status === 'decay' && "drop-shadow-[0_0_2px_rgba(239,68,68,0.8)]",

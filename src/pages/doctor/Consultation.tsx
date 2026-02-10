@@ -28,6 +28,13 @@ export default function Consultation() {
     const [doctorBranchId, setDoctorBranchId] = useState<string | null>(null);
     const [chartMode, setChartMode] = useState<DentalChartMode>('adult');
 
+    const calculateAge = (dob: string) => {
+        if (!dob) return 0;
+        const diffMs = Date.now() - new Date(dob).getTime();
+        const ageDt = new Date(diffMs);
+        return Math.abs(ageDt.getUTCFullYear() - 1970);
+    };
+
     useEffect(() => {
         if (visitId) {
             fetchDoctorInfo();
@@ -110,8 +117,7 @@ export default function Consultation() {
         const dob = visit.dependants?.dob || visit.members.dob;
         const age = calculateAge(dob);
 
-        if (age < 6) setChartMode('child');
-        else if (age < 13) setChartMode('mixed'); // 6-12 years
+        if (age <= 14) setChartMode('mixed');
         else setChartMode('adult');
     }, [visit]);
 
@@ -366,12 +372,7 @@ export default function Consultation() {
     const patientDob = visit.dependants?.dob || visit.members.dob;
 
     // Calculate age (approximation)
-    const calculateAge = (dob: string) => {
-        if (!dob) return 0;
-        const diffMs = Date.now() - new Date(dob).getTime();
-        const ageDt = new Date(diffMs);
-        return Math.abs(ageDt.getUTCFullYear() - 1970);
-    };
+
 
     const patientAge = calculateAge(patientDob);
     const isChild = patientAge < 13;
@@ -402,31 +403,10 @@ export default function Consultation() {
                                     <CardTitle>Dental Chart (FDI)</CardTitle>
                                     <CardDescription>Select teeth to add services or update clinical status.</CardDescription>
                                 </div>
-                                <div className="flex gap-1 bg-secondary/20 p-1 rounded-lg">
-                                    <Button
-                                        variant={chartMode === 'child' ? 'secondary' : 'ghost'}
-                                        size="sm"
-                                        className="h-7 text-xs"
-                                        onClick={() => setChartMode('child')}
-                                    >
-                                        Child
-                                    </Button>
-                                    <Button
-                                        variant={chartMode === 'mixed' ? 'secondary' : 'ghost'}
-                                        size="sm"
-                                        className="h-7 text-xs"
-                                        onClick={() => setChartMode('mixed')}
-                                    >
-                                        Mixed
-                                    </Button>
-                                    <Button
-                                        variant={chartMode === 'adult' ? 'secondary' : 'ghost'}
-                                        size="sm"
-                                        className="h-7 text-xs"
-                                        onClick={() => setChartMode('adult')}
-                                    >
-                                        Adult
-                                    </Button>
+                                <div className="flex gap-1 bg-secondary/10 px-3 py-1 rounded-full text-xs font-medium text-muted-foreground">
+                                    {chartMode === 'child' && <span>Pediatric Mode</span>}
+                                    {chartMode === 'mixed' && <span>Mixed Dentition Mode (Pediatric)</span>}
+                                    {chartMode === 'adult' && <span>Adult Mode</span>}
                                 </div>
                             </div>
                         </CardHeader>

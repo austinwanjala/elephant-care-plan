@@ -96,8 +96,8 @@ export default function DoctorPatientHistory() {
     let chartMode: DentalChartMode = 'adult';
     if (member?.dob) {
         const age = calculateAge(member.dob);
-        if (age < 6) chartMode = 'child';
-        else if (age < 13) chartMode = 'mixed';
+        if (age <= 14) chartMode = 'mixed';
+        else chartMode = 'adult';
     }
 
     return (

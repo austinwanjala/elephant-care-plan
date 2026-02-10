@@ -34,8 +34,7 @@ export default function DoctorDashboard() {
             .from("visits")
             .select("status")
             .eq('branch_id', staffData.branch_id)
-            .or(`doctor_id.eq.${staffData.id},doctor_id.is.null`)
-            .gte('created_at', today);
+            .or(`and(status.eq.registered,created_at.gte.${today}),and(status.eq.with_doctor,doctor_id.eq.${staffData.id})`);
 
         if (visits) {
             setStats({

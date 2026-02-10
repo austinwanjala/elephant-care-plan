@@ -4,51 +4,20 @@ import { useSidebar, Sidebar, SidebarHeader, SidebarContent, SidebarGroup, Sideb
 import { Button } from "@/components/ui/button";
 import { UserPlus, Fingerprint, Receipt, LogOut, LayoutDashboard, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { usePermissions } from "@/hooks/usePermissions";
+
+const menuItems = [
+    { title: "Dashboard", url: "/reception", icon: LayoutDashboard },
+    { title: "Register Visit", url: "/reception/register-visit", icon: UserPlus },
+    { title: "Add Member", url: "/reception/add-member", icon: UserPlus }, // New Add Member item
+    { title: "Search Member", url: "/reception/search", icon: Search }, // New item
+    { title: "Billing & Claims", url: "/reception/billing", icon: Receipt },
+];
 
 export function ReceptionSidebar() {
     const { state } = useSidebar();
     const collapsed = state === "collapsed";
     const navigate = useNavigate();
     const location = useLocation();
-    const { hasPermission, loading } = usePermissions();
-
-    const [pendingBillsCount, setPendingBillsCount] = useState(0);
-
-    const allMenuItems = [
-        {
-            title: "Dashboard",
-            url: "/reception",
-            icon: LayoutDashboard,
-            show: hasPermission('dashboard', 'view')
-        },
-        {
-            title: "Register Visit",
-            url: "/reception/register-visit",
-            icon: UserPlus,
-            show: hasPermission('visits', 'create')
-        },
-        {
-            title: "Add Member",
-            url: "/reception/add-member",
-            icon: UserPlus,
-            show: hasPermission('members', 'create')
-        },
-        {
-            title: "Search Member",
-            url: "/reception/search",
-            icon: Search,
-            show: hasPermission('members', 'view')
-        },
-        {
-            title: "Billing & Claims",
-            url: "/reception/billing",
-            icon: Receipt,
-            show: hasPermission('financials', 'view')
-        },
-    ];
-
-    const menuItems = allMenuItems.filter(item => item.show);
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
@@ -58,44 +27,25 @@ export function ReceptionSidebar() {
     const isActive = (path: string) => {
         if (path === "/reception") return location.pathname === "/reception";
         return location.pathname.startsWith(path);
-    };
+    }
+
+    const [pendingBillsCount, setPendingBillsCount] = useState(0);
 
     useEffect(() => {
         const fetchPendingBills = async () => {
             const { count } = await (supabase as any)
                 .from('bills')
                 .select('*', { count: 'exact', head: true })
-                .eq('status', 'pending');
+                .eq('status', 'pending'); // Assuming 'pending' status for unpaid bills
             setPendingBillsCount(count || 0);
         };
 
         fetchPendingBills();
 
-        const channel = supabase
-            .channel('reception:bills_changes')
-            .on(
-                'postgres_changes',
-                { event: '*', schema: 'public', table: 'bills' },
-                () => fetchPendingBills()
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
+        // Polling every 30s
+        const interval = setInterval(fetchPendingBills, 30000);
+        return () => clearInterval(interval);
     }, []);
-
-    if (loading) {
-        return (
-            <Sidebar collapsible="icon" className="border-r border-border">
-                <SidebarHeader className="p-4 border-b border-border">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-muted animate-pulse" />
-                    </div>
-                </SidebarHeader>
-            </Sidebar>
-        );
-    }
 
     return (
         <Sidebar collapsible="icon" className="border-r border-border">

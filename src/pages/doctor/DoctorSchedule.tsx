@@ -36,7 +36,7 @@ const DoctorSchedule = () => {
                 .from("appointments")
                 .select(`
                     *,
-                    members (first_name, last_name, phone_number, membership_number, gender),
+                    members (first_name, last_name, phone, membership_number, gender),
                     dependants (first_name, last_name, gender)
                 `)
                 .eq("doctor_id", doctorId)
@@ -129,7 +129,7 @@ const DoctorSchedule = () => {
                                                             </Badge>
                                                         </div>
                                                         <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                                                            <Phone className="h-3 w-3" /> {appt.members.phone_number}
+                                                            <Phone className="h-3 w-3" /> {appt.members.phone}
                                                             <span className="mx-1">•</span>
                                                             <User className="h-3 w-3" /> {gender}
                                                         </div>

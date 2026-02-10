@@ -69,9 +69,9 @@ const ReceptionAppointments = () => {
                 .from("appointments")
                 .select(`
                     *,
-                    members (id, full_name, phone_number, biometric_data),
+                    members (id, full_name, phone, biometric_data),
                     dependants (full_name),
-                    doctor:staff(full_name)
+                    staff (full_name)
                 `)
                 .eq("branch_id", branchId)
                 .eq("appointment_date", formattedDate)
@@ -145,7 +145,7 @@ const ReceptionAppointments = () => {
             : `${appt.members.full_name}`;
 
         const matchesSearch = patientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            (appt.members.phone_number && appt.members.phone_number.includes(searchQuery));
+            (appt.members.phone && appt.members.phone.includes(searchQuery));
 
         const matchesDoctor = selectedDoctorId === "all" || appt.doctor_id === selectedDoctorId;
 
@@ -270,13 +270,13 @@ const ReceptionAppointments = () => {
                                                         <div className="flex flex-col">
                                                             <span className="font-medium">{patientName}</span>
                                                             {isDependant && <Badge variant="secondary" className="w-fit text-[10px] py-0 h-4 mt-1">Dependant</Badge>}
-                                                            <span className="text-xs text-muted-foreground mt-1">{appt.members.phone_number}</span>
+                                                            <span className="text-xs text-muted-foreground mt-1">{appt.members.phone}</span>
                                                         </div>
                                                     </TableCell>
                                                     <TableCell className="align-top">
                                                         <div className="flex items-center gap-2">
                                                             <User className="h-4 w-4 text-muted-foreground" />
-                                                            <span>Dr. {appt.doctor?.full_name}</span>
+                                                            <span>Dr. {appt.staff?.full_name}</span>
                                                         </div>
                                                     </TableCell>
                                                     <TableCell className="align-top">

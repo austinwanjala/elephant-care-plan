@@ -135,6 +135,22 @@ export default function AdminMembers() {
 
       if (error) throw error;
 
+      if (error) throw error;
+
+      // Send Welcome SMS
+      try {
+        await supabase.functions.invoke('send-sms', {
+          body: {
+            type: 'welcome',
+            phone: formData.phone,
+            data: { name: formData.fullName }
+          }
+        });
+      } catch (smsErr) {
+        console.error("Failed to send Welcome SMS:", smsErr);
+        // Don't block success UI if SMS fails
+      }
+
       toast({ title: "Member registered successfully" });
       setDialogOpen(false);
       setFormData({ fullName: "", email: "", phone: "", idNumber: "", dob: "", password: "", branchId: "", membershipCategoryId: "" });

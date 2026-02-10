@@ -3,6 +3,7 @@ import { useSidebar, Sidebar, SidebarHeader, SidebarContent, SidebarGroup, Sideb
 import { Button } from "@/components/ui/button";
 import { Stethoscope, ClipboardList, LogOut, History, LayoutDashboard } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { usePermissions } from "@/hooks/usePermissions";
 
 const menuItems = [
     { title: "Dashboard", url: "/doctor", icon: LayoutDashboard },
@@ -15,6 +16,30 @@ export function DoctorSidebar() {
     const collapsed = state === "collapsed";
     const navigate = useNavigate();
     const location = useLocation();
+    const { hasPermission, loading } = usePermissions();
+
+    const allMenuItems = [
+        {
+            title: "Dashboard",
+            url: "/doctor",
+            icon: LayoutDashboard,
+            show: hasPermission('dashboard', 'view')
+        },
+        {
+            title: "Today's Queue",
+            url: "/doctor/queue",
+            icon: ClipboardList,
+            show: hasPermission('visits', 'view')
+        },
+        {
+            title: "Patient History",
+            url: "/doctor/history",
+            icon: History,
+            show: hasPermission('visits', 'process') // Or a specific history permission
+        },
+    ];
+
+    const menuItems = allMenuItems.filter(item => item.show);
 
     const handleLogout = async () => {
         await supabase.auth.signOut();

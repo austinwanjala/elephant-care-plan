@@ -87,6 +87,10 @@ export default function DoctorDashboard() {
                             <ClipboardList className="h-5 w-5" />
                             Open Today's Queue
                         </Button>
+                        <Button variant="outline" className="h-20 flex flex-col gap-1" onClick={() => navigate("/doctor/schedule")}>
+                            <History className="h-5 w-5" />
+                            My Schedule (Approved Appointments)
+                        </Button>
                         <Button variant="outline" className="h-20 flex flex-col gap-1" onClick={() => navigate("/doctor/history")}>
                             <History className="h-5 w-5" />
                             Search Patient History

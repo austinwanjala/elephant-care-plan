@@ -19,9 +19,11 @@ const DoctorSchedule = () => {
     useEffect(() => {
         const getDoctorId = async () => {
             const { data: { user } } = await supabase.auth.getUser();
+            console.log("Current User:", user);
             if (!user) return;
 
             const { data } = await supabase.from("staff").select("id").eq("user_id", user.id).maybeSingle();
+            console.log("Doctor Staff Data:", data);
             if (data) setDoctorId(data.id);
         };
         getDoctorId();
@@ -32,19 +34,35 @@ const DoctorSchedule = () => {
         enabled: !!doctorId && !!date,
         queryFn: async () => {
             const formattedDate = format(date!, "yyyy-MM-dd");
+            console.log("Fetching appointments for:", { doctorId, formattedDate });
+
+            // Debug query to see ALL appointments for this doctor on this date, regardless of status
+            const { data: allAppts, error: debugError } = await supabase
+                .from("appointments")
+                .select("id, status, appointment_date, doctor_id")
+                .eq("doctor_id", doctorId)
+                .eq("appointment_date", formattedDate);
+
+            console.log("DEBUG: All appointments for doctor/date (any status):", allAppts);
+            if (debugError) console.error("DEBUG Error:", debugError);
+
             const { data, error } = await supabase
                 .from("appointments")
                 .select(`
                     *,
-                    members (first_name, last_name, phone, membership_number, gender),
-                    dependants (first_name, last_name, gender)
+                    members (full_name, phone, member_number, age),
+                    dependants (full_name, dob)
                 `)
                 .eq("doctor_id", doctorId)
                 .eq("appointment_date", formattedDate)
                 .neq("status", "pending") // Doctor only sees approved (confirmed) or processed appointments
                 .order("start_time", { ascending: true });
 
-            if (error) throw error;
+            if (error) {
+                console.error("Query Error:", error);
+                throw error;
+            }
+            console.log("Filtered Appointments (non-pending):", data);
             return data;
         },
     });
@@ -99,16 +117,18 @@ const DoctorSchedule = () => {
                                 <div className="flex justify-center p-8"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>
                             ) : !appointments || appointments.length === 0 ? (
                                 <div className="text-center p-8 text-muted-foreground">
-                                    No appointments scheduled for this date.
+                                    No approved appointments found for this date.
                                 </div>
                             ) : (
                                 <div className="space-y-4">
                                     {appointments.map((appt: any) => {
                                         const patientName = appt.dependants
-                                            ? `${appt.dependants.first_name} ${appt.dependants.last_name} (Dep)`
-                                            : `${appt.members.first_name} ${appt.members.last_name}`;
+                                            ? `${appt.dependants.full_name} (Dep)`
+                                            : appt.members.full_name;
 
-                                        const gender = appt.dependants ? appt.dependants.gender : appt.members.gender;
+                                        const extraInfo = appt.dependants
+                                            ? `DOB: ${appt.dependants.dob}`
+                                            : `Age: ${appt.members.age || 'N/A'}`;
 
                                         return (
                                             <div key={appt.id} className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 border rounded-lg hover:bg-slate-50 transition-colors">
@@ -131,7 +151,7 @@ const DoctorSchedule = () => {
                                                         <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
                                                             <Phone className="h-3 w-3" /> {appt.members.phone}
                                                             <span className="mx-1">•</span>
-                                                            <User className="h-3 w-3" /> {gender}
+                                                            <User className="h-3 w-3" /> {extraInfo}
                                                         </div>
                                                     </div>
                                                 </div>

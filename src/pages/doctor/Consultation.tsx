@@ -28,12 +28,7 @@ export default function Consultation() {
     const [doctorBranchId, setDoctorBranchId] = useState<string | null>(null);
     const [chartMode, setChartMode] = useState<DentalChartMode>('adult');
 
-    const calculateAge = (dob: string) => {
-        if (!dob) return 0;
-        const diffMs = Date.now() - new Date(dob).getTime();
-        const ageDt = new Date(diffMs);
-        return Math.abs(ageDt.getUTCFullYear() - 1970);
-    };
+
 
     useEffect(() => {
         if (visitId) {
@@ -111,11 +106,24 @@ export default function Consultation() {
         setLoading(false);
     };
 
+    // Calculate age (approximation or exact if available)
+    const getPatientAge = () => {
+        if (!visit) return 0;
+        // member.age is a computed column in the view/table usually
+        if (visit.members?.age) return visit.members.age;
+
+        const dob = visit.dependants?.dob || visit.members?.dob;
+        if (!dob) return 0;
+
+        const diffMs = Date.now() - new Date(dob).getTime();
+        const ageDt = new Date(diffMs);
+        return Math.abs(ageDt.getUTCFullYear() - 1970);
+    };
+
     // Auto-set chart mode based on age when visit loads
     useEffect(() => {
         if (!visit) return;
-        const dob = visit.dependants?.dob || visit.members.dob;
-        const age = calculateAge(dob);
+        const age = getPatientAge();
 
         if (age <= 14) setChartMode('mixed');
         else setChartMode('adult');
@@ -374,8 +382,8 @@ export default function Consultation() {
     // Calculate age (approximation)
 
 
-    const patientAge = calculateAge(patientDob);
-    const isChild = patientAge < 13;
+    const patientAge = getPatientAge();
+    const isChild = patientAge <= 14;
 
     return (
         <div className="space-y-6 max-w-7xl mx-auto">

@@ -27,7 +27,10 @@ BEGIN
         receptionist_id,
         status,
         biometrics_verified,
-        created_at
+        created_at,
+        benefit_deducted,
+        branch_compensation,
+        profit_loss
     ) VALUES (
         v_appt.member_id,
         v_appt.branch_id,
@@ -36,7 +39,10 @@ BEGIN
         _receptionist_id,
         'registered', -- CHANGED from 'in_progress' to 'registered' to match queue logic
         TRUE,
-        now()
+        now(),
+        0,
+        0,
+        0
     ) RETURNING id INTO v_visit_id;
 
     -- Update Appointment

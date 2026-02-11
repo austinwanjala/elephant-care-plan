@@ -71,6 +71,7 @@ import AdminMembers from "./pages/admin/AdminMembers";
 import AdminBranches from "./pages/admin/AdminBranches";
 import AdminStaff from "./pages/admin/AdminStaff";
 import AdminVisits from "./pages/admin/AdminVisits";
+import AdminAppointments from "./pages/admin/AdminAppointments";
 import AdminServices from "./pages/admin/AdminServices";
 import AdminBranchPayments from "./pages/admin/AdminBranchPayments";
 import AdminMarketerClaims from "./pages/admin/AdminMarketerClaims";
@@ -165,6 +166,7 @@ const App = () => (
             <Route path="branches" element={<AdminBranches />} />
             <Route path="staff" element={<AdminStaff />} />
             <Route path="visits" element={<AdminVisits />} />
+            <Route path="appointments" element={<AdminAppointments />} />
             <Route path="services" element={<AdminServices />} />
             <Route path="branch-payments" element={<AdminBranchPayments />} />
             <Route path="marketer-claims" element={<AdminMarketerClaims />} />
@@ -182,6 +184,7 @@ const App = () => (
             <Route path="branches" element={<AdminBranches />} />
             <Route path="staff" element={<AdminStaff />} />
             <Route path="visits" element={<AdminVisits />} />
+            <Route path="appointments" element={<AdminAppointments />} />
             <Route path="services" element={<AdminServices />} />
             <Route path="branch-payments" element={<AdminBranchPayments />} />
             <Route path="marketer-claims" element={<AdminMarketerClaims />} />

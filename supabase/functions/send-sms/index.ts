@@ -6,7 +6,7 @@ const corsHeaders = {
 };
 
 interface SmsPayload {
-    type: 'welcome' | 'payment_confirmation' | 'billing_completion' | 'low_balance' | 'payment_failed' | 'otp' | 'appointment_booked' | 'appointment_reminder' | 'appointment_cancelled' | 'appointment_rescheduled';
+    type: 'welcome' | 'payment_confirmation' | 'billing_completion' | 'low_balance' | 'payment_failed' | 'otp' | 'appointment_booked' | 'appointment_reminder' | 'appointment_cancelled' | 'appointment_rescheduled' | 'appointment_pending';
     phone: string;
     email?: string;
     data: any;
@@ -73,6 +73,10 @@ serve(async (req) => {
             case 'appointment_rescheduled':
                 message = `Your appointment has been rescheduled to ${data.date} at ${data.time} with ${data.doctor_name}.`;
                 subject = "Appointment Rescheduled - Elephant Dental";
+                break;
+            case 'appointment_pending':
+                message = `Your appointment request with ${data.doctor_name} for ${data.date} at ${data.time} has been received and is pending approval.`;
+                subject = "Appointment Request Received - Elephant Dental";
                 break;
             default:
                 message = `Notification from Elephant Dental: ${JSON.stringify(data)}`;

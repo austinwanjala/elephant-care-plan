@@ -65,6 +65,7 @@ export function AdminSidebar() {
     { title: "Branches", url: `${basePath}/branches`, icon: Building2 },
     { title: "Staff", url: `${basePath}/staff`, icon: UserCog },
     { title: "Visits", url: `${basePath}/visits`, icon: History },
+    { title: "Appointments", url: `${basePath}/appointments`, icon: History },
     { title: "Services", url: `${basePath}/services`, icon: Stethoscope },
     { title: "Branch Payments", url: `${basePath}/branch-payments`, icon: DollarSign },
     { title: "Marketer Claims", url: `${basePath}/marketer-claims`, icon: ClipboardList },

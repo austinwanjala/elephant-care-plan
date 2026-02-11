@@ -306,7 +306,7 @@ export default function ReceptionBilling() {
                                                                         Verify services for <b>{visit.members?.full_name}</b>.
                                                                     </DialogDescription>
                                                                 </DialogHeader>
-                                                                <div className="space-y-4 py-4">
+                                                                <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
                                                                     <div className="border rounded-lg overflow-hidden">
                                                                         <Table>
                                                                             <TableHeader className="bg-slate-50">

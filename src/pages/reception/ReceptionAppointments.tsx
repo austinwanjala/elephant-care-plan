@@ -286,9 +286,19 @@ const ReceptionAppointments = () => {
                                                     </TableCell>
                                                     <TableCell className="text-right align-top">
                                                         {appt.status === 'confirmed' && (
-                                                            <Button size="sm" onClick={() => handleInitialCheckIn(appt)}>
-                                                                <CheckCircle2 className="mr-2 h-4 w-4" /> Check In
-                                                            </Button>
+                                                            <div className="flex flex-col items-end gap-1">
+                                                                <Button
+                                                                    size="sm"
+                                                                    onClick={() => handleInitialCheckIn(appt)}
+                                                                    disabled={appt.appointment_date !== format(new Date(), "yyyy-MM-dd")}
+                                                                    title={appt.appointment_date !== format(new Date(), "yyyy-MM-dd") ? "Check-in allowed on appointment day only" : ""}
+                                                                >
+                                                                    <CheckCircle2 className="mr-2 h-4 w-4" /> Check In
+                                                                </Button>
+                                                                {appt.appointment_date !== format(new Date(), "yyyy-MM-dd") && (
+                                                                    <span className="text-[10px] text-muted-foreground">Today only</span>
+                                                                )}
+                                                            </div>
                                                         )}
                                                         {appt.status === 'pending' && (
                                                             <Button size="sm" variant="outline" disabled>

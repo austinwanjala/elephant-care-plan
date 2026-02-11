@@ -4,10 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, CheckCircle2, XCircle, Calendar, User, Clock, MapPin, Building2 } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, Calendar, User, Clock, MapPin, Building2, BarChart2 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import AppointmentAnalytics from "@/components/director/AppointmentAnalytics";
 
 const DirectorAppointments = () => {
     const queryClient = useQueryClient();
@@ -146,90 +147,99 @@ const DirectorAppointments = () => {
                     <TabsTrigger value="history" className="flex items-center gap-2">
                         <CheckCircle2 className="w-4 h-4" /> Approval History
                     </TabsTrigger>
+                    <TabsTrigger value="analytics" className="flex items-center gap-2">
+                        <BarChart2 className="w-4 h-4" /> Analytics
+                    </TabsTrigger>
                 </TabsList>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            {activeTab === "pending" ? <Clock className="h-5 w-5 text-orange-500" /> : <Calendar className="h-5 w-5 text-blue-500" />}
-                            {activeTab === "pending" ? "Pending Requests" : "Processed Appointments"}
-                        </CardTitle>
-                        <CardDescription>
-                            {activeTab === "pending"
-                                ? `Appointments requiring authorization for ${branchName || "your branch"}.`
-                                : `History of approved and rejected appointments.`}
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {isLoading ? (
-                            <div className="flex justify-center p-12"><Loader2 className="animate-spin text-primary" /></div>
-                        ) : !appointments || appointments.length === 0 ? (
-                            <div className="text-center p-12 text-muted-foreground border rounded-lg border-dashed">
-                                {activeTab === "pending" ? "No pending appointments found." : "No appointment history found."}
-                            </div>
-                        ) : (
-                            <div className="space-y-4">
-                                {appointments.map((appt: any) => {
-                                    const patientName = appt.dependants
-                                        ? `${appt.dependants.full_name} (Dep)`
-                                        : `${appt.members.full_name}`;
+                <TabsContent value="analytics" className="mt-4">
+                    <AppointmentAnalytics />
+                </TabsContent>
 
-                                    return (
-                                        <div key={appt.id} className="flex flex-col md:flex-row items-center justify-between p-4 border rounded-lg hover:bg-slate-50 transition-colors">
-                                            <div className="flex gap-4 w-full md:w-auto">
-                                                <div className="flex-shrink-0 text-center w-20 bg-primary/10 rounded p-2 text-primary">
-                                                    <div className="font-bold">{format(new Date(appt.appointment_date), "MMM d")}</div>
-                                                    <div className="text-xs">{appt.start_time.slice(0, 5)}</div>
+                {activeTab !== 'analytics' && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                {activeTab === "pending" ? <Clock className="h-5 w-5 text-orange-500" /> : <Calendar className="h-5 w-5 text-blue-500" />}
+                                {activeTab === "pending" ? "Pending Requests" : "Processed Appointments"}
+                            </CardTitle>
+                            <CardDescription>
+                                {activeTab === "pending"
+                                    ? `Appointments requiring authorization for ${branchName || "your branch"}.`
+                                    : `History of approved and rejected appointments.`}
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            {isLoading ? (
+                                <div className="flex justify-center p-12"><Loader2 className="animate-spin text-primary" /></div>
+                            ) : !appointments || appointments.length === 0 ? (
+                                <div className="text-center p-12 text-muted-foreground border rounded-lg border-dashed">
+                                    {activeTab === "pending" ? "No pending appointments found." : "No appointment history found."}
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {appointments.map((appt: any) => {
+                                        const patientName = appt.dependants
+                                            ? `${appt.dependants.full_name} (Dep)`
+                                            : `${appt.members.full_name}`;
+
+                                        return (
+                                            <div key={appt.id} className="flex flex-col md:flex-row items-center justify-between p-4 border rounded-lg hover:bg-slate-50 transition-colors">
+                                                <div className="flex gap-4 w-full md:w-auto">
+                                                    <div className="flex-shrink-0 text-center w-20 bg-primary/10 rounded p-2 text-primary">
+                                                        <div className="font-bold">{format(new Date(appt.appointment_date), "MMM d")}</div>
+                                                        <div className="text-xs">{appt.start_time.slice(0, 5)}</div>
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <h4 className="font-semibold text-lg">{patientName}</h4>
+                                                            {activeTab !== 'pending' && getStatusBadge(appt.status)}
+                                                        </div>
+                                                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                                                            <span className="flex items-center gap-1"><User className="h-3 w-3" /> Dr. {appt.staff?.full_name}</span>
+                                                            <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {appt.branches?.name}</span>
+                                                        </div>
+                                                        <div className="text-xs text-muted-foreground">
+                                                            Request received: {format(new Date(appt.created_at), "MMM d, h:mm a")}
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div className="space-y-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <h4 className="font-semibold text-lg">{patientName}</h4>
-                                                        {activeTab !== 'pending' && getStatusBadge(appt.status)}
-                                                    </div>
-                                                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                                                        <span className="flex items-center gap-1"><User className="h-3 w-3" /> Dr. {appt.staff?.full_name}</span>
-                                                        <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {appt.branches?.name}</span>
-                                                    </div>
-                                                    <div className="text-xs text-muted-foreground">
-                                                        Request received: {format(new Date(appt.created_at), "MMM d, h:mm a")}
-                                                    </div>
+
+                                                <div className="flex gap-2 mt-4 md:mt-0 w-full md:w-auto">
+                                                    {activeTab === 'pending' ? (
+                                                        <>
+                                                            <Button
+                                                                className="flex-1 md:flex-none bg-green-600 hover:bg-green-700"
+                                                                onClick={() => handleAction(appt.id, 'approve')}
+                                                                disabled={!!actioningId}
+                                                            >
+                                                                {actioningId === appt.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+                                                                Approve
+                                                            </Button>
+                                                            <Button
+                                                                variant="destructive"
+                                                                className="flex-1 md:flex-none"
+                                                                onClick={() => handleAction(appt.id, 'reject')}
+                                                                disabled={!!actioningId}
+                                                            >
+                                                                {actioningId === appt.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="mr-2 h-4 w-4" />}
+                                                                Reject
+                                                            </Button>
+                                                        </>
+                                                    ) : (
+                                                        <div className="text-sm text-muted-foreground italic">
+                                                            Processed
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
-
-                                            <div className="flex gap-2 mt-4 md:mt-0 w-full md:w-auto">
-                                                {activeTab === 'pending' ? (
-                                                    <>
-                                                        <Button
-                                                            className="flex-1 md:flex-none bg-green-600 hover:bg-green-700"
-                                                            onClick={() => handleAction(appt.id, 'approve')}
-                                                            disabled={!!actioningId}
-                                                        >
-                                                            {actioningId === appt.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                                                            Approve
-                                                        </Button>
-                                                        <Button
-                                                            variant="destructive"
-                                                            className="flex-1 md:flex-none"
-                                                            onClick={() => handleAction(appt.id, 'reject')}
-                                                            disabled={!!actioningId}
-                                                        >
-                                                            {actioningId === appt.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="mr-2 h-4 w-4" />}
-                                                            Reject
-                                                        </Button>
-                                                    </>
-                                                ) : (
-                                                    <div className="text-sm text-muted-foreground italic">
-                                                        Processed
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
             </Tabs>
         </div>
     );

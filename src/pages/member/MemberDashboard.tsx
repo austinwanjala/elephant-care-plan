@@ -47,9 +47,12 @@ interface Visit {
   id: string;
   created_at: string;
   notes: string | null;
-  services: { name: string } | null;
   branches: { name: string } | null;
-  bills: { total_benefit_cost: number }[] | null;
+  bills: {
+    total_benefit_cost: number;
+    total_real_cost: number;
+    bill_items: { service_name: string }[]
+  }[] | null;
 }
 
 interface Payment {
@@ -137,8 +140,17 @@ const MemberDashboard = () => {
     if (memberData) {
       const { data, error } = await supabase
         .from("visits")
-        .select("*, services(name), branches(name), bills(total_benefit_cost)")
+        .select(`
+          *, 
+          branches(name), 
+          bills(
+            total_benefit_cost,
+            total_real_cost,
+            bill_items(service_name)
+          )
+        `)
         .eq("member_id", memberData.id)
+        .eq("status", "completed")
         .order("created_at", { ascending: false });
 
       if (data) {
@@ -378,18 +390,30 @@ const MemberDashboard = () => {
                           </TableCell>
                         </TableRow>
                       ) : (
-                        visits.map((visit) => (
-                          <TableRow key={visit.id}>
-                            <TableCell>
-                              {new Date(visit.created_at).toLocaleDateString()}
-                            </TableCell>
-                            <TableCell>{visit.services?.name || "N/A"}</TableCell>
-                            <TableCell>{visit.branches?.name || "N/A"}</TableCell>
-                            <TableCell className="text-destructive">
-                              -KES {visit.bills?.[0]?.total_benefit_cost?.toLocaleString() || 0}
-                            </TableCell>
-                          </TableRow>
-                        ))
+                        visits.map((visit) => {
+                          const isPending = visit.status !== 'completed';
+                          const bill = visit.bills?.[0];
+                          const serviceNames = isPending
+                            ? "Processing..."
+                            : (bill?.bill_items?.map(i => i.service_name).join(", ") || "Consultation");
+
+                          const amountDisplay = isPending
+                            ? "Pending"
+                            : `-KES ${(bill?.total_benefit_cost || 0).toLocaleString()}`;
+
+                          return (
+                            <TableRow key={visit.id}>
+                              <TableCell>
+                                {new Date(visit.created_at).toLocaleDateString()}
+                              </TableCell>
+                              <TableCell>{serviceNames}</TableCell>
+                              <TableCell>{visit.branches?.name || "N/A"}</TableCell>
+                              <TableCell className={`font-semibold ${isPending ? "text-muted-foreground" : "text-destructive"}`}>
+                                {amountDisplay}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
                       )}
                     </TableBody>
                   </Table>

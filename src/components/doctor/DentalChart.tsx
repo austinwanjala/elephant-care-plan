@@ -58,6 +58,73 @@ export function DentalChart({ onToothClick, selectedTeeth, toothStatus, isChild 
         return "/img/incisor.png";
     };
 
+    // Calculate vertical offset for curve effect
+    const getCurveOffset = (id: number, isUpper: boolean) => {
+        const lastDigit = id % 10;
+        // Central Incisors (1) -> Lowest point (0px)
+        // Molars (8) -> Highest point (e.g., 40px)
+
+        let offset = 0;
+        if (lastDigit === 1) offset = 0;
+        else if (lastDigit === 2) offset = 5;
+        else if (lastDigit === 3) offset = 15; // Canine - start curving up
+        else if (lastDigit === 4) offset = 30;
+        else if (lastDigit === 5) offset = 40;
+        else if (lastDigit >= 6) offset = 50;
+
+        // For lower jaw, we might want to curve downwards or same direction depending on visual preference.
+        // Usually, a "smile" curve means corners are higher.
+        // So for "Upper Jaw", incisors are lowest, molars highest.
+        // For "Lower Jaw", incisors are highest, molars lowest? Or usually displayed as an arch too.
+        // Let's standard "Arch" display:
+        // Upper: Concave down (Incisors low, Molars high visually on screen? No, standard chart is usually straight or slightly curved).
+        // Request says "curvature of a mouth".
+        // Let's try: Upper Jaw -> Incisors (bottom), Molars (top). Arch shape.
+        // Lower Jaw -> Incisors (top), Molars (bottom). U shape.
+
+        if (isUpper) {
+            // Arch like ◠ . Incisors (1) at bottom (high Y value?), Molars (8) at top (low Y value?)
+            // If Flex container aligns items at 'start' (top), then increasing Y moves them down.
+            // visual: 
+            //   M M       M M
+            //    C         C
+            //     I I I I
+
+            // So Motars should have 0 offset? Incisors should have max offset?
+            // Let's try:
+            // Molars: 0px
+            // Premolars: 20px
+            // Canines: 40px
+            // Incisors: 50px
+
+            if (lastDigit >= 6) offset = 0;
+            else if (lastDigit === 5) offset = 15;
+            else if (lastDigit === 4) offset = 25;
+            else if (lastDigit === 3) offset = 35;
+            else if (lastDigit === 2) offset = 45;
+            else if (lastDigit === 1) offset = 50;
+        } else {
+            // Lower Jaw (U shape). 
+            //   I I I I
+            //  C       C
+            // M M     M M
+
+            // Incisors at top (0px or negative?). Molars at bottom (max positive).
+            // If we use mt (margin-top) or translate-y:
+            // Incisors: 0px
+            // Molars: 50px
+
+            if (lastDigit === 1) offset = 0;
+            else if (lastDigit === 2) offset = 5;
+            else if (lastDigit === 3) offset = 15;
+            else if (lastDigit === 4) offset = 30;
+            else if (lastDigit === 5) offset = 40;
+            else if (lastDigit >= 6) offset = 50;
+        }
+
+        return offset;
+    };
+
     return (
         <div className="w-full max-w-5xl mx-auto p-4 sm:p-8 border rounded-2xl bg-slate-50/30 shadow-sm">
             <h3 className="text-center font-serif font-bold text-xl mb-8 text-slate-800">
@@ -115,29 +182,32 @@ export function DentalChart({ onToothClick, selectedTeeth, toothStatus, isChild 
                 ) : (
                     <>
                         {/* Standard Layout (Adult/Child) */}
-                        <div className="space-y-4 min-w-[600px]">
-                            <div className="flex justify-between px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                <span>Right</span>
-                                <span className="text-primary/60">Upper Jaw</span>
-                                <span>Left</span>
+                        {/* Standard Layout (Adult/Child) */}
+                        <div className="space-y-8 min-w-[600px] py-4">
+                            <div className="space-y-2">
+                                <div className="flex justify-between px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                    <span>Right</span>
+                                    <span className="text-primary/60">Upper Jaw</span>
+                                    <span>Left</span>
+                                </div>
+                                <div className="flex justify-center gap-1 sm:gap-2 bg-white/50 p-4 rounded-xl border border-slate-100 shadow-sm">
+                                    {upperJaw.map((id) => (
+                                        <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} imageSrc={getToothImage(id)} />
+                                    ))}
+                                </div>
                             </div>
-                            <div className="flex justify-center gap-1 sm:gap-2">
-                                {upperJaw.map((id) => (
-                                    <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} imageSrc={getToothImage(id)} />
-                                ))}
-                            </div>
-                        </div>
 
-                        <div className="space-y-4 min-w-[600px]">
-                            <div className="flex justify-center gap-1 sm:gap-2">
-                                {lowerJaw.map((id) => (
-                                    <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} isLower imageSrc={getToothImage(id)} />
-                                ))}
-                            </div>
-                            <div className="flex justify-between px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                <span>Right</span>
-                                <span className="text-primary/60">Lower Jaw</span>
-                                <span>Left</span>
+                            <div className="space-y-2">
+                                <div className="flex justify-center gap-1 sm:gap-2 bg-white/50 p-4 rounded-xl border border-slate-100 shadow-sm">
+                                    {lowerJaw.map((id) => (
+                                        <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} isLower imageSrc={getToothImage(id)} />
+                                    ))}
+                                </div>
+                                <div className="flex justify-between px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                    <span>Right</span>
+                                    <span className="text-primary/60">Lower Jaw</span>
+                                    <span>Left</span>
+                                </div>
                             </div>
                         </div>
                     </>

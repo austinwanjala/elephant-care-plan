@@ -7,10 +7,14 @@ import { format } from "date-fns";
 interface Visit {
   id: string;
   created_at: string;
+  status: string;
   notes: string | null;
-  services: { name: string } | null;
   branches: { name: string } | null;
-  bills: { total_benefit_cost: number }[] | null;
+  bills: {
+    total_benefit_cost: number;
+    total_real_cost: number;
+    bill_items: { service_name: string }[]
+  }[] | null;
 }
 
 export default function MemberVisits() {
@@ -38,8 +42,20 @@ export default function MemberVisits() {
 
     const { data } = await supabase
       .from("visits")
-      .select("id, created_at, notes, services(name), branches(name), bills(total_benefit_cost)")
+      .select(`
+        id, 
+        created_at, 
+        status,
+        notes, 
+        branches(name), 
+        bills(
+          total_benefit_cost, 
+          total_real_cost,
+          bill_items(service_name)
+        )
+      `)
       .eq("member_id", member.id)
+      .eq("status", "completed")
       .order("created_at", { ascending: false });
 
     setVisits(data as any || []);
@@ -70,25 +86,39 @@ export default function MemberVisits() {
         </Card>
       ) : (
         <div className="space-y-4">
-          {visits.map((visit) => (
-            <Card key={visit.id}>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <p className="font-semibold">{visit.services?.name || "Unknown Service"}</p>
-                    <p className="text-sm text-muted-foreground">{visit.branches?.name || "Unknown Branch"}</p>
-                    {visit.notes && <p className="text-xs text-muted-foreground">{visit.notes}</p>}
+          {visits.map((visit) => {
+            const isPending = visit.status !== 'completed';
+            const bill = visit.bills?.[0];
+            const serviceNames = isPending
+              ? "Processing..."
+              : (bill?.bill_items?.map(i => i.service_name).join(", ") || "Consultation");
+
+            const amountDisplay = isPending
+              ? "Pending"
+              : `-KES ${(bill?.total_benefit_cost || 0).toLocaleString()}`;
+
+            return (
+              <Card key={visit.id}>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <p className="font-semibold">{serviceNames}</p>
+                      <p className="text-sm text-muted-foreground">{visit.branches?.name || "Unknown Branch"}</p>
+                      {visit.notes && <p className="text-xs text-muted-foreground">{visit.notes}</p>}
+                    </div>
+                    <div className="text-right">
+                      <p className={`font-semibold ${isPending ? "text-muted-foreground" : "text-destructive"}`}>
+                        {amountDisplay}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(visit.created_at), "MMM d, yyyy")}
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-destructive">-KES {visit.bills?.[0]?.total_benefit_cost?.toLocaleString() || 0}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {format(new Date(visit.created_at), "MMM d, yyyy")}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

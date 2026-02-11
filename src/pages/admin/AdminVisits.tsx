@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { History, Loader2, Download, Calendar as CalendarIcon } from "lucide-react";
+import { History, Loader2, Download, Calendar as CalendarIcon, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { exportToCsv } from "@/utils/csvExport";
@@ -19,6 +19,16 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Visit {
   id: string;
@@ -103,6 +113,30 @@ export default function AdminVisits() {
         return <Badge variant="destructive">Cancelled</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  const { toast } = useToast();
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  const handleDeleteVisit = async (visitId: string) => {
+    try {
+      const { error } = await supabase.from("visits").delete().eq("id", visitId);
+      if (error) throw error;
+
+      toast({
+        title: "Visit deleted",
+        description: "The visit record has been permanently removed.",
+      });
+      loadVisits();
+    } catch (error: any) {
+      toast({
+        title: "Error deleting visit",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteId(null);
     }
   };
 
@@ -208,12 +242,13 @@ export default function AdminVisits() {
                   <TableHead>Benefit Deducted</TableHead>
                   <TableHead>Branch Comp.</TableHead>
                   <TableHead>Profit/Loss</TableHead>
+                  <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {visits.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
                       No visits recorded yet.
                     </TableCell>
                   </TableRow>
@@ -253,6 +288,16 @@ export default function AdminVisits() {
                         <TableCell className={profitLoss >= 0 ? "text-success" : "text-destructive"}>
                           KES {profitLoss.toLocaleString()}
                         </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => setDeleteId(visit.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     );
                   })
@@ -262,6 +307,23 @@ export default function AdminVisits() {
           </div>
         </CardContent>
       </Card>
-    </div>
-  );
-}
+
+      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the visit record and associated billing information.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteId && handleDeleteVisit(deleteId)}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>

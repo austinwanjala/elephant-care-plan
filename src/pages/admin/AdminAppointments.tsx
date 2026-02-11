@@ -182,52 +182,54 @@ export default function AdminAppointments() {
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Date & Time</TableHead>
-                                <TableHead>Member</TableHead>
-                                <TableHead>Branch</TableHead>
-                                <TableHead>Doctor</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead>Notes</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {appointments.length === 0 ? (
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
                                 <TableRow>
-                                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                                        No appointments found.
-                                    </TableCell>
+                                    <TableHead>Date & Time</TableHead>
+                                    <TableHead>Member</TableHead>
+                                    <TableHead>Branch</TableHead>
+                                    <TableHead>Doctor</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Notes</TableHead>
                                 </TableRow>
-                            ) : (
-                                appointments.map((apt) => (
-                                    <TableRow key={apt.id}>
-                                        <TableCell>
-                                            <div className="flex flex-col">
-                                                <span className="font-medium">{format(new Date(apt.appointment_date), "MMM d, yyyy")}</span>
-                                                <span className="text-xs text-muted-foreground">{apt.start_time}</span>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div>
-                                                <p className="font-medium">{apt.members?.full_name}</p>
-                                                <p className="text-xs text-muted-foreground font-mono">
-                                                    {apt.members?.member_number}
-                                                </p>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>{apt.branches?.name || "N/A"}</TableCell>
-                                        <TableCell>{apt.doctor?.full_name || <span className="text-muted-foreground italic">Unassigned</span>}</TableCell>
-                                        <TableCell>{getStatusBadge(apt.status)}</TableCell>
-                                        <TableCell className="max-w-[200px] truncate" title={apt.notes || ""}>
-                                            {apt.notes || "-"}
+                            </TableHeader>
+                            <TableBody>
+                                {appointments.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                                            No appointments found.
                                         </TableCell>
                                     </TableRow>
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
+                                ) : (
+                                    appointments.map((apt) => (
+                                        <TableRow key={apt.id}>
+                                            <TableCell>
+                                                <div className="flex flex-col">
+                                                    <span className="font-medium">{format(new Date(apt.appointment_date), "MMM d, yyyy")}</span>
+                                                    <span className="text-xs text-muted-foreground">{apt.start_time}</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div>
+                                                    <p className="font-medium">{apt.members?.full_name}</p>
+                                                    <p className="text-xs text-muted-foreground font-mono">
+                                                        {apt.members?.member_number}
+                                                    </p>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>{apt.branches?.name || "N/A"}</TableCell>
+                                            <TableCell>{apt.doctor?.full_name || <span className="text-muted-foreground italic">Unassigned</span>}</TableCell>
+                                            <TableCell>{getStatusBadge(apt.status)}</TableCell>
+                                            <TableCell className="max-w-[200px] truncate" title={apt.notes || ""}>
+                                                {apt.notes || "-"}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </CardContent>
             </Card>
         </div>

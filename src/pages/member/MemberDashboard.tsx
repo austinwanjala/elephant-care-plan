@@ -46,6 +46,7 @@ interface Member {
 interface Visit {
   id: string;
   created_at: string;
+  status: string;
   notes: string | null;
   branches: { name: string } | null;
   bills: {

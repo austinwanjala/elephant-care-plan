@@ -116,7 +116,6 @@ export default function AdminVisits() {
     }
   };
 
-  const { toast } = useToast();
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const handleDeleteVisit = async (visitId: string) => {
@@ -327,3 +326,6 @@ export default function AdminVisits() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}

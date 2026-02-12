@@ -123,6 +123,14 @@ export default function AdminVisits() {
       const { error } = await supabase.from("visits").delete().eq("id", visitId);
       if (error) throw error;
 
+      // Log the action
+      const { error: logError } = await supabase.from("system_logs").insert({
+        action: "DELETE_VISIT",
+        details: { visit_id: visitId, deleted_by: (await supabase.auth.getUser()).data.user?.id },
+        user_id: (await supabase.auth.getUser()).data.user?.id
+      });
+      if (logError) console.error("Error logging action:", logError);
+
       toast({
         title: "Visit deleted",
         description: "The visit record has been permanently removed.",

@@ -35,7 +35,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, Edit, Settings, Shield, Download } from "lucide-react";
+import { Plus, MoreHorizontal, Edit, Settings, Shield, Download, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { exportToCsv } from "@/utils/csvExport";
 
@@ -93,7 +93,7 @@ export default function AdminServices() {
       supabase.from("service_preapprovals").select("service_id, branch_id"),
     ]);
 
-    if (servicesRes.data) setServices(servicesRes.data);
+    if (servicesRes.data) setServices(servicesRes.data as any as Service[]);
     if (branchesRes.data) setBranches(branchesRes.data);
     if (preapprovalsRes.data) setPreapprovals(preapprovalsRes.data);
   };
@@ -156,6 +156,23 @@ export default function AdminServices() {
         .eq("id", service.id);
 
       if (error) throw error;
+      loadData();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleDeleteService = async (service: Service) => {
+    if (!confirm(`Are you sure you want to delete "${service.name}"? This action cannot be undone.`)) return;
+
+    try {
+      const { error } = await supabase
+        .from("services")
+        .delete()
+        .eq("id", service.id);
+
+      if (error) throw error;
+      toast({ title: "Service deleted successfully" });
       loadData();
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -416,6 +433,9 @@ export default function AdminServices() {
                             <Shield className="mr-2 h-4 w-4" /> Manage Branches
                           </DropdownMenuItem>
                         )}
+                        <DropdownMenuItem onClick={() => handleDeleteService(service)} className="text-destructive focus:text-destructive">
+                          <Trash2 className="mr-2 h-4 w-4" /> Delete
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

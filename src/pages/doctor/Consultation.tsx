@@ -8,6 +8,21 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Save, Send, ArrowLeft, Trash2, Plus, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { DentalChart, DentalChartMode } from "@/components/doctor/DentalChart";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 
 export default function Consultation() {
     const { visitId } = useParams();
@@ -31,6 +46,9 @@ export default function Consultation() {
 
 
     const [activeStages, setActiveStages] = useState<any[]>([]);
+    const [stageDialogOpen, setStageDialogOpen] = useState(false);
+    const [pendingService, setPendingService] = useState<any>(null);
+    const [selectedStageNumber, setSelectedStageNumber] = useState(1);
 
     useEffect(() => {
         if (visitId) {
@@ -83,7 +101,7 @@ export default function Consultation() {
             // Fetch active multi-stage treatments
             const { data: stages } = await supabase
                 .from("service_stages")
-                .select("*, services(name)")
+                .select("*, services(name), tooth_number, related_bill_id")
                 .eq("member_id", data.member_id)
                 .eq("dependant_id", data.dependant_id || null) // Handle nullable dependant
                 .eq("status", "in_progress");
@@ -200,40 +218,27 @@ export default function Consultation() {
         }
     };
 
-    const addService = (serviceId: string) => {
-        if (!serviceId) return;
-        const service = availableServices.find(s => s.id === serviceId);
-        if (!service) return;
-
-        // Check if this is a multi-stage service and there's already an active stage
-        const existingStage = activeStages.find(stage => stage.service_id === serviceId);
-        if (existingStage) {
-            toast({
-                title: "Active Stage Exists",
-                description: `This patient is already in Stage ${existingStage.current_stage} of ${existingStage.total_stages} for ${service.name}. Please use the 'Multi-Stage Treatments' panel to continue.`,
-                variant: 'destructive'
-            });
-            return;
-        }
-
+    const performAddService = (service: any, startStage: number = 1) => {
         if (selectedTeeth.length > 0) {
             let addedCount = 0;
             const newSelections = [...selectedServices];
             const blockedTeeth: number[] = [];
 
             selectedTeeth.forEach(tooth => {
-                if (newSelections.find(s => s.service.id === serviceId && s.tooth_number === tooth)) {
+                if (newSelections.find(s => s.service.id === service.id && s.tooth_number === tooth)) {
                     return;
                 }
 
                 const hasExistingRecord = serviceHistory.some(h =>
-                    h.tooth_number == tooth && h.service_id === serviceId
+                    h.tooth_number == tooth && h.service_id === service.id
                 );
 
                 if (hasExistingRecord) {
                     blockedTeeth.push(tooth);
                 } else {
-                    newSelections.push({ service, tooth_number: tooth });
+                    // Clone service to add stage info if needed
+                    const serviceWithStage = { ...service, startAtStage: startStage };
+                    newSelections.push({ service: serviceWithStage, tooth_number: tooth });
                     addedCount++;
                 }
             });
@@ -253,10 +258,117 @@ export default function Consultation() {
             }
 
         } else {
+            const serviceWithStage = { ...service, startAtStage: startStage };
             toast({ title: "General Service", description: "Added as general service (no tooth specified)." });
-            if (!selectedServices.find(s => s.service.id === serviceId && s.tooth_number === null)) {
-                setSelectedServices([...selectedServices, { service, tooth_number: null }]);
+            if (!selectedServices.find(s => s.service.id === service.id && s.tooth_number === null)) {
+                setSelectedServices([...selectedServices, { service: serviceWithStage, tooth_number: null }]);
             }
+        }
+    };
+
+    const addService = (serviceId: string) => {
+        if (!serviceId) return;
+        const service = availableServices.find(s => s.id === serviceId);
+        if (!service) return;
+
+        // Check if this is a multi-stage service and there's already an active stage
+        // We need to check if we are adding it to specific teeth or generally
+        if (selectedTeeth.length > 0) {
+            const blockedTeeth: number[] = [];
+            selectedTeeth.forEach(tooth => {
+                const existingStage = activeStages.find(stage =>
+                    stage.service_id === serviceId &&
+                    stage.tooth_number === tooth
+                );
+                if (existingStage) {
+                    blockedTeeth.push(tooth);
+                } else {
+                    // If no existing stage, and it's a new multi-stage service, add it as a new start
+                    if (service.is_multi_stage) {
+                        const serviceWithStage = { ...service, startAtStage: 1 }; // New multi-stage MUST start at 1
+                        newSelections.push({ service: serviceWithStage, tooth_number: tooth });
+                        addedCount++;
+                    } else {
+                        // For non-multi-stage or if it's not blocked, add normally
+                        newSelections.push({ service: { ...service, startAtStage: 1 }, tooth_number: tooth });
+                        addedCount++;
+                    }
+                }
+            });
+
+            if (blockedTeeth.length > 0) {
+                // Auto-continue logic for blocked teeth (existing active stages)
+                blockedTeeth.forEach(tooth => {
+                    const existingStage = activeStages.find(stage =>
+                        stage.service_id === serviceId &&
+                        stage.tooth_number === tooth
+                    );
+                    if (existingStage) {
+                        const nextStage = existingStage.current_stage + 1;
+                        if (nextStage > existingStage.total_stages) return; // Should not happen if filtered by in_progress
+
+                        // Add as Progress Update
+                        toast({ title: "Continuing Treatment", description: `Added ${service.name} Stage ${nextStage} for Tooth ${tooth}.` });
+                        const serviceUpdate = {
+                            ...service,
+                            benefit_cost: 0, // No charge for follow-up stages
+                            startAtStage: nextStage,
+                            is_multi_stage_update: true,
+                            related_bill_id: existingStage.related_bill_id,
+                            stage_id: existingStage.id
+                        };
+                        newSelections.push({ service: serviceUpdate, tooth_number: tooth });
+                        addedCount++;
+                    }
+                });
+            }
+
+            if (addedCount > 0) {
+                setSelectedServices(newSelections);
+                toast({ title: "Services Added", description: `Added ${service.name} for ${addedCount} teeth.` });
+                setSelectedTeeth([]);
+            }
+
+        } else {
+            // General service check (no tooth selected)
+            const existingStage = activeStages.find(stage =>
+                stage.service_id === serviceId &&
+                stage.tooth_number === null
+            );
+            if (existingStage) {
+                const nextStage = existingStage.current_stage + 1;
+
+                toast({ title: "Continuing Treatment", description: `Added ${service.name} Stage ${nextStage}.` });
+                const serviceUpdate = {
+                    ...service,
+                    benefit_cost: 0, // No charge for follow-up stages
+                    startAtStage: nextStage,
+                    is_multi_stage_update: true,
+                    related_bill_id: existingStage.related_bill_id,
+                    stage_id: existingStage.id
+                };
+                if (!selectedServices.find(s => s.service.id === serviceId && s.tooth_number === null)) {
+                    setSelectedServices([...selectedServices, { service: serviceUpdate, tooth_number: null }]);
+                }
+                return;
+            }
+
+            // If no existing stage and it's a multi-stage service, it must be a new start (Stage 1)
+            if (service.is_multi_stage) {
+                performAddService(service, 1);
+                return;
+            }
+
+            // For non-multi-stage services or new multi-stage services (handled above)
+            performAddService(service, 1);
+        }
+    };
+
+    const handleConfirmStage = () => {
+        if (pendingService) {
+            performAddService(pendingService, selectedStageNumber);
+            setStageDialogOpen(false);
+            setPendingService(null);
         }
     };
 
@@ -383,104 +495,158 @@ export default function Consultation() {
                 if (dentalError) throw dentalError;
             }
 
-            const totalBenefit = selectedServices.reduce((acc, s) => acc + Number(s.service.benefit_cost || 0), 0);
-            const totalCompensation = selectedServices.reduce((acc, s) => acc + Number(s.service.branch_compensation || 0), 0);
-            const totalReal = selectedServices.reduce((acc, s) => acc + Number(s.service.real_cost || 0), 0);
-            const totalProfitLoss = totalBenefit - totalCompensation;
+            // Split services into "New Multi-Stage" (Locked) and "Standard/Updates" (Unlocked/No-Cost)
+            const newMultiStageServices = selectedServices.filter(s => s.service.is_multi_stage && !s.service.is_multi_stage_update);
+            const otherServices = selectedServices.filter(s => !s.service.is_multi_stage || s.service.is_multi_stage_update); // Updates are 0 cost typically, but kept here for logic
 
-            // Determine if bill should be claimable immediately
-            // If it contains a NEW multi-stage service, it is NOT claimable yet.
-            const hasNewMultiStage = selectedServices.some(s => s.service.is_multi_stage && !s.service.is_multi_stage_update);
-            const isClaimable = !hasNewMultiStage;
+            // Calculate cost only for items that are NOT multi-stage updates (updates are free/pre-paid)
+            const billableStandardServices = otherServices.filter(s => !s.service.is_multi_stage_update);
 
-            const { data: bill, error: billError } = await supabase.from("bills").insert({
-                visit_id: visitId,
-                branch_id: doctorBranchId,
-                total_benefit_cost: totalBenefit,
-                total_branch_compensation: totalCompensation,
-                total_real_cost: totalReal,
-                total_profit_loss: totalProfitLoss,
-                is_finalized: false,
-                is_claimable: isClaimable
-            }).select().single();
+            let primaryBillId = null;
 
-            if (billError) throw billError;
+            // 1. Handle Standard Bill (Unlocked) - Only if there are billable standard items
+            if (billableStandardServices.length > 0) {
+                const totalBenefit = billableStandardServices.reduce((acc, s) => acc + Number(s.service.benefit_cost || 0), 0);
+                const totalCompensation = billableStandardServices.reduce((acc, s) => acc + Number(s.service.branch_compensation || 0), 0);
+                const totalReal = billableStandardServices.reduce((acc, s) => acc + Number(s.service.real_cost || 0), 0);
 
-            const itemsToInsert = selectedServices.map(s => ({
-                bill_id: bill.id,
-                service_id: s.service.id,
-                service_name: s.service.name,
-                benefit_cost: s.service.benefit_cost || 0,
-                branch_compensation: s.service.branch_compensation || 0,
-                real_cost: s.service.real_cost || 0,
-                tooth_number: s.tooth_number ? s.tooth_number.toString() : null
-            }));
+                const { data: bill, error: billError } = await supabase.from("bills").insert({
+                    visit_id: visitId,
+                    branch_id: doctorBranchId,
+                    member_id: visit.member_id,
+                    total_benefit_cost: totalBenefit,
+                    total_branch_compensation: totalCompensation,
+                    total_real_cost: totalReal,
+                    total_profit_loss: totalBenefit - totalCompensation,
+                    is_finalized: true,
+                    is_claimable: true,
+                    payment_status: 'pending'
+                }).select().single();
 
-            const { error: itemsError } = await supabase.from("bill_items").insert(itemsToInsert);
-            if (itemsError) throw itemsError;
+                if (billError) throw billError;
+                primaryBillId = bill.id;
 
-            // Handle Multi-Stage Updates
-            for (const item of selectedServices) {
-                // 1. New Multi-Stage Service (Stage 1)
-                if (item.service.is_multi_stage && !item.service.is_multi_stage_update) {
+                const itemsToInsert = billableStandardServices.map(s => ({
+                    bill_id: bill.id,
+                    service_id: s.service.id,
+                    item_name: s.service.name,
+                    item_type: 'service',
+                    quantity: 1,
+                    unit_cost: s.service.benefit_cost || 0,
+                    total_cost: s.service.benefit_cost || 0,
+                    tooth_number: s.tooth_number ? s.tooth_number.toString() : null
+                }));
+
+                const { error: itemsError } = await supabase.from("bill_items").insert(itemsToInsert);
+                if (itemsError) throw itemsError;
+            }
+
+            // 2. Handle Locked Bill (New Multi-Stage Starts)
+            if (newMultiStageServices.length > 0) {
+                const totalBenefit = newMultiStageServices.reduce((acc, s) => acc + Number(s.service.benefit_cost || 0), 0);
+                const totalCompensation = newMultiStageServices.reduce((acc, s) => acc + Number(s.service.branch_compensation || 0), 0);
+                const totalReal = newMultiStageServices.reduce((acc, s) => acc + Number(s.service.real_cost || 0), 0);
+
+                const { data: lockedBill, error: billError } = await supabase.from("bills").insert({
+                    visit_id: visitId,
+                    branch_id: doctorBranchId,
+                    member_id: visit.member_id,
+                    total_benefit_cost: totalBenefit,
+                    total_branch_compensation: totalCompensation,
+                    total_real_cost: totalReal,
+                    total_profit_loss: totalBenefit - totalCompensation,
+                    is_finalized: true,
+                    is_claimable: false, // LOCKED
+                    payment_status: 'pending'
+                }).select().single();
+
+                if (billError) throw billError;
+                if (!primaryBillId) primaryBillId = lockedBill.id; // Use locked bill as primary if no standard bill
+
+                const itemsToInsert = newMultiStageServices.map(s => ({
+                    bill_id: lockedBill.id,
+                    service_id: s.service.id,
+                    item_name: s.service.name + " (Stage 1)",
+                    item_type: 'service',
+                    quantity: 1,
+                    unit_cost: s.service.benefit_cost || 0,
+                    total_cost: s.service.benefit_cost || 0,
+                    tooth_number: s.tooth_number ? s.tooth_number.toString() : null
+                }));
+
+                const { error: itemsError } = await supabase.from("bill_items").insert(itemsToInsert);
+                if (itemsError) throw itemsError;
+
+                // Create Service Stage Records linked to Locked Bill
+                for (const item of newMultiStageServices) {
                     await supabase.from("service_stages").insert({
                         service_id: item.service.id,
                         member_id: visit.member_id,
                         dependant_id: visit.dependant_id || null,
                         visit_id: visitId,
+                        tooth_number: item.tooth_number || null,
                         current_stage: 1,
                         total_stages: item.service.total_stages,
                         status: 'in_progress',
-                        notes: `Started in visit ${visitId}`
+                        related_bill_id: lockedBill.id,
+                        notes: `Started in visit ${visitId} on tooth ${item.tooth_number}`
                     });
                 }
-                // 2. Existing Stage Update
-                else if (item.service.is_multi_stage_update) {
-                    await supabase.from("service_stages").update({
-                        current_stage: item.service.nextStage,
-                        status: item.service.isFinal ? 'completed' : 'in_progress',
-                        visit_id: visitId,
-                        updated_at: new Date().toISOString()
-                    }).eq('id', item.service.stageId);
+            }
 
-                    // If Final Stage, unlock previous bills for this service
-                    if (item.service.isFinal) {
-                        try {
-                            // Find bills that contain this service for this member and are not claimable
-                            // We need to look up bill_items -> bills
-                            // This is a bit complex via client, ideally a stored proc, but let's try 2-step
-                            const { data: items } = await supabase
-                                .from("bill_items")
-                                .select("bill_id")
-                                .eq("service_id", item.service.id);
+            // 3. Handle Stage Updates (Logic only, no billing implications as they are 0 cost)
+            const updates = selectedServices.filter(s => s.service.is_multi_stage_update);
+            for (const item of updates) {
+                const currentStage = item.service.startAtStage; // This holds the *next* stage
+                const isFinal = currentStage === item.service.total_stages;
 
-                            const billIds = items?.map(i => i.bill_id) || [];
+                await supabase
+                    .from("service_stages")
+                    .update({
+                        current_stage: currentStage,
+                        status: isFinal ? 'completed' : 'in_progress',
+                        updated_at: new Date().toISOString(),
+                        visit_id: visitId
+                    })
+                    .eq("id", item.service.stage_id);
 
-                            if (billIds.length > 0) {
-                                await supabase
-                                    .from("bills")
-                                    .update({ is_claimable: true })
-                                    .in("id", billIds)
-                                    .eq("member_id", visit.member_id)
-                                    .eq("is_claimable", false);
-                            }
-                        } catch (e) {
-                            console.error("Error unlocking bills:", e);
-                        }
+                if (isFinal && item.service.related_bill_id) {
+                    // Unlock the original bill
+                    await supabase
+                        .from("bills")
+                        .update({ is_claimable: true })
+                        .eq("id", item.service.related_bill_id);
+
+                    // Create Revenue Claim
+                    if (doctorBranchId && doctorId) {
+                        await supabase.from("revenue_claims").insert({
+                            branch_id: doctorBranchId,
+                            director_id: doctorId,
+                            amount: item.service.real_cost || 0, // Using real_cost as claim amount
+                            status: 'pending',
+                            notes: `Completed ${item.service.name} (All Stages) for ${visit.members.full_name}`
+                        });
                     }
                 }
             }
 
+            // Only insert chart records if we have a bill ID or we can insert without it (check active stages for related bill)
             const chartRecordsToInsert = selectedServices
                 .filter(s => s.tooth_number !== null)
-                .map(s => ({
-                    member_id: visit.member_id,
-                    dependant_id: visit.dependant_id || null, // Add dependant_id
-                    bill_id: bill.id,
-                    service_id: s.service.id,
-                    tooth_number: s.tooth_number!.toString(),
-                    notes: `Procedure performed on visit ${visitId}`,
-                }));
+                .map(s => {
+                    let billIdToUse = primaryBillId;
+                    if (s.service.is_multi_stage_update && s.service.related_bill_id) {
+                        billIdToUse = s.service.related_bill_id;
+                    }
+                    return {
+                        member_id: visit.member_id,
+                        dependant_id: visit.dependant_id || null, // Add dependant_id
+                        bill_id: billIdToUse, // Allow null if schema supports it, or it will fail and we'll know
+                        service_id: s.service.id,
+                        tooth_number: s.tooth_number!.toString(),
+                        notes: `Procedure performed on visit ${visitId}`,
+                    };
+                });
 
             if (chartRecordsToInsert.length > 0) {
                 const { error: chartError } = await supabase.from("dental_chart_records").insert(chartRecordsToInsert);
@@ -503,7 +669,7 @@ export default function Consultation() {
 
             await (supabase as any).from("system_logs").insert({
                 action: "Consultation Submitted",
-                details: { visit_id: visitId, doctor_id: doctorId, services_count: selectedServices.length, bill_id: bill.id },
+                details: { visit_id: visitId, doctor_id: doctorId, services_count: selectedServices.length, bill_id: primaryBillId },
                 user_id: (await supabase.auth.getUser()).data.user?.id
             });
 
@@ -561,10 +727,12 @@ export default function Consultation() {
                                 {activeStages.map(stage => (
                                     <div key={stage.id} className="flex flex-col sm:flex-row sm:items-center justify-between bg-white p-4 rounded-lg border shadow-sm gap-4">
                                         <div>
-                                            <h4 className="font-bold text-foreground">{stage.services.name}</h4>
-                                            <p className="text-sm text-muted-foreground">
-                                                Currently at <span className="font-medium text-blue-600">Stage {stage.current_stage}</span> of {stage.total_stages}
-                                            </p>
+                                            <div>
+                                                <h4 className="font-bold text-foreground">{stage.services.name} {stage.tooth_number && <span className="text-sm font-normal text-muted-foreground">(Tooth #{stage.tooth_number})</span>}</h4>
+                                                <p className="text-sm text-muted-foreground">
+                                                    Currently at <span className="font-medium text-blue-600">Stage {stage.current_stage}</span> of {stage.total_stages}
+                                                </p>
+                                            </div>
                                         </div>
                                         <Button
                                             size="sm"
@@ -756,11 +924,11 @@ export default function Consultation() {
                                 <div className="mt-2 space-y-1">
                                     <div className="flex justify-between">
                                         <span>Total Benefit Cost:</span>
-                                        <span>KES {selectedServices.reduce((acc, s) => acc + Number(s.service.benefit_cost), 0).toLocaleString()}</span>
+                                        <span>KES {selectedServices.filter(s => !s.service.is_multi_stage_update).reduce((acc, s) => acc + Number(s.service.benefit_cost), 0).toLocaleString()}</span>
                                     </div>
                                     <div className="flex justify-between font-bold text-primary">
                                         <span>Estimated Coverage Deduction:</span>
-                                        <span>KES {Math.min(selectedServices.reduce((acc, s) => acc + Number(s.service.benefit_cost), 0), visit.members.coverage_balance || 0).toLocaleString()}</span>
+                                        <span>KES {Math.min(selectedServices.filter(s => !s.service.is_multi_stage_update).reduce((acc, s) => acc + Number(s.service.benefit_cost), 0), visit.members.coverage_balance || 0).toLocaleString()}</span>
                                     </div>
                                 </div>
                             </div>
@@ -777,6 +945,39 @@ export default function Consultation() {
                     </Button>
                 </div>
             </div>
+
+            <Dialog open={stageDialogOpen} onOpenChange={setStageDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Select Starting Stage</DialogTitle>
+                        <DialogDescription>
+                            "{pendingService?.name}" is a multi-stage procedure. Please select which stage you are performing today.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <Label>Current Stage</Label>
+                        <Select
+                            value={selectedStageNumber.toString()}
+                            onValueChange={(val) => setSelectedStageNumber(parseInt(val))}
+                        >
+                            <SelectTrigger className="w-full mt-2">
+                                <SelectValue placeholder="Select stage" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {pendingService && Array.from({ length: pendingService.total_stages }, (_, i) => i + 1).map((num) => (
+                                    <SelectItem key={num} value={num.toString()}>
+                                        Stage {num} of {pendingService.total_stages}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setStageDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleConfirmStage}>Confirm & Add</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

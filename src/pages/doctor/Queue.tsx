@@ -83,101 +83,103 @@ export default function DoctorQueue() {
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Time</TableHead>
-                                <TableHead>Patient</TableHead>
-                                <TableHead>ID / Number</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead>Action</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {loading ? (
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
                                 <TableRow>
-                                    <TableCell colSpan={5} className="text-center py-8">
-                                        <Loader2 className="animate-spin h-6 w-6 mx-auto text-primary" />
-                                    </TableCell>
+                                    <TableHead>Time</TableHead>
+                                    <TableHead>Patient</TableHead>
+                                    <TableHead>ID / Number</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Action</TableHead>
                                 </TableRow>
-                            ) : visits.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                                        No patients in queue.
-                                    </TableCell>
-                                </TableRow>
-                            ) : (
-                                visits.map((visit) => {
-                                    const patientName = visit.dependants?.full_name || visit.members?.full_name;
+                            </TableHeader>
+                            <TableBody>
+                                {loading ? (
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="text-center py-8">
+                                            <Loader2 className="animate-spin h-6 w-6 mx-auto text-primary" />
+                                        </TableCell>
+                                    </TableRow>
+                                ) : visits.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                                            No patients in queue.
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    visits.map((visit) => {
+                                        const patientName = visit.dependants?.full_name || visit.members?.full_name;
 
-                                    // Age Calculation Logic (Consistent with Consultation.tsx)
-                                    const getAge = () => {
-                                        if (visit.dependants?.dob) {
-                                            const birthDate = new Date(visit.dependants.dob);
-                                            const today = new Date();
-                                            let age = today.getFullYear() - birthDate.getFullYear();
-                                            const m = today.getMonth() - birthDate.getMonth();
-                                            if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-                                                age--;
+                                        // Age Calculation Logic (Consistent with Consultation.tsx)
+                                        const getAge = () => {
+                                            if (visit.dependants?.dob) {
+                                                const birthDate = new Date(visit.dependants.dob);
+                                                const today = new Date();
+                                                let age = today.getFullYear() - birthDate.getFullYear();
+                                                const m = today.getMonth() - birthDate.getMonth();
+                                                if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                                                    age--;
+                                                }
+                                                return age;
                                             }
-                                            return age;
-                                        }
-                                        if (visit.members?.age) return visit.members.age;
-                                        if (visit.members?.dob) {
-                                            const birthDate = new Date(visit.members.dob);
-                                            const today = new Date();
-                                            let age = today.getFullYear() - birthDate.getFullYear();
-                                            const m = today.getMonth() - birthDate.getMonth();
-                                            if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-                                                age--;
+                                            if (visit.members?.age) return visit.members.age;
+                                            if (visit.members?.dob) {
+                                                const birthDate = new Date(visit.members.dob);
+                                                const today = new Date();
+                                                let age = today.getFullYear() - birthDate.getFullYear();
+                                                const m = today.getMonth() - birthDate.getMonth();
+                                                if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                                                    age--;
+                                                }
+                                                return age;
                                             }
-                                            return age;
-                                        }
-                                        return 0;
-                                    };
+                                            return 0;
+                                        };
 
-                                    const patientAge = getAge();
-                                    const isDependant = !!visit.dependants;
+                                        const patientAge = getAge();
+                                        const isDependant = !!visit.dependants;
 
-                                    return (
-                                        <TableRow key={visit.id}>
-                                            <TableCell className="font-mono text-xs">
-                                                {new Date(visit.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                <div className="text-[10px] text-muted-foreground">{new Date(visit.created_at).toLocaleDateString()}</div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div>
-                                                    <p className="font-medium flex items-center gap-2">
-                                                        {patientName}
-                                                        {isDependant && <Badge variant="outline" className="text-[10px] h-4 px-1">Dependant</Badge>}
-                                                        {patientAge <= 14 && <Badge variant="secondary" className="text-[10px] h-4 px-1 bg-amber-100 text-amber-800 hover:bg-amber-100">Pediatric</Badge>}
-                                                    </p>
-                                                    <p className="text-xs text-muted-foreground">{patientAge} yrs</p>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex flex-col">
-                                                    <span>{visit.dependants?.document_number ? `ID: ${visit.dependants.document_number}` : (visit.members?.member_number || '-')}</span>
-                                                    {isDependant && <span className="text-[10px] text-muted-foreground">Principal: {visit.members?.full_name}</span>}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge variant={visit.status === 'with_doctor' ? 'default' : 'secondary'}>
-                                                    {visit.status === 'with_doctor' ? 'In Progress' : 'Waiting'}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Button size="sm" onClick={() => handleStartConsultation(visit.id, visit.status)}>
-                                                    {visit.status === 'with_doctor' ? 'Continue' : 'Start Consultation'}
-                                                    <ArrowRight className="ml-2 h-4 w-4" />
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    );
-                                })
-                            )}
-                        </TableBody>
-                    </Table>
+                                        return (
+                                            <TableRow key={visit.id}>
+                                                <TableCell className="font-mono text-xs">
+                                                    {new Date(visit.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    <div className="text-[10px] text-muted-foreground">{new Date(visit.created_at).toLocaleDateString()}</div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div>
+                                                        <p className="font-medium flex items-center gap-2">
+                                                            {patientName}
+                                                            {isDependant && <Badge variant="outline" className="text-[10px] h-4 px-1">Dependant</Badge>}
+                                                            {patientAge <= 14 && <Badge variant="secondary" className="text-[10px] h-4 px-1 bg-amber-100 text-amber-800 hover:bg-amber-100">Pediatric</Badge>}
+                                                        </p>
+                                                        <p className="text-xs text-muted-foreground">{patientAge} yrs</p>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="flex flex-col">
+                                                        <span>{visit.dependants?.document_number ? `ID: ${visit.dependants.document_number}` : (visit.members?.member_number || '-')}</span>
+                                                        {isDependant && <span className="text-[10px] text-muted-foreground">Principal: {visit.members?.full_name}</span>}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge variant={visit.status === 'with_doctor' ? 'default' : 'secondary'}>
+                                                        {visit.status === 'with_doctor' ? 'In Progress' : 'Waiting'}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Button size="sm" onClick={() => handleStartConsultation(visit.id, visit.status)}>
+                                                        {visit.status === 'with_doctor' ? 'Continue' : 'Start Consultation'}
+                                                        <ArrowRight className="ml-2 h-4 w-4" />
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </CardContent>
             </Card>
         </div>

@@ -171,7 +171,7 @@ export default function DirectorDashboard() {
                 </div>
             </div>
 
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
                 <DashboardCard
                     title="Revenue"
                     value={`KES ${stats.totalRevenue.toLocaleString()}`}
@@ -202,7 +202,7 @@ export default function DirectorDashboard() {
                 />
             </div>
 
-            <div className="grid gap-6 md:grid-cols-7">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-7">
                 {/* Upcoming Appointments List */}
                 <Card className="md:col-span-3 shadow-md border-none card-elevated">
                     <CardHeader>

@@ -258,106 +258,108 @@ const ReceptionAppointments = () => {
                                     No appointments found matching your criteria.
                                 </div>
                             ) : (
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead className="w-[100px]">Time</TableHead>
-                                            <TableHead>Patient</TableHead>
-                                            <TableHead>Doctor</TableHead>
-                                            <TableHead>Status</TableHead>
-                                            <TableHead className="text-right">Actions</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {filteredAppointments.map((appt: any) => {
-                                            const patientName = appt.dependants
-                                                ? `${appt.dependants.full_name}`
-                                                : `${appt.members.full_name}`;
-                                            const isDependant = !!appt.dependants;
+                                <div className="overflow-x-auto">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead className="w-[100px]">Time</TableHead>
+                                                <TableHead>Patient</TableHead>
+                                                <TableHead>Doctor</TableHead>
+                                                <TableHead>Status</TableHead>
+                                                <TableHead className="text-right">Actions</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {filteredAppointments.map((appt: any) => {
+                                                const patientName = appt.dependants
+                                                    ? `${appt.dependants.full_name}`
+                                                    : `${appt.members.full_name}`;
+                                                const isDependant = !!appt.dependants;
 
-                                            return (
-                                                <TableRow key={appt.id}>
-                                                    <TableCell className="font-medium align-top">
-                                                        <div className="flex flex-col">
-                                                            <span className="text-base">{appt.start_time.slice(0, 5)}</span>
-                                                            <span className="text-xs text-muted-foreground">{appt.end_time.slice(0, 5)}</span>
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell className="align-top">
-                                                        <div className="flex flex-col">
-                                                            <span className="font-medium">{patientName}</span>
-                                                            {isDependant && <Badge variant="secondary" className="w-fit text-[10px] py-0 h-4 mt-1">Dependant</Badge>}
-                                                            <span className="text-xs text-muted-foreground mt-1">{appt.members.phone}</span>
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell className="align-top">
-                                                        <div className="flex items-center gap-2">
-                                                            <User className="h-4 w-4 text-muted-foreground" />
-                                                            <span>Dr. {appt.staff?.full_name}</span>
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell className="align-top">
-                                                        <Badge variant="outline" className={getStatusColor(appt.status)}>
-                                                            {appt.status.replace('_', ' ')}
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell className="text-right align-top">
-                                                        {appt.status === 'confirmed' && (
-                                                            <div className="flex flex-col items-end gap-1">
-                                                                <Button
-                                                                    size="sm"
-                                                                    onClick={() => handleInitialCheckIn(appt)}
-                                                                    disabled={appt.appointment_date !== format(new Date(), "yyyy-MM-dd")}
-                                                                    title={appt.appointment_date !== format(new Date(), "yyyy-MM-dd") ? "Check-in allowed on appointment day only" : ""}
-                                                                >
-                                                                    <CheckCircle2 className="mr-2 h-4 w-4" /> Check In
-                                                                </Button>
-                                                                {appt.appointment_date !== format(new Date(), "yyyy-MM-dd") && (
-                                                                    <span className="text-[10px] text-muted-foreground">Today only</span>
-                                                                )}
+                                                return (
+                                                    <TableRow key={appt.id}>
+                                                        <TableCell className="font-medium align-top">
+                                                            <div className="flex flex-col">
+                                                                <span className="text-base">{appt.start_time.slice(0, 5)}</span>
+                                                                <span className="text-xs text-muted-foreground">{appt.end_time.slice(0, 5)}</span>
                                                             </div>
-                                                        )}
-                                                        {appt.status === 'pending' && (
-                                                            <div className="flex gap-2 justify-end">
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="outline"
-                                                                    className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200"
-                                                                    onClick={() => {
-                                                                        if (confirm("Approve this appointment?")) {
-                                                                            updateStatusMutation.mutate({ id: appt.id, status: 'confirmed' });
-                                                                        }
-                                                                    }}
-                                                                    disabled={updateStatusMutation.isPending}
-                                                                >
-                                                                    Approve
-                                                                </Button>
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="outline"
-                                                                    className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                                                                    onClick={() => {
-                                                                        if (prompt("Reason for rejection:") !== null) {
-                                                                            updateStatusMutation.mutate({ id: appt.id, status: 'rejected' });
-                                                                        }
-                                                                    }}
-                                                                    disabled={updateStatusMutation.isPending}
-                                                                >
-                                                                    Reject
-                                                                </Button>
+                                                        </TableCell>
+                                                        <TableCell className="align-top">
+                                                            <div className="flex flex-col">
+                                                                <span className="font-medium">{patientName}</span>
+                                                                {isDependant && <Badge variant="secondary" className="w-fit text-[10px] py-0 h-4 mt-1">Dependant</Badge>}
+                                                                <span className="text-xs text-muted-foreground mt-1">{appt.members.phone}</span>
                                                             </div>
-                                                        )}
-                                                        {appt.status === 'checked_in' && (
-                                                            <Button size="sm" variant="secondary" disabled>
-                                                                Checked In
-                                                            </Button>
-                                                        )}
-                                                    </TableCell>
-                                                </TableRow>
-                                            );
-                                        })}
-                                    </TableBody>
-                                </Table>
+                                                        </TableCell>
+                                                        <TableCell className="align-top">
+                                                            <div className="flex items-center gap-2">
+                                                                <User className="h-4 w-4 text-muted-foreground" />
+                                                                <span>Dr. {appt.staff?.full_name}</span>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="align-top">
+                                                            <Badge variant="outline" className={getStatusColor(appt.status)}>
+                                                                {appt.status.replace('_', ' ')}
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell className="text-right align-top">
+                                                            {appt.status === 'confirmed' && (
+                                                                <div className="flex flex-col items-end gap-1">
+                                                                    <Button
+                                                                        size="sm"
+                                                                        onClick={() => handleInitialCheckIn(appt)}
+                                                                        disabled={appt.appointment_date !== format(new Date(), "yyyy-MM-dd")}
+                                                                        title={appt.appointment_date !== format(new Date(), "yyyy-MM-dd") ? "Check-in allowed on appointment day only" : ""}
+                                                                    >
+                                                                        <CheckCircle2 className="mr-2 h-4 w-4" /> Check In
+                                                                    </Button>
+                                                                    {appt.appointment_date !== format(new Date(), "yyyy-MM-dd") && (
+                                                                        <span className="text-[10px] text-muted-foreground">Today only</span>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                            {appt.status === 'pending' && (
+                                                                <div className="flex gap-2 justify-end">
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200"
+                                                                        onClick={() => {
+                                                                            if (confirm("Approve this appointment?")) {
+                                                                                updateStatusMutation.mutate({ id: appt.id, status: 'confirmed' });
+                                                                            }
+                                                                        }}
+                                                                        disabled={updateStatusMutation.isPending}
+                                                                    >
+                                                                        Approve
+                                                                    </Button>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                                                                        onClick={() => {
+                                                                            if (prompt("Reason for rejection:") !== null) {
+                                                                                updateStatusMutation.mutate({ id: appt.id, status: 'rejected' });
+                                                                            }
+                                                                        }}
+                                                                        disabled={updateStatusMutation.isPending}
+                                                                    >
+                                                                        Reject
+                                                                    </Button>
+                                                                </div>
+                                                            )}
+                                                            {appt.status === 'checked_in' && (
+                                                                <Button size="sm" variant="secondary" disabled>
+                                                                    Checked In
+                                                                </Button>
+                                                            )}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })}
+                                        </TableBody>
+                                    </Table>
+                                </div>
                             )}
                         </CardContent>
                     </Card>

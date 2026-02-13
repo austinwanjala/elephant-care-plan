@@ -256,7 +256,7 @@ const MemberDashboard = () => {
   return (
     <div className="bg-background">
       <main className="container mx-auto px-4 py-8">
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Coverage Balance</CardTitle>
@@ -321,7 +321,7 @@ const MemberDashboard = () => {
           </Card>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-1 space-y-8">
             {member && <InsuranceCard member={{
               full_name: member.full_name,

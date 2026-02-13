@@ -195,11 +195,11 @@ export default function AdminServices() {
   const openEditDialog = (service: Service) => {
     setSelectedService(service);
     setFormData({
-      name: service.name,
-      realCost: service.real_cost.toString(),
-      branchCompensation: service.branch_compensation.toString(),
-      benefitCost: service.benefit_cost.toString(),
-      approvalType: service.approval_type,
+      name: service.name || "",
+      realCost: (service.real_cost ?? 0).toString(),
+      branchCompensation: (service.branch_compensation ?? 0).toString(),
+      benefitCost: (service.benefit_cost ?? 0).toString(),
+      approvalType: service.approval_type || "all_branches",
       isMultiStage: service.is_multi_stage || false,
       totalStages: service.total_stages || 2
     });
@@ -387,11 +387,11 @@ export default function AdminServices() {
               {services.map((service) => (
                 <TableRow key={service.id}>
                   <TableCell className="font-medium">{service.name}</TableCell>
-                  <TableCell>KES {service.real_cost.toLocaleString()}</TableCell>
-                  <TableCell>KES {service.branch_compensation.toLocaleString()}</TableCell>
-                  <TableCell>KES {service.benefit_cost.toLocaleString()}</TableCell>
-                  <TableCell className={service.profit_loss >= 0 ? "text-success" : "text-destructive"}>
-                    KES {service.profit_loss.toLocaleString()}
+                  <TableCell>KES {(service.real_cost ?? 0).toLocaleString()}</TableCell>
+                  <TableCell>KES {(service.branch_compensation ?? 0).toLocaleString()}</TableCell>
+                  <TableCell>KES {(service.benefit_cost ?? 0).toLocaleString()}</TableCell>
+                  <TableCell className={(service.profit_loss ?? 0) >= 0 ? "text-success" : "text-destructive"}>
+                    KES {(service.profit_loss ?? 0).toLocaleString()}
                   </TableCell>
                   <TableCell>{getApprovalBadge(service.approval_type)}</TableCell>
                   <TableCell>

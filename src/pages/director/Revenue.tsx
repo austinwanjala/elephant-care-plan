@@ -319,34 +319,36 @@ export default function DirectorRevenue() {
                     {claims.length === 0 ? (
                         <p className="text-center text-muted-foreground py-8">No claims history found.</p>
                     ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Date</TableHead>
-                                    <TableHead>Amount</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Paid Date</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {claims.map((claim) => (
-                                    <TableRow key={claim.id}>
-                                        <TableCell>{format(new Date(claim.created_at), 'MMM d, yyyy')}</TableCell>
-                                        <TableCell className="font-bold text-blue-700">KES {claim.amount.toLocaleString()}</TableCell>
-                                        <TableCell>
-                                            <Badge className={
-                                                claim.status === 'paid' ? 'bg-green-100 text-green-800' :
-                                                    claim.status === 'approved' ? 'bg-blue-100 text-blue-800' :
-                                                        'bg-amber-100 text-amber-800'
-                                            }>
-                                                {claim.status === 'approved' ? 'APPROVED (WAITING FOR PAYMENT)' : claim.status.toUpperCase()}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell>{claim.paid_at ? format(new Date(claim.paid_at), 'MMM d, yyyy') : '-'}</TableCell>
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead>Amount</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead>Paid Date</TableHead>
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+                                </TableHeader>
+                                <TableBody>
+                                    {claims.map((claim) => (
+                                        <TableRow key={claim.id}>
+                                            <TableCell>{format(new Date(claim.created_at), 'MMM d, yyyy')}</TableCell>
+                                            <TableCell className="font-bold text-blue-700">KES {claim.amount.toLocaleString()}</TableCell>
+                                            <TableCell>
+                                                <Badge className={
+                                                    claim.status === 'paid' ? 'bg-green-100 text-green-800' :
+                                                        claim.status === 'approved' ? 'bg-blue-100 text-blue-800' :
+                                                            'bg-amber-100 text-amber-800'
+                                                }>
+                                                    {claim.status === 'approved' ? 'APPROVED (WAITING FOR PAYMENT)' : claim.status.toUpperCase()}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell>{claim.paid_at ? format(new Date(claim.paid_at), 'MMM d, yyyy') : '-'}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
                     )}
                 </CardContent>
             </Card>

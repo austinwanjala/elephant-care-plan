@@ -559,7 +559,7 @@ export default function Consultation() {
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 {activeStages.map(stage => (
-                                    <div key={stage.id} className="flex items-center justify-between bg-white p-4 rounded-lg border shadow-sm">
+                                    <div key={stage.id} className="flex flex-col sm:flex-row sm:items-center justify-between bg-white p-4 rounded-lg border shadow-sm gap-4">
                                         <div>
                                             <h4 className="font-bold text-foreground">{stage.services.name}</h4>
                                             <p className="text-sm text-muted-foreground">
@@ -568,7 +568,7 @@ export default function Consultation() {
                                         </div>
                                         <Button
                                             size="sm"
-                                            className={stage.current_stage + 1 === stage.total_stages ? "bg-green-600 hover:bg-green-700" : ""}
+                                            className={stage.current_stage + 1 === stage.total_stages ? "bg-green-600 hover:bg-green-700 w-full sm:w-auto" : "w-full sm:w-auto"}
                                             onClick={() => handleContinueStage(stage)}
                                             disabled={selectedServices.some(s => s.service.stageId === stage.id)}
                                         >
@@ -718,7 +718,7 @@ export default function Consultation() {
                                     <div className="p-4 text-center text-muted-foreground">No services added yet. Select teeth and choose a procedure.</div>
                                 ) : (
                                     selectedServices.map((s, index) => (
-                                        <div key={`${s.service.id}-${index}`} className="p-4 flex justify-between items-center bg-white">
+                                        <div key={`${s.service.id}-${index}`} className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white gap-2">
                                             <div>
                                                 <div className="font-semibold">{s.service.name}</div>
                                                 <div className="text-xs text-muted-foreground">
@@ -726,7 +726,7 @@ export default function Consultation() {
                                                     Benefit: KES {s.service.benefit_cost.toLocaleString()}
                                                 </div>
                                             </div>
-                                            <Button variant="ghost" size="icon" onClick={() => removeService(index)}>
+                                            <Button variant="ghost" size="icon" onClick={() => removeService(index)} className="self-end sm:self-center">
                                                 <Trash2 className="h-4 w-4 text-destructive" />
                                             </Button>
                                         </div>

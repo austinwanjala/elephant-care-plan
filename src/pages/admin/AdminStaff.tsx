@@ -340,75 +340,77 @@ export default function AdminStaff() {
       </div>
 
       <Card className="shadow-sm border-blue-50 overflow-hidden">
-        <Table>
-          <TableHeader className="bg-slate-50">
-            <TableRow>
-              <TableHead>User</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Branch / Details</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-[80px]"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading && users.length === 0 ? (
-              <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground">Refreshing staff records...</TableCell></TableRow>
-            ) : filteredUsers.length === 0 ? (
-              <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground">No staff members found. Create your first portal user above.</TableCell></TableRow>
-            ) : (
-              filteredUsers.map((u) => (
-                <TableRow key={u.user_id}>
-                  <TableCell>
-                    <div className="font-bold text-slate-900 flex items-center gap-2">
-                      {u.full_name}
-                      {u.displayRole === 'super_admin' && <ShieldAlert className="h-3 w-3 text-red-600" />}
-                    </div>
-                    <div className="text-xs text-muted-foreground">{u.email || u.phone}</div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={`capitalize ${u.displayRole === 'super_admin' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
-                      {u.displayRole.replace('_', ' ')}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm text-slate-600">
-                    {u.type === 'marketer' ? (
-                      <span className="text-xs font-mono bg-slate-100 px-2 py-1 rounded">Code: {u.code}</span>
-                    ) : (
-                      u.branches?.name || 'Unassigned'
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={u.is_active}
-                        onCheckedChange={() => handleToggleActive(u.user_id, u.type, u.is_active)}
-                        disabled={!isSuperAdmin && u.displayRole === 'admin'} // Regular admins can't deactivate other admins
-                      />
-                      <span className={`text-xs font-medium ${u.is_active ? 'text-green-600' : 'text-slate-400'}`}>
-                        {u.is_active ? 'Active' : 'Paused'}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEditUser(u)}>
-                          <Edit className="mr-2 h-4 w-4" /> Edit Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive font-medium" onClick={() => handleDelete(u.user_id)}>
-                          <Trash2 className="mr-2 h-4 w-4" /> Revoke Access
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader className="bg-slate-50">
+              <TableRow>
+                <TableHead>User</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Branch / Details</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="w-[80px]"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading && users.length === 0 ? (
+                <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground">Refreshing staff records...</TableCell></TableRow>
+              ) : filteredUsers.length === 0 ? (
+                <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground">No staff members found. Create your first portal user above.</TableCell></TableRow>
+              ) : (
+                filteredUsers.map((u) => (
+                  <TableRow key={u.user_id}>
+                    <TableCell>
+                      <div className="font-bold text-slate-900 flex items-center gap-2">
+                        {u.full_name}
+                        {u.displayRole === 'super_admin' && <ShieldAlert className="h-3 w-3 text-red-600" />}
+                      </div>
+                      <div className="text-xs text-muted-foreground">{u.email || u.phone}</div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={`capitalize ${u.displayRole === 'super_admin' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
+                        {u.displayRole.replace('_', ' ')}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-slate-600">
+                      {u.type === 'marketer' ? (
+                        <span className="text-xs font-mono bg-slate-100 px-2 py-1 rounded">Code: {u.code}</span>
+                      ) : (
+                        u.branches?.name || 'Unassigned'
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={u.is_active}
+                          onCheckedChange={() => handleToggleActive(u.user_id, u.type, u.is_active)}
+                          disabled={!isSuperAdmin && u.displayRole === 'admin'} // Regular admins can't deactivate other admins
+                        />
+                        <span className={`text-xs font-medium ${u.is_active ? 'text-green-600' : 'text-slate-400'}`}>
+                          {u.is_active ? 'Active' : 'Paused'}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEditUser(u)}>
+                            <Edit className="mr-2 h-4 w-4" /> Edit Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive font-medium" onClick={() => handleDelete(u.user_id)}>
+                            <Trash2 className="mr-2 h-4 w-4" /> Revoke Access
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </Card>
     </div>
   );

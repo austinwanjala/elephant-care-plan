@@ -239,9 +239,9 @@ export default function AdminDashboard() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Button 
-            variant={showAllTime ? "default" : "outline"} 
-            size="sm" 
+          <Button
+            variant={showAllTime ? "default" : "outline"}
+            size="sm"
             onClick={() => setShowAllTime(!showAllTime)}
             className="gap-2"
           >
@@ -354,7 +354,7 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Revenue Trend Chart */}
         <Card className="lg:col-span-2 shadow-md">
           <CardHeader>
@@ -432,7 +432,7 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg">Membership Distribution</CardTitle>

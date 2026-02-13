@@ -259,151 +259,153 @@ export default function ReceptionBilling() {
                             <CardDescription>Waiting for coverage deduction and final verification.</CardDescription>
                         </CardHeader>
                         <CardContent className="pt-6">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead>Patient</TableHead>
-                                        <TableHead>Services</TableHead>
-                                        <TableHead>Benefit Cost</TableHead>
-                                        <TableHead>Action</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {loading ? (
-                                        <TableRow><TableCell colSpan={5} className="text-center py-8"><Loader2 className="animate-spin h-6 w-6 mx-auto text-primary" /></TableCell></TableRow>
-                                    ) : filteredVisits.length === 0 ? (
-                                        <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No pending bills.</TableCell></TableRow>
-                                    ) : (
-                                        filteredVisits.map((visit) => {
-                                            const bill = visit.bills?.[0];
-                                            return (
-                                                <TableRow key={visit.id}>
-                                                    <TableCell>{new Date(visit.created_at).toLocaleDateString()}</TableCell>
-                                                    <TableCell>
-                                                        <div className="font-medium text-slate-900">{visit.members?.full_name}</div>
-                                                        <div className="text-xs text-muted-foreground">{visit.members?.member_number}</div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="max-w-[200px] truncate text-slate-600">
-                                                            {bill?.bill_items?.map((item: any) => item.service_name).join(", ")}
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell className="font-bold text-blue-700">
-                                                        KES {(bill?.total_benefit_cost || 0).toLocaleString()}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Dialog>
-                                                            <DialogTrigger asChild>
-                                                                <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
-                                                                    Review & Finalize
-                                                                </Button>
-                                                            </DialogTrigger>
-                                                            <DialogContent className="max-w-2xl">
-                                                                <DialogHeader>
-                                                                    <DialogTitle>Complete Finalization</DialogTitle>
-                                                                    <DialogDescription>
-                                                                        Verify services for <b>{visit.members?.full_name}</b>.
-                                                                    </DialogDescription>
-                                                                </DialogHeader>
-                                                                <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
-                                                                    <div className="border rounded-lg overflow-hidden">
-                                                                        <Table>
-                                                                            <TableHeader className="bg-slate-50">
-                                                                                <TableRow>
-                                                                                    <TableHead>Service</TableHead>
-                                                                                    <TableHead className="text-right">Benefit</TableHead>
-                                                                                </TableRow>
-                                                                            </TableHeader>
-                                                                            <TableBody>
-                                                                                {bill?.bill_items?.map((item: any) => (
-                                                                                    <TableRow key={item.id}>
-                                                                                        <TableCell>{item.service_name}</TableCell>
-                                                                                        <TableCell className="text-right">KES {Number(item.benefit_cost).toLocaleString()}</TableCell>
-                                                                                    </TableRow>
-                                                                                ))}
-                                                                                <TableRow className="bg-slate-50 font-bold">
-                                                                                    <TableCell>Total Deduction</TableCell>
-                                                                                    <TableCell className="text-right text-blue-700">KES {Number(bill?.total_benefit_cost).toLocaleString()}</TableCell>
-                                                                                </TableRow>
-                                                                            </TableBody>
-                                                                        </Table>
-                                                                    </div>
-                                                                    <div className="p-3 bg-blue-50 text-blue-800 rounded-md text-sm">
-                                                                        Patient Coverage Balance: <b>KES {visit.members?.coverage_balance?.toLocaleString()}</b>
-                                                                    </div>
-
-                                                                    <div className="p-3 bg-amber-50 text-amber-900 rounded-md text-sm border border-amber-200">
-                                                                        <div className="font-bold mb-1">Doctor's Diagnosis & Notes:</div>
-                                                                        <p className="italic">"{visit.diagnosis || visit.treatment_notes || 'No notes provided'}"</p>
-                                                                    </div>
-
-                                                                    {visit.members?.coverage_balance < bill?.total_benefit_cost && (
-                                                                        <div className="p-3 bg-red-50 text-red-700 rounded-md text-sm border border-red-200">
-                                                                            Insufficient Balance! Collect deficit in cash.
-                                                                        </div>
-                                                                    )}
-
-                                                                    <div className="py-2">
-                                                                        <Button
-                                                                            variant={biometricsVerified === visit.id ? "default" : "outline"}
-                                                                            className={`w-full py-6 text-lg border-2 ${biometricsVerified === visit.id ? 'bg-green-600 hover:bg-green-700 border-green-600' : 'border-blue-200 hover:border-blue-400 text-blue-700'}`}
-                                                                            onClick={async () => {
-                                                                                if (biometricsVerified === visit.id) return; // Already verified
-
-                                                                                // 1. Check if member has biometrics enrolled
-                                                                                if (!visit.members.biometric_data) {
-                                                                                    toast({
-                                                                                        title: "Biometrics Not Enrolled",
-                                                                                        description: "This member has not set up biometrics yet. Please update their profile.",
-                                                                                        variant: "destructive"
-                                                                                    });
-                                                                                    return;
-                                                                                }
-
-                                                                                try {
-                                                                                    // 2. Perform WebAuthn Verification
-                                                                                    const isVerified = await verifyCredential(visit.members.biometric_data);
-
-                                                                                    if (isVerified) {
-                                                                                        setBiometricsVerified(visit.id);
-                                                                                        toast({ title: "Biometrics Verified", description: "Identity confirmed via biometric scan." });
-                                                                                    }
-                                                                                } catch (err: any) {
-                                                                                    console.error("Biometric error:", err);
-                                                                                    // Differentiate between technical error and mismatch (though client-side match fail usually throws too)
-                                                                                    toast({ title: "Verification Error", description: err.message || "Biometric validation failed.", variant: "destructive" });
-                                                                                }
-                                                                            }}
-                                                                        >
-                                                                            {biometricsVerified === visit.id ? (
-                                                                                <><Check className="mr-2 h-6 w-6" /> Biometrics Confirmed</>
-                                                                            ) : (
-                                                                                <><Fingerprint className="mr-2 h-6 w-6" /> Verify Member Biometrics</>
-                                                                            )}
-                                                                        </Button>
-                                                                        <p className="text-[10px] text-center text-muted-foreground mt-1">Authorization required by member before coverage deduction.</p>
-                                                                    </div>
-                                                                </div>
-                                                                <DialogFooter>
-                                                                    <Button
-                                                                        className="w-full bg-blue-600 hover:bg-blue-700 h-12 text-lg"
-                                                                        onClick={() => handleFinalizeBill(visit, bill?.id)}
-                                                                        disabled={processingId === visit.id || biometricsVerified !== visit.id}
-                                                                    >
-                                                                        {processingId === visit.id ? <Loader2 className="animate-spin mr-2 h-5 w-5" /> : <Check className="mr-2 h-5 w-5" />}
-                                                                        Finalize & Deduct Coverage
+                            <div className="overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Date</TableHead>
+                                            <TableHead>Patient</TableHead>
+                                            <TableHead>Services</TableHead>
+                                            <TableHead>Benefit Cost</TableHead>
+                                            <TableHead>Action</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {loading ? (
+                                            <TableRow><TableCell colSpan={5} className="text-center py-8"><Loader2 className="animate-spin h-6 w-6 mx-auto text-primary" /></TableCell></TableRow>
+                                        ) : filteredVisits.length === 0 ? (
+                                            <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No pending bills.</TableCell></TableRow>
+                                        ) : (
+                                            filteredVisits.map((visit) => {
+                                                const bill = visit.bills?.[0];
+                                                return (
+                                                    <TableRow key={visit.id}>
+                                                        <TableCell>{new Date(visit.created_at).toLocaleDateString()}</TableCell>
+                                                        <TableCell>
+                                                            <div className="font-medium text-slate-900">{visit.members?.full_name}</div>
+                                                            <div className="text-xs text-muted-foreground">{visit.members?.member_number}</div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="max-w-[200px] truncate text-slate-600">
+                                                                {bill?.bill_items?.map((item: any) => item.service_name).join(", ")}
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="font-bold text-blue-700">
+                                                            KES {(bill?.total_benefit_cost || 0).toLocaleString()}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Dialog>
+                                                                <DialogTrigger asChild>
+                                                                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
+                                                                        Review & Finalize
                                                                     </Button>
-                                                                </DialogFooter>
-                                                            </DialogContent>
-                                                        </Dialog>
-                                                    </TableCell>
-                                                </TableRow>
-                                            );
-                                        })
-                                    )}
-                                </TableBody>
-                            </Table>
+                                                                </DialogTrigger>
+                                                                <DialogContent className="max-w-2xl">
+                                                                    <DialogHeader>
+                                                                        <DialogTitle>Complete Finalization</DialogTitle>
+                                                                        <DialogDescription>
+                                                                            Verify services for <b>{visit.members?.full_name}</b>.
+                                                                        </DialogDescription>
+                                                                    </DialogHeader>
+                                                                    <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
+                                                                        <div className="border rounded-lg overflow-hidden overflow-x-auto">
+                                                                            <Table>
+                                                                                <TableHeader className="bg-slate-50">
+                                                                                    <TableRow>
+                                                                                        <TableHead>Service</TableHead>
+                                                                                        <TableHead className="text-right">Benefit</TableHead>
+                                                                                    </TableRow>
+                                                                                </TableHeader>
+                                                                                <TableBody>
+                                                                                    {bill?.bill_items?.map((item: any) => (
+                                                                                        <TableRow key={item.id}>
+                                                                                            <TableCell>{item.service_name}</TableCell>
+                                                                                            <TableCell className="text-right">KES {Number(item.benefit_cost).toLocaleString()}</TableCell>
+                                                                                        </TableRow>
+                                                                                    ))}
+                                                                                    <TableRow className="bg-slate-50 font-bold">
+                                                                                        <TableCell>Total Deduction</TableCell>
+                                                                                        <TableCell className="text-right text-blue-700">KES {Number(bill?.total_benefit_cost).toLocaleString()}</TableCell>
+                                                                                    </TableRow>
+                                                                                </TableBody>
+                                                                            </Table>
+                                                                        </div>
+                                                                        <div className="p-3 bg-blue-50 text-blue-800 rounded-md text-sm">
+                                                                            Patient Coverage Balance: <b>KES {visit.members?.coverage_balance?.toLocaleString()}</b>
+                                                                        </div>
+
+                                                                        <div className="p-3 bg-amber-50 text-amber-900 rounded-md text-sm border border-amber-200">
+                                                                            <div className="font-bold mb-1">Doctor's Diagnosis & Notes:</div>
+                                                                            <p className="italic">"{visit.diagnosis || visit.treatment_notes || 'No notes provided'}"</p>
+                                                                        </div>
+
+                                                                        {visit.members?.coverage_balance < bill?.total_benefit_cost && (
+                                                                            <div className="p-3 bg-red-50 text-red-700 rounded-md text-sm border border-red-200">
+                                                                                Insufficient Balance! Collect deficit in cash.
+                                                                            </div>
+                                                                        )}
+
+                                                                        <div className="py-2">
+                                                                            <Button
+                                                                                variant={biometricsVerified === visit.id ? "default" : "outline"}
+                                                                                className={`w-full py-6 text-lg border-2 ${biometricsVerified === visit.id ? 'bg-green-600 hover:bg-green-700 border-green-600' : 'border-blue-200 hover:border-blue-400 text-blue-700'}`}
+                                                                                onClick={async () => {
+                                                                                    if (biometricsVerified === visit.id) return; // Already verified
+
+                                                                                    // 1. Check if member has biometrics enrolled
+                                                                                    if (!visit.members.biometric_data) {
+                                                                                        toast({
+                                                                                            title: "Biometrics Not Enrolled",
+                                                                                            description: "This member has not set up biometrics yet. Please update their profile.",
+                                                                                            variant: "destructive"
+                                                                                        });
+                                                                                        return;
+                                                                                    }
+
+                                                                                    try {
+                                                                                        // 2. Perform WebAuthn Verification
+                                                                                        const isVerified = await verifyCredential(visit.members.biometric_data);
+
+                                                                                        if (isVerified) {
+                                                                                            setBiometricsVerified(visit.id);
+                                                                                            toast({ title: "Biometrics Verified", description: "Identity confirmed via biometric scan." });
+                                                                                        }
+                                                                                    } catch (err: any) {
+                                                                                        console.error("Biometric error:", err);
+                                                                                        // Differentiate between technical error and mismatch (though client-side match fail usually throws too)
+                                                                                        toast({ title: "Verification Error", description: err.message || "Biometric validation failed.", variant: "destructive" });
+                                                                                    }
+                                                                                }}
+                                                                            >
+                                                                                {biometricsVerified === visit.id ? (
+                                                                                    <><Check className="mr-2 h-6 w-6" /> Biometrics Confirmed</>
+                                                                                ) : (
+                                                                                    <><Fingerprint className="mr-2 h-6 w-6" /> Verify Member Biometrics</>
+                                                                                )}
+                                                                            </Button>
+                                                                            <p className="text-[10px] text-center text-muted-foreground mt-1">Authorization required by member before coverage deduction.</p>
+                                                                        </div>
+                                                                    </div>
+                                                                    <DialogFooter>
+                                                                        <Button
+                                                                            className="w-full bg-blue-600 hover:bg-blue-700 h-12 text-lg"
+                                                                            onClick={() => handleFinalizeBill(visit, bill?.id)}
+                                                                            disabled={processingId === visit.id || biometricsVerified !== visit.id}
+                                                                        >
+                                                                            {processingId === visit.id ? <Loader2 className="animate-spin mr-2 h-5 w-5" /> : <Check className="mr-2 h-5 w-5" />}
+                                                                            Finalize & Deduct Coverage
+                                                                        </Button>
+                                                                    </DialogFooter>
+                                                                </DialogContent>
+                                                            </Dialog>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </div>
                         </CardContent>
                     </Card>
                 </TabsContent>
@@ -415,47 +417,49 @@ export default function ReceptionBilling() {
                             <CardDescription>Recently closed visits. You can re-print invoices here.</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead>Patient</TableHead>
-                                        <TableHead>Branch</TableHead>
-                                        <TableHead>Services</TableHead>
-                                        <TableHead>Amount</TableHead>
-                                        <TableHead>Action</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {loadingHistory ? (
-                                        <TableRow><TableCell colSpan={6} className="text-center py-8"><Loader2 className="animate-spin h-6 w-6 mx-auto text-primary" /></TableCell></TableRow>
-                                    ) : history.length === 0 ? (
-                                        <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No history records found.</TableCell></TableRow>
-                                    ) : (
-                                        history.map((h) => (
-                                            <TableRow key={h.id}>
-                                                <TableCell>{new Date(h.created_at).toLocaleDateString()}</TableCell>
-                                                <TableCell>
-                                                    <div className="font-medium">{h.members?.full_name}</div>
-                                                    <div className="text-xs text-muted-foreground">{h.members?.member_number}</div>
-                                                </TableCell>
-                                                <TableCell>{h.branches?.name || "N/A"}</TableCell>
-                                                <TableCell>
-                                                    <div className="max-w-[200px] truncate">
-                                                        {h.bills?.[0]?.bill_items?.map((i: any) => i.service_name).join(", ")}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>KES {Number(h.bills?.[0]?.total_benefit_cost || 0).toLocaleString()}</TableCell>
-                                                <TableCell>
-                                                    <Button variant="outline" size="sm" onClick={() => handlePrintInvoice(h)}>
-                                                        <Printer className="mr-2 h-4 w-4" /> Invoice
-                                                    </Button>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
+                            <div className="overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Date</TableHead>
+                                            <TableHead>Patient</TableHead>
+                                            <TableHead>Branch</TableHead>
+                                            <TableHead>Services</TableHead>
+                                            <TableHead>Amount</TableHead>
+                                            <TableHead>Action</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {loadingHistory ? (
+                                            <TableRow><TableCell colSpan={6} className="text-center py-8"><Loader2 className="animate-spin h-6 w-6 mx-auto text-primary" /></TableCell></TableRow>
+                                        ) : history.length === 0 ? (
+                                            <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No history records found.</TableCell></TableRow>
+                                        ) : (
+                                            history.map((h) => (
+                                                <TableRow key={h.id}>
+                                                    <TableCell>{new Date(h.created_at).toLocaleDateString()}</TableCell>
+                                                    <TableCell>
+                                                        <div className="font-medium">{h.members?.full_name}</div>
+                                                        <div className="text-xs text-muted-foreground">{h.members?.member_number}</div>
+                                                    </TableCell>
+                                                    <TableCell>{h.branches?.name || "N/A"}</TableCell>
+                                                    <TableCell>
+                                                        <div className="max-w-[200px] truncate">
+                                                            {h.bills?.[0]?.bill_items?.map((i: any) => i.service_name).join(", ")}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>KES {Number(h.bills?.[0]?.total_benefit_cost || 0).toLocaleString()}</TableCell>
+                                                    <TableCell>
+                                                        <Button variant="outline" size="sm" onClick={() => handlePrintInvoice(h)}>
+                                                            <Printer className="mr-2 h-4 w-4" /> Invoice
+                                                        </Button>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </div>
                         </CardContent>
                     </Card>
                 </TabsContent>

@@ -48,6 +48,8 @@ interface Service {
   profit_loss: number;
   approval_type: "all_branches" | "pre_approved_only";
   is_active: boolean;
+  is_multi_stage: boolean;
+  total_stages: number;
 }
 
 interface Branch {
@@ -75,6 +77,8 @@ export default function AdminServices() {
     branchCompensation: "",
     benefitCost: "",
     approvalType: "all_branches" as "all_branches" | "pre_approved_only",
+    isMultiStage: false,
+    totalStages: 2
   });
   const { toast } = useToast();
 
@@ -102,6 +106,8 @@ export default function AdminServices() {
         branch_compensation: parseFloat(formData.branchCompensation),
         benefit_cost: parseFloat(formData.benefitCost),
         approval_type: formData.approvalType,
+        is_multi_stage: formData.isMultiStage,
+        total_stages: formData.isMultiStage ? formData.totalStages : 1
       });
 
       if (error) throw error;
@@ -127,6 +133,8 @@ export default function AdminServices() {
           branch_compensation: parseFloat(formData.branchCompensation),
           benefit_cost: parseFloat(formData.benefitCost),
           approval_type: formData.approvalType,
+          is_multi_stage: formData.isMultiStage,
+          total_stages: formData.isMultiStage ? formData.totalStages : 1
         })
         .eq("id", selectedService.id);
 
@@ -192,6 +200,8 @@ export default function AdminServices() {
       branchCompensation: service.branch_compensation.toString(),
       benefitCost: service.benefit_cost.toString(),
       approvalType: service.approval_type,
+      isMultiStage: service.is_multi_stage || false,
+      totalStages: service.total_stages || 2
     });
     setEditDialogOpen(true);
   };
@@ -214,6 +224,8 @@ export default function AdminServices() {
       branchCompensation: "",
       benefitCost: "",
       approvalType: "all_branches",
+      isMultiStage: false,
+      totalStages: 2
     });
   };
 
@@ -322,6 +334,29 @@ export default function AdminServices() {
                         KES {(parseFloat(formData.benefitCost) - parseFloat(formData.branchCompensation)).toLocaleString()}
                       </span>
                     </div>
+                  </div>
+                )}
+                <div className="flex items-center space-x-2 border p-4 rounded-md">
+                  <Switch
+                    id="multi-stage"
+                    checked={formData.isMultiStage}
+                    onCheckedChange={(checked) => setFormData({ ...formData, isMultiStage: checked })}
+                  />
+                  <div className="flex-1">
+                    <Label htmlFor="multi-stage" className="font-medium">Multi-Stage Service</Label>
+                    <p className="text-sm text-muted-foreground">Service requires multiple visits to complete.</p>
+                  </div>
+                </div>
+
+                {formData.isMultiStage && (
+                  <div className="space-y-2">
+                    <Label>Total Stages</Label>
+                    <Input
+                      type="number"
+                      min="2"
+                      value={formData.totalStages}
+                      onChange={(e) => setFormData({ ...formData, totalStages: parseInt(e.target.value) || 2 })}
+                    />
                   </div>
                 )}
                 <Button onClick={handleAddService} className="btn-primary">
@@ -448,7 +483,32 @@ export default function AdminServices() {
                 </SelectContent>
               </Select>
             </div>
-            <Button onClick={handleEditService} className="btn-primary">
+
+            <div className="flex items-center space-x-2 border p-4 rounded-md">
+              <Switch
+                id="edit-multi-stage"
+                checked={formData.isMultiStage}
+                onCheckedChange={(checked) => setFormData({ ...formData, isMultiStage: checked })}
+              />
+              <div className="flex-1">
+                <Label htmlFor="edit-multi-stage" className="font-medium">Multi-Stage Service</Label>
+                <p className="text-sm text-muted-foreground">Service requires multiple visits to complete.</p>
+              </div>
+            </div>
+
+            {formData.isMultiStage && (
+              <div className="space-y-2">
+                <Label>Total Stages</Label>
+                <Input
+                  type="number"
+                  min="2"
+                  value={formData.totalStages}
+                  onChange={(e) => setFormData({ ...formData, totalStages: parseInt(e.target.value) || 2 })}
+                />
+              </div>
+            )}
+
+            <Button onClick={handleEditService} className="btn-primary w-full">
               Update Service
             </Button>
           </div>

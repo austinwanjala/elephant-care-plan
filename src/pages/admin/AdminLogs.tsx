@@ -21,17 +21,33 @@ export default function AdminLogs() {
 
     const fetchLogs = async () => {
         setLoading(true);
-        const { data, error } = await supabase
-            .from("audit_logs")
-            .select("*")
-            .order("created_at", { ascending: false })
-            .limit(100);
 
-        if (error) {
-            console.error("Error fetching logs:", error);
-        } else {
-            setLogs(data || []);
-        }
+        // Fetch both logs in parallel
+        const [auditLogsResult, systemLogsResult] = await Promise.all([
+            supabase
+                .from("audit_logs")
+                .select("*")
+                .order("created_at", { ascending: false })
+                .limit(50),
+            supabase
+                .from("system_logs")
+                .select("*")
+                .order("created_at", { ascending: false })
+                .limit(50)
+        ]);
+
+        const auditLogs = auditLogsResult.data || [];
+        const systemLogs = systemLogsResult.data || [];
+
+        // Combine and sort
+        const combinedLogs = [...auditLogs, ...systemLogs].sort((a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+
+        if (auditLogsResult.error) console.error("Error fetching audit logs:", auditLogsResult.error);
+        if (systemLogsResult.error) console.error("Error fetching system logs:", systemLogsResult.error);
+
+        setLogs(combinedLogs);
         setLoading(false);
     };
 

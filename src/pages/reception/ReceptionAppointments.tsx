@@ -82,6 +82,23 @@ const ReceptionAppointments = () => {
         }
     });
 
+    const updateStatusMutation = useMutation({
+        mutationFn: async ({ id, status }: { id: string, status: string }) => {
+            const { error } = await supabase
+                .from("appointments")
+                .update({ status })
+                .eq("id", id);
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["reception_appointments"] });
+            toast.success("Appointment status updated successfully.");
+        },
+        onError: (err) => {
+            toast.error("Failed to update status: " + err.message);
+        }
+    });
+
     const checkInMutation = useMutation({
         mutationFn: async ({ appointmentId, verified }: { appointmentId: string, verified: boolean }) => {
             if (!verified) throw new Error("Biometric verification failed or skipped inappropriately.");
@@ -301,9 +318,34 @@ const ReceptionAppointments = () => {
                                                             </div>
                                                         )}
                                                         {appt.status === 'pending' && (
-                                                            <Button size="sm" variant="outline" disabled>
-                                                                Pending Approval
-                                                            </Button>
+                                                            <div className="flex gap-2 justify-end">
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200"
+                                                                    onClick={() => {
+                                                                        if (confirm("Approve this appointment?")) {
+                                                                            updateStatusMutation.mutate({ id: appt.id, status: 'confirmed' });
+                                                                        }
+                                                                    }}
+                                                                    disabled={updateStatusMutation.isPending}
+                                                                >
+                                                                    Approve
+                                                                </Button>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                                                                    onClick={() => {
+                                                                        if (prompt("Reason for rejection:") !== null) {
+                                                                            updateStatusMutation.mutate({ id: appt.id, status: 'rejected' });
+                                                                        }
+                                                                    }}
+                                                                    disabled={updateStatusMutation.isPending}
+                                                                >
+                                                                    Reject
+                                                                </Button>
+                                                            </div>
                                                         )}
                                                         {appt.status === 'checked_in' && (
                                                             <Button size="sm" variant="secondary" disabled>

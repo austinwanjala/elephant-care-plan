@@ -3,25 +3,26 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ArrowLeft, Plus, Trash, Users, Camera, User, ImagePlus } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Loader2, ArrowLeft, Plus, Trash, Users, Camera, User, ImagePlus, AlertCircle } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface Dependant {
   id: string;
   full_name: string;
   dob: string;
-  id_number: string;
-  relationship: string;
+  id_number: string | null;
+  relationship: string | null;
   image_url: string | null;
 }
 
 const MemberDependants = () => {
   const [dependants, setDependants] = useState<Dependant[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [memberId, setMemberId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newDependant, setNewDependant] = useState({
@@ -41,20 +42,54 @@ const MemberDependants = () => {
 
   const fetchDependants = async () => {
     setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      navigate("/login");
-      return;
-    }
+    setFetchError(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        navigate("/login");
+        return;
+      }
 
-    const { data: memberData } = await supabase.from("members").select("id").eq("user_id", user.id).maybeSingle();
+      const { data: memberData, error: memberError } = await supabase
+        .from("members")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
 
-    if (memberData) {
-      setMemberId(memberData.id);
-      const { data } = await supabase.from("dependants").select("*").eq("member_id", memberData.id).order("full_name", { ascending: true });
-      setDependants(data || []);
+      if (memberError) {
+        console.error("Member fetch error:", memberError);
+        throw new Error("Could not load your member profile. Please contact support.");
+      }
+
+      if (memberData) {
+        setMemberId(memberData.id);
+        const { data, error: depError } = await supabase
+          .from("dependants")
+          .select("*")
+          .eq("member_id", memberData.id)
+          .order("full_name", { ascending: true });
+
+        if (depError) {
+          console.error("Dependants fetch error:", depError);
+          throw new Error("Failed to load dependants list.");
+        }
+        setDependants(data || []);
+      } else {
+        setFetchError("Member profile not linking to this account.");
+      }
+    } catch (err: any) {
+      console.error("Error fetching dependants:", err);
+      // Ensure error message is not blank
+      const msg = err.message || "An unexpected error occurred.";
+      setFetchError(msg);
+      toast({
+        title: "Error loading dependants",
+        description: msg,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleAddDependant = async (e: React.FormEvent) => {
@@ -72,20 +107,23 @@ const MemberDependants = () => {
       if (imageFile) {
         const fileExt = imageFile.name.split('.').pop();
         const fileName = `${memberId}-${Math.random()}.${fileExt}`;
-        
+
         const { error: uploadError } = await supabase.storage
           .from('dependant-images')
           .upload(fileName, imageFile);
 
         if (uploadError) {
           if (uploadError.message.includes("bucket not found")) {
-            throw new Error("Storage bucket 'dependant-images' not found. Please contact administrator to create it.");
+            // Log but don't block dependant creation if image fails (optional)
+            console.error("Storage bucket issue:", uploadError);
+            toast({ title: "Image Upload Failed", description: "Could not upload photo. Proceeding without it.", variant: "secondary" });
+          } else {
+            throw uploadError;
           }
-          throw uploadError;
+        } else {
+          const { data: { publicUrl } } = supabase.storage.from('dependant-images').getPublicUrl(fileName);
+          imageUrl = publicUrl;
         }
-        
-        const { data: { publicUrl } } = supabase.storage.from('dependant-images').getPublicUrl(fileName);
-        imageUrl = publicUrl;
       }
 
       const { error } = await supabase.from("dependants").insert({
@@ -110,6 +148,40 @@ const MemberDependants = () => {
       setSubmitting(false);
     }
   };
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to remove ${name}?`)) return;
+
+    try {
+      const { error } = await supabase.from("dependants").delete().eq("id", id);
+      if (error) throw error;
+      toast({ title: "Dependant Removed", description: `${name} has been removed.` });
+      fetchDependants();
+    } catch (error: any) {
+      toast({ title: "Error removing dependant", description: error.message, variant: "destructive" });
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <AlertCircle className="h-12 w-12 text-destructive opacity-50" />
+        <div className="text-center">
+          <h3 className="font-semibold text-lg">Unable to load dependants</h3>
+          <p className="text-muted-foreground">{fetchError}</p>
+        </div>
+        <Button variant="outline" onClick={fetchDependants}>Retry</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -136,7 +208,7 @@ const MemberDependants = () => {
                   <Label>Full Name *</Label>
                   <Input value={newDependant.fullName} onChange={(e) => setNewDependant({ ...newDependant, fullName: e.target.value })} required placeholder="e.g. Jane Doe" />
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Date of Birth *</Label>
@@ -218,19 +290,16 @@ const MemberDependants = () => {
                   <div className="flex items-center gap-4">
                     <Avatar className="h-12 w-12 border">
                       <AvatarImage src={dep.image_url || ""} />
-                      <AvatarFallback>{dep.full_name.charAt(0)}</AvatarFallback>
+                      <AvatarFallback>{dep.full_name?.charAt(0) || "?"}</AvatarFallback>
                     </Avatar>
                     <div>
                       <p className="font-semibold">{dep.full_name}</p>
-                      <p className="text-xs text-muted-foreground">{dep.relationship} • ID: {dep.id_number}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {dep.relationship || "N/A"} • ID: {dep.id_number || "N/A"}
+                      </p>
                     </div>
                   </div>
-                  <Button variant="ghost" size="icon" onClick={async () => { 
-                    if (confirm(`Are you sure you want to remove ${dep.full_name}?`)) { 
-                      await supabase.from("dependants").delete().eq("id", dep.id); 
-                      fetchDependants(); 
-                    } 
-                  }}>
+                  <Button variant="ghost" size="icon" onClick={() => handleDelete(dep.id, dep.full_name)}>
                     <Trash className="h-4 w-4 text-destructive" />
                   </Button>
                 </Card>

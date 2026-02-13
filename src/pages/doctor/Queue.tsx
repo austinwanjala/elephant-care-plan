@@ -109,15 +109,34 @@ export default function DoctorQueue() {
                             ) : (
                                 visits.map((visit) => {
                                     const patientName = visit.dependants?.full_name || visit.members?.full_name;
-                                    const patientDob = visit.dependants?.dob || visit.members?.dob;
 
-                                    let patientAge = visit.members?.age;
-                                    if (visit.dependants?.dob) {
-                                        const diffMs = Date.now() - new Date(visit.dependants.dob).getTime();
-                                        const ageDt = new Date(diffMs);
-                                        patientAge = Math.abs(ageDt.getUTCFullYear() - 1970);
-                                    }
+                                    // Age Calculation Logic (Consistent with Consultation.tsx)
+                                    const getAge = () => {
+                                        if (visit.dependants?.dob) {
+                                            const birthDate = new Date(visit.dependants.dob);
+                                            const today = new Date();
+                                            let age = today.getFullYear() - birthDate.getFullYear();
+                                            const m = today.getMonth() - birthDate.getMonth();
+                                            if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                                                age--;
+                                            }
+                                            return age;
+                                        }
+                                        if (visit.members?.age) return visit.members.age;
+                                        if (visit.members?.dob) {
+                                            const birthDate = new Date(visit.members.dob);
+                                            const today = new Date();
+                                            let age = today.getFullYear() - birthDate.getFullYear();
+                                            const m = today.getMonth() - birthDate.getMonth();
+                                            if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                                                age--;
+                                            }
+                                            return age;
+                                        }
+                                        return 0;
+                                    };
 
+                                    const patientAge = getAge();
                                     const isDependant = !!visit.dependants;
 
                                     return (
@@ -131,6 +150,7 @@ export default function DoctorQueue() {
                                                     <p className="font-medium flex items-center gap-2">
                                                         {patientName}
                                                         {isDependant && <Badge variant="outline" className="text-[10px] h-4 px-1">Dependant</Badge>}
+                                                        {patientAge <= 14 && <Badge variant="secondary" className="text-[10px] h-4 px-1 bg-amber-100 text-amber-800 hover:bg-amber-100">Pediatric</Badge>}
                                                     </p>
                                                     <p className="text-xs text-muted-foreground">{patientAge} yrs</p>
                                                 </div>

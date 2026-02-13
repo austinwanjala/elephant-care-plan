@@ -122,6 +122,24 @@ const BookingWizard = ({ onSuccess }: BookingWizardProps) => {
         enabled: step === 4 && !!bookingData.doctorId
     });
 
+    // 5. Fetch Existing Appointments (to block double booking)
+    const { data: existingAppts } = useQuery({
+        queryKey: ["existing_appts", bookingData.doctorId, bookingData.date],
+        queryFn: async () => {
+            const formattedDate = format(bookingData.date, "yyyy-MM-dd");
+            const { data, error } = await supabase
+                .from("appointments")
+                .select("start_time")
+                .eq("doctor_id", bookingData.doctorId)
+                .eq("appointment_date", formattedDate)
+                .in("status", ["pending", "confirmed", "checked_in"]); // exclude cancelled/rejected
+
+            if (error) throw error;
+            return data?.map(a => a.start_time.slice(0, 5)) || [];
+        },
+        enabled: step === 4 && !!bookingData.doctorId
+    });
+
     // --- Mutation ---
     const bookingMutation = useMutation({
         mutationFn: async () => {
@@ -292,17 +310,39 @@ const BookingWizard = ({ onSuccess }: BookingWizardProps) => {
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-3 gap-2 max-h-[300px] overflow-y-auto">
-                                    {slots.map(slot => (
-                                        <Button
-                                            key={slot}
-                                            variant={bookingData.time === slot ? "default" : "outline"}
-                                            size="sm"
-                                            onClick={() => setBookingData(prev => ({ ...prev, time: slot }))}
-                                            className="text-xs"
-                                        >
-                                            {slot.slice(0, 5)}
-                                        </Button>
-                                    ))}
+                                    {slots.map(slot => {
+                                        // Check if slot is in the past
+                                        const isToday = new Date().toDateString() === bookingData.date.toDateString();
+                                        let isPast = false;
+
+                                        if (isToday) {
+                                            const [hours, minutes] = slot.split(':').map(Number);
+                                            const slotDate = new Date();
+                                            slotDate.setHours(hours, minutes, 0, 0);
+                                            if (slotDate < new Date()) {
+                                                isPast = true;
+                                            }
+                                        }
+
+                                        // Check if slot is booked
+                                        const formattedSlot = slot.slice(0, 5);
+                                        const isBooked = existingAppts?.includes(formattedSlot);
+
+
+                                        return (
+                                            <Button
+                                                key={slot}
+                                                variant={bookingData.time === slot ? "default" : "outline"}
+                                                size="sm"
+                                                onClick={() => setBookingData(prev => ({ ...prev, time: slot }))}
+                                                className={cn("text-xs", isBooked && "opacity-50 cursor-not-allowed bg-slate-100 text-slate-400 decoration-slate-400")}
+                                                disabled={isPast || isBooked}
+                                                title={isBooked ? "Slot already booked" : ""}
+                                            >
+                                                {slot.slice(0, 5)}
+                                            </Button>
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>

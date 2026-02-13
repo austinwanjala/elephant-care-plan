@@ -47,7 +47,8 @@ export default function DirectorRevenue() {
                 .from("bills")
                 .select("total_branch_compensation")
                 .eq("branch_id", branchId)
-                .eq("is_finalized", true);
+                .eq("is_finalized", true)
+                .eq("is_claimable", true);
 
             if (billsErr) throw billsErr;
 
@@ -257,7 +258,7 @@ export default function DirectorRevenue() {
                                         {availableToClaim > 0 ? `Submit Claim (KES ${availableToClaim.toLocaleString()})` : 'All Revenue Claimed'}
                                     </Button>
                                 )}
-                                
+
                                 {availableToClaim < accumulatedRevenue && accumulatedRevenue > 0 && !hasApprovedClaim && !hasPendingClaim && (
                                     <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-lg">
                                         <p className="text-xs text-blue-700 text-center font-medium">
@@ -334,9 +335,9 @@ export default function DirectorRevenue() {
                                         <TableCell className="font-bold text-blue-700">KES {claim.amount.toLocaleString()}</TableCell>
                                         <TableCell>
                                             <Badge className={
-                                                claim.status === 'paid' ? 'bg-green-100 text-green-800' : 
-                                                claim.status === 'approved' ? 'bg-blue-100 text-blue-800' : 
-                                                'bg-amber-100 text-amber-800'
+                                                claim.status === 'paid' ? 'bg-green-100 text-green-800' :
+                                                    claim.status === 'approved' ? 'bg-blue-100 text-blue-800' :
+                                                        'bg-amber-100 text-amber-800'
                                             }>
                                                 {claim.status === 'approved' ? 'APPROVED (WAITING FOR PAYMENT)' : claim.status.toUpperCase()}
                                             </Badge>

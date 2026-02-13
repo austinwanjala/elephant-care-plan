@@ -150,7 +150,14 @@ const MemberAppointments = () => {
                                             </div>
                                         </div>
                                         <div className="flex gap-2">
-                                            <Button variant="outline" size="sm" onClick={() => setRescheduleData(appt)}>Reschedule</Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => setRescheduleData(appt)}
+                                                disabled={appt.status === 'confirmed'}
+                                            >
+                                                Reschedule
+                                            </Button>
                                             <Button
                                                 variant="destructive"
                                                 size="sm"
@@ -159,7 +166,7 @@ const MemberAppointments = () => {
                                                         cancelMutation.mutate(appt.id);
                                                     }
                                                 }}
-                                                disabled={cancelMutation.isPending}
+                                                disabled={cancelMutation.isPending || appt.status === 'confirmed'}
                                             >
                                                 Cancel
                                             </Button>

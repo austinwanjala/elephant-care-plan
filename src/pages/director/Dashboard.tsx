@@ -4,19 +4,19 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import {
     Users,
-    CreditCard,
     Stethoscope,
-    TrendingUp,
     Calendar,
     ArrowUpRight,
-    ArrowDownRight,
     Loader2,
     DollarSign,
-    ClipboardList
+    ClipboardList,
+    Clock,
+    User
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfMonth, endOfMonth } from "date-fns";
+import { Button } from "@/components/ui/button";
 
 export default function DirectorDashboard() {
     const [loading, setLoading] = useState(true);
@@ -29,11 +29,12 @@ export default function DirectorDashboard() {
         totalAppts: 0,
         completedAppts: 0,
         cancelledAppts: 0,
-        noShowAppts: 0
+        noShowAppts: 0,
+        confirmedAppts: 0
     });
     const [recentVisits, setRecentVisits] = useState<any[]>([]);
+    const [upcomingAppts, setUpcomingAppts] = useState<any[]>([]);
     const [branchName, setBranchName] = useState("Loading...");
-    const [directorBranchId, setDirectorBranchId] = useState<string | null>(null);
     const { toast } = useToast();
     const navigate = useNavigate();
 
@@ -63,7 +64,6 @@ export default function DirectorDashboard() {
             }
 
             setBranchName(staffData.branches.name);
-            setDirectorBranchId(staffData.branch_id);
             await fetchMetrics(staffData.branch_id);
 
         } catch (error: any) {
@@ -114,7 +114,7 @@ export default function DirectorDashboard() {
             .gte("created_at", startOfMonthDate)
             .lte("created_at", endOfMonthDate);
 
-        // Fetch Appointments Analytics
+        // Fetch Appointments Analytics - Showing ALL for stats, but highlighting logic
         const { data: apptData } = await supabase
             .from("appointments")
             .select("status")
@@ -122,10 +122,25 @@ export default function DirectorDashboard() {
             .gte("appointment_date", startOfMonthDate)
             .lte("appointment_date", endOfMonthDate);
 
-        const totalAppts = apptData?.length || 0;
+        const totalAppts = apptData?.filter(a => a.status !== 'pending').length || 0; // Exclude pending from total count for simpler view if requested
         const completedAppts = apptData?.filter(a => a.status === 'completed' || a.status === 'checked_in').length || 0;
         const cancelledAppts = apptData?.filter(a => a.status === 'cancelled').length || 0;
         const noShowAppts = apptData?.filter(a => a.status === 'no_show').length || 0;
+        const confirmedAppts = apptData?.filter(a => a.status === 'confirmed').length || 0;
+
+        // Fetch Upcoming Confirmed Appointments (Next 5)
+        const today = new Date().toISOString().split('T')[0];
+        const { data: upcomingData } = await supabase
+            .from("appointments")
+            .select("id, appointment_date, start_time, status, members(full_name), dependants(full_name)")
+            .eq("branch_id", branchId)
+            .eq("status", "confirmed")
+            .gte("appointment_date", today)
+            .order("appointment_date", { ascending: true })
+            .order("start_time", { ascending: true })
+            .limit(5);
+
+        setUpcomingAppts(upcomingData || []);
 
         setStats({
             totalRevenue: totalRevenue,
@@ -136,106 +151,106 @@ export default function DirectorDashboard() {
             totalAppts,
             completedAppts,
             cancelledAppts,
-            noShowAppts
+            noShowAppts,
+            confirmedAppts
         });
     };
 
     if (loading) return <div className="p-8 text-center"><Loader2 className="animate-spin h-8 w-8 text-primary mx-auto" /></div>;
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-8 p-4 md:p-8 bg-slate-50/50 min-h-screen">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-blue-900">Branch Overview</h1>
-                    <p className="text-muted-foreground">{branchName} Performance Metrics</p>
+                    <h1 className="text-4xl font-serif font-bold tracking-tight text-slate-900">Branch Overview</h1>
+                    <p className="text-slate-500 mt-1">{branchName} Performance Metrics</p>
                 </div>
-                <div className="flex items-center gap-2 bg-white p-2 rounded-lg border shadow-sm">
+                <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-full border shadow-sm text-slate-600 font-medium">
                     <Calendar className="h-4 w-4 text-blue-600" />
-                    <span className="text-sm font-medium">{new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
+                    <span>{new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
                 </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Card className="border-l-4 border-l-blue-600 shadow-sm">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Branch Revenue</CardTitle>
-                        <DollarSign className="h-4 w-4 text-blue-600" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">KES {stats.totalRevenue.toLocaleString()}</div>
-                        <p className="text-xs text-muted-foreground flex items-center mt-1">
-                            <span className="text-green-600 flex items-center mr-1 font-medium">
-                                <ArrowUpRight className="h-3 w-3 mr-0.5" /> 12%
-                            </span>
-                            from last month
-                        </p>
-                    </CardContent>
-                </Card>
-
-                <Card className="border-l-4 border-l-emerald-600 shadow-sm">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Active Visits</CardTitle>
-                        <ClipboardList className="h-4 w-4 text-emerald-600" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{stats.visitCount}</div>
-                        <p className="text-xs text-muted-foreground flex items-center mt-1">
-                            <span className="text-green-600 flex items-center mr-1 font-medium">
-                                <ArrowUpRight className="h-3 w-3 mr-0.5" /> 8%
-                            </span>
-                            daily average: {(stats.visitCount / 30).toFixed(1)}
-                        </p>
-                    </CardContent>
-                </Card>
-
-                <Card className="border-l-4 border-l-orange-600 shadow-sm">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Net Profit/Loss</CardTitle>
-                        <TrendingUp className="h-4 w-4 text-orange-600" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className={`text-2xl font-bold ${stats.profitLoss >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                            KES {stats.profitLoss.toLocaleString()}
-                        </div>
-                        <p className="text-xs text-muted-foreground flex items-center mt-1">
-                            {stats.profitLoss >= 0 ? 'Positive margin' : 'Deficit detected'}
-                        </p>
-                    </CardContent>
-                </Card>
-
-                <Card className="border-l-4 border-l-purple-600 shadow-sm">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Services Rendered</CardTitle>
-                        <Stethoscope className="h-4 w-4 text-purple-600" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{stats.totalServices}</div>
-                        <p className="text-xs text-muted-foreground mt-1">Total procedures this month</p>
-                    </CardContent>
-                </Card>
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                <DashboardCard
+                    title="Revenue"
+                    value={`KES ${stats.totalRevenue.toLocaleString()}`}
+                    icon={DollarSign}
+                    trend="+12% vs last month"
+                    color="blue"
+                />
+                <DashboardCard
+                    title="Active Visits"
+                    value={stats.visitCount}
+                    icon={ClipboardList}
+                    trend="+8% vs last month"
+                    color="emerald"
+                />
+                <DashboardCard
+                    title="Services Rendered"
+                    value={stats.totalServices}
+                    icon={Stethoscope}
+                    trend="Procedures"
+                    color="purple"
+                />
+                <DashboardCard
+                    title="Confirmed Appts"
+                    value={stats.confirmedAppts}
+                    icon={Calendar}
+                    trend="Upcoming & Completed"
+                    color="indigo"
+                />
             </div>
 
-            {/* Appointment Analytics Section */}
-            <div className="grid gap-4 md:grid-cols-3">
-                <Card className="shadow-sm">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">Appointment Overview</CardTitle>
+            <div className="grid gap-6 md:grid-cols-7">
+                {/* Upcoming Appointments List */}
+                <Card className="md:col-span-3 shadow-md border-none card-elevated">
+                    <CardHeader>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle className="text-lg">Upcoming Appointments</CardTitle>
+                                <CardDescription>Next confirmed visits</CardDescription>
+                            </div>
+                            <Button variant="ghost" size="sm" onClick={() => navigate("/director/appointments")}>View All</Button>
+                        </div>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{stats.totalAppts}</div>
-                        <p className="text-xs text-muted-foreground">Total appointments this month</p>
-                        <div className="mt-4 flex gap-2 text-xs">
-                            <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-green-500"></div> Done: {stats.completedAppts}</div>
-                            <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-500"></div> Cancel: {stats.cancelledAppts}</div>
-                            <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-gray-500"></div> No-Show: {stats.noShowAppts}</div>
+                        <div className="space-y-4">
+                            {upcomingAppts.length === 0 ? (
+                                <p className="text-center text-muted-foreground py-8 border rounded-lg border-dashed">No upcoming appointments.</p>
+                            ) : (
+                                upcomingAppts.map((appt) => (
+                                    <div key={appt.id} className="flex items-center gap-4 p-3 rounded-lg border bg-white hover:bg-slate-50 transition-colors">
+                                        <div className="flex-shrink-0 text-center w-14 bg-indigo-50 text-indigo-700 rounded p-1">
+                                            <div className="font-bold text-lg">{format(new Date(appt.appointment_date), "dd")}</div>
+                                            <div className="text-[10px] uppercase font-bold">{format(new Date(appt.appointment_date), "MMM")}</div>
+                                        </div>
+                                        <div className="overflow-hidden">
+                                            <p className="font-medium truncate">
+                                                {appt.dependants?.full_name ? `${appt.dependants.full_name} (Child)` : appt.members?.full_name}
+                                            </p>
+                                            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                                                <Clock className="w-3 h-3" />
+                                                {appt.start_time.slice(0, 5)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
                         </div>
                     </CardContent>
                 </Card>
 
-                <Card className="md:col-span-2 shadow-sm">
+                {/* Recent Visits List */}
+                <Card className="md:col-span-4 shadow-md border-none card-elevated">
                     <CardHeader>
-                        <CardTitle>Recent Patient Visits</CardTitle>
-                        <CardDescription>Last active consultations in this branch.</CardDescription>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle className="text-lg">Recent Visits</CardTitle>
+                                <CardDescription>Latest patient activity</CardDescription>
+                            </div>
+                            <Button variant="ghost" size="sm">View All</Button>
+                        </div>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
@@ -243,9 +258,9 @@ export default function DirectorDashboard() {
                                 <p className="text-center text-muted-foreground py-8">No recent visits recorded.</p>
                             ) : (
                                 recentVisits.slice(0, 5).map((visit) => (
-                                    <div key={visit.id} className="flex items-center justify-between p-3 rounded-lg border bg-blue-50/30">
-                                        <div className="flex items-center gap-4">
-                                            <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-700">
+                                    <div key={visit.id} className="flex items-center justify-between p-3 rounded-lg border bg-white hover:bg-slate-50 transition-colors">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-9 w-9 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-700 text-sm">
                                                 {visit.members?.full_name?.charAt(0)}
                                             </div>
                                             <div>
@@ -253,14 +268,14 @@ export default function DirectorDashboard() {
                                                 <p className="text-xs text-muted-foreground mt-1">{new Date(visit.created_at).toLocaleTimeString()}</p>
                                             </div>
                                         </div>
-                                        <div className="flex flex-col items-end gap-1">
-                                            <Badge variant={visit.status === 'completed' ? 'default' : 'secondary'} className={visit.status === 'completed' ? 'bg-green-600' : ''}>
+                                        <div className="text-right">
+                                            <Badge variant={visit.status === 'completed' ? 'default' : 'secondary'} className="mb-1">
                                                 {visit.status}
                                             </Badge>
                                             {visit.bills?.[0] && (
-                                                <span className="text-xs font-bold text-blue-700">
+                                                <div className="text-xs font-bold text-emerald-600">
                                                     KES {visit.bills[0].total_branch_compensation.toLocaleString()}
-                                                </span>
+                                                </div>
                                             )}
                                         </div>
                                     </div>
@@ -271,5 +286,32 @@ export default function DirectorDashboard() {
                 </Card>
             </div>
         </div>
+    );
+}
+
+function DashboardCard({ title, value, icon: Icon, trend, color }: any) {
+    const colorClasses: any = {
+        blue: "text-blue-600 bg-blue-100",
+        emerald: "text-emerald-600 bg-emerald-100",
+        purple: "text-purple-600 bg-purple-100",
+        indigo: "text-indigo-600 bg-indigo-100",
+    };
+
+    return (
+        <Card className="shadow-sm border-none card-elevated hover:shadow-md transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+                <div className={`p-2 rounded-full ${colorClasses[color]}`}>
+                    <Icon className="h-4 w-4" />
+                </div>
+            </CardHeader>
+            <CardContent>
+                <div className="text-2xl font-bold">{value}</div>
+                <p className="text-xs text-muted-foreground flex items-center mt-2">
+                    {trend.includes('+') ? <ArrowUpRight className="h-3 w-3 mr-1 text-emerald-500" /> : null}
+                    {trend}
+                </p>
+            </CardContent>
+        </Card>
     );
 }

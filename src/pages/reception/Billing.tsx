@@ -84,13 +84,17 @@ export default function ReceptionBilling() {
             return;
         }
         setProcessingId(visit.id);
+        console.log("Attempting finalize_visit_bill with:", { p_bill_id: billId, p_receptionist_id: receptionistId });
         try {
-            const { error } = await supabase.rpc('finalize_bill', {
-                _bill_id: billId,
-                _receptionist_id: receptionistId
-            });
+            const { data, error } = await supabase.rpc('finalize_visit_bill', {
+                p_bill_id: billId,
+                p_receptionist_id: receptionistId
+            } as any);
 
-            if (error) throw error;
+            if (error) {
+                console.error("RPC Error:", error);
+                throw error;
+            }
 
             // Send Billing Completion SMS
             try {

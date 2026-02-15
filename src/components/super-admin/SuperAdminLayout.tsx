@@ -10,6 +10,7 @@ import { NotificationBell } from "../notifications/NotificationBell";
 export function SuperAdminLayout() {
     const [loading, setLoading] = useState(true);
     const [authorized, setAuthorized] = useState(false);
+    const [userName, setUserName] = useState<string | null>(null);
     const navigate = useNavigate();
     const { toast } = useToast();
 
@@ -29,6 +30,17 @@ export function SuperAdminLayout() {
             return;
         }
 
+        // Fetch Super Admin Name
+        const { data: staffData } = await supabase
+            .from("staff")
+            .select("full_name")
+            .eq("user_id", user.id)
+            .maybeSingle();
+
+        if (staffData) {
+            setUserName(staffData.full_name);
+        }
+
         setAuthorized(true);
         setLoading(false);
     };
@@ -44,8 +56,9 @@ export function SuperAdminLayout() {
                         <SidebarTrigger className="mr-4" />
                         <ShieldAlert className="h-5 w-5 text-red-600 mr-2" />
                         <span className="font-bold text-red-700">Super Admin Control</span>
-                        <div className="ml-auto">
+                        <div className="ml-auto flex items-center gap-4 text-sm text-slate-600">
                             <NotificationBell />
+                            <span>Welcome, <span className="font-bold text-slate-800">{loading ? "..." : authorized ? (userName || "Super Admin") : ""}</span></span>
                         </div>
                     </header>
                     <main className="p-6"><Outlet /></main>

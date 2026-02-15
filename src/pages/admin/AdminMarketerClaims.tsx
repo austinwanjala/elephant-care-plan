@@ -48,6 +48,7 @@ export default function AdminMarketerClaims() {
     const [selectedClaim, setSelectedClaim] = useState<MarketerClaim | null>(null);
     const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
     const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
+    const [rejectionDialogOpen, setRejectionDialogOpen] = useState(false);
     const [actionNotes, setActionNotes] = useState("");
     const [submitting, setSubmitting] = useState(false);
     const { toast } = useToast();
@@ -91,6 +92,12 @@ export default function AdminMarketerClaims() {
         setSelectedClaim(claim);
         setActionNotes("");
         setPaymentDialogOpen(true);
+    };
+
+    const handleRejectClick = (claim: MarketerClaim) => {
+        setSelectedClaim(claim);
+        setActionNotes("");
+        setRejectionDialogOpen(true);
     };
 
     const handleProcessApproval = async () => {
@@ -154,13 +161,45 @@ export default function AdminMarketerClaims() {
         }
     };
 
+    const handleProcessRejection = async () => {
+        if (!selectedClaim) return;
+        setSubmitting(true);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            // We might want to track who rejected it, but schema might not have rejected_by.
+            // For now just update status and notes.
+
+            const existingNotes = selectedClaim.notes || "";
+            const rejectionReason = actionNotes ? `Rejection Reason: ${actionNotes}` : "Rejected by Admin";
+            const newNotes = `${existingNotes}\n${rejectionReason}`;
+
+            const { error } = await (supabase as any)
+                .from("marketer_claims")
+                .update({
+                    status: 'rejected',
+                    notes: newNotes.trim()
+                })
+                .eq("id", selectedClaim.id);
+
+            if (error) throw error;
+
+            toast({ title: "Claim Rejected", description: "Claim has been rejected." });
+            setRejectionDialogOpen(false);
+            loadClaims();
+        } catch (error: any) {
+            toast({ title: "Rejection Failed", description: error.message, variant: "destructive" });
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
     if (loading) {
         return <div className="p-12 text-center"><Loader2 className="animate-spin h-8 w-8 text-primary mx-auto" /></div>;
     }
 
     const pendingClaims = claims.filter(c => c.status === 'pending');
     const financeClaims = claims.filter(c => c.status === 'finance_review');
-    const paidClaims = claims.filter(c => c.status === 'paid');
+    const historyClaims = claims.filter(c => c.status === 'paid' || c.status === 'rejected');
 
     const canApprove = userRole === 'admin' || userRole === 'super_admin';
     const canPay = userRole === 'finance' || userRole === 'super_admin';
@@ -197,6 +236,8 @@ export default function AdminMarketerClaims() {
                                 onAction={handleApproveClick}
                                 actionDisabled={!canApprove}
                                 actionVariant="outline"
+                                // Add Reject Action
+                                onReject={handleRejectClick}
                             />
                         </CardContent>
                     </Card>
@@ -214,6 +255,7 @@ export default function AdminMarketerClaims() {
                                 onAction={handlePayClick}
                                 actionDisabled={!canPay} // Only finish logic
                                 actionVariant="default"
+                                onReject={canPay ? handleRejectClick : undefined} // Finance can also reject if needed? User asked for admin portal reject.
                             />
                         </CardContent>
                     </Card>
@@ -222,10 +264,10 @@ export default function AdminMarketerClaims() {
                 <TabsContent value="history">
                     <Card>
                         <CardHeader>
-                            <CardTitle>Paid Claims</CardTitle>
+                            <CardTitle>Claim History</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <ClaimsTable claims={paidClaims} />
+                            <ClaimsTable claims={historyClaims} />
                         </CardContent>
                     </Card>
                 </TabsContent>
@@ -253,6 +295,34 @@ export default function AdminMarketerClaims() {
                         <Button onClick={handleProcessApproval} disabled={submitting} className="w-full">
                             {submitting ? <Loader2 className="animate-spin mr-2" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
                             Approve for Finance
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Rejection Dialog */}
+            <Dialog open={rejectionDialogOpen} onOpenChange={setRejectionDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle className="text-destructive">Reject Claim</DialogTitle>
+                        <DialogDescription>
+                            Reject claim for {selectedClaim?.marketers?.full_name}. This action cannot be undone easily.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="flex justify-between items-center sm:text-lg font-semibold">
+                            <span>Amount:</span>
+                            <span>KES {selectedClaim?.amount.toLocaleString()}</span>
+                        </div>
+                        <Textarea
+                            placeholder="Reason for rejection (required)..."
+                            value={actionNotes}
+                            onChange={e => setActionNotes(e.target.value)}
+                            className="border-destructive/50 focus-visible:ring-destructive"
+                        />
+                        <Button onClick={handleProcessRejection} disabled={submitting || !actionNotes.trim()} className="w-full" variant="destructive">
+                            {submitting ? <Loader2 className="animate-spin mr-2" /> : null}
+                            Confirm Rejection
                         </Button>
                     </div>
                 </DialogContent>
@@ -288,12 +358,13 @@ export default function AdminMarketerClaims() {
     );
 }
 
-function ClaimsTable({ claims, actionLabel, onAction, actionDisabled, actionVariant = "default" }: {
+function ClaimsTable({ claims, actionLabel, onAction, actionDisabled, actionVariant = "default", onReject }: {
     claims: MarketerClaim[],
     actionLabel?: string,
     onAction?: (c: MarketerClaim) => void,
     actionDisabled?: boolean,
-    actionVariant?: "default" | "outline" | "secondary" | "destructive" | "ghost" | "link"
+    actionVariant?: "default" | "outline" | "secondary" | "destructive" | "ghost" | "link",
+    onReject?: (c: MarketerClaim) => void
 }) {
     if (claims.length === 0) {
         return <div className="text-center py-8 text-muted-foreground">No claims found in this category.</div>;
@@ -309,7 +380,7 @@ function ClaimsTable({ claims, actionLabel, onAction, actionDisabled, actionVari
                         <TableHead>Referrals</TableHead>
                         <TableHead>Amount</TableHead>
                         <TableHead>Status</TableHead>
-                        {actionLabel && <TableHead className="text-right">Action</TableHead>}
+                        {(actionLabel || onReject) && <TableHead className="text-right">Action</TableHead>}
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -325,16 +396,28 @@ function ClaimsTable({ claims, actionLabel, onAction, actionDisabled, actionVari
                             <TableCell>
                                 <ClaimBadge status={claim.status} />
                             </TableCell>
-                            {actionLabel && (
-                                <TableCell className="text-right">
-                                    <Button
-                                        size="sm"
-                                        variant={actionVariant}
-                                        onClick={() => onAction && onAction(claim)}
-                                        disabled={actionDisabled}
-                                    >
-                                        {actionLabel}
-                                    </Button>
+                            {(actionLabel || onReject) && (
+                                <TableCell className="text-right space-x-2">
+                                    {onReject && (
+                                        <Button
+                                            size="sm"
+                                            variant="destructive"
+                                            onClick={() => onReject(claim)}
+                                            disabled={actionDisabled}
+                                        >
+                                            Reject
+                                        </Button>
+                                    )}
+                                    {actionLabel && (
+                                        <Button
+                                            size="sm"
+                                            variant={actionVariant}
+                                            onClick={() => onAction && onAction(claim)}
+                                            disabled={actionDisabled}
+                                        >
+                                            {actionLabel}
+                                        </Button>
+                                    )}
                                 </TableCell>
                             )}
                         </TableRow>
@@ -350,6 +433,7 @@ function ClaimBadge({ status }: { status: string }) {
         case 'pending': return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">Pending</Badge>;
         case 'finance_review': return <Badge variant="secondary" className="bg-blue-100 text-blue-800">Finance Review</Badge>;
         case 'paid': return <Badge className="bg-green-600">Paid</Badge>;
+        case 'rejected': return <Badge variant="destructive">Rejected</Badge>;
         default: return <Badge variant="outline">{status}</Badge>;
     }
 }

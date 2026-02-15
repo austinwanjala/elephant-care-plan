@@ -10,6 +10,7 @@ import { Loader2 } from "lucide-react";
 export function FinanceLayout() {
     const [loading, setLoading] = useState(true);
     const [authorized, setAuthorized] = useState(false);
+    const [userName, setUserName] = useState<string | null>(null);
     const navigate = useNavigate();
     const { toast } = useToast();
 
@@ -30,6 +31,17 @@ export function FinanceLayout() {
             return;
         }
 
+        // Fetch Finance Staff Name
+        const { data: staffData } = await supabase
+            .from("staff")
+            .select("full_name")
+            .eq("user_id", user.id)
+            .maybeSingle();
+
+        if (staffData) {
+            setUserName(staffData.full_name);
+        }
+
         setAuthorized(true);
         setLoading(false);
     };
@@ -44,8 +56,9 @@ export function FinanceLayout() {
                     <header className="h-14 border-b border-border flex items-center px-4 sticky top-0 bg-background/95 backdrop-blur z-40">
                         <SidebarTrigger className="mr-4" />
                         <span className="font-bold text-amber-700">Finance Portal</span>
-                        <div className="ml-auto">
+                        <div className="ml-auto flex items-center gap-4 text-sm text-slate-600">
                             <NotificationBell />
+                            <span>Welcome, <span className="font-bold text-slate-800">{loading ? "..." : authorized ? (userName || "Finance") : ""}</span></span>
                         </div>
                     </header>
                     <main className="p-6"><Outlet /></main>

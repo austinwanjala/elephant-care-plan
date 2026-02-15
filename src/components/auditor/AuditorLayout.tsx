@@ -21,6 +21,7 @@ import { NotificationBell } from "../notifications/NotificationBell";
 export const AuditorLayout = () => {
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [userEmail, setUserEmail] = useState<string | null>(null);
+    const [userName, setUserName] = useState<string | null>(null);
     const location = useLocation();
     const navigate = useNavigate(); // Add hook usage
     const { toast } = useToast();
@@ -49,6 +50,24 @@ export const AuditorLayout = () => {
                     variant: "destructive",
                 });
                 navigate("/login");
+                return;
+            }
+
+            // Fetch Auditor Name (from staff table, assuming auditors are staff or separate)
+            // If audits table exists, check there? No, user management is usually centralized.
+            // Let's check 'staff' table first.
+            const { data: staffData } = await supabase
+                .from("staff")
+                .select("full_name")
+                .eq("user_id", user.id)
+                .maybeSingle();
+
+            if (staffData) {
+                // Use a separate state for name, or reuse userEmail but that's confusing.
+                // Let's just update the display logic to prefer name.
+                // We don't have a specific state for name in AuditorLayout yet except maybe inside 'userEmail' hack?
+                // No, let's add a state.
+                setUserName(staffData.full_name);
             }
         };
 
@@ -117,10 +136,10 @@ export const AuditorLayout = () => {
                     <div className="p-4 border-t border-slate-800">
                         <div className="flex items-center gap-3 px-4 py-3 mb-2">
                             <div className="h-8 w-8 rounded-full bg-emerald-900/50 flex items-center justify-center text-emerald-400 font-bold border border-emerald-700">
-                                A
+                                {userName ? userName.charAt(0) : "A"}
                             </div>
                             <div className="overflow-hidden">
-                                <p className="text-sm font-medium truncate text-white">Auditor</p>
+                                <p className="text-sm font-medium truncate text-white">{userName || "Auditor"}</p>
                                 <p className="text-xs text-slate-400 truncate">{userEmail}</p>
                             </div>
                         </div>
@@ -144,8 +163,9 @@ export const AuditorLayout = () => {
                         </Button>
                         <h1 className="font-bold text-lg text-slate-800 lg:hidden">Auditor Portal</h1>
                     </div>
-                    <div>
+                    <div className="flex items-center gap-4 text-sm text-slate-600">
                         <NotificationBell />
+                        <span className="hidden md:inline">Welcome, <span className="font-bold text-slate-800">{userName || "Auditor"}</span></span>
                     </div>
                 </header>
 

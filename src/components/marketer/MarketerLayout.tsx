@@ -14,6 +14,7 @@ interface MarketerLayoutProps {
 export function MarketerLayout({ children }: MarketerLayoutProps) {
     const [loading, setLoading] = useState(true);
     const [authorized, setAuthorized] = useState(false);
+    const [userName, setUserName] = useState<string | null>(null);
     const navigate = useNavigate();
     const { toast } = useToast();
 
@@ -59,6 +60,17 @@ export function MarketerLayout({ children }: MarketerLayoutProps) {
             return;
         }
 
+        // Fetch Marketer Name
+        const { data: marketerData } = await supabase
+            .from("marketers")
+            .select("full_name")
+            .eq("user_id", user.id)
+            .maybeSingle();
+
+        if (marketerData) {
+            setUserName(marketerData.full_name);
+        }
+
         setAuthorized(true);
         setLoading(false);
     };
@@ -83,7 +95,7 @@ export function MarketerLayout({ children }: MarketerLayoutProps) {
                         <span className="font-semibold text-purple-700">Marketer Portal</span>
                         <div className="ml-auto flex items-center gap-4 text-sm text-slate-600">
                             <NotificationBell />
-                            <span>Welcome, <span className="font-bold text-slate-800">{loading ? "..." : authorized ? "Marketer" : ""}</span></span>
+                            <span>Welcome, <span className="font-bold text-slate-800">{loading ? "..." : authorized ? (userName || "Marketer") : ""}</span></span>
                         </div>
                     </header>
                     <main className="p-6">

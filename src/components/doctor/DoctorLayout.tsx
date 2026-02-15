@@ -61,14 +61,22 @@ export function DoctorLayout({ children }: DoctorLayoutProps) {
         }
 
         // Fetch Doctor Name
-        const { data: doctorData } = await supabase
-            .from("doctors")
+        const { data: staffData } = await supabase
+            .from("staff")
             .select("full_name")
             .eq("user_id", user.id)
             .maybeSingle();
 
-        if (doctorData) {
-            setUserName(doctorData.full_name);
+        if (staffData) {
+            setUserName(staffData.full_name);
+        } else {
+            // Fallback to doctors table if migration not fully done
+            const { data: doctorData } = await supabase
+                .from("doctors")
+                .select("full_name")
+                .eq("user_id", user.id)
+                .maybeSingle();
+            if (doctorData) setUserName(doctorData.full_name);
         }
 
         setAuthorized(true);

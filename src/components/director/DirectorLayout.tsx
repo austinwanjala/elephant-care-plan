@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useState } from "react";
 import { useNavigate, Outlet } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
+import { NotificationBell } from "../notifications/NotificationBell";
 import { DirectorSidebar } from "./DirectorSidebar";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -13,6 +14,7 @@ interface DirectorLayoutProps {
 export function DirectorLayout({ children }: DirectorLayoutProps) {
     const [loading, setLoading] = useState(true);
     const [authorized, setAuthorized] = useState(false);
+    const [userName, setUserName] = useState<string | null>(null);
     const navigate = useNavigate();
     const { toast } = useToast();
 
@@ -58,6 +60,17 @@ export function DirectorLayout({ children }: DirectorLayoutProps) {
             return;
         }
 
+        // Fetch Director Name
+        const { data: staffData } = await supabase
+            .from("staff")
+            .select("full_name")
+            .eq("user_id", user.id)
+            .maybeSingle();
+
+        if (staffData) {
+            setUserName(staffData.full_name);
+        }
+
         setAuthorized(true);
         setLoading(false);
     };
@@ -80,6 +93,10 @@ export function DirectorLayout({ children }: DirectorLayoutProps) {
                     <header className="h-14 border-b border-border flex items-center px-4 sticky top-0 bg-background/95 backdrop-blur z-40">
                         <SidebarTrigger className="mr-4" />
                         <span className="font-semibold text-emerald-700">Director Portal</span>
+                        <div className="ml-auto flex items-center gap-4 text-sm text-slate-600">
+                            <NotificationBell />
+                            <span>Welcome, <span className="font-bold text-slate-800">{loading ? "..." : authorized ? (userName || "Director") : ""}</span></span>
+                        </div>
                     </header>
                     <main className="p-6">
                         {children || <Outlet />}

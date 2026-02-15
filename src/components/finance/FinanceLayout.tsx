@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useState } from "react";
 import { useNavigate, Outlet } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
+import { NotificationBell } from "../notifications/NotificationBell";
 import { FinanceSidebar } from "./FinanceSidebar";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -22,6 +23,7 @@ export function FinanceLayout() {
 
         const { data: roleData } = await supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
 
+        // @ts-ignore
         if (roleData?.role !== "finance" && roleData?.role !== "super_admin") {
             toast({ title: "Access Denied", description: "Finance privileges required.", variant: "destructive" });
             navigate("/");
@@ -42,6 +44,9 @@ export function FinanceLayout() {
                     <header className="h-14 border-b border-border flex items-center px-4 sticky top-0 bg-background/95 backdrop-blur z-40">
                         <SidebarTrigger className="mr-4" />
                         <span className="font-bold text-amber-700">Finance Portal</span>
+                        <div className="ml-auto">
+                            <NotificationBell />
+                        </div>
                     </header>
                     <main className="p-6"><Outlet /></main>
                 </SidebarInset>

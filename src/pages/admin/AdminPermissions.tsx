@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -88,7 +88,10 @@ export default function AdminPermissions() {
                 newRolePermissions.push({ role, permission_id: permissionId });
             }
         } else {
+            console.log(`Removing ${role} - ${permissionId}`);
+            const initialLen = newRolePermissions.length;
             newRolePermissions = newRolePermissions.filter(rp => !(rp.role === role && rp.permission_id === permissionId));
+            console.log(`Length before: ${initialLen}, after: ${newRolePermissions.length}`);
         }
 
         setRolePermissions(newRolePermissions);
@@ -97,18 +100,39 @@ export default function AdminPermissions() {
 
     const handleSave = async () => {
         setSaving(true);
+        console.log("Starting save process...");
+        console.log("Original:", originalRolePermissions.length, originalRolePermissions);
+        console.log("Current:", rolePermissions.length, rolePermissions);
+
         try {
             // 1. Find additions
             const toAdd = rolePermissions.filter(rp =>
-                !originalRolePermissions.some(orp => orp.role === rp.role && orp.permission_id === rp.permission_id)
+                !originalRolePermissions.some(orp =>
+                    orp.role.toLowerCase() === rp.role.toLowerCase() &&
+                    orp.permission_id === rp.permission_id
+                )
             ).map(rp => ({ ...rp, role: rp.role.toLowerCase() }));
 
             // 2. Find removals
-            const toRemove = originalRolePermissions.filter(orp =>
-                !rolePermissions.some(rp => rp.role === orp.role && rp.permission_id === rp.permission_id)
-            ).map(rp => ({ ...rp, role: rp.role.toLowerCase() }));
+            const toRemove = originalRolePermissions.filter(orp => {
+                const found = rolePermissions.some(rp => {
+                    const roleMatch = rp.role.toLowerCase() === orp.role.toLowerCase();
+                    const idMatch = rp.permission_id === orp.permission_id;
+                    if (orp.permission_id === 'c30331db-79c4-4df0-99ae-563fde68d55d' && roleMatch && idMatch) {
+                        console.log("CRITICAL: Found deleted item in Current state!", rp);
+                    }
+                    return roleMatch && idMatch;
+                });
+
+                if (!found) {
+                    console.log("Found removal candidate:", orp);
+                }
+                return !found;
+            }).map(rp => ({ ...rp, role: rp.role.toLowerCase() }));
 
             if (toAdd.length === 0 && toRemove.length === 0) {
+                console.log("No changes detected.");
+                toast({ title: "No changes detected", description: "You haven't made any modifications." });
                 setSaving(false);
                 setHasChanges(false);
                 return;
@@ -185,7 +209,7 @@ export default function AdminPermissions() {
                             </TableHeader>
                             <TableBody>
                                 {Object.entries(groupedPermissions).map(([resource, perms]) => (
-                                    <>
+                                    <Fragment key={resource}>
                                         <TableRow key={`header-${resource}`} className="bg-muted/50">
                                             <TableCell colSpan={ROLES.length + 1} className="font-semibold capitalize py-2">
                                                 {resource} Management
@@ -209,7 +233,7 @@ export default function AdminPermissions() {
                                                 ))}
                                             </TableRow>
                                         ))}
-                                    </>
+                                    </Fragment>
                                 ))}
                             </TableBody>
                         </Table>

@@ -82,6 +82,7 @@ import AdminMembershipCategories from "./pages/admin/AdminMembershipCategories";
 import AdminLogs from "./pages/admin/AdminLogs";
 import AdminPermissions from "./pages/admin/AdminPermissions";
 import AdminReports from "./pages/admin/AdminReports";
+import AdminNotifications from "./pages/admin/AdminNotifications";
 
 // Finance Pages
 import FinanceDashboard from "./pages/finance/Dashboard";
@@ -176,6 +177,7 @@ const App = () => (
             <Route path="settings" element={<AdminSettings />} />
             <Route path="membership-categories" element={<AdminMembershipCategories />} />
             <Route path="logs" element={<AdminLogs />} />
+            <Route path="notifications" element={<AdminNotifications />} />
             <Route path="reports" element={<AdminReports />} />
           </Route>
 
@@ -196,6 +198,7 @@ const App = () => (
             <Route path="membership-categories" element={<AdminMembershipCategories />} />
             <Route path="logs" element={<AdminLogs />} />
             <Route path="permissions" element={<AdminPermissions />} />
+            <Route path="notifications" element={<AdminNotifications />} />
             <Route path="reports" element={<AdminReports />} />
           </Route>
 

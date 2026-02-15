@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { NotificationBell } from "../notifications/NotificationBell";
 
 export const AuditorLayout = () => {
     const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -40,6 +41,7 @@ export const AuditorLayout = () => {
                 .eq("user_id", user.id)
                 .single();
 
+            // @ts-ignore
             if (roleData?.role !== "auditor" && roleData?.role !== "super_admin" && roleData?.role !== "admin") {
                 toast({
                     title: "Access Denied",
@@ -135,11 +137,16 @@ export const AuditorLayout = () => {
 
             {/* Main Content */}
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-                <header className="bg-white border-b shadow-sm p-4 lg:hidden flex items-center justify-between">
-                    <h1 className="font-bold text-lg text-slate-800">Auditor Portal</h1>
-                    <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
-                        <Menu className="h-6 w-6" />
-                    </Button>
+                <header className="bg-white border-b shadow-sm p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)} className="lg:hidden">
+                            <Menu className="h-6 w-6" />
+                        </Button>
+                        <h1 className="font-bold text-lg text-slate-800 lg:hidden">Auditor Portal</h1>
+                    </div>
+                    <div>
+                        <NotificationBell />
+                    </div>
                 </header>
 
                 <main className="flex-1 overflow-auto p-4 md:p-8">

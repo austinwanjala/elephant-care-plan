@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useState } from "react";
 import { useNavigate, Outlet } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
+import { NotificationBell } from "../notifications/NotificationBell";
 import { MemberSidebar } from "./MemberSidebar";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -27,7 +28,7 @@ export function MemberLayout({ children }: MemberLayoutProps) {
 
   const checkAuthAndMaintenance = async () => {
     setLoading(true);
-    
+
     // 1. Check Maintenance Mode
     const { data: maintenanceData } = await supabase
       .from("system_settings")
@@ -59,6 +60,7 @@ export function MemberLayout({ children }: MemberLayoutProps) {
     }
 
     // If maintenance is ON and user is NOT admin/super_admin, redirect to maintenance page
+    // @ts-ignore
     if (isMaintenance && roleData?.role !== "admin" && roleData?.role !== "super_admin") {
       navigate("/maintenance");
       setLoading(false);
@@ -70,6 +72,7 @@ export function MemberLayout({ children }: MemberLayoutProps) {
     if (roleData?.role === "doctor") { navigate("/doctor"); setLoading(false); return; }
     if (roleData?.role === "branch_director") { navigate("/director"); setLoading(false); return; }
     if (roleData?.role === "marketer") { navigate("/marketer"); setLoading(false); return; }
+    // @ts-ignore
     if (roleData?.role === "finance") { navigate("/finance"); setLoading(false); return; }
 
     // 3. Load Member Details
@@ -85,6 +88,7 @@ export function MemberLayout({ children }: MemberLayoutProps) {
       return;
     }
 
+    // @ts-ignore
     if (!memberDetails && roleData?.role !== "admin" && roleData?.role !== "super_admin") {
       toast({ title: "Access denied", description: "You don't have member privileges", variant: "destructive" });
       navigate("/");
@@ -108,11 +112,11 @@ export function MemberLayout({ children }: MemberLayoutProps) {
         <SidebarInset className="flex-1">
           <header className="h-14 border-b border-border flex items-center px-4 sticky top-0 bg-background/95 backdrop-blur z-40">
             <SidebarTrigger className="mr-4" />
-            {memberInfo && memberInfo.full_name && (
-              <span className="text-muted-foreground text-sm sm:text-base">
-                Welcome, <span className="font-semibold text-foreground">{memberInfo.full_name}</span>
-              </span>
-            )}
+            <SidebarTrigger className="mr-4 h-5 w-5 md:h-6 md:w-6" />
+            <div className="ml-auto flex items-center gap-4 text-sm text-slate-600">
+              <NotificationBell />
+              <span>Welcome, <span className="font-bold text-slate-800">{loading ? "..." : authorized ? (memberInfo?.full_name || "Member") : ""}</span></span>
+            </div>
           </header>
           <main className="p-6">
             {children || <Outlet />}

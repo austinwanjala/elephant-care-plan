@@ -21,12 +21,9 @@ BEGIN
         RAISE EXCEPTION 'Access Denied: Only admins can manage permissions.';
     END IF;
 
-    -- 1. Process Removals
-    IF p_removes IS NOT NULL AND jsonb_array_length(p_removes) > 0 THEN
-        FOR item IN SELECT * FROM jsonb_array_elements(p_removes)
-        LOOP
+            -- Cast role safely (handle case sensitivity)
             DELETE FROM public.role_permissions
-            WHERE role = (item->>'role')::public.app_role
+            WHERE role = lower(item->>'role')::public.app_role
             AND permission_id = (item->>'permission_id')::uuid;
             
             IF FOUND THEN
@@ -41,7 +38,7 @@ BEGIN
         LOOP
             INSERT INTO public.role_permissions (role, permission_id)
             VALUES (
-                (item->>'role')::public.app_role,
+                lower(item->>'role')::public.app_role,
                 (item->>'permission_id')::uuid
             )
             ON CONFLICT (role, permission_id) DO NOTHING;

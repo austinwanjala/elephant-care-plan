@@ -79,6 +79,9 @@ export function AdminSidebar() {
   // Add Reports for admins
   menuItems.push({ title: "Reports", url: `${basePath}/reports`, icon: FileText });
 
+  // Add Notifications for admins
+  menuItems.push({ title: "Notifications", url: `${basePath}/notifications`, icon: ShieldAlert });
+
   const settingsMenuItems = [
     { title: "General Settings", url: `${basePath}/settings`, icon: Settings },
     { title: "Appointment Settings", url: `${basePath}/appointment-settings`, icon: ClipboardList },

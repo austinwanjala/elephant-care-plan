@@ -2,6 +2,7 @@ import { ReactNode, useEffect, useState } from "react";
 import { useNavigate, Outlet } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { MarketerSidebar } from "./MarketerSidebar";
+import { NotificationBell } from "../notifications/NotificationBell";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
@@ -80,6 +81,10 @@ export function MarketerLayout({ children }: MarketerLayoutProps) {
                     <header className="h-14 border-b border-border flex items-center px-4 sticky top-0 bg-background/95 backdrop-blur z-40">
                         <SidebarTrigger className="mr-4" />
                         <span className="font-semibold text-purple-700">Marketer Portal</span>
+                        <div className="ml-auto flex items-center gap-4 text-sm text-slate-600">
+                            <NotificationBell />
+                            <span>Welcome, <span className="font-bold text-slate-800">{loading ? "..." : authorized ? "Marketer" : ""}</span></span>
+                        </div>
                     </header>
                     <main className="p-6">
                         {children || <Outlet />}

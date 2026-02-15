@@ -5,6 +5,7 @@ import { AdminSidebar } from "../admin/AdminSidebar"; // Reusing Admin sidebar f
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, ShieldAlert } from "lucide-react";
+import { NotificationBell } from "../notifications/NotificationBell";
 
 export function SuperAdminLayout() {
     const [loading, setLoading] = useState(true);
@@ -43,6 +44,9 @@ export function SuperAdminLayout() {
                         <SidebarTrigger className="mr-4" />
                         <ShieldAlert className="h-5 w-5 text-red-600 mr-2" />
                         <span className="font-bold text-red-700">Super Admin Control</span>
+                        <div className="ml-auto">
+                            <NotificationBell />
+                        </div>
                     </header>
                     <main className="p-6"><Outlet /></main>
                 </SidebarInset>

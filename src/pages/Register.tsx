@@ -35,7 +35,7 @@ const Register = () => {
     fullName: "",
     phone: "",
     idNumber: "",
-    age: "",
+    dob: "",
     email: "",
     password: "",
   });
@@ -135,9 +135,6 @@ const Register = () => {
     setLoading(true);
 
     try {
-      const ageInt = parseInt(formData.age);
-      if (isNaN(ageInt)) throw new Error("Please enter a valid age.");
-
       // 1. Sign up the user using the Admin Edge Function to bypass email confirmation
       const { data: authData, error: authError } = await supabase.functions.invoke("admin-create-user", {
         body: {
@@ -148,7 +145,7 @@ const Register = () => {
             full_name: formData.fullName,
             phone: formData.phone,
             id_number: formData.idNumber,
-            age: ageInt,
+            dob: formData.dob, // Include DOB
             marketer_id: selectedMarketer?.id || null,
             marketer_code: selectedMarketer?.code || null
           }
@@ -296,8 +293,15 @@ const Register = () => {
                   <Input id="idNumber" placeholder="12345678" value={formData.idNumber} onChange={(e) => setFormData({ ...formData, idNumber: e.target.value })} required />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="age">Age</Label>
-                  <Input id="age" type="number" placeholder="25" value={formData.age} onChange={(e) => setFormData({ ...formData, age: e.target.value })} required />
+                  <Label htmlFor="dob">Date of Birth</Label>
+                  <Input
+                    id="dob"
+                    type="date"
+                    value={formData.dob}
+                    onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
+                    required
+                    max={new Date().toISOString().split('T')[0]}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="email">Email Address</Label>

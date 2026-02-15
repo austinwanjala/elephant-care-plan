@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -205,11 +205,12 @@ const Login = () => {
       } else if (role === "member") {
         const { data: memberProfile } = await supabase
           .from("members")
-          .select("is_active")
+          .select("is_active, membership_category_id")
           .eq("user_id", userId)
           .maybeSingle();
 
-        if (memberProfile && memberProfile.is_active) {
+        // Redirect to scheme selection if inactive OR no membership category selected
+        if (memberProfile && memberProfile.is_active && memberProfile.membership_category_id) {
           navigate("/dashboard");
         } else {
           navigate("/dashboard/scheme-selection");

@@ -2,9 +2,20 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Loader2, User, Phone, Mail, CreditCard, Cake, Users } from "lucide-react";
+import { Loader2, User, Phone, Mail, CreditCard, Cake, Users, Pencil, Save, X } from "lucide-react";
 import { InsuranceCard } from "@/components/member/InsuranceCard";
 import { differenceInYears, parseISO } from "date-fns";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 
 interface MemberProfile {
   id: string;
@@ -27,6 +38,16 @@ interface MemberProfile {
 export default function MemberProfile() {
   const [profile, setProfile] = useState<MemberProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const { toast } = useToast();
+
+  const [editForm, setEditForm] = useState({
+    full_name: "",
+    phone: "",
+    id_number: "",
+    dob: "",
+  });
 
   useEffect(() => {
     fetchProfile();
@@ -43,7 +64,47 @@ export default function MemberProfile() {
       .maybeSingle();
 
     setProfile(data);
+    if (data) {
+      setEditForm({
+        full_name: data.full_name || "",
+        phone: data.phone || "",
+        id_number: data.id_number || "",
+        dob: data.dob || "",
+      });
+    }
     setLoading(false);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profile) return;
+    setIsSaving(true);
+
+    try {
+      const { error } = await supabase
+        .from("members")
+        .update({
+          full_name: editForm.full_name,
+          phone: editForm.phone,
+          id_number: editForm.id_number,
+          dob: editForm.dob || null,
+        })
+        .eq("id", profile.id);
+
+      if (error) throw error;
+
+      toast({ title: "Profile Updated", description: "Your details have been saved." });
+      setIsEditOpen(false);
+      fetchProfile(); // Refresh data
+    } catch (error: any) {
+      toast({
+        title: "Update Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (loading) {
@@ -69,15 +130,20 @@ export default function MemberProfile() {
     ? ((profile.coverage_balance || 0) / profile.benefit_limit) * 100
     : 0;
 
-  const displayAge = profile.dob 
-    ? differenceInYears(new Date(), parseISO(profile.dob)) 
+  const displayAge = profile.dob
+    ? differenceInYears(new Date(), parseISO(profile.dob))
     : (profile.age || "N/A");
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">My Profile</h1>
-        <p className="text-muted-foreground">Your membership details</p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold">My Profile</h1>
+          <p className="text-muted-foreground">Your membership details</p>
+        </div>
+        <Button onClick={() => setIsEditOpen(true)} variant="outline" className="gap-2">
+          <Pencil className="h-4 w-4" /> Edit Profile
+        </Button>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
@@ -152,7 +218,7 @@ export default function MemberProfile() {
             <Cake className="h-5 w-5 text-muted-foreground" />
             <div>
               <p className="text-sm text-muted-foreground">Age</p>
-              <p>{displayAge}</p>
+              <p>{displayAge} {profile.dob && <span className="text-xs text-slate-400">({profile.dob})</span>}</p>
             </div>
           </div>
           {profile.marketers && (
@@ -168,6 +234,62 @@ export default function MemberProfile() {
           )}
         </CardContent>
       </Card>
+
+      {/* Edit Profile Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit Profile</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditSubmit} className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="full_name">Full Name</Label>
+              <Input
+                id="full_name"
+                value={editForm.full_name}
+                onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone Number</Label>
+              <Input
+                id="phone"
+                value={editForm.phone}
+                onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="id_number">ID Number</Label>
+              <Input
+                id="id_number"
+                value={editForm.id_number}
+                onChange={(e) => setEditForm({ ...editForm, id_number: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="dob">Date of Birth</Label>
+              <Input
+                id="dob"
+                type="date"
+                value={editForm.dob}
+                onChange={(e) => setEditForm({ ...editForm, dob: e.target.value })}
+                required
+                max={new Date().toISOString().split('T')[0]}
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={isSaving}>
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

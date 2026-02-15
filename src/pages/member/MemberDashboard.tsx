@@ -228,7 +228,7 @@ const MemberDashboard = () => {
     );
   }
 
-  if (!member.is_active) {
+  if (!member.is_active || !member.membership_categories) {
     return (
       <div className="container mx-auto px-4 py-8">
         <Card className="card-elevated p-8 text-center max-w-lg mx-auto">

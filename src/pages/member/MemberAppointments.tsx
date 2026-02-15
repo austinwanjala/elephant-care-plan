@@ -77,6 +77,18 @@ const MemberAppointments = () => {
 
     const [rescheduleData, setRescheduleData] = useState<any>(null); // Appointment object to reschedule
 
+    const { data: memberStatus } = useQuery({
+        queryKey: ["member_status"],
+        queryFn: async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return null;
+            const { data } = await supabase.from("members").select("is_active, membership_category_id").eq("user_id", user.id).single();
+            return data;
+        }
+    });
+
+    const isCovered = memberStatus?.is_active && memberStatus?.membership_category_id;
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -84,16 +96,22 @@ const MemberAppointments = () => {
                     <h2 className="text-3xl font-bold tracking-tight">My Appointments</h2>
                     <p className="text-muted-foreground">Manage your visits and bookings.</p>
                 </div>
-                <Dialog open={isBookingOpen} onOpenChange={setIsBookingOpen}>
-                    <DialogTrigger asChild>
-                        <Button className="gap-2">
-                            <Plus className="h-4 w-4" /> Book Appointment
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-                        <BookingWizard onSuccess={() => setIsBookingOpen(false)} />
-                    </DialogContent>
-                </Dialog>
+                {isCovered ? (
+                    <Dialog open={isBookingOpen} onOpenChange={setIsBookingOpen}>
+                        <DialogTrigger asChild>
+                            <Button className="gap-2">
+                                <Plus className="h-4 w-4" /> Book Appointment
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                            <BookingWizard onSuccess={() => setIsBookingOpen(false)} />
+                        </DialogContent>
+                    </Dialog>
+                ) : (
+                    <Button className="gap-2" variant="secondary" disabled title="You must select a scheme to book appointments.">
+                        <Plus className="h-4 w-4" /> Book Appointment (Uncovered)
+                    </Button>
+                )}
             </div>
 
             <Tabs defaultValue="upcoming" className="w-full">
@@ -111,7 +129,7 @@ const MemberAppointments = () => {
                                 <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
                                 <h3 className="text-lg font-medium">No upcoming appointments</h3>
                                 <p className="text-muted-foreground mb-4">You don't have any scheduled visits.</p>
-                                <Button variant="outline" onClick={() => setIsBookingOpen(true)}>Book Now</Button>
+                                <Button variant="outline" onClick={() => setIsBookingOpen(true)} disabled={!isCovered}>Book Now</Button>
                             </CardContent>
                         </Card>
                     ) : (

@@ -84,11 +84,11 @@ export default function ReceptionBilling() {
             return;
         }
         setProcessingId(visit.id);
-        console.log("Attempting finalize_visit_bill with:", { p_bill_id: billId, p_receptionist_id: receptionistId });
+        console.log("Attempting finalize_invoice_rpc with:", { bill_id: billId, receptionist_id: receptionistId });
         try {
-            const { data, error } = await supabase.rpc('finalize_visit_bill', {
-                p_bill_id: billId,
-                p_receptionist_id: receptionistId
+            const { data, error } = await supabase.rpc('finalize_invoice_rpc', {
+                bill_id: billId,
+                receptionist_id: receptionistId
             } as any);
 
             if (error) {

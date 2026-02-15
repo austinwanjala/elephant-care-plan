@@ -144,18 +144,8 @@ const Login = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
+  const checkUserRoleAndNavigate = async (userId: string) => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-
       let role = null;
       let attempts = 0;
       const maxAttempts = 5;
@@ -165,7 +155,7 @@ const Login = () => {
         const { data: roleData } = await supabase
           .from("user_roles")
           .select("role")
-          .eq("user_id", data.user.id)
+          .eq("user_id", userId)
           .maybeSingle();
 
         if (roleData?.role) {
@@ -216,7 +206,7 @@ const Login = () => {
         const { data: memberProfile } = await supabase
           .from("members")
           .select("is_active")
-          .eq("user_id", data.user.id)
+          .eq("user_id", userId)
           .maybeSingle();
 
         if (memberProfile && memberProfile.is_active) {
@@ -230,10 +220,58 @@ const Login = () => {
     } catch (error: any) {
       toast({
         title: "Login failed",
+        description: error.message || "Failed to retrieve user details",
+        variant: "destructive",
+      });
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setLoading(true);
+        await checkUserRoleAndNavigate(session.user.id);
+      }
+    };
+
+    checkSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session) {
+        setLoading(true);
+        // Only navigate if we're technically still on the login page (to avoid double navs)
+        if (window.location.pathname === '/login') {
+          await checkUserRoleAndNavigate(session.user.id);
+        }
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      if (data.user) {
+        await checkUserRoleAndNavigate(data.user.id);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Login failed",
         description: error.message || "Invalid email or password",
         variant: "destructive",
       });
-    } finally {
       setLoading(false);
     }
   };

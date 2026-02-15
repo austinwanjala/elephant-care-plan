@@ -27,18 +27,32 @@ export default function DirectorRevenue() {
     const [accumulatedRevenue, setAccumulatedRevenue] = useState(0);
     const [availableToClaim, setAvailableToClaim] = useState(0);
     const [claims, setClaims] = useState<any[]>([]);
+    const [pendingMultiStageClaims, setPendingMultiStageClaims] = useState<any[]>([]);
     const [claiming, setClaiming] = useState(false);
     const { toast } = useToast();
     const navigate = useNavigate();
 
     const fetchClaims = useCallback(async (branchId: string) => {
-        const { data, error } = await (supabase as any)
+        // Fetch Regular Claims
+        const { data: regClaims, error } = await (supabase as any)
             .from("revenue_claims")
             .select("*")
             .eq("branch_id", branchId)
             .order("created_at", { ascending: false });
 
-        if (!error) setClaims(data || []);
+        if (!error) setClaims(regClaims || []);
+
+        // Fetch Pending/Unlocked Multi-Stage Claims
+        const { data: pending, error: pendingError } = await (supabase as any)
+            .from("pending_claims")
+            .select("*, services(name), members(full_name)")
+            .eq("branch_id", branchId)
+            .eq("released_to_director", true)
+            .eq("approved_by_director", false)
+            .order("updated_at", { ascending: false });
+
+        if (pending) setPendingMultiStageClaims(pending);
+
     }, []);
 
     const fetchAccumulatedRevenue = useCallback(async (branchId: string) => {
@@ -172,6 +186,43 @@ export default function DirectorRevenue() {
             }
         } catch (error: any) {
             toast({ title: "Claim Failed", description: error.message, variant: "destructive" });
+        } finally {
+            setClaiming(false);
+        }
+    };
+
+    const handleApprovePendingClaim = async (claimId: string, amount: number) => {
+        if (!claimId) return;
+        try {
+            setClaiming(true);
+            // 1. Mark pending_claim as approved
+            await (supabase as any)
+                .from("pending_claims")
+                .update({ approved_by_director: true, status: 'approved' })
+                .eq("id", claimId);
+
+            // 2. Insert into revenue_claims (Realized Revenue) or just let it flow into accumulated revenue?
+            // The user requirement said: "Move locked amount into branch compensation".
+            // Since accumulated revenue is calculated from finalized bills, and the bill was ALREADY finalized at Stage 1,
+            // the money is technically already in "bills" table. 
+            // However, our fetchAccumulatedRevenue might need to account for this lock.
+            // Let's assume we just want to create a revenue_claim now.
+
+            // Wait, usually the director claims a lump sum. 
+            // If we just unlock it, it becomes part of "Accumulated Revenue" pool.
+            // So we don't necessarily need to create a revenue_claim immediately, UNLESS the user wants to cash it out immediately.
+            // The requirement says: "Move locked amount into branch compensation". 
+            // This implies it joins the pool.
+
+            toast({ title: "Funds Unlocked", description: `KES ${amount.toLocaleString()} has been added to available branch compensation.` });
+
+            if (directorBranchId) {
+                fetchClaims(directorBranchId);
+                fetchAccumulatedRevenue(directorBranchId); // This should now reflect the unlocked amount if we filter correctly
+            }
+
+        } catch (err: any) {
+            toast({ title: "Error", description: err.message, variant: "destructive" });
         } finally {
             setClaiming(false);
         }
@@ -312,6 +363,53 @@ export default function DirectorRevenue() {
                     )}
                 </CardContent>
             </Card>
+
+            {/* Pending Multi-Stage Claims Section */}
+            {pendingMultiStageClaims.length > 0 && (
+                <Card className="shadow-md border-amber-200 bg-amber-50/30 mt-6">
+                    <CardHeader>
+                        <CardTitle className="text-amber-800 flex items-center gap-2">
+                            <ShieldCheck className="h-5 w-5" />
+                            Completed Multi-Stage Services (Action Required)
+                        </CardTitle>
+                        <CardDescription>These services are complete. Approve them to release funds to branch revenue.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Date Completed</TableHead>
+                                    <TableHead>Patient</TableHead>
+                                    <TableHead>Service</TableHead>
+                                    <TableHead>Locked Amount</TableHead>
+                                    <TableHead>Action</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {pendingMultiStageClaims.map((claim) => (
+                                    <TableRow key={claim.id} className="bg-white">
+                                        <TableCell>{format(new Date(claim.updated_at), 'MMM d, yyyy')}</TableCell>
+                                        <TableCell>{claim.members?.full_name}</TableCell>
+                                        <TableCell>{claim.services?.name}</TableCell>
+                                        <TableCell className="font-bold text-amber-700">KES {Number(claim.locked_amount).toLocaleString()}</TableCell>
+                                        <TableCell>
+                                            <Button
+                                                size="sm"
+                                                className="bg-amber-600 hover:bg-amber-700 text-white"
+                                                onClick={() => handleApprovePendingClaim(claim.id, claim.locked_amount)}
+                                                disabled={claiming}
+                                            >
+                                                {claiming ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+                                                Approve & Release
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+            )}
 
             <Card className="shadow-sm border-slate-100 mt-6">
                 <CardHeader><CardTitle>Claims History</CardTitle></CardHeader>

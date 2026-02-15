@@ -603,6 +603,7 @@ export default function Consultation() {
                 const totalCompensation = newMultiStageServices.reduce((acc, s) => acc + Number(s.service.branch_compensation || 0), 0);
                 const totalReal = newMultiStageServices.reduce((acc, s) => acc + Number(s.service.real_cost || 0), 0);
 
+                // Create a BILL for the full amount
                 const { data: lockedBill, error: billError } = await (supabase as any).from("bills").insert({
                     visit_id: visitId,
                     branch_id: doctorBranchId,
@@ -612,17 +613,17 @@ export default function Consultation() {
                     total_real_cost: totalReal,
                     total_profit_loss: totalBenefit - totalCompensation,
                     is_finalized: true,
-                    is_claimable: false, // LOCKED
+                    is_claimable: false, // LOCKED - Not claimable by director yet
                     payment_status: 'pending'
                 }).select().single();
 
                 if (billError) throw billError;
-                if (!primaryBillId) primaryBillId = lockedBill.id; // Use locked bill as primary if no standard bill
+                if (!primaryBillId) primaryBillId = lockedBill.id;
 
                 const itemsToInsert = newMultiStageServices.map(s => ({
                     bill_id: lockedBill.id,
                     service_id: s.service.id,
-                    service_name: s.service.name + " (Stage 1)",
+                    service_name: s.service.name + " (Stage 1 - Full Payment)",
                     quantity: 1,
                     unit_cost: s.service.benefit_cost || 0,
                     total_cost: s.service.benefit_cost || 0,
@@ -635,8 +636,22 @@ export default function Consultation() {
                 const { error: itemsError } = await (supabase as any).from("bill_items").insert(itemsToInsert as any);
                 if (itemsError) throw itemsError;
 
-                // Create Service Stage Records linked to Locked Bill
+                // Create Pending Claims (Locked Funds)
                 for (const item of newMultiStageServices) {
+                    const { data: pendingClaim, error: claimError } = await (supabase as any).from("pending_claims").insert({
+                        branch_id: doctorBranchId,
+                        member_id: visit.member_id,
+                        service_id: item.service.id,
+                        visit_id: visitId,
+                        bill_id: lockedBill.id,
+                        locked_amount: item.service.branch_compensation || 0, // Lock the compensation amount
+                        is_multi_stage: true,
+                        status: 'locked',
+                        released_to_director: false
+                    }).select().single();
+
+                    if (claimError) throw claimError;
+
                     await supabase.from("service_stages").insert({
                         service_id: item.service.id,
                         member_id: visit.member_id,
@@ -644,9 +659,11 @@ export default function Consultation() {
                         visit_id: visitId,
                         tooth_number: item.tooth_number || null,
                         current_stage: 1,
+                        selected_tooth: item.tooth_number || null, // Ensure selected_tooth is set
                         total_stages: item.service.total_stages,
                         status: 'in_progress',
                         related_bill_id: lockedBill.id,
+                        pending_claim_id: pendingClaim.id, // Link to pending claim
                         notes: `Started in visit ${visitId} on tooth ${item.tooth_number}`
                     });
                 }
@@ -669,22 +686,17 @@ export default function Consultation() {
                     })
                     .eq("id", item.service.stageId || item.service.stage_id);
 
-                if (isFinal && item.service.related_bill_id) {
-                    // Unlock the original bill
-                    await (supabase as any)
-                        .from("bills")
-                        .update({ is_claimable: true })
-                        .eq("id", item.service.related_bill_id);
+                if (isFinal) {
+                    // Trigger logic is handled by DB Trigger on service_stages update
+                    // But we can optionally notify or log here
+                    console.log("Final stage completed. Compensation should be unlocked via DB trigger.");
 
-                    // Create Revenue Claim
-                    if (doctorBranchId && doctorId) {
-                        await supabase.from("revenue_claims").insert({
-                            branch_id: doctorBranchId,
-                            director_id: doctorId,
-                            amount: item.service.real_cost || 0, // Using real_cost as claim amount
-                            status: 'pending',
-                            notes: `Completed ${item.service.name} (All Stages) for ${visit.members.full_name}`
-                        });
+                    if (item.service.related_bill_id) {
+                        // Unlock the original bill (Legacy support or redundancy)
+                        await (supabase as any)
+                            .from("bills")
+                            .update({ is_claimable: true })
+                            .eq("id", item.service.related_bill_id);
                     }
                 }
             }

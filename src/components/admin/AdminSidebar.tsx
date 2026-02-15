@@ -72,7 +72,7 @@ export function AdminSidebar() {
   ];
 
   // Conditionally add System Logs
-  if (hasPermission('audit_logs', 'view') || roleLabel === 'Super Admin') {
+  if (hasPermission('system_logs', 'view')) {
     menuItems.push({ title: "System Logs", url: `${basePath}/logs`, icon: FileText });
   }
 

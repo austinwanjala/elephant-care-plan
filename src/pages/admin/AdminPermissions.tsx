@@ -101,12 +101,12 @@ export default function AdminPermissions() {
             // 1. Find additions
             const toAdd = rolePermissions.filter(rp =>
                 !originalRolePermissions.some(orp => orp.role === rp.role && orp.permission_id === rp.permission_id)
-            );
+            ).map(rp => ({ ...rp, role: rp.role.toLowerCase() }));
 
             // 2. Find removals
             const toRemove = originalRolePermissions.filter(orp =>
                 !rolePermissions.some(rp => rp.role === orp.role && rp.permission_id === rp.permission_id)
-            );
+            ).map(rp => ({ ...rp, role: rp.role.toLowerCase() }));
 
             if (toAdd.length === 0 && toRemove.length === 0) {
                 setSaving(false);
@@ -114,22 +114,22 @@ export default function AdminPermissions() {
                 return;
             }
 
-            // Execute Updates
-            if (toRemove.length > 0) {
-                for (const rp of toRemove) {
-                    await (supabase as any).from("role_permissions").delete().match({ role: rp.role, permission_id: rp.permission_id });
-                }
-            }
+            console.log("Saving Permissions - Add:", toAdd);
+            console.log("Saving Permissions - Remove:", toRemove);
 
-            if (toAdd.length > 0) {
-                const { error } = await (supabase as any).from("role_permissions").insert(toAdd);
-                if (error) throw error;
-            }
+            // Execute Updates via RPC
+            const { data, error } = await (supabase as any).rpc('process_permission_updates', {
+                p_adds: toAdd,
+                p_removes: toRemove
+            });
 
-            toast({ title: "Permissions Updated", description: "Role capabilities saved successfully." });
+            if (error) throw error;
 
-            // Refresh state
-            setOriginalRolePermissions(rolePermissions);
+            console.log("RPC Result:", data);
+            toast({ title: "Permissions Updated", description: `Saved: ${data?.added} added, ${data?.removed} removed.` });
+
+            // Refresh state from DB to be sure
+            await loadData();
             setHasChanges(false);
 
         } catch (error: any) {

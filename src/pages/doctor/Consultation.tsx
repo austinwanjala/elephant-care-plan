@@ -121,6 +121,19 @@ export default function Consultation() {
             if (records) {
                 const statuses: any = {};
                 records.forEach((r: any) => statuses[r.tooth_number] = r.status);
+
+                // Highlight active stages
+                // We do this AFTER records to potentially overlay 'in_progress' on top of existing status, 
+                // OR we might want to prioritize 'decay' or 'completed' depending on logic.
+                // Usually "In Progress" is most important to see.
+                if (stages) {
+                    stages.forEach((s: any) => {
+                        if (s.tooth_number) {
+                            statuses[s.tooth_number] = 'in_progress';
+                        }
+                    });
+                }
+
                 setToothStatus(statuses);
             }
 
@@ -669,8 +682,46 @@ export default function Consultation() {
                 }
             }
 
-            // 3. Handle Stage Updates (Logic only, no billing implications as they are 0 cost)
+            // 3. Handle Stage Updates (Create 0-cost bill for reception approval)
             const updates = selectedServices.filter(s => s.service.is_multi_stage_update);
+
+            if (updates.length > 0) {
+                // Create a bill for these updates so Receptionist can "Finalize" them
+                // This ensures the flow is identical to other services
+                const { data: updateBill, error: billError } = await (supabase as any).from("bills").insert({
+                    visit_id: visitId,
+                    branch_id: doctorBranchId,
+                    receptionist_id: null,
+                    status: 'pending',
+                    total_benefit_cost: 0,
+                    total_branch_compensation: 0,
+                    total_real_cost: 0,
+                    total_profit_loss: 0,
+                    is_finalized: false,
+                    is_claimable: false,
+                    payment_status: 'pending' // Pending receptionist finalization
+                }).select().single();
+
+                if (billError) throw billError;
+                if (!primaryBillId) primaryBillId = updateBill.id;
+
+                const updateItems = updates.map(s => ({
+                    bill_id: updateBill.id,
+                    service_id: s.service.id,
+                    service_name: s.service.name, // e.g. "Root Canal (Stage 2/3)"
+                    quantity: 1,
+                    unit_cost: 0,
+                    total_cost: 0,
+                    benefit_cost: 0,
+                    branch_compensation: 0,
+                    real_cost: 0,
+                    tooth_number: s.tooth_number ? s.tooth_number.toString() : null,
+                    notes: s.service.notes
+                }));
+
+                const { error: itemsError } = await (supabase as any).from("bill_items").insert(updateItems as any);
+                if (itemsError) throw itemsError;
+            }
             for (const item of updates) {
                 const currentStage = item.service.startAtStage; // This holds the *next* stage
                 const isFinal = currentStage === item.service.total_stages;

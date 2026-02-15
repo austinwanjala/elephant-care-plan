@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ export default function AdminReports() {
     const [loading, setLoading] = useState(true);
     const [branches, setBranches] = useState<any[]>([]);
     const [selectedBranchId, setSelectedBranchId] = useState<string>("all");
+    const [visits, setVisits] = useState<any[]>([]);
     const [stats, setStats] = useState({
         totalRevenue: 0,
         visitCount: 0,
@@ -67,9 +69,10 @@ export default function AdminReports() {
 
             let query = supabase
                 .from("visits")
-                .select("*, bills(*)")
+                .select("*, bills(*), members(full_name, member_number), doctor:staff!visits_doctor_id_fkey(full_name)")
                 .gte("created_at", startOfMonthDate)
-                .lte("created_at", endOfMonthDate);
+                .lte("created_at", endOfMonthDate)
+                .order("created_at", { ascending: false });
 
             if (branchId !== "all") {
                 query = query.eq("branch_id", branchId);
@@ -79,7 +82,10 @@ export default function AdminReports() {
 
             if (visitsError) throw visitsError;
 
-            const completedVisits = (visitsData || []).filter(v => v.status === 'completed');
+            // Set detailed visits for table
+            setVisits(visitsData || []);
+
+            const completedVisits = (visitsData || []).filter((v: any) => v.status === 'completed');
 
             let totalRevenue = 0;
             let totalProfitLoss = 0;
@@ -109,7 +115,7 @@ export default function AdminReports() {
 
             // Appointments
             let apptsQuery = supabase
-                .from("appointments")
+                .from("appointments" as any)
                 .select("status")
                 .gte("appointment_date", startOfMonthDate)
                 .lte("appointment_date", endOfMonthDate);
@@ -121,7 +127,7 @@ export default function AdminReports() {
             const { data: apptData } = await apptsQuery;
 
             const totalAppts = apptData?.length || 0;
-            const completedAppts = apptData?.filter(a => a.status === 'completed' || a.status === 'checked_in').length || 0;
+            const completedAppts = apptData?.filter((a: any) => a.status === 'completed' || a.status === 'checked_in').length || 0;
 
             setStats({
                 totalRevenue,
@@ -215,6 +221,71 @@ export default function AdminReports() {
                         </CardContent>
                     </Card>
                 </div>
+            )}
+
+            {!loading && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Detailed Visit Reports</CardTitle>
+                        <CardDescription>
+                            Showing {visits.length} records for selected period.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Date</TableHead>
+                                    <TableHead>Patient</TableHead>
+                                    <TableHead>Doctor</TableHead>
+                                    <TableHead>Service</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead className="text-right">Revenue</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {visits.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={6} className="text-center h-24 text-muted-foreground">
+                                            No records found for this period.
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    visits.map((visit) => {
+                                        const bill = visit.bills?.[0];
+                                        return (
+                                            <TableRow key={visit.id}>
+                                                <TableCell className="font-mono text-xs">
+                                                    {format(new Date(visit.created_at), "yyyy-MM-dd HH:mm")}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div>
+                                                        <div className="font-medium">{visit.members?.full_name || "Unknown"}</div>
+                                                        <div className="text-xs text-muted-foreground">{visit.members?.member_number}</div>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    {visit.doctor?.full_name || "N/A"}
+                                                </TableCell>
+                                                <TableCell className="max-w-[200px] truncate" title={bill?.service_name || "No Bill"}>
+                                                    {bill?.service_name || "-"}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge variant={visit.status === 'completed' ? 'default' : 'secondary'} className="capitalize">
+                                                        {visit.status.replace('_', ' ')}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="text-right font-mono">
+                                                    {bill?.total_branch_compensation ? `KES ${bill.total_branch_compensation.toLocaleString()}` : "-"}
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })
+                                )}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
             )}
         </div>
     );

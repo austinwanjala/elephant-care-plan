@@ -44,10 +44,40 @@ export default function AdminLogs() {
             new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
 
+        // Extract all unique user_ids
+        const userIds = Array.from(new Set(combinedLogs.map(log => log.user_id).filter(Boolean)));
+
+        // Fetch staff profiles for these IDs
+        const { data: staffData } = await supabase
+            .from("staff")
+            .select("user_id, full_name")
+            .in("user_id", userIds);
+
+        // Create a map
+        const userMap: Record<string, string> = {};
+        if (staffData) {
+            staffData.forEach((s: any) => {
+                userMap[s.user_id] = s.full_name;
+            });
+        }
+
+        // Also check members if needed, but usually logs are staff actions. 
+        // If we want to be thorough we could search members too if not found in staff.
+
+        // Store map in state or just process logs? 
+        // Let's attach names to logs or keep map. 
+        // Simpler: just update the logs state to include 'user_name' property or uses map in render.
+        // Let's use a separate state for userMap or just modify the logs to include resolved name.
+
+        const enhancedLogs = combinedLogs.map(log => ({
+            ...log,
+            user_name: userMap[log.user_id] || log.user_id || "System"
+        }));
+
         if (auditLogsResult.error) console.error("Error fetching audit logs:", auditLogsResult.error);
         if (systemLogsResult.error) console.error("Error fetching system logs:", systemLogsResult.error);
 
-        setLogs(combinedLogs);
+        setLogs(enhancedLogs);
         setLoading(false);
     };
 
@@ -115,6 +145,7 @@ export default function AdminLogs() {
     const filteredLogs = logs.filter(log =>
         log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
         log.user_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        log.user_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         JSON.stringify(log.details).toLowerCase().includes(searchTerm.toLowerCase())
     );
 
@@ -185,7 +216,7 @@ export default function AdminLogs() {
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="font-mono text-xs text-muted-foreground max-w-[150px] truncate" title={log.user_id}>
-                                            {log.user_id || "System"}
+                                            {log.user_name}
                                         </TableCell>
                                         <TableCell className="max-w-[400px]">
                                             <pre className="text-[10px] bg-slate-50 p-2 rounded overflow-auto max-h-[100px]">

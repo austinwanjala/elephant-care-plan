@@ -227,6 +227,10 @@ export function DentalChart({ onToothClick, selectedTeeth, toothStatus, isChild 
                     <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
                     <span className="text-blue-700">Completed</span>
                 </div>
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-100">
+                    <div className="w-3 h-3 bg-amber-400 rounded-full animate-pulse"></div>
+                    <span className="text-amber-700">In Progress</span>
+                </div>
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-50 border border-orange-200">
                     <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
                     <span className="text-orange-700">Selected</span>
@@ -272,6 +276,7 @@ function Tooth({ id, isSelected, status, onClick, isLower, imageSrc, small }: To
     let colorClass = "fill-white stroke-slate-300 hover:stroke-slate-500";
     if (status === 'decay') colorClass = "fill-red-100 stroke-red-500";
     if (status === 'planned') colorClass = "fill-cyan-100 stroke-cyan-500";
+    if (status === 'in_progress') colorClass = "fill-amber-100 stroke-amber-500 animate-pulse";
     if (status === 'completed') colorClass = "fill-blue-100 stroke-blue-500";
     if (isSelected) colorClass = "fill-orange-100 stroke-orange-500";
 

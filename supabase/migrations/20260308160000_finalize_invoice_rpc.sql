@@ -1,11 +1,11 @@
 -- Migration: 20260308160000_finalize_invoice_rpc.sql
 
--- Last resort: A completely new function name to bypass ALL caching
+-- Drop the function again
 DROP FUNCTION IF EXISTS public.finalize_invoice_rpc(UUID, UUID);
 
 CREATE OR REPLACE FUNCTION public.finalize_invoice_rpc(
-    bill_id UUID,
-    receptionist_id UUID
+    p_bill_id UUID,
+    p_receptionist_id UUID
 )
 RETURNS VOID
 LANGUAGE plpgsql
@@ -22,7 +22,7 @@ BEGIN
     -- Get bill details
     SELECT visit_id, total_benefit_cost, total_branch_compensation, branch_id
     INTO v_visit_id, v_total_benefit, v_total_compensation, v_branch_id
-    FROM public.bills WHERE id = bill_id;
+    FROM public.bills WHERE id = p_bill_id;
 
     IF v_visit_id IS NULL THEN
         RAISE EXCEPTION 'Bill not found.';
@@ -49,11 +49,12 @@ BEGIN
     END IF;
 
     -- Mark bill as finalized
+    -- Note: Ensure parameter names p_receptionist_id are used to avoid ambiguity with column names
     UPDATE public.bills 
     SET is_finalized = true, 
         finalized_at = now(),
-        receptionist_id = receptionist_id
-    WHERE id = bill_id;
+        receptionist_id = p_receptionist_id
+    WHERE id = p_bill_id;
 
     -- Update visit status
     UPDATE public.visits

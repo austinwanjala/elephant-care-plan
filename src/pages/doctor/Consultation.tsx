@@ -726,7 +726,7 @@ export default function Consultation() {
                 const currentStage = item.service.startAtStage; // This holds the *next* stage
                 const isFinal = currentStage === item.service.total_stages;
 
-                await (supabase as any)
+                const { error: stageUpdateError } = await (supabase as any)
                     .from("service_stages")
                     .update({
                         current_stage: currentStage,
@@ -736,6 +736,19 @@ export default function Consultation() {
                         notes: item.service.notes // Save notes here
                     })
                     .eq("id", item.service.stageId || item.service.stage_id);
+
+                if (stageUpdateError) {
+                    console.error("Error updating service stage:", stageUpdateError);
+                    toast({
+                        title: "Warning",
+                        description: `Failed to update stage for ${item.service.name}. Please contact support.`,
+                        variant: "destructive"
+                    });
+                    // Decide if we should throw to abort the whole transaction or continue. 
+                    // Given this is critical for the next visit, we should probably throw or at least alert loudly.
+                    // For now, let's throw to ensure data consistency (rollback bills if stage doesn't update).
+                    throw stageUpdateError;
+                }
 
                 if (isFinal) {
                     // Trigger logic is handled by DB Trigger on service_stages update

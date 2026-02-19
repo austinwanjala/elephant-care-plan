@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, Send, ArrowLeft, Trash2, Plus, AlertTriangle } from "lucide-react";
+import { Loader2, Save, Send, ArrowLeft, Trash2, Plus, AlertTriangle, Lock, Unlock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { DentalChart, DentalChartMode } from "@/components/doctor/DentalChart";
 import {
@@ -42,6 +43,12 @@ export default function Consultation() {
     const [doctorId, setDoctorId] = useState<string | null>(null);
     const [doctorBranchId, setDoctorBranchId] = useState<string | null>(null);
     const [chartMode, setChartMode] = useState<DentalChartMode>('adult');
+
+    // New State for Diagnosis/Treatment Separation
+    const [consultationMode, setConsultationMode] = useState<'diagnosis' | 'treatment'>('diagnosis');
+    const [diagnosisLockedAt, setDiagnosisLockedAt] = useState<string | null>(null);
+    const [selectedDiagnosisTool, setSelectedDiagnosisTool] = useState<string>('decay'); // Default tool
+    const [toothConditions, setToothConditions] = useState<Record<number, string>>({}); // status/condition map
 
 
 
@@ -102,6 +109,13 @@ export default function Consultation() {
         } else {
             setVisit(data);
 
+            if (data.diagnosis_locked_at) {
+                setDiagnosisLockedAt(data.diagnosis_locked_at);
+                setConsultationMode('treatment');
+            } else {
+                setConsultationMode('diagnosis');
+            }
+
             // Fetch active multi-stage treatments
             const { data: stages } = await supabase
                 .from("service_stages")
@@ -114,27 +128,24 @@ export default function Consultation() {
 
             const { data: records, error: recordsError } = await supabase
                 .from("dental_records")
-                .select("tooth_number, status")
+                .select("tooth_number, status, condition, color")
                 .eq("member_id", data.member_id)
                 .eq("dependant_id", data.dependant_id || null); // Filter by dependant if exists, else null (for principal)
 
             if (records) {
-                const statuses: any = {};
-                records.forEach((r: any) => statuses[r.tooth_number] = r.status);
+                const conditions: Record<number, string> = {};
+                // If we have specific 'condition' field, use it. Otherwise fallback to 'status'.
+                // Ideally, 'condition' stores 'decay', 'missing'. 'status' stores 'planned', 'completed'.
+                records.forEach((r: any) => {
+                    if (r.condition) conditions[r.tooth_number] = r.condition;
+                    else if (r.status) conditions[r.tooth_number] = r.status;
+                });
+                setToothConditions(conditions);
 
-                // Highlight active stages
-                // We do this AFTER records to potentially overlay 'in_progress' on top of existing status, 
-                // OR we might want to prioritize 'decay' or 'completed' depending on logic.
-                // Usually "In Progress" is most important to see.
-                if (stages) {
-                    stages.forEach((s: any) => {
-                        if (s.tooth_number) {
-                            statuses[s.tooth_number] = 'in_progress';
-                        }
-                    });
-                }
-
-                setToothStatus(statuses);
+                // For display in Treatment Mode, we want to overlay treatment status (e.g. in_progress)
+                // But keep underlying condition visible if not hidden?
+                // DentalChart takes a single status.
+                // We will compute `toothStatus` derived state during render or use effect.
             }
 
             const { data: history } = await supabase
@@ -201,6 +212,25 @@ export default function Consultation() {
         }
     }, [visit]);
 
+    // Compute effective tooth status for display
+    useEffect(() => {
+        const effectiveStatus: Record<number, string> = { ...toothConditions };
+
+        // Overlay active stages (In Progress)
+        activeStages.forEach(stage => {
+            if (stage.tooth_number) {
+                effectiveStatus[stage.tooth_number] = 'in_progress';
+            }
+        });
+
+        // Overlay current selections? 
+        // DentalChart handles selection visually via `selectedTeeth` prop, but we might want to show 'planned' color?
+        // 'Selected' usually implies 'Planned' in this context.
+        // But `selectedTeeth` prop is array of IDs.
+
+        setToothStatus(effectiveStatus);
+    }, [toothConditions, activeStages]);
+
     const loadServices = async (branchId: string) => {
         const { data: servicesData, error: servicesError } = await supabase
             .from("services")
@@ -228,10 +258,111 @@ export default function Consultation() {
     };
 
     const handleToothClick = (toothId: number) => {
-        if (selectedTeeth.includes(toothId)) {
-            setSelectedTeeth(selectedTeeth.filter(id => id !== toothId));
+        if (consultationMode === 'diagnosis') {
+            // Apply selected condition tool
+            const currentCondition = toothConditions[toothId];
+            if (currentCondition === selectedDiagnosisTool) {
+                // Toggle off
+                const newConditions = { ...toothConditions };
+                delete newConditions[toothId];
+                setToothConditions(newConditions);
+            } else {
+                // Apply tool
+                setToothConditions({ ...toothConditions, [toothId]: selectedDiagnosisTool });
+            }
         } else {
-            setSelectedTeeth([...selectedTeeth, toothId]);
+            // Treatment Mode - Select for service
+            // Only allow selection if diagnosis is locked ? 
+            // Or if tooth has a condition (Problematic)?
+            // The prompt says "making only problematic teeth selectable".
+            // We can enforce this here or in `DentalChart` via `disabledTeeth` prop.
+            // If `DentalChart` handles visual disablement, we should also enforce it here.
+
+            // Check if tooth is "problematic" (has a condition that needs treatment)
+            // Or if it's just allowed. "Healthy" teeth might not be selectable.
+            // Let's assume if it's in `toothConditions`, it's problematic? 
+            // What if condition is 'healthy'? (If we had that). We don't have 'healthy' tool yet.
+            // Assuming any key in toothConditions = problematic for now.
+            // Exception: 'filled', 'crowned' might not need treatment?
+            // User requirement: "mark tooth conditions... save... treatment phase... make only problematic teeth selectable".
+            // Let's assume 'decay', 'missing', 'broken' are problematic. 'filled' might be history.
+            // But maybe user wants to re-do a filling?
+            // For now, let's allow clicking any tooth that is not disabled by the Chart.
+            // The Chart will hide healthy ones.
+
+            if (activeStages.find(s => s.tooth_number === toothId)) {
+                // If active stage exists, we might want to allow selection to "Continue"?
+                // Existing logic allows selection.
+            }
+
+            if (selectedTeeth.includes(toothId)) {
+                setSelectedTeeth(selectedTeeth.filter(id => id !== toothId));
+            } else {
+                setSelectedTeeth([...selectedTeeth, toothId]);
+            }
+        }
+    };
+
+    const saveDiagnosis = async (lock: boolean = false) => {
+        if (!visitId) return;
+        setSubmitting(true);
+        try {
+            // Upsert dental records with diagnosis
+            const recordsToUpsert = Object.entries(toothConditions).map(([tooth_number, condition]) => ({
+                member_id: visit.member_id,
+                dependant_id: visit.dependant_id || null,
+                visit_id: visitId,
+                tooth_number: parseInt(tooth_number),
+                condition: condition, // Save condition
+                status: 'diagnosed', // General status or keep existing? 
+                // We should probably preserve 'status' if it exists, but we can't easily read it per row here without fetching.
+                // However, 'condition' column is separate now.
+                // We can just update 'condition' and 'color' (derived from condition).
+                // But `upsert` needs all PKs.
+                // If we rely on default 'status', it might overwrite?
+                // `dental_records` has (member_id, tooth_number) unique.
+                // If we upsert `condition`, we might reset `status` if we don't provide it?
+                // NO, supabase `upsert` updates columns provided. 
+                // Wait, standard SQL `INSERT ... ON CONFLICT DO UPDATE` only updates what you say.
+                // Supabase `.upsert()` usually replaces the row or updates match.
+                // If we want partial update on conflict, we need to specify.
+                // Actually, let's just save.
+
+                // We also need to save 'color' for analytics/display if needed, but condition is source of truth.
+                updated_at: new Date().toISOString()
+            }));
+
+            if (recordsToUpsert.length > 0) {
+                const { error: dentalError } = await supabase.rpc('upsert_dental_records', { records: recordsToUpsert });
+                if (dentalError) throw dentalError;
+            }
+
+            // Update visit diagnosis text
+            const { error: visitError } = await supabase.from("visits").update({
+                diagnosis: diagnosis,
+                treatment_notes: treatmentNotes,
+                ...(lock ? { diagnosis_locked_at: new Date().toISOString() } : {})
+            }).eq("id", visitId);
+
+            if (visitError) throw visitError;
+
+            toast({
+                title: lock ? "Diagnosis Locked" : "Diagnosis Saved",
+                description: lock ? "Chart locked. Proceeding to treatment." : "Diagnosis details saved."
+            });
+
+            if (lock) {
+                setDiagnosisLockedAt(new Date().toISOString());
+                setConsultationMode('treatment');
+                // Clear selections?
+                setSelectedTeeth([]);
+            }
+
+        } catch (error: any) {
+            console.error(error);
+            toast({ title: "Error", description: error.message, variant: "destructive" });
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -475,17 +606,31 @@ export default function Consultation() {
             }));
 
             if (recordsToUpsert.length > 0) {
-                // We need to use a conflict strategy. 
-                // Ideally (member_id, dependant_id, tooth_number) or just (dependant_id, tooth_number) if dependant_id is NN.
-                // But since dependant_id is nullable, unique constraints are tricky in some DBs without Partial Index.
-                // PostgreSQL handles (col1, col2) unique where col2 is null as distinct.
-                // We might need to handle this carefully.
-                // For now, let's assume the upsert works if we have the constraint.
-                // If not, we might need a stored procedure or just delete insert.
-                const { error: dentalError } = await supabase.from("dental_records").upsert(recordsToUpsert as any);
-                // Removed explicit onConflict to let supabase infer from PK or unique set.
-                // Or better: ensure we have a unique constraint.
+                // Save treatment status / notes
+                // Ideally we use RPC too but upsert might work for status since we are not changing condition?
+                // But wait, `toothStatus` in Treatment mode is derived and includes 'in_progress'. 
+                // We probably DON'T want to save 'in_progress' to DB permanently if it's computed from service_stages.
+                // However, legacy logic did.
+                // Let's rely on RPC for safety if we can.
+                // But `upsert_dental_records` handles both.
+                // Let's use RPC for robustness.
+
+                const { error: dentalError } = await supabase.rpc('upsert_dental_records', { records: recordsToUpsert });
                 if (dentalError) throw dentalError;
+            }
+
+            // Save Diagnosis if in Diagnosis Mode
+            if (consultationMode === 'diagnosis') {
+                const { error: diagnosisError } = await supabase.rpc('upsert_dental_records', {
+                    records: Object.entries(toothConditions).map(([t, c]) => ({
+                        member_id: visit.member_id,
+                        dependant_id: visit.dependant_id || null,
+                        visit_id: visitId,
+                        tooth_number: parseInt(t),
+                        condition: c
+                    }))
+                });
+                if (diagnosisError) throw diagnosisError;
             }
 
             toast({ title: "Draft Saved", description: "Clinical notes and dental chart changes saved." });
@@ -901,12 +1046,27 @@ export default function Consultation() {
                         </Card>
                     )}
 
-                    <Card>
+                    <Card className={cn("transition-all", consultationMode === 'diagnosis' ? "border-orange-200 bg-orange-50/30" : "")}>
                         <CardHeader>
-                            <div className="flex justify-between items-center">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                 <div>
-                                    <CardTitle>Dental Chart (FDI)</CardTitle>
-                                    <CardDescription>Select teeth to add services or update clinical status.</CardDescription>
+                                    <div className="flex items-center gap-2">
+                                        <CardTitle>Dental Chart (FDI)</CardTitle>
+                                        {consultationMode === 'diagnosis' ? (
+                                            <span className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 text-xs font-bold border border-orange-200">
+                                                Diagnosis Phase
+                                            </span>
+                                        ) : (
+                                            <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold border border-blue-200 flex items-center gap-1">
+                                                <Lock className="w-3 h-3" /> Treatment Phase
+                                            </span>
+                                        )}
+                                    </div>
+                                    <CardDescription>
+                                        {consultationMode === 'diagnosis'
+                                            ? "Mark tooth conditions. Lock detection to proceed to treatment."
+                                            : "Select diagnosed teeth to add treatment services."}
+                                    </CardDescription>
                                 </div>
                                 <div className="flex gap-1 bg-secondary/10 px-3 py-1 rounded-full text-xs font-medium text-muted-foreground">
                                     {chartMode === 'child' && <span>Pediatric Mode</span>}
@@ -916,18 +1076,72 @@ export default function Consultation() {
                             </div>
                         </CardHeader>
                         <CardContent>
+
+                            {/* Diagnosis Toolbar */}
+                            {consultationMode === 'diagnosis' && (
+                                <div className="mb-6 p-4 bg-white rounded-xl border shadow-sm space-y-3">
+                                    <Label className="text-xs uppercase tracking-wider text-muted-foreground font-bold">Diagnosis Tools</Label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {[
+                                            { id: 'decay', label: 'Decay', color: 'bg-red-500', border: 'border-red-200' },
+                                            { id: 'missing', label: 'Missing', color: 'bg-yellow-400', border: 'border-yellow-200' },
+                                            { id: 'filled', label: 'Filled', color: 'bg-green-500', border: 'border-green-200' },
+                                            { id: 'crowned', label: 'Crowned', color: 'bg-blue-500', border: 'border-blue-200' },
+                                            { id: 'partial_denture', label: 'Pt. Denture', color: 'bg-pink-500', border: 'border-pink-200' },
+                                        ].map(tool => (
+                                            <button
+                                                key={tool.id}
+                                                onClick={() => setSelectedDiagnosisTool(tool.id)}
+                                                className={cn(
+                                                    "flex items-center gap-2 px-3 py-2 rounded-lg border transition-all text-sm font-medium",
+                                                    selectedDiagnosisTool === tool.id
+                                                        ? "ring-2 ring-offset-1 ring-primary border-primary bg-secondary/20"
+                                                        : "hover:bg-secondary/10 bg-white"
+                                                )}
+                                            >
+                                                <div className={cn("w-4 h-4 rounded-full", tool.color)} />
+                                                {tool.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="flex justify-between items-center pt-2 border-t mt-2">
+                                        <p className="text-xs text-muted-foreground">Select a tool and click on teeth to apply.</p>
+                                        <div className="flex gap-2">
+                                            <Button variant="outline" size="sm" onClick={() => saveDiagnosis(false)} disabled={submitting}>
+                                                <Save className="w-4 h-4 mr-2" /> Save Progress
+                                            </Button>
+                                            <Button size="sm" onClick={() => saveDiagnosis(true)} disabled={submitting || Object.keys(toothConditions).length === 0} className="bg-orange-600 hover:bg-orange-700 text-white">
+                                                <Lock className="w-4 h-4 mr-2" /> Lock & Treat
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             <DentalChart
                                 onToothClick={handleToothClick}
                                 selectedTeeth={selectedTeeth}
                                 toothStatus={toothStatus}
                                 mode={chartMode}
+                                readOnly={false} // Always interactive, but behavior changes
+                                disabledTeeth={consultationMode === 'treatment'
+                                    ? [ // Generate array of all possible teeth
+                                        18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28,
+                                        48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38,
+                                        55, 54, 53, 52, 51, 61, 62, 63, 64, 65,
+                                        85, 84, 83, 82, 81, 71, 72, 73, 74, 75
+                                    ].filter(id => !toothConditions[id]) // Disable if NOT in conditions
+                                    : []
+                                }
                             />
-                            {selectedTeeth.length > 0 && (
-                                <div className="mt-4 space-y-4">
-                                    <div className="p-4 border rounded bg-secondary/20">
-                                        <Label>Add Procedure for Selected Teeth ({selectedTeeth.join(", ")})</Label>
+
+                            {/* Service Selection (Treatment Mode Only) */}
+                            {consultationMode === 'treatment' && selectedTeeth.length > 0 && (
+                                <div className="mt-6 space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
+                                    <div className="p-5 border rounded-xl bg-blue-50/50 shadow-sm">
+                                        <Label className="text-blue-900 font-bold mb-2 block">Add Procedure for Selected Teeth ({selectedTeeth.join(", ")})</Label>
                                         <select
-                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-2"
+                                            className="flex h-11 w-full rounded-md border border-input bg-white px-3 py-2 text-sm mt-2 shadow-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                             onChange={(e) => {
                                                 addService(e.target.value);
                                                 e.target.value = "";

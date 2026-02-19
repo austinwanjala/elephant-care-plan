@@ -21,9 +21,11 @@ interface DentalChartProps {
     toothStatus: Record<number, string>;
     isChild?: boolean; // Deprecated in favor of mode, kept for backward compatibility
     mode?: DentalChartMode;
+    readOnly?: boolean;
+    disabledTeeth?: number[];
 }
 
-export function DentalChart({ onToothClick, selectedTeeth, toothStatus, isChild = false, mode }: DentalChartProps) {
+export function DentalChart({ onToothClick, selectedTeeth, toothStatus, isChild = false, mode, readOnly, disabledTeeth = [] }: DentalChartProps) {
     // Determine effective mode
     const effectiveMode: DentalChartMode = mode || (isChild ? 'child' : 'adult');
 
@@ -248,9 +250,10 @@ interface ToothProps {
     isLower?: boolean;
     imageSrc?: string;
     small?: boolean;
+    disabled?: boolean;
 }
 
-function Tooth({ id, isSelected, status, onClick, isLower, imageSrc, small }: ToothProps) {
+function Tooth({ id, isSelected, status, onClick, isLower, imageSrc, small, disabled }: ToothProps) {
     const lastDigit = id % 10;
     let toothPath = "";
 
@@ -275,10 +278,17 @@ function Tooth({ id, isSelected, status, onClick, isLower, imageSrc, small }: To
 
     let colorClass = "fill-white stroke-slate-300 hover:stroke-slate-500";
     if (status === 'decay') colorClass = "fill-red-100 stroke-red-500";
+    if (status === 'missing') colorClass = "fill-yellow-100 stroke-yellow-500 opacity-60";
+    if (status === 'filled') colorClass = "fill-green-100 stroke-green-500";
+    if (status === 'crowned') colorClass = "fill-blue-100 stroke-blue-500";
+    if (status === 'partial_denture') colorClass = "fill-pink-100 stroke-pink-500";
+
+    // Legacy support or Treatment statuses
     if (status === 'planned') colorClass = "fill-cyan-100 stroke-cyan-500";
     if (status === 'in_progress') colorClass = "fill-amber-100 stroke-amber-500 animate-pulse";
-    if (status === 'completed') colorClass = "fill-blue-100 stroke-blue-500";
-    if (isSelected) colorClass = "fill-orange-100 stroke-orange-500";
+    if (status === 'completed') colorClass = "fill-blue-100 stroke-blue-500"; // Can map to crowned or kept separate
+
+    if (isSelected) colorClass = "fill-orange-100 stroke-orange-500 stroke-2";
 
     // For images, we might want different overlay/border styles when selected
     const imageContainerClass = cn(
@@ -289,10 +299,11 @@ function Tooth({ id, isSelected, status, onClick, isLower, imageSrc, small }: To
 
     return (
         <div
-            onClick={onClick}
+            onClick={disabled ? undefined : onClick}
             className={cn(
-                "group relative flex flex-col items-center cursor-pointer transition-all duration-200",
-                !imageSrc && (isSelected ? "scale-110 z-10" : "hover:-translate-y-1")
+                "group relative flex flex-col items-center transition-all duration-200",
+                disabled ? "cursor-not-allowed opacity-50 grayscale" : "cursor-pointer",
+                !imageSrc && !disabled && (isSelected ? "scale-110 z-10" : "hover:-translate-y-1")
             )}
         >
             {!isLower && <span className={cn("text-[8px] font-bold mb-1", isSelected ? "text-orange-600" : "text-slate-400")}>{id}</span>}
@@ -306,21 +317,25 @@ function Tooth({ id, isSelected, status, onClick, isLower, imageSrc, small }: To
                             "w-full h-full object-contain filter",
                             // Invert upper jaw images (Crown Down) if not lower
                             !isLower && "rotate-180",
-                            // Apply filters based on status? Or just borders?
-                            // For now, let's use borders/overlays for status on images
                             status === 'decay' && "drop-shadow-[0_0_2px_rgba(239,68,68,0.8)]",
-                            status === 'planned' && "drop-shadow-[0_0_2px_rgba(6,182,212,0.8)]",
-                            status === 'completed' && "drop-shadow-[0_0_2px_rgba(59,130,246,0.8)]",
+                            status === 'filled' && "drop-shadow-[0_0_2px_rgba(34,197,94,0.8)]",
+                            status === 'crowned' && "drop-shadow-[0_0_2px_rgba(59,130,246,0.8)]",
+                            status === 'missing' && "opacity-40 grayscale",
+                            status === 'partial_denture' && "drop-shadow-[0_0_2px_rgba(236,72,153,0.8)]",
+                            status === 'in_progress' && "drop-shadow-[0_0_2px_rgba(245,158,11,0.8)]",
                             isSelected && "drop-shadow-[0_0_4px_rgba(249,115,22,0.9)]"
                         )}
                     />
                     {/* Status Overlays for images if needed */}
                     {status && (
                         <div className={cn(
-                            "absolute inset-0 opacity-20 rounded-sm",
+                            "absolute inset-0 opacity-30 rounded-full mix-blend-multiply",
                             status === 'decay' && "bg-red-500",
-                            status === 'planned' && "bg-cyan-500",
-                            status === 'completed' && "bg-blue-500",
+                            status === 'filled' && "bg-green-500",
+                            status === 'crowned' && "bg-blue-500",
+                            status === 'missing' && "bg-yellow-500",
+                            status === 'partial_denture' && "bg-pink-500",
+                            status === 'in_progress' && "bg-amber-500",
                         )} />
                     )}
                 </div>

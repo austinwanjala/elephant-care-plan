@@ -216,28 +216,7 @@ export function DentalChart({ onToothClick, selectedTeeth, toothStatus, isChild 
                 )}
             </div>
 
-            <div className="mt-8 pt-6 border-t flex flex-wrap justify-center gap-6 text-xs font-semibold">
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-50 border border-red-100">
-                    <div className="w-3 h-3 bg-red-400 rounded-full"></div>
-                    <span className="text-red-700">Decay</span>
-                </div>
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-cyan-50 border border-cyan-100">
-                    <div className="w-3 h-3 bg-cyan-400 rounded-full"></div>
-                    <span className="text-cyan-700">Planned</span>
-                </div>
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-100">
-                    <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
-                    <span className="text-blue-700">Completed</span>
-                </div>
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-100">
-                    <div className="w-3 h-3 bg-amber-400 rounded-full animate-pulse"></div>
-                    <span className="text-amber-700">In Progress</span>
-                </div>
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-50 border border-orange-200">
-                    <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
-                    <span className="text-orange-700">Selected</span>
-                </div>
-            </div>
+
         </div >
     );
 }

@@ -118,20 +118,35 @@ export default function Consultation() {
             }
 
             // Fetch active multi-stage treatments
-            const { data: stages } = await supabase
+            // Fetch active multi-stage treatments
+            let stagesQuery = supabase
                 .from("service_stages")
                 .select("*, services(name), tooth_number, related_bill_id")
                 .eq("member_id", data.member_id)
-                .eq("dependant_id", data.dependant_id || null) // Handle nullable dependant
                 .eq("status", "in_progress");
+
+            if (data.dependant_id) {
+                stagesQuery = stagesQuery.eq("dependant_id", data.dependant_id);
+            } else {
+                stagesQuery = stagesQuery.is("dependant_id", null);
+            }
+
+            const { data: stages } = await stagesQuery;
 
             if (stages) setActiveStages(stages);
 
-            const { data: records, error: recordsError } = await supabase
+            let recordsQuery = supabase
                 .from("dental_records")
                 .select("tooth_number, status, condition, color, visit_id")
-                .eq("member_id", data.member_id)
-                .eq("dependant_id", data.dependant_id || null); // Filter by dependant if exists, else null (for principal)
+                .eq("member_id", data.member_id);
+
+            if (data.dependant_id) {
+                recordsQuery = recordsQuery.eq("dependant_id", data.dependant_id);
+            } else {
+                recordsQuery = recordsQuery.is("dependant_id", null);
+            }
+
+            const { data: records, error: recordsError } = await recordsQuery;
 
             if (records) {
                 const conditions: Record<number, string> = {};
@@ -162,11 +177,18 @@ export default function Consultation() {
                 // We will compute `toothStatus` derived state during render or use effect.
             }
 
-            const { data: history } = await supabase
+            let historyQuery = supabase
                 .from("dental_chart_records")
                 .select("tooth_number, service_id, created_at")
-                .eq("member_id", data.member_id)
-                .eq("dependant_id", data.dependant_id || null);
+                .eq("member_id", data.member_id);
+
+            if (data.dependant_id) {
+                historyQuery = historyQuery.eq("dependant_id", data.dependant_id);
+            } else {
+                historyQuery = historyQuery.is("dependant_id", null);
+            }
+
+            const { data: history } = await historyQuery;
 
             if (history) {
                 setServiceHistory(history);
@@ -700,6 +722,7 @@ export default function Consultation() {
                 visit_id: visitId,
                 tooth_number: parseInt(tooth_number),
                 status: status,
+                condition: toothConditions[parseInt(tooth_number)] || null, // Preserve condition
                 notes: `Updated in visit ${visitId}`
             }));
 

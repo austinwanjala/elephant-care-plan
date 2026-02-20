@@ -65,6 +65,9 @@ export default function AdminStaff() {
         supabase.from("branches").select("id, name").eq("is_active", true),
       ]);
 
+      console.log("Roles fetched:", rolesRes.data?.length, rolesRes.data);
+      if (rolesRes.error) console.error("Error fetching roles:", rolesRes.error);
+
       const roleMap: Record<string, string> = {};
       (rolesRes.data || []).forEach((r: any) => {
         roleMap[r.user_id] = r.role;
@@ -85,6 +88,7 @@ export default function AdminStaff() {
       ];
 
       setUsers(combined);
+      console.log("Loaded users:", combined);
       if (branchesRes.data) setBranches(branchesRes.data);
     } catch (error: any) {
       toast({ title: "Error loading data", description: error.message, variant: "destructive" });
@@ -94,10 +98,15 @@ export default function AdminStaff() {
   };
 
   const handleEditUser = (user: any) => {
+    console.log("Editing user:", user);
+
+    // If the role is generic 'staff', it means we failed to fetch the specific role.
+    // The Select component won't show anything. User must select a new role or we rely on them applying the RLS fix.
+
     setEditingUser({
       ...user,
       branchId: user.branch_id,
-      role: user.displayRole // Load current role
+      role: user.displayRole === 'staff' ? '' : user.displayRole
     });
     setEditDialogOpen(true);
   };
@@ -304,7 +313,7 @@ export default function AdminStaff() {
                       <SelectItem value="doctor">Doctor</SelectItem>
                       {(isSuperAdmin || currentUserRole === 'admin') && <SelectItem value="branch_director">Branch Director</SelectItem>}
                       <SelectItem value="marketer">Marketer</SelectItem>
-                      <SelectItem value="finance">Finance Officer</SelectItem>
+                      {(isSuperAdmin || currentUserRole === 'admin') && <SelectItem value="finance">Finance Officer</SelectItem>}
                       {isSuperAdmin && <SelectItem value="auditor">Auditor</SelectItem>}
                       {isSuperAdmin && <SelectItem value="admin">Administrator</SelectItem>}
                       {isSuperAdmin && <SelectItem value="super_admin">Super Administrator</SelectItem>}
@@ -343,6 +352,9 @@ export default function AdminStaff() {
             <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle className="font-serif text-xl">Edit User Details</DialogTitle>
+                <DialogDescription>
+                  Update the user's personal details, branch assignment, and portal role.
+                </DialogDescription>
               </DialogHeader>
               {editingUser && (
                 <div className="grid gap-4 py-4">
@@ -360,12 +372,36 @@ export default function AdminStaff() {
                       onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })}
                     />
                   </div>
+
+                  <div className="space-y-2">
+                    <Label>Role</Label>
+                    <Select
+                      value={editingUser.role}
+                      onValueChange={(v) => setEditingUser({ ...editingUser, role: v })}
+                      disabled={
+                        (['super_admin', 'admin'].includes(editingUser.displayRole) && !isSuperAdmin)
+                      }
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="receptionist">Receptionist</SelectItem>
+                        <SelectItem value="doctor">Doctor</SelectItem>
+                        {(isSuperAdmin || currentUserRole === 'admin') && <SelectItem value="branch_director">Branch Director</SelectItem>}
+                        <SelectItem value="marketer">Marketer</SelectItem>
+                        {(isSuperAdmin || currentUserRole === 'admin') && <SelectItem value="finance">Finance Officer</SelectItem>}
+                        {isSuperAdmin && <SelectItem value="auditor">Auditor</SelectItem>}
+                        {isSuperAdmin && <SelectItem value="admin">Administrator</SelectItem>}
+                        {isSuperAdmin && <SelectItem value="super_admin">Super Administrator</SelectItem>}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   {editingUser.type !== 'marketer' && editingUser.displayRole !== 'admin' && editingUser.displayRole !== 'super_admin' && (
                     <div className="space-y-2">
                       <Label>Branch</Label>
                       <Select
                         value={editingUser.branchId || ''}
                         onValueChange={(v) => setEditingUser({ ...editingUser, branchId: v })}
+                        disabled={currentUserRole === 'branch_director'}
                       >
                         <SelectTrigger><SelectValue placeholder="Select branch" /></SelectTrigger>
                         <SelectContent>

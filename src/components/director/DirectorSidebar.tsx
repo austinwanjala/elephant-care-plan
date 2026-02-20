@@ -9,6 +9,7 @@ const menuItems = [
     { title: "Approvals", url: "/director/appointments", icon: CheckCircle2 },
     { title: "Revenue", url: "/director/revenue", icon: DollarSign },
     { title: "Doctor Performance", url: "/director/performance", icon: Stethoscope },
+    { title: "Staff & Management", url: "/director/staff", icon: Users },
     { title: "Branch Reports", url: "/director/reports", icon: FileText },
 ];
 

@@ -58,7 +58,9 @@ export default function Consultation() {
     const [pendingService, setPendingService] = useState<any>(null);
     const [selectedStageNumber, setSelectedStageNumber] = useState(1);
 
-    const [lockedVisitConditions, setLockedVisitConditions] = useState<Record<number, boolean>>({});
+    const [stageNotes, setStageNotes] = useState("");
+    const [continueStageDialogOpen, setContinueStageDialogOpen] = useState(false);
+    const [pendingContinueStage, setPendingContinueStage] = useState<any>(null);
 
     useEffect(() => {
         if (visitId) {
@@ -134,7 +136,6 @@ export default function Consultation() {
             if (records) {
                 const conditions: Record<number, string> = {};
                 const history: Record<number, boolean> = {};
-                const lockedThisVisit: Record<number, boolean> = {};
 
                 records.forEach((r: any) => {
                     if (r.condition) conditions[r.tooth_number] = r.condition;
@@ -144,21 +145,21 @@ export default function Consultation() {
                     if (r.visit_id !== visitId) {
                         history[r.tooth_number] = true;
                     }
-                    // If it is THIS visit, check if it should be locked
-                    else if (r.visit_id === visitId && data.diagnosis_locked_at) {
-                        // Logic: "For new diagnosis the restriction should only after he clicked on save diagnosis otherwise he can change the diagnosis"
-                        // This means if we loaded it from DB AND the visit has been saved/locked at least once, these are "Old Saved" diagnoses.
-                        lockedThisVisit[r.tooth_number] = true;
-                    }
                 });
                 setToothConditions(conditions);
                 setExistingConditions(history);
-                setLockedVisitConditions(lockedThisVisit);
 
-                // Default to treatment mode logic...
+                // If we have existing records (history) OR current visit records, default to treatment mode
+                // so doctor can immediately start treating existing conditions.
+                // Unless it's a fresh visit with NO history.
                 if (records.length > 0 && !data.diagnosis_locked_at) {
                     setConsultationMode('treatment');
                 }
+
+                // For display in Treatment Mode, we want to overlay treatment status (e.g. in_progress)
+                // But keep underlying condition visible if not hidden?
+                // DentalChart takes a single status.
+                // We will compute `toothStatus` derived state during render or use effect.
             }
 
             const { data: history } = await supabase
@@ -278,14 +279,13 @@ export default function Consultation() {
                 return;
             }
 
-            // Start handleToothClick update
             // Check if tooth has CURRENT diagnosis but we are in a "locked" state (returning from treatment)
-            // Use local lockedVisitConditions state which tracks what is in the DB/saved.
-            if (diagnosisLockedAt && lockedVisitConditions[toothId]) {
+            // User request: "once a doctor has clicked add diagnosis he cannot edit the previous diagnosis"
+            // This implies: If I already saved it (diagnosisLockedAt is set), I can't change it. I can only ADD new ones.
+            if (diagnosisLockedAt && toothConditions[toothId]) {
                 toast({ title: "Saved", description: "This diagnosis has already been saved. You can only add new diagnoses.", variant: "secondary" });
                 return;
             }
-            // End handleToothClick update
 
             // Apply selected condition tool
             const currentCondition = toothConditions[toothId];
@@ -1193,55 +1193,9 @@ export default function Consultation() {
                                             defaultValue=""
                                         >
                                             <option value="" disabled>Select a procedure to perform on these teeth...</option>
-                                            {availableServices.map(s => {
-                                                // Check active stages
-                                                const activeStagesForService = selectedTeeth.map(t =>
-                                                    activeStages.find(stage => stage.tooth_number === t && stage.service_id === s.id)
-                                                ).filter(Boolean);
-
-                                                const allActive = activeStagesForService.length === selectedTeeth.length;
-                                                const anyActive = activeStagesForService.length > 0;
-
-                                                // Check history/completed
-                                                const anyCompleted = selectedTeeth.some(t =>
-                                                    serviceHistory.some(h => h.tooth_number === t && h.service_id === s.id)
-                                                );
-
-                                                if (anyCompleted) return null; // Hide if already done
-
-                                                if (allActive) {
-                                                    // All selected teeth have this service active. Check next stage.
-                                                    // Assuming all are at same stage for simplicity, or taking the first one's next stage.
-                                                    // If we want to be robust, we'd check if they align.
-                                                    const currentStage = activeStagesForService[0]?.current_stage || 1;
-                                                    const totalStages = activeStagesForService[0]?.total_stages || 1;
-                                                    const nextStage = currentStage + 1;
-
-                                                    if (nextStage > totalStages) return null; // All done? Should catch in history check usually, but just in case.
-
-                                                    return (
-                                                        <option key={s.id} value={s.id}>
-                                                            {s.name} (Continue Stage {nextStage}) - Benefit: KES 0
-                                                        </option>
-                                                    );
-                                                }
-
-                                                if (anyActive) {
-                                                    // Mixed state (some active, some not). Disable to prevent confusion.
-                                                    return (
-                                                        <option key={s.id} value={s.id} disabled>
-                                                            {s.name} (Mixed Status - Select Individually)
-                                                        </option>
-                                                    );
-                                                }
-
-                                                // Default: New Start
-                                                return (
-                                                    <option key={s.id} value={s.id}>
-                                                        {s.name} (Stage 1) - Benefit: KES {s.benefit_cost.toLocaleString()}
-                                                    </option>
-                                                );
-                                            })}
+                                            {availableServices.map(s => (
+                                                <option key={s.id} value={s.id}>{s.name} (Benefit: KES {s.benefit_cost.toLocaleString()})</option>
+                                            ))}
                                         </select>
                                     </div>
                                 </div>

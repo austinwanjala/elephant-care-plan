@@ -147,14 +147,14 @@ export function DentalChart({ onToothClick, selectedTeeth, toothStatus, isChild 
                                 {/* Upper Permanent (Outer) */}
                                 <div className="flex justify-center gap-0.5 pb-2 border-b border-dashed border-orange-200/50 w-full">
                                     {[17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27].map(id => (
-                                        <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} imageSrc={getToothImage(id)} />
+                                        <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} imageSrc={getToothImage(id)} disabled={disabledTeeth.includes(id)} />
                                     ))}
                                 </div>
 
                                 {/* Upper Primary (Inner) */}
                                 <div className="flex justify-center gap-0.5 bg-yellow-50/50 px-4 py-2 rounded-full border border-yellow-100/50">
                                     {[55, 54, 53, 52, 51, 61, 62, 63, 64, 65].map(id => (
-                                        <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} imageSrc={getToothImage(id)} small />
+                                        <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} imageSrc={getToothImage(id)} small disabled={disabledTeeth.includes(id)} />
                                     ))}
                                 </div>
                             </div>
@@ -168,14 +168,14 @@ export function DentalChart({ onToothClick, selectedTeeth, toothStatus, isChild 
                                 {/* Lower Primary (Inner) */}
                                 <div className="flex justify-center gap-0.5 bg-yellow-50/50 px-4 py-2 rounded-full border border-yellow-100/50">
                                     {[85, 84, 83, 82, 81, 71, 72, 73, 74, 75].map(id => (
-                                        <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} isLower imageSrc={getToothImage(id)} small />
+                                        <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} isLower imageSrc={getToothImage(id)} small disabled={disabledTeeth.includes(id)} />
                                     ))}
                                 </div>
 
                                 {/* Lower Permanent (Outer) */}
                                 <div className="flex justify-center gap-0.5 pt-2 border-t border-dashed border-orange-200/50 w-full">
                                     {[47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37].map(id => (
-                                        <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} isLower imageSrc={getToothImage(id)} />
+                                        <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} isLower imageSrc={getToothImage(id)} disabled={disabledTeeth.includes(id)} />
                                     ))}
                                 </div>
                             </div>
@@ -194,7 +194,7 @@ export function DentalChart({ onToothClick, selectedTeeth, toothStatus, isChild 
                                 </div>
                                 <div className="flex justify-center gap-1 sm:gap-2 bg-white/50 p-4 rounded-xl border border-slate-100 shadow-sm">
                                     {upperJaw.map((id) => (
-                                        <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} imageSrc={getToothImage(id)} />
+                                        <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} imageSrc={getToothImage(id)} disabled={disabledTeeth.includes(id)} />
                                     ))}
                                 </div>
                             </div>
@@ -202,7 +202,7 @@ export function DentalChart({ onToothClick, selectedTeeth, toothStatus, isChild 
                             <div className="space-y-2">
                                 <div className="flex justify-center gap-1 sm:gap-2 bg-white/50 p-4 rounded-xl border border-slate-100 shadow-sm">
                                     {lowerJaw.map((id) => (
-                                        <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} isLower imageSrc={getToothImage(id)} />
+                                        <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} isLower imageSrc={getToothImage(id)} disabled={disabledTeeth.includes(id)} />
                                     ))}
                                 </div>
                                 <div className="flex justify-between px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
@@ -320,7 +320,7 @@ function Tooth({ id, isSelected, status, onClick, isLower, imageSrc, small, disa
                             status === 'decay' && "drop-shadow-[0_0_2px_rgba(239,68,68,0.8)]",
                             status === 'filled' && "drop-shadow-[0_0_2px_rgba(34,197,94,0.8)]",
                             status === 'crowned' && "drop-shadow-[0_0_2px_rgba(59,130,246,0.8)]",
-                            status === 'missing' && "opacity-40 grayscale",
+                            status === 'missing' && "opacity-40 grayscale", // Keep strict grayscale for missing
                             status === 'partial_denture' && "drop-shadow-[0_0_2px_rgba(236,72,153,0.8)]",
                             status === 'in_progress' && "drop-shadow-[0_0_2px_rgba(245,158,11,0.8)]",
                             isSelected && "drop-shadow-[0_0_4px_rgba(249,115,22,0.9)]"

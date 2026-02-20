@@ -170,6 +170,7 @@ export default function Consultation() {
 
     // But I will apply the full replacement block for loadVisitData section first.
 
+    // For display in Treatment Mode, we want to overlay treatment status (e.g. in_progress)
     // DentalChart takes a single status.
     // We will compute `toothStatus` derived state during render or use effect.
 }
@@ -1206,9 +1207,55 @@ return (
                                         defaultValue=""
                                     >
                                         <option value="" disabled>Select a procedure to perform on these teeth...</option>
-                                        {availableServices.map(s => (
-                                            <option key={s.id} value={s.id}>{s.name} (Benefit: KES {s.benefit_cost.toLocaleString()})</option>
-                                        ))}
+                                        {availableServices.map(s => {
+                                            // Check active stages
+                                            const activeStagesForService = selectedTeeth.map(t =>
+                                                activeStages.find(stage => stage.tooth_number === t && stage.service_id === s.id)
+                                            ).filter(Boolean);
+
+                                            const allActive = activeStagesForService.length === selectedTeeth.length;
+                                            const anyActive = activeStagesForService.length > 0;
+
+                                            // Check history/completed
+                                            const anyCompleted = selectedTeeth.some(t =>
+                                                serviceHistory.some(h => h.tooth_number === t && h.service_id === s.id)
+                                            );
+
+                                            if (anyCompleted) return null; // Hide if already done
+
+                                            if (allActive) {
+                                                // All selected teeth have this service active. Check next stage.
+                                                // Assuming all are at same stage for simplicity, or taking the first one's next stage.
+                                                // If we want to be robust, we'd check if they align.
+                                                const currentStage = activeStagesForService[0]?.current_stage || 1;
+                                                const totalStages = activeStagesForService[0]?.total_stages || 1;
+                                                const nextStage = currentStage + 1;
+
+                                                if (nextStage > totalStages) return null; // All done? Should catch in history check usually, but just in case.
+
+                                                return (
+                                                    <option key={s.id} value={s.id}>
+                                                        {s.name} (Continue Stage {nextStage}) - Benefit: KES 0
+                                                    </option>
+                                                );
+                                            }
+
+                                            if (anyActive) {
+                                                // Mixed state (some active, some not). Disable to prevent confusion.
+                                                return (
+                                                    <option key={s.id} value={s.id} disabled>
+                                                        {s.name} (Mixed Status - Select Individually)
+                                                    </option>
+                                                );
+                                            }
+
+                                            // Default: New Start
+                                            return (
+                                                <option key={s.id} value={s.id}>
+                                                    {s.name} (Stage 1) - Benefit: KES {s.benefit_cost.toLocaleString()}
+                                                </option>
+                                            );
+                                        })}
                                     </select>
                                 </div>
                             </div>

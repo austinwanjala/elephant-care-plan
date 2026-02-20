@@ -39,11 +39,19 @@ export default function AdminStaff() {
     fetchCurrentUserRole();
   }, []);
 
+  const [currentUserBranchId, setCurrentUserBranchId] = useState<string | null>(null);
+
   const fetchCurrentUserRole = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       const { data } = await supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
-      setCurrentUserRole(data?.role || null);
+      const role = data?.role || null;
+      setCurrentUserRole(role);
+
+      if (role === 'branch_director') {
+        const { data: staffData } = await supabase.from("staff").select("branch_id").eq("user_id", user.id).single();
+        if (staffData) setCurrentUserBranchId(staffData.branch_id);
+      }
     }
   };
 
@@ -137,7 +145,7 @@ export default function AdminStaff() {
             phone: formData.phone || null,
             id_number: `STAFF-${Date.now()}`,
             age: 30,
-            branch_id: formData.branchId || null,
+            branch_id: (currentUserRole === 'branch_director' ? currentUserBranchId : formData.branchId) || null,
             marketer_code: formData.marketerCode || null
           }
         }
@@ -154,7 +162,15 @@ export default function AdminStaff() {
       });
 
       setDialogOpen(false);
-      setFormData({ fullName: "", email: "", phone: "", password: "", branchId: "", role: "receptionist", marketerCode: "" });
+      setFormData({
+        fullName: "",
+        email: "",
+        phone: "",
+        password: "",
+        branchId: currentUserRole === 'branch_director' ? (currentUserBranchId || "") : "",
+        role: "receptionist",
+        marketerCode: ""
+      });
       loadData();
 
     } catch (error: any) {
@@ -208,7 +224,20 @@ export default function AdminStaff() {
   const isSuperAdmin = currentUserRole === 'super_admin';
 
   // Filter out Super Admins if the current user is just an Admin
+  // Filter out Super Admins if the current user is just an Admin
+  // If Branch Director, only show staff from their branch
   const filteredUsers = users.filter(u => {
+    if (currentUserRole === 'branch_director') {
+      // Directors can't see Super Admins or Admins or Auditors
+      if (['super_admin', 'admin', 'auditor'].includes(u.displayRole)) return false;
+      // Marketers are shared/global? Or per branch? 
+      // Marketers don't have branch_id usually, so maybe show all or none? 
+      // User request: "create staff that is (doctors, marketers, and receiptionists)"
+      // So they should see marketers. 
+      // But for staff (doctors/receptionists), check branch.
+      if (u.type === 'staff' && u.branch_id !== currentUserBranchId) return false;
+      return true;
+    }
     if (isSuperAdmin) return true;
     return u.displayRole !== 'super_admin';
   });
@@ -261,7 +290,7 @@ export default function AdminStaff() {
                     <SelectContent>
                       <SelectItem value="receptionist">Receptionist</SelectItem>
                       <SelectItem value="doctor">Doctor</SelectItem>
-                      <SelectItem value="branch_director">Branch Director</SelectItem>
+                      {(isSuperAdmin || currentUserRole === 'admin') && <SelectItem value="branch_director">Branch Director</SelectItem>}
                       <SelectItem value="marketer">Marketer</SelectItem>
                       <SelectItem value="finance">Finance Officer</SelectItem>
                       {isSuperAdmin && <SelectItem value="auditor">Auditor</SelectItem>}
@@ -273,7 +302,11 @@ export default function AdminStaff() {
                 {formData.role !== 'marketer' && formData.role !== 'admin' && formData.role !== 'super_admin' && formData.role !== 'finance' && (
                   <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
                     <Label>Assigned Branch</Label>
-                    <Select value={formData.branchId} onValueChange={(v) => setFormData({ ...formData, branchId: v })}>
+                    <Select
+                      value={currentUserRole === 'branch_director' ? currentUserBranchId : formData.branchId}
+                      onValueChange={(v) => setFormData({ ...formData, branchId: v })}
+                      disabled={currentUserRole === 'branch_director'}
+                    >
                       <SelectTrigger><SelectValue placeholder="Select branch" /></SelectTrigger>
                       <SelectContent>
                         {branches.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}

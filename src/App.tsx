@@ -150,6 +150,7 @@ const App = () => (
             <Route path="revenue" element={<DirectorRevenue />} />
             <Route path="performance" element={<DirectorPerformance />} />
             <Route path="reports" element={<DirectorReports />} />
+            <Route path="staff" element={<AdminStaff />} />
           </Route>
 
           {/* Marketer Routes */}

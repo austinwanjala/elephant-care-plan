@@ -13,6 +13,7 @@ import {
   ClipboardList,
   FileText,
   ShieldAlert,
+  MessageSquare,
 } from "lucide-react";
 import {
   Sidebar,
@@ -87,6 +88,7 @@ export function AdminSidebar() {
     { title: "Appointment Settings", url: `${basePath}/appointment-settings`, icon: ClipboardList },
     { title: "Membership Categories", url: `${basePath}/membership-categories`, icon: Users },
     { title: "Commission Rates", url: `${basePath}/commission-settings`, icon: DollarSign },
+    { title: "WhatsApp Config", url: `${basePath}/whatsapp`, icon: MessageSquare },
   ];
 
   if (roleLabel === "Super Admin") {

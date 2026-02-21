@@ -129,6 +129,7 @@ export default function AdminMembers() {
             age: calculatedAge,
             dob: formData.dob,
             branch_id: formData.branchId || null,
+            whatsapp_opt_in: (formData as any).whatsappOptIn || false,
           }
         }
       });
@@ -153,7 +154,7 @@ export default function AdminMembers() {
 
       toast({ title: "Member registered successfully" });
       setDialogOpen(false);
-      setFormData({ fullName: "", email: "", phone: "", idNumber: "", dob: "", password: "", branchId: "", membershipCategoryId: "" });
+      setFormData({ fullName: "", email: "", phone: "", idNumber: "", dob: "", password: "", branchId: "", membershipCategoryId: "", whatsappOptIn: false } as any);
       loadData();
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -187,6 +188,7 @@ export default function AdminMembers() {
         dob: formData.dob || null,
         branch_id: formData.branchId || null,
         membership_category_id: formData.membershipCategoryId || null,
+        whatsapp_opt_in: (formData as any).whatsappOptIn || false,
       };
 
       // 2. If scheme changed, update limits and balance
@@ -277,6 +279,16 @@ export default function AdminMembers() {
                     <SelectContent>{branches.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
+                <div className="flex items-center space-x-2 md:col-span-2 pt-2">
+                  <Switch
+                    id="whatsapp-opt-in"
+                    checked={(formData as any).whatsappOptIn || false}
+                    onCheckedChange={(checked) => setFormData({ ...formData, whatsappOptIn: checked } as any)}
+                  />
+                  <Label htmlFor="whatsapp-opt-in" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    I agree to receive WhatsApp updates regarding my medical cover.
+                  </Label>
+                </div>
               </div>
               <Button onClick={handleRegisterMember} className="w-full btn-primary" disabled={loading}>
                 {loading ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : "Register Member"}
@@ -322,7 +334,7 @@ export default function AdminMembers() {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => { setSelectedMember(m); setFormData({ ...formData, fullName: m.full_name, phone: m.phone, idNumber: m.id_number, dob: m.dob || "", branchId: m.branch_id || "", membershipCategoryId: m.membership_category_id || "" }); setEditDialogOpen(true); }}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => { setSelectedMember(m); setFormData({ ...formData, fullName: m.full_name, phone: m.phone, idNumber: m.id_number, dob: m.dob || "", branchId: m.branch_id || "", membershipCategoryId: m.membership_category_id || "", whatsappOptIn: (m as any).whatsapp_opt_in || false } as any); setEditDialogOpen(true); }}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => { setSelectedMember(m); setDependantsDialogOpen(true); }}><Users className="mr-2 h-4 w-4" /> View Dependants</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => { setSelectedMember(m); setHistoryDialogOpen(true); }}><History className="mr-2 h-4 w-4" /> View History</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => { setSelectedMember(m); setBiometricDialogOpen(true); }}><Fingerprint className="mr-2 h-4 w-4" /> Biometric</DropdownMenuItem>
@@ -367,6 +379,16 @@ export default function AdminMembers() {
                   Changing the scheme will add the new benefit amount to the member's balance and activate their account.
                 </p>
               </div>
+            </div>
+            <div className="flex items-center space-x-2 pt-2">
+              <Switch
+                id="edit-whatsapp-opt-in"
+                checked={(formData as any).whatsappOptIn || false}
+                onCheckedChange={(checked) => setFormData({ ...formData, whatsappOptIn: checked } as any)}
+              />
+              <Label htmlFor="edit-whatsapp-opt-in" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                I agree to receive WhatsApp updates regarding my medical cover.
+              </Label>
             </div>
             <Button onClick={handleEditMember} className="btn-primary" disabled={loading}>
               {loading ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : "Update Member"}
@@ -413,19 +435,60 @@ function MemberHistoryDialog({ open, onOpenChange, member }: { open: boolean, on
 
   const fetchHistory = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    // Fetch visits including dependants metadata
+    const { data: visitsData, error: visitsError } = await supabase
       .from("visits")
       .select(`
             *,
             branches(name),
             doctor:doctor_id(full_name),
-            bills(total_benefit_cost)
+            dependants(full_name),
+            bills(
+              id,
+              total_benefit_cost,
+              bill_items(id, service_name, service_id)
+            )
         `)
       .eq("member_id", member.id)
       .order("created_at", { ascending: false });
 
-    if (!error && data) {
-      setVisits(data);
+    if (visitsError) {
+      toast({
+        title: "Error fetching visits",
+        description: visitsError.message,
+        variant: "destructive"
+      });
+    }
+
+    // Fetch dental records for these visits to show treated teeth
+    const { data: dentalData } = await supabase
+      .from("dental_records")
+      .select("visit_id, tooth_number")
+      .eq("member_id", member.id);
+
+    // Fetch service stages to show progress
+    const { data: stagesData } = await supabase
+      .from("service_stages")
+      .select("*")
+      .eq("member_id", member.id);
+
+    if (visitsData) {
+      // Map dental records and stages to visits
+      const enhancedVisits = visitsData.map(v => {
+        const visitTeeth = dentalData
+          ?.filter(d => d.visit_id === v.id)
+          .map(d => d.tooth_number)
+          .sort((a, b) => (a || 0) - (b || 0)) || [];
+
+        const visitStages = stagesData?.filter(s => s.visit_id === v.id) || [];
+
+        return {
+          ...v,
+          treatedTeeth: Array.from(new Set(visitTeeth.filter(t => t !== null))),
+          stages: visitStages
+        };
+      });
+      setVisits(enhancedVisits);
     }
     setLoading(false);
   };
@@ -448,8 +511,9 @@ function MemberHistoryDialog({ open, onOpenChange, member }: { open: boolean, on
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
-                  <TableHead>Branch</TableHead>
-                  <TableHead>Doctor</TableHead>
+                  <TableHead>Patient</TableHead>
+                  <TableHead>Services & Stages</TableHead>
+                  <TableHead>Teeth</TableHead>
                   <TableHead>Diagnosis</TableHead>
                   <TableHead>Cost</TableHead>
                   <TableHead>Status</TableHead>
@@ -459,8 +523,41 @@ function MemberHistoryDialog({ open, onOpenChange, member }: { open: boolean, on
                 {visits.map((visit) => (
                   <TableRow key={visit.id}>
                     <TableCell className="whitespace-nowrap">{new Date(visit.created_at).toLocaleDateString()}</TableCell>
-                    <TableCell>{visit.branches?.name || 'N/A'}</TableCell>
-                    <TableCell>{visit.doctor?.full_name || 'N/A'}</TableCell>
+                    <TableCell>
+                      {visit.dependant_id ? (
+                        <div className="flex items-center gap-1 text-blue-600 font-medium">
+                          <Users className="h-3 w-3" /> {visit.dependants?.full_name}
+                        </div>
+                      ) : (
+                        <span className="font-medium">Principal</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        {visit.bills?.[0]?.bill_items?.map((item: any) => {
+                          const stage = visit.stages?.find((s: any) => s.service_id === item.service_id);
+                          return (
+                            <div key={item.id} className="text-xs">
+                              {item.service_name}
+                              {stage && (
+                                <Badge variant="secondary" className="ml-2 text-[10px] px-1 py-0 h-4">
+                                  Stage {stage.current_stage}/{stage.total_stages}
+                                </Badge>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {(!visit.bills?.[0] || visit.bills[0].bill_items?.length === 0) && "-"}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1 max-w-[100px]">
+                        {visit.treatedTeeth?.map((t: number) => (
+                          <Badge key={t} variant="outline" className="text-[10px] px-1 py-0 h-4 font-mono">{t}</Badge>
+                        ))}
+                        {(!visit.treatedTeeth || visit.treatedTeeth.length === 0) && "-"}
+                      </div>
+                    </TableCell>
                     <TableCell className="max-w-[150px] truncate" title={visit.diagnosis || ''}>{visit.diagnosis || '-'}</TableCell>
                     <TableCell>KES {(visit.bills?.[0]?.total_benefit_cost || 0).toLocaleString()}</TableCell>
                     <TableCell>

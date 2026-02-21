@@ -14,6 +14,7 @@ import {
   Users,
   RefreshCw,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -41,6 +42,7 @@ interface Member {
   membership_categories: { name: string; benefit_amount: number } | null;
   id_number: string;
   marketers?: { full_name: string; code: string } | null;
+  whatsapp_opt_in: boolean;
 }
 
 interface Visit {
@@ -418,6 +420,49 @@ const MemberDashboard = () => {
                       )}
                     </TableBody>
                   </Table>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-primary" />
+                  Security & Notifications
+                </CardTitle>
+                <CardDescription>Manage your account preferences</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <div className="text-sm font-medium">WhatsApp Notifications</div>
+                    <div className="text-xs text-muted-foreground">
+                      Receive updates on your medical cover via WhatsApp
+                    </div>
+                  </div>
+                  <Switch
+                    checked={member.whatsapp_opt_in}
+                    onCheckedChange={async (checked) => {
+                      const { error } = await supabase
+                        .from("members")
+                        .update({ whatsapp_opt_in: checked })
+                        .eq("id", member.id);
+
+                      if (error) {
+                        toast({
+                          title: "Update failed",
+                          description: error.message,
+                          variant: "destructive"
+                        });
+                      } else {
+                        setMember({ ...member, whatsapp_opt_in: checked });
+                        toast({
+                          title: "Settings updated",
+                          description: `WhatsApp notifications ${checked ? 'enabled' : 'disabled'}`
+                        });
+                      }
+                    }}
+                  />
                 </div>
               </CardContent>
             </Card>

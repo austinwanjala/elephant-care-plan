@@ -83,6 +83,7 @@ import AdminLogs from "./pages/admin/AdminLogs";
 import AdminPermissions from "./pages/admin/AdminPermissions";
 import AdminReports from "./pages/admin/AdminReports";
 import AdminNotifications from "./pages/admin/AdminNotifications";
+import AdminWhatsApp from "./pages/admin/AdminWhatsApp";
 
 // Finance Pages
 import FinanceDashboard from "./pages/finance/Dashboard";

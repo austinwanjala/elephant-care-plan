@@ -145,9 +145,22 @@ export function NotificationBell() {
                 <div className="flex items-center justify-between p-4 border-b">
                     <h4 className="font-semibold text-sm">Notifications</h4>
                     <div className="flex gap-2">
+                        <Button variant="ghost" size="sm" className="h-auto text-xs text-blue-600 font-bold" onClick={() => {
+                            setOpen(false);
+                            // Determine route based on current path or just use a generic /messages if we fix routing
+                            const path = window.location.pathname;
+                            const prefix = path.split('/')[1];
+                            if (prefix && prefix !== 'login' && prefix !== 'register') {
+                                window.location.href = `/${prefix}/messages`;
+                            } else {
+                                window.location.href = `/doctor/messages`; // default
+                            }
+                        }}>
+                            Messages
+                        </Button>
                         {unreadCount > 0 && (
                             <Button variant="ghost" size="sm" className="h-auto text-xs text-muted-foreground" onClick={markAllAsRead}>
-                                Mark all as read
+                                Mark all
                             </Button>
                         )}
                     </div>

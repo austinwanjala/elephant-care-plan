@@ -6,9 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, Send, ArrowLeft, Trash2, Plus, AlertTriangle, Lock, Unlock } from "lucide-react";
+import { Loader2, Save, Send, ArrowLeft, Trash2, Plus, AlertTriangle, Lock, Unlock, Image as ImageIcon, Upload, X, History, Camera, Stethoscope as DiagnosisIcon, ClipboardList } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { DentalChart, DentalChartMode } from "@/components/doctor/DentalChart";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
     Dialog,
     DialogContent,
@@ -42,6 +45,10 @@ export default function Consultation() {
     const [serviceHistory, setServiceHistory] = useState<any[]>([]);
     const [doctorId, setDoctorId] = useState<string | null>(null);
     const [doctorBranchId, setDoctorBranchId] = useState<string | null>(null);
+    const [periodontalStatus, setPeriodontalStatus] = useState<string | null>(null);
+    const [xrayUrls, setXrayUrls] = useState<string[]>([]);
+    const [isXrayModalOpen, setIsXrayModalOpen] = useState(false);
+    const [uploading, setUploading] = useState(false);
     const [chartMode, setChartMode] = useState<DentalChartMode>('adult');
 
     // New State for Diagnosis/Treatment Separation
@@ -50,6 +57,18 @@ export default function Consultation() {
     const [selectedDiagnosisTool, setSelectedDiagnosisTool] = useState<string>('decay'); // Default tool
     const [toothConditions, setToothConditions] = useState<Record<number, string>>({}); // status/condition map
     const [existingConditions, setExistingConditions] = useState<Record<number, boolean>>({}); // Lock map for historical data
+    const [allMemberStages, setAllMemberStages] = useState<any[]>([]);
+    const [pastVisits, setPastVisits] = useState<any[]>([]);
+    const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
+
+    const getMaxStageForSelection = (serviceId: string, teeth: number[]) => {
+        const relevantStages = allMemberStages.filter(s =>
+            s.service_id === serviceId &&
+            (teeth.length === 0 ? s.tooth_number === null : teeth.includes(s.tooth_number))
+        );
+        if (relevantStages.length === 0) return 0;
+        return Math.max(...relevantStages.map(s => s.current_stage));
+    };
 
 
 
@@ -117,13 +136,11 @@ export default function Consultation() {
                 setConsultationMode('diagnosis');
             }
 
-            // Fetch active multi-stage treatments
-            // Fetch active multi-stage treatments
+            // Fetch ALL multi-stage treatments to check history and progression
             let stagesQuery = supabase
                 .from("service_stages")
                 .select("*, services(name), tooth_number, related_bill_id")
-                .eq("member_id", data.member_id)
-                .eq("status", "in_progress");
+                .eq("member_id", data.member_id);
 
             if (data.dependant_id) {
                 stagesQuery = stagesQuery.eq("dependant_id", data.dependant_id);
@@ -133,7 +150,32 @@ export default function Consultation() {
 
             const { data: stages } = await stagesQuery;
 
-            if (stages) setActiveStages(stages);
+            if (stages) {
+                // Store active ones for auto-continuation
+                setActiveStages(stages.filter(s => s.status === 'in_progress'));
+                // Store everything for progression checks
+                setAllMemberStages(stages);
+            }
+
+            // Fetch past visits with X-rays and stages
+            const { data: visitsData } = await supabase
+                .from("visits")
+                .select(`
+                    id, 
+                    created_at, 
+                    diagnosis, 
+                    treatment_notes, 
+                    xray_urls, 
+                    status,
+                    doctor:doctor_id(full_name),
+                    branches(name),
+                    service_stages(*)
+                `)
+                .eq("member_id", data.member_id)
+                .neq("id", visitId) // Exclude current visit
+                .order("created_at", { ascending: false });
+
+            if (visitsData) setPastVisits(visitsData);
 
             let recordsQuery = supabase
                 .from("dental_records")
@@ -301,13 +343,12 @@ export default function Consultation() {
                 return;
             }
 
-            // Check if tooth has CURRENT diagnosis but we are in a "locked" state (returning from treatment)
-            // User request: "once a doctor has clicked add diagnosis he cannot edit the previous diagnosis"
-            // This implies: If I already saved it (diagnosisLockedAt is set), I can't change it. I can only ADD new ones.
-            if (diagnosisLockedAt && toothConditions[toothId]) {
-                toast({ title: "Saved", description: "This diagnosis has already been saved. You can only add new diagnoses.", variant: "secondary" });
-                return;
-            }
+            // Allow editing even if previously saved in this visit.
+            // Explicit locking only happens in Treatment Mode.
+            // User request: "allow editing... lock editing only after a save diagnosis button is clicked"
+            // We interpret "lock" as "stopping the doctor from toggling while in treatment mode"
+            // and "save" as the trigger to persist to DB.
+
 
             // Apply selected condition tool
             const currentCondition = toothConditions[toothId];
@@ -365,6 +406,8 @@ export default function Consultation() {
             const { error: visitError } = await supabase.from("visits").update({
                 diagnosis: diagnosis,
                 treatment_notes: treatmentNotes,
+                periodontal_status: periodontalStatus,
+                xray_urls: xrayUrls,
                 diagnosis_locked_at: new Date().toISOString() // We still track this for state persistence
             }).eq("id", visitId);
 
@@ -388,6 +431,19 @@ export default function Consultation() {
     };
 
     const performAddService = (service: any, startStage: number = 1) => {
+        // Scaling Restriction: Must have periodontal status
+        const scalingNames = ["scaling", "polishing", "scaling and polishing"];
+        const isScaling = scalingNames.some(name => service.name.toLowerCase().includes(name));
+
+        if (isScaling && !periodontalStatus) {
+            toast({
+                title: "Diagnosis Required",
+                description: "You must select a periodontal status (Staining, Calculus, or Periodontitis) before adding Scaling services.",
+                variant: "destructive"
+            });
+            return;
+        }
+
         if (selectedTeeth.length > 0) {
             let addedCount = 0;
             const newSelections = [...selectedServices];
@@ -398,25 +454,26 @@ export default function Consultation() {
                     return;
                 }
 
-                // 1. Check History: Has this SPECIFIC service been done before?
-                const hasExistingRecord = serviceHistory.some(h =>
+                // 1. Check History: For non-multi-stage, block if already done EVER on this tooth
+                const hasExistingRecord = !service.is_multi_stage && serviceHistory.some(h =>
                     h.tooth_number == tooth && h.service_id === service.id
                 );
 
-                // 2. Check Active Stages: Is there ANY active treatment on this tooth?
-                // The user says "another service cannot be done in a tooth that is actively being treated".
-                // This implies exclusive lock on the tooth.
-                // UNLESS it is the SAME service (continuation) - but continuation is handled in `addService` before this.
-                // So if we are here, it's a "New Start".
-                const hasActiveTreatment = activeStages.some(s => s.tooth_number === tooth);
+                // 2. Check Active: Is this SAME stage already in progress?
+                const isCurrentStageActive = activeStages.some(as =>
+                    as.tooth_number === tooth &&
+                    as.service_id === service.id &&
+                    as.current_stage === startStage
+                );
 
-                if (hasActiveTreatment) {
+                // 3. Multi-stage progression check
+                const maxDone = getMaxStageForSelection(service.id, [tooth]);
+
+                if (isCurrentStageActive) {
                     blockedTeeth.push(tooth);
-                    // We can be specific about why
-                    // But for simplicity, we block.
-                } else if (hasExistingRecord) {
-                    // Prevent repeating the same service (e.g. Root Canal done twice)
-                    // Unless it allows repeats? Assuming multi-stage logic implies "once done, done".
+                } else if (!service.is_multi_stage && hasExistingRecord) {
+                    blockedTeeth.push(tooth);
+                } else if (service.is_multi_stage && startStage <= maxDone) {
                     blockedTeeth.push(tooth);
                 } else {
                     // Clone service to add stage info if needed
@@ -428,9 +485,8 @@ export default function Consultation() {
 
             if (blockedTeeth.length > 0) {
                 toast({
-                    title: "Service Blocked",
-                    description: `Cannot perform ${service.name} (Stage ${startStage}) on teeth: ${blockedTeeth.join(", ")} as it has been done previously or is already in progress. activeStages: ${JSON.stringify(activeStages)}`, // Debug info potentially
-                    description: `Cannot start ${service.name} on teeth: ${blockedTeeth.join(", ")}. Treatment already completed or in progress.`,
+                    title: "Action Restricted",
+                    description: `One or more teeth are blocked for ${service.name} (Stage ${startStage}). You may have already performed this stage or it is currently active.`,
                     variant: "destructive"
                 });
             }
@@ -538,6 +594,10 @@ export default function Consultation() {
                 );
                 if (existingStage) {
                     const nextStage = existingStage.current_stage + 1;
+                    if (nextStage > service.total_stages) {
+                        toast({ title: "Completed", description: "This treatment is already completed.", variant: "secondary" });
+                        return;
+                    }
                     toast({ title: "Continuing Treatment", description: `Added ${service.name} Stage ${nextStage}.` });
                     const serviceUpdate = {
                         ...service,
@@ -554,7 +614,21 @@ export default function Consultation() {
                 }
             }
 
+            // Set default stage to next available
+            const maxStage = getMaxStageForSelection(service.id, selectedTeeth);
+            const nextSuggested = maxStage + 1;
+
+            if (nextSuggested > service.total_stages) {
+                toast({
+                    title: "Service Completed",
+                    description: `All ${service.total_stages} stages of this service have already been recorded for these teeth.`,
+                    variant: "destructive"
+                });
+                return;
+            }
+
             setPendingService(service);
+            setSelectedStageNumber(nextSuggested);
             setStageDialogOpen(true);
             return;
         }
@@ -590,18 +664,20 @@ export default function Consultation() {
         // Create a 'virtual' service object for the bill
         const stageService = {
             id: stage.service_id,
-            name: `${stage.services.name} (Stage ${nextStageNum}/${stage.total_stages})`,
+            name: stage.services.name, // Use base name, handleFinalize will add the suffix
             benefit_cost: 0, // No charge for subsequent stages
             branch_compensation: 0,
             real_cost: 0,
             is_multi_stage_update: true,
+            startAtStage: nextStageNum, // CRITICAL: handleFinalize expects this for updating the DB
+            total_stages: stage.total_stages,
             stageId: stage.id,
             nextStage: nextStageNum,
             isFinal: isFinal,
             notes: stageNotes // Attach notes
         };
 
-        setSelectedServices([...selectedServices, { service: stageService, tooth_number: null }]);
+        setSelectedServices([...selectedServices, { service: stageService, tooth_number: stage.tooth_number }]);
         toast({ title: "Stage Added", description: `Scheduled completion of Stage ${nextStageNum}.` });
 
         setContinueStageDialogOpen(false);
@@ -621,6 +697,8 @@ export default function Consultation() {
             const { error } = await supabase.from("visits").update({
                 diagnosis: diagnosis,
                 treatment_notes: treatmentNotes,
+                periodontal_status: periodontalStatus,
+                xray_urls: xrayUrls
             }).eq("id", visitId);
 
             if (error) throw error;
@@ -648,19 +726,9 @@ export default function Consultation() {
                 if (dentalError) throw dentalError;
             }
 
-            // Save Diagnosis if in Diagnosis Mode
-            if (consultationMode === 'diagnosis') {
-                const { error: diagnosisError } = await supabase.rpc('upsert_dental_records', {
-                    records: Object.entries(toothConditions).map(([t, c]) => ({
-                        member_id: visit.member_id,
-                        dependant_id: visit.dependant_id || null,
-                        visit_id: visitId,
-                        tooth_number: parseInt(t),
-                        condition: c
-                    }))
-                });
-                if (diagnosisError) throw diagnosisError;
-            }
+            // Removed autosave of dental records here to allow free editing until explicit "Save Diagnosis".
+            // Draft saving now only focuses on Clinical Notes (visits table).
+
 
             toast({ title: "Draft Saved", description: "Clinical notes and dental chart changes saved." });
         } catch (error: any) {
@@ -764,7 +832,7 @@ export default function Consultation() {
                 const itemsToInsert = standardAndUpdates.map(s => {
                     let itemName = s.service.name;
                     if (s.service.is_multi_stage_update) {
-                        itemName += ` (Stage ${s.service.startAtStage})`; // startAtStage holds the target stage
+                        itemName += ` (Stage ${s.service.startAtStage}/${s.service.total_stages || '?'})`;
                     }
 
                     return {
@@ -1027,7 +1095,18 @@ export default function Consultation() {
                 <div>
                     <h1 className="text-2xl font-bold">Consultation - {patientName} {isChild && <span className="text-sm font-normal text-amber-600 ml-2">(Pediatric)</span>}</h1>
                     <div className="flex flex-col gap-1">
-                        <p className="text-muted-foreground">Visit #{visitId?.slice(0, 8)} • ID: {visit.dependants?.document_number || visit.members.id_number || 'N/A'} • Age: {patientAge} yrs</p>
+                        <div className="flex items-center gap-3">
+                            <p className="text-muted-foreground">Visit #{visitId?.slice(0, 8)} • ID: {visit.dependants?.document_number || visit.members.id_number || 'N/A'} • Age: {patientAge} yrs</p>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-[10px] uppercase font-bold tracking-wider border-blue-200 text-blue-700 bg-blue-50/50 hover:bg-blue-100"
+                                onClick={() => setIsHistoryDialogOpen(true)}
+                            >
+                                <History className="w-3 h-3 mr-1" />
+                                View Clinical History
+                            </Button>
+                        </div>
                         {visit.dependants && (
                             <p className="text-sm text-muted-foreground">Principal Member: <span className="font-medium text-foreground">{visit.members.full_name}</span> ({visit.members.member_number})</p>
                         )}
@@ -1129,38 +1208,66 @@ export default function Consultation() {
                             )}
 
                             {consultationMode === 'diagnosis' && (
-                                <div className="mb-6 p-4 bg-white rounded-xl border shadow-sm space-y-3">
-                                    <Label className="text-xs uppercase tracking-wider text-muted-foreground font-bold">Diagnosis Tools</Label>
-                                    <div className="flex flex-wrap gap-2">
-                                        {[
-                                            { id: 'decay', label: 'Decay', color: 'bg-red-500', border: 'border-red-200' },
-                                            { id: 'missing', label: 'Missing', color: 'bg-yellow-400', border: 'border-yellow-200' },
-                                            { id: 'filled', label: 'Filled', color: 'bg-green-500', border: 'border-green-200' },
-                                            { id: 'crowned', label: 'Crowned', color: 'bg-blue-500', border: 'border-blue-200' },
-                                            { id: 'partial_denture', label: 'Pt. Denture', color: 'bg-pink-500', border: 'border-pink-200' },
-                                        ].map(tool => (
-                                            <button
-                                                key={tool.id}
-                                                onClick={() => setSelectedDiagnosisTool(tool.id)}
-                                                className={cn(
-                                                    "flex items-center gap-2 px-3 py-2 rounded-lg border transition-all text-sm font-medium",
-                                                    selectedDiagnosisTool === tool.id
-                                                        ? "ring-2 ring-offset-1 ring-primary border-primary bg-secondary/20"
-                                                        : "hover:bg-secondary/10 bg-white"
-                                                )}
-                                            >
-                                                <div className={cn("w-4 h-4 rounded-full", tool.color)} />
-                                                {tool.label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                    <div className="flex justify-between items-center pt-2 border-t mt-2">
-                                        <p className="text-xs text-muted-foreground">Mark all conditions then click Save to proceed to treatment.</p>
-                                        <div className="flex gap-2">
-                                            <Button size="sm" onClick={() => saveDiagnosis()} disabled={submitting || Object.keys(toothConditions).length === 0} className="bg-primary hover:bg-primary/90 text-white shadow-sm">
-                                                <Save className="w-4 h-4 mr-2" /> Save Diagnosis
-                                            </Button>
+                                <div className="space-y-6">
+                                    <div className="p-4 bg-white rounded-xl border shadow-sm space-y-3">
+                                        <Label className="text-xs uppercase tracking-wider text-muted-foreground font-bold">Diagnosis Tools</Label>
+                                        <div className="flex flex-wrap gap-2">
+                                            {[
+                                                { id: 'decay', label: 'Decay', color: 'bg-red-500', border: 'border-red-200' },
+                                                { id: 'missing', label: 'Missing', color: 'bg-yellow-400', border: 'border-yellow-200' },
+                                                { id: 'filled', label: 'Filled', color: 'bg-green-500', border: 'border-green-200' },
+                                                { id: 'crowned', label: 'Crowned', color: 'bg-blue-500', border: 'border-blue-200' },
+                                                { id: 'partial_denture', label: 'Pt. Denture', color: 'bg-pink-500', border: 'border-pink-200' },
+                                            ].map(tool => (
+                                                <button
+                                                    key={tool.id}
+                                                    onClick={() => setSelectedDiagnosisTool(tool.id)}
+                                                    className={cn(
+                                                        "flex items-center gap-2 px-3 py-2 rounded-lg border transition-all text-sm font-medium",
+                                                        selectedDiagnosisTool === tool.id
+                                                            ? "ring-2 ring-offset-1 ring-primary border-primary bg-secondary/20"
+                                                            : "hover:bg-secondary/10 bg-white"
+                                                    )}
+                                                >
+                                                    <div className={cn("w-4 h-4 rounded-full", tool.color)} />
+                                                    {tool.label}
+                                                </button>
+                                            ))}
                                         </div>
+                                        <div className="flex justify-between items-center pt-2 border-t mt-2">
+                                            <p className="text-xs text-muted-foreground">Mark all conditions then click Save to proceed to treatment.</p>
+                                            <div className="flex gap-2">
+                                                <Button variant="outline" size="sm" onClick={() => setIsXrayModalOpen(true)} className="border-blue-200 text-blue-700 bg-blue-50/50">
+                                                    <ImageIcon className="w-4 h-4 mr-2" /> X-Rays ({xrayUrls.length})
+                                                </Button>
+                                                <Button size="sm" onClick={() => saveDiagnosis()} disabled={submitting || Object.keys(toothConditions).length === 0} className="bg-primary hover:bg-primary/90 text-white shadow-sm">
+                                                    <Save className="w-4 h-4 mr-2" /> Save Diagnosis
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Periodontal Status Selection - Only in Diagnosis Phase */}
+                                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                                        <Label className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-3 block">Periodontal Status</Label>
+                                        <RadioGroup
+                                            value={periodontalStatus || ""}
+                                            onValueChange={setPeriodontalStatus}
+                                            className="flex flex-wrap gap-4"
+                                        >
+                                            <div className="flex items-center space-x-2 bg-white px-3 py-2 rounded-lg border shadow-sm cursor-pointer hover:bg-slate-50">
+                                                <RadioGroupItem value="staining" id="staining" />
+                                                <Label htmlFor="staining" className="cursor-pointer">Staining</Label>
+                                            </div>
+                                            <div className="flex items-center space-x-2 bg-white px-3 py-2 rounded-lg border shadow-sm cursor-pointer hover:bg-slate-50">
+                                                <RadioGroupItem value="calculus" id="calculus" />
+                                                <Label htmlFor="calculus" className="cursor-pointer">Calculus</Label>
+                                            </div>
+                                            <div className="flex items-center space-x-2 bg-white px-3 py-2 rounded-lg border shadow-sm cursor-pointer hover:bg-slate-50">
+                                                <RadioGroupItem value="periodontitis" id="periodontitis" />
+                                                <Label htmlFor="periodontitis" className="cursor-pointer">Periodontitis</Label>
+                                            </div>
+                                        </RadioGroup>
                                     </div>
                                 </div>
                             )}
@@ -1169,6 +1276,25 @@ export default function Consultation() {
                                 onToothClick={handleToothClick}
                                 selectedTeeth={selectedTeeth}
                                 toothStatus={toothStatus}
+                                toothStages={(() => {
+                                    const stages: Record<number, { current: number, total: number }> = {};
+                                    // Add existing active stages
+                                    activeStages.forEach(s => {
+                                        if (s.tooth_number) {
+                                            stages[s.tooth_number] = { current: s.current_stage, total: s.total_stages };
+                                        }
+                                    });
+                                    // Override with session selections (if incrementing or starting)
+                                    selectedServices.forEach(s => {
+                                        if (s.tooth_number && s.service.is_multi_stage) {
+                                            stages[s.tooth_number] = {
+                                                current: s.service.startAtStage || 1,
+                                                total: s.service.total_stages
+                                            };
+                                        }
+                                    });
+                                    return stages;
+                                })()}
                                 mode={chartMode}
                                 readOnly={false} // Always interactive, but behavior changes
                                 disabledTeeth={consultationMode === 'treatment'
@@ -1192,19 +1318,23 @@ export default function Consultation() {
 
                                         {/* Show Active Stages Hint */}
                                         {selectedTeeth.some(t => activeStages.some(s => s.tooth_number === t)) && (
-                                            <div className="mb-3 text-xs bg-amber-100 text-amber-800 p-2 rounded border border-amber-200">
-                                                <strong>Active Treatments:</strong>
-                                                <ul className="list-disc pl-4 mt-1 space-y-0.5">
-                                                    {selectedTeeth
-                                                        .map(t => activeStages.find(s => s.tooth_number === t))
-                                                        .filter(Boolean)
-                                                        .map(s => (
-                                                            <li key={s.id}>
-                                                                Tooth {s.tooth_number}: {s.services?.name} - <strong>Stage {s.current_stage + 1}</strong> (Next)
-                                                            </li>
-                                                        ))
-                                                    }
-                                                </ul>
+                                            <div className="mb-4 space-y-2">
+                                                {selectedTeeth.map(t => {
+                                                    const stage = activeStages.find(s => s.tooth_number === t);
+                                                    if (!stage) return null;
+                                                    return (
+                                                        <div key={stage.id} className="flex items-center justify-between p-2 bg-amber-50 border border-amber-200 rounded-lg text-xs">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                                                                <span className="font-bold text-amber-900">Tooth {t}:</span>
+                                                                <span className="text-amber-800">{stage.services?.name}</span>
+                                                            </div>
+                                                            <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-300 font-bold">
+                                                                Stage {stage.current_stage} Completed
+                                                            </Badge>
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
                                         )}
                                         <select
@@ -1275,8 +1405,15 @@ export default function Consultation() {
                                     selectedServices.map((s, index) => (
                                         <div key={`${s.service.id}-${index}`} className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white gap-2">
                                             <div>
-                                                <div className="font-semibold">{s.service.name}</div>
-                                                <div className="text-xs text-muted-foreground">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="font-semibold">{s.service.name}</div>
+                                                    {s.service.is_multi_stage && (
+                                                        <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-blue-200">
+                                                            Stage {s.service.startAtStage || 1} of {s.service.total_stages}
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                                <div className="text-xs text-muted-foreground mt-0.5">
                                                     {s.tooth_number ? <span className="font-bold text-primary mr-2">Tooth #{s.tooth_number}</span> : <span className="mr-2 italic">No tooth specified</span>}
                                                     Benefit: KES {s.service.benefit_cost.toLocaleString()}
                                                 </div>
@@ -1293,6 +1430,49 @@ export default function Consultation() {
                 </div>
 
                 <div className="space-y-6">
+                    {/* Active Treatments Progress */}
+                    {activeStages.length > 0 && (
+                        <Card className="border-blue-200 bg-blue-50/30">
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-sm font-bold flex items-center gap-2 text-blue-900">
+                                    <History className="w-4 h-4" />
+                                    Active Treatments
+                                </CardTitle>
+                                <CardDescription className="text-[10px] text-blue-700">Currently in progress for this member</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-2">
+                                    {activeStages.map((stage) => (
+                                        <div key={stage.id} className="text-xs p-2 bg-white rounded border border-blue-100 flex justify-between items-center shadow-sm">
+                                            <div>
+                                                <div className="font-semibold text-blue-900">
+                                                    {stage.tooth_number ? `Tooth ${stage.tooth_number}` : 'General'}
+                                                </div>
+                                                <div className="text-[10px] text-muted-foreground truncate max-w-[120px]">
+                                                    {stage.services?.name}
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col items-end">
+                                                <Badge className="text-[10px] px-1 py-0 h-5 bg-blue-600">
+                                                    At Stage {stage.current_stage}
+                                                </Badge>
+                                                {stage.current_stage < stage.total_stages ? (
+                                                    <span className="text-[9px] text-blue-500 mt-1 font-medium">
+                                                        Awaiting Stage {stage.current_stage + 1}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-[9px] text-emerald-600 mt-1 font-bold">
+                                                        Final Session Soon
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
                     <Card>
                         <CardHeader>
                             <CardTitle>Patient Eligibility</CardTitle>
@@ -1351,11 +1531,13 @@ export default function Consultation() {
                                 <SelectValue placeholder="Select stage" />
                             </SelectTrigger>
                             <SelectContent>
-                                {pendingService && Array.from({ length: pendingService.total_stages }, (_, i) => i + 1).map((num) => (
-                                    <SelectItem key={num} value={num.toString()}>
-                                        Stage {num} of {pendingService.total_stages}
-                                    </SelectItem>
-                                ))}
+                                {pendingService && Array.from({ length: pendingService.total_stages }, (_, i) => i + 1)
+                                    .filter(num => num > getMaxStageForSelection(pendingService.id, selectedTeeth))
+                                    .map((num) => (
+                                        <SelectItem key={num} value={num.toString()}>
+                                            Stage {num} of {pendingService.total_stages}
+                                        </SelectItem>
+                                    ))}
                             </SelectContent>
                         </Select>
                     </div>
@@ -1387,6 +1569,176 @@ export default function Consultation() {
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setContinueStageDialogOpen(false)}>Cancel</Button>
                         <Button onClick={confirmContinueStage}>Confirm & Add</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            {/* Clinical History Dialog */}
+            <Dialog open={isHistoryDialogOpen} onOpenChange={setIsHistoryDialogOpen}>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <History className="w-5 h-5 text-primary" />
+                            Clinical History - {patientName}
+                        </DialogTitle>
+                        <DialogDescription>Previous visits, diagnoses, and medical records.</DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-6 pt-4">
+                        {pastVisits.length === 0 ? (
+                            <div className="text-center py-12 border-2 border-dashed rounded-xl">
+                                <History className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+                                <p className="text-muted-foreground">No previous clinical history found.</p>
+                            </div>
+                        ) : (
+                            pastVisits.map((v) => (
+                                <Card key={v.id} className="border-slate-200 shadow-sm overflow-hidden">
+                                    <CardHeader className="bg-slate-50/50 py-3">
+                                        <div className="flex justify-between items-center">
+                                            <div className="flex items-center gap-2">
+                                                <Badge variant="outline" className="bg-white">{format(new Date(v.created_at), 'PPP')}</Badge>
+                                                <span className="text-[10px] text-muted-foreground">Dr. {v.doctor?.full_name} @ {v.branches?.name}</span>
+                                            </div>
+                                            <Badge variant={v.status === 'completed' ? 'success' : 'secondary'}>{v.status}</Badge>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="pt-4 space-y-4">
+                                        <div className="grid md:grid-cols-2 gap-4">
+                                            <div className="space-y-1">
+                                                <Label className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1">
+                                                    <DiagnosisIcon className="w-3 h-3" /> Diagnosis
+                                                </Label>
+                                                <p className="text-sm bg-white p-2 rounded border leading-relaxed">
+                                                    {v.diagnosis || 'N/A'}
+                                                </p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1">
+                                                    <ClipboardList className="w-3 h-3" /> Treatment Notes
+                                                </Label>
+                                                <p className="text-sm bg-white p-2 rounded border leading-relaxed">
+                                                    {v.treatment_notes || 'N/A'}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {v.service_stages && v.service_stages.length > 0 && (
+                                            <div className="space-y-2">
+                                                <Label className="text-[10px] uppercase font-bold text-muted-foreground">Procedures Performed</Label>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {v.service_stages.map((stage: any) => (
+                                                        <Badge key={stage.id} variant="secondary" className="bg-blue-50 text-blue-700 border-blue-100">
+                                                            {stage.tooth_number ? `Tooth #${stage.tooth_number}` : 'General'}: Stage {stage.current_stage}
+                                                        </Badge>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {v.xray_urls && v.xray_urls.length > 0 && (
+                                            <div className="space-y-2">
+                                                <Label className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1">
+                                                    <Camera className="w-3 h-3" /> Radiographs (X-Rays)
+                                                </Label>
+                                                <div className="flex gap-2 overflow-x-auto pb-2">
+                                                    {v.xray_urls.map((url: string, idx: number) => (
+                                                        <Dialog key={idx}>
+                                                            <DialogTrigger asChild>
+                                                                <div className="relative cursor-pointer group rounded-lg border overflow-hidden h-20 w-20 flex-shrink-0 bg-slate-100 shadow-sm hover:ring-2 ring-primary transition-all">
+                                                                    <img src={url} alt="X-ray thumbnail" className="h-full w-full object-cover transition-opacity group-hover:opacity-80" />
+                                                                </div>
+                                                            </DialogTrigger>
+                                                            <DialogContent className="max-w-4xl p-0 bg-black border-0">
+                                                                <img src={url} alt="X-ray view" className="max-h-[85vh] w-auto mx-auto object-contain" />
+                                                            </DialogContent>
+                                                        </Dialog>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            ))
+                        )}
+                    </div>
+
+                    <DialogFooter>
+                        <Button onClick={() => setIsHistoryDialogOpen(false)}>Close History</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* X-Ray Upload Modal */}
+            <Dialog open={isXrayModalOpen} onOpenChange={setIsXrayModalOpen}>
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Patient X-Rays</DialogTitle>
+                        <DialogDescription>
+                            Upload and manage radiographic images for this visit.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-6 py-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                            {xrayUrls.map((url, idx) => (
+                                <div key={idx} className="relative group aspect-square rounded-lg overflow-hidden border bg-slate-100">
+                                    <img src={url} alt={`X-ray ${idx + 1}`} className="w-full h-full object-cover" />
+                                    <button
+                                        onClick={() => setXrayUrls(xrayUrls.filter((_, i) => i !== idx))}
+                                        className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            ))}
+
+                            <label className="flex flex-col items-center justify-center aspect-square rounded-lg border-2 border-dashed border-slate-300 hover:border-blue-400 hover:bg-blue-50 cursor-pointer transition-all">
+                                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                    {uploading ? <Loader2 className="w-8 h-8 text-blue-500 animate-spin" /> : <Upload className="w-8 h-8 text-slate-400" />}
+                                    <p className="mt-2 text-sm text-slate-500 font-medium">Click to upload</p>
+                                </div>
+                                <input
+                                    type="file"
+                                    className="hidden"
+                                    accept="image/*"
+                                    disabled={uploading}
+                                    onChange={async (e) => {
+                                        const file = e.target.files?.[0];
+                                        if (!file) return;
+
+                                        setUploading(true);
+                                        try {
+                                            const fileExt = file.name.split('.').pop();
+                                            const fileName = `${visitId}/${Math.random()}.${fileExt}`;
+                                            const filePath = `x-rays/${fileName}`;
+
+                                            const { error: uploadError, data } = await supabase.storage
+                                                .from('medical-records')
+                                                .upload(filePath, file);
+
+                                            if (uploadError) throw uploadError;
+
+                                            const { data: { publicUrl } } = supabase.storage
+                                                .from('medical-records')
+                                                .getPublicUrl(filePath);
+
+                                            setXrayUrls([...xrayUrls, publicUrl]);
+                                            toast({ title: "Success", description: "X-ray uploaded successfully." });
+                                        } catch (error: any) {
+                                            console.error("Upload error:", error);
+                                            toast({ title: "Upload Failed", description: error.message, variant: "destructive" });
+                                        } finally {
+                                            setUploading(false);
+                                        }
+                                    }}
+                                />
+                            </label>
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button onClick={() => setIsXrayModalOpen(false)} className="w-full sm:w-auto">
+                            Close
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

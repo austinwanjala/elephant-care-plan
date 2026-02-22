@@ -120,7 +120,7 @@ export default function RegisterVisit() {
             // Use ilike with wildcards and double quotes for all fields to handle spaces and partial matches
             const { data, error } = await supabase
                 .from("members")
-                .select("*, membership_categories(name)")
+                .select("*, membership_categories(name), branches(name)")
                 .or(`phone.ilike."%${term}%",id_number.ilike."%${term}%",member_number.ilike."%${term}%",full_name.ilike."%${term}%"`)
                 .maybeSingle();
 
@@ -279,6 +279,10 @@ export default function RegisterVisit() {
                                 <div>
                                     <Label className="text-muted-foreground">Membership</Label>
                                     <p className="font-medium">{member.membership_categories?.name || "N/A"}</p>
+                                </div>
+                                <div>
+                                    <Label className="text-muted-foreground">Assigned Branch</Label>
+                                    <p className="font-medium">{member.branches?.name || "N/A"}</p>
                                 </div>
                             </div>
 

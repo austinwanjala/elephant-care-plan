@@ -11,7 +11,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { History, Loader2, Download, Calendar as CalendarIcon, Trash2 } from "lucide-react";
+import { History, Loader2, Download, Calendar as CalendarIcon, Trash2, Image as ImageIcon } from "lucide-react";
+import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { exportToCsv } from "@/utils/csvExport";
@@ -44,6 +45,7 @@ interface Visit {
   branches: { name: string } | null;
   receptionist: { full_name: string } | null;
   doctor: { full_name: string } | null;
+  xray_urls: string[] | null;
   bills: { total_benefit_cost: number; total_branch_compensation: number; total_profit_loss: number; bill_items: { service_name: string }[] }[] | null;
 }
 
@@ -68,6 +70,7 @@ export default function AdminVisits() {
         branches(name), 
         doctor:doctor_id(full_name), 
         receptionist:receptionist_id(full_name), 
+        xray_urls,
         bills(total_benefit_cost, total_branch_compensation, total_profit_loss, bill_items(service_name))
       `)
       .order("created_at", { ascending: false });
@@ -284,7 +287,35 @@ export default function AdminVisits() {
                         <TableCell>{visit.doctor?.full_name || "N/A"}</TableCell>
                         <TableCell>{visit.receptionist?.full_name || "N/A"}</TableCell>
                         <TableCell className="max-w-[150px] truncate">{servicesList}</TableCell>
-                        <TableCell className="max-w-[150px] truncate">{visit.diagnosis || "N/A"}</TableCell>
+                        <TableCell className="max-w-[150px]">
+                          <div className="space-y-2">
+                            <div className="truncate text-sm" title={visit.diagnosis || ''}>
+                              {visit.diagnosis || '-'}
+                            </div>
+                            {visit.xray_urls && visit.xray_urls.length > 0 && (
+                              <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide">
+                                {visit.xray_urls.map((url, idx) => (
+                                  <Dialog key={idx}>
+                                    <DialogTrigger asChild>
+                                      <div className="relative cursor-pointer group rounded border overflow-hidden h-8 w-8 flex-shrink-0 bg-slate-100">
+                                        <img src={url} alt="X-ray thumbnail" className="h-full w-full object-cover transition-opacity group-hover:opacity-80" />
+                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-white">
+                                          <ImageIcon className="h-3 w-3" />
+                                        </div>
+                                      </div>
+                                    </DialogTrigger>
+                                    <DialogContent className="max-w-4xl p-1 bg-black/90 border-0">
+                                      <DialogHeader className="hidden"><DialogTitle>X-Ray View</DialogTitle></DialogHeader>
+                                      <div className="flex items-center justify-center min-h-[50vh]">
+                                        <img src={url} alt="X-ray clinical view" className="max-h-[85vh] w-auto object-contain" />
+                                      </div>
+                                    </DialogContent>
+                                  </Dialog>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell>{getStatusBadge(visit.status || "unknown")}</TableCell>
                         <TableCell className="text-destructive">
                           -KES {benefitDeducted.toLocaleString()}

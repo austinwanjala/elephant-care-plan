@@ -19,13 +19,23 @@ interface DentalChartProps {
     onToothClick: (toothId: number) => void;
     selectedTeeth: number[];
     toothStatus: Record<number, string>;
+    toothStages?: Record<number, { current: number, total: number }>;
     isChild?: boolean; // Deprecated in favor of mode, kept for backward compatibility
     mode?: DentalChartMode;
     readOnly?: boolean;
     disabledTeeth?: number[];
 }
 
-export function DentalChart({ onToothClick, selectedTeeth, toothStatus, isChild = false, mode, readOnly, disabledTeeth = [] }: DentalChartProps) {
+export function DentalChart({
+    onToothClick,
+    selectedTeeth,
+    toothStatus,
+    toothStages = {},
+    isChild = false,
+    mode,
+    readOnly,
+    disabledTeeth = []
+}: DentalChartProps) {
     // Determine effective mode
     const effectiveMode: DentalChartMode = mode || (isChild ? 'child' : 'adult');
 
@@ -147,14 +157,33 @@ export function DentalChart({ onToothClick, selectedTeeth, toothStatus, isChild 
                                 {/* Upper Permanent (Outer) */}
                                 <div className="flex justify-center gap-0.5 pb-2 border-b border-dashed border-orange-200/50 w-full">
                                     {[17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27].map(id => (
-                                        <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} imageSrc={getToothImage(id)} disabled={disabledTeeth.includes(id)} />
+                                        <Tooth
+                                            key={id}
+                                            id={id}
+                                            isSelected={selectedTeeth.includes(id)}
+                                            status={toothStatus[id]}
+                                            stage={toothStages[id]}
+                                            onClick={() => onToothClick(id)}
+                                            imageSrc={getToothImage(id)}
+                                            disabled={disabledTeeth.includes(id)}
+                                        />
                                     ))}
                                 </div>
 
                                 {/* Upper Primary (Inner) */}
                                 <div className="flex justify-center gap-0.5 bg-yellow-50/50 px-4 py-2 rounded-full border border-yellow-100/50">
                                     {[55, 54, 53, 52, 51, 61, 62, 63, 64, 65].map(id => (
-                                        <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} imageSrc={getToothImage(id)} small disabled={disabledTeeth.includes(id)} />
+                                        <Tooth
+                                            key={id}
+                                            id={id}
+                                            isSelected={selectedTeeth.includes(id)}
+                                            status={toothStatus[id]}
+                                            stage={toothStages[id]}
+                                            onClick={() => onToothClick(id)}
+                                            imageSrc={getToothImage(id)}
+                                            small
+                                            disabled={disabledTeeth.includes(id)}
+                                        />
                                     ))}
                                 </div>
                             </div>
@@ -168,14 +197,35 @@ export function DentalChart({ onToothClick, selectedTeeth, toothStatus, isChild 
                                 {/* Lower Primary (Inner) */}
                                 <div className="flex justify-center gap-0.5 bg-yellow-50/50 px-4 py-2 rounded-full border border-yellow-100/50">
                                     {[85, 84, 83, 82, 81, 71, 72, 73, 74, 75].map(id => (
-                                        <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} isLower imageSrc={getToothImage(id)} small disabled={disabledTeeth.includes(id)} />
+                                        <Tooth
+                                            key={id}
+                                            id={id}
+                                            isSelected={selectedTeeth.includes(id)}
+                                            status={toothStatus[id]}
+                                            stage={toothStages[id]}
+                                            onClick={() => onToothClick(id)}
+                                            isLower
+                                            imageSrc={getToothImage(id)}
+                                            small
+                                            disabled={disabledTeeth.includes(id)}
+                                        />
                                     ))}
                                 </div>
 
                                 {/* Lower Permanent (Outer) */}
                                 <div className="flex justify-center gap-0.5 pt-2 border-t border-dashed border-orange-200/50 w-full">
                                     {[47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37].map(id => (
-                                        <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} isLower imageSrc={getToothImage(id)} disabled={disabledTeeth.includes(id)} />
+                                        <Tooth
+                                            key={id}
+                                            id={id}
+                                            isSelected={selectedTeeth.includes(id)}
+                                            status={toothStatus[id]}
+                                            stage={toothStages[id]}
+                                            onClick={() => onToothClick(id)}
+                                            isLower
+                                            imageSrc={getToothImage(id)}
+                                            disabled={disabledTeeth.includes(id)}
+                                        />
                                     ))}
                                 </div>
                             </div>
@@ -194,7 +244,16 @@ export function DentalChart({ onToothClick, selectedTeeth, toothStatus, isChild 
                                 </div>
                                 <div className="flex justify-center gap-1 sm:gap-2 bg-white/50 p-4 rounded-xl border border-slate-100 shadow-sm">
                                     {upperJaw.map((id) => (
-                                        <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} imageSrc={getToothImage(id)} disabled={disabledTeeth.includes(id)} />
+                                        <Tooth
+                                            key={id}
+                                            id={id}
+                                            isSelected={selectedTeeth.includes(id)}
+                                            status={toothStatus[id]}
+                                            stage={toothStages[id]}
+                                            onClick={() => onToothClick(id)}
+                                            imageSrc={getToothImage(id)}
+                                            disabled={disabledTeeth.includes(id)}
+                                        />
                                     ))}
                                 </div>
                             </div>
@@ -202,7 +261,17 @@ export function DentalChart({ onToothClick, selectedTeeth, toothStatus, isChild 
                             <div className="space-y-2">
                                 <div className="flex justify-center gap-1 sm:gap-2 bg-white/50 p-4 rounded-xl border border-slate-100 shadow-sm">
                                     {lowerJaw.map((id) => (
-                                        <Tooth key={id} id={id} isSelected={selectedTeeth.includes(id)} status={toothStatus[id]} onClick={() => onToothClick(id)} isLower imageSrc={getToothImage(id)} disabled={disabledTeeth.includes(id)} />
+                                        <Tooth
+                                            key={id}
+                                            id={id}
+                                            isSelected={selectedTeeth.includes(id)}
+                                            status={toothStatus[id]}
+                                            stage={toothStages[id]}
+                                            onClick={() => onToothClick(id)}
+                                            isLower
+                                            imageSrc={getToothImage(id)}
+                                            disabled={disabledTeeth.includes(id)}
+                                        />
                                     ))}
                                 </div>
                                 <div className="flex justify-between px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
@@ -225,6 +294,7 @@ interface ToothProps {
     id: number;
     isSelected: boolean;
     status?: string;
+    stage?: { current: number, total: number };
     onClick: () => void;
     isLower?: boolean;
     imageSrc?: string;
@@ -232,7 +302,7 @@ interface ToothProps {
     disabled?: boolean;
 }
 
-function Tooth({ id, isSelected, status, onClick, isLower, imageSrc, small, disabled }: ToothProps) {
+function Tooth({ id, isSelected, status, stage, onClick, isLower, imageSrc, small, disabled }: ToothProps) {
     const lastDigit = id % 10;
     let toothPath = "";
 
@@ -317,11 +387,28 @@ function Tooth({ id, isSelected, status, onClick, isLower, imageSrc, small, disa
                             status === 'in_progress' && "bg-amber-500",
                         )} />
                     )}
+                    {/* Stage Indicator Overlay */}
+                    {stage && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="bg-blue-600 text-white text-[9px] font-black px-1 rounded-full shadow-lg border border-white">
+                                {stage.current}
+                            </div>
+                        </div>
+                    )}
                 </div>
             ) : (
-                <svg width="28" height="32" viewBox="0 0 20 24" className={cn("transition-all drop-shadow-sm", colorClass)}>
-                    <path d={toothPath} strokeWidth="1.5" />
-                </svg>
+                <div className="relative">
+                    <svg width="28" height="32" viewBox="0 0 20 24" className={cn("transition-all drop-shadow-sm", colorClass)}>
+                        <path d={toothPath} strokeWidth="1.5" />
+                    </svg>
+                    {stage && (
+                        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex justify-center">
+                            <div className="bg-blue-600 text-white text-[9px] font-black px-1 rounded-full shadow-lg border border-white">
+                                {stage.current}
+                            </div>
+                        </div>
+                    )}
+                </div>
             )}
 
             {isLower && <span className={cn("text-[8px] font-bold mt-1", isSelected ? "text-orange-600" : "text-slate-400")}>{id}</span>}

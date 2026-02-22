@@ -3,7 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Download, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, Download, ChevronLeft, ChevronRight, Image as ImageIcon } from "lucide-react";
+import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { exportToCsv } from "@/utils/csvExport";
 import { format } from "date-fns";
@@ -72,6 +73,7 @@ export default function AuditorVisits() {
                                 <TableHead>Patient / Member</TableHead>
                                 <TableHead>Branch</TableHead>
                                 <TableHead>Status</TableHead>
+                                <TableHead>Clinical</TableHead>
                                 <TableHead>Financials</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -90,6 +92,28 @@ export default function AuditorVisits() {
                                         </TableCell>
                                         <TableCell>{visit.branches?.name}</TableCell>
                                         <TableCell><Badge variant="secondary" className="capitalize">{visit.status}</Badge></TableCell>
+                                        <TableCell>
+                                            {visit.xray_urls && visit.xray_urls.length > 0 && (
+                                                <div className="flex gap-1">
+                                                    {visit.xray_urls.map((url: string, idx: number) => (
+                                                        <Dialog key={idx}>
+                                                            <DialogTrigger asChild>
+                                                                <div className="relative cursor-pointer group rounded border overflow-hidden h-8 w-8 flex-shrink-0 bg-slate-100">
+                                                                    <img src={url} alt="X-ray thumbnail" className="h-full w-full object-cover transition-opacity group-hover:opacity-80" />
+                                                                </div>
+                                                            </DialogTrigger>
+                                                            <DialogContent className="max-w-4xl p-1 bg-black/90 border-0">
+                                                                <DialogHeader className="hidden"><DialogTitle>X-Ray View</DialogTitle></DialogHeader>
+                                                                <div className="flex items-center justify-center min-h-[50vh]">
+                                                                    <img src={url} alt="X-ray clinical view" className="max-h-[85vh] w-auto object-contain" />
+                                                                </div>
+                                                            </DialogContent>
+                                                        </Dialog>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            {!visit.xray_urls?.length && <span className="text-xs text-muted-foreground">-</span>}
+                                        </TableCell>
                                         <TableCell className="text-xs font-mono">
                                             <div>Deducted: {visit.benefit_deducted}</div>
                                             <div>Comp: {visit.branch_compensation}</div>

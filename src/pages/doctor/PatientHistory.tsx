@@ -5,17 +5,29 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Search, User, History, Loader2, ArrowLeft, Stethoscope, FileText, CalendarDays } from "lucide-react";
+import { Search, User, History, Loader2, ArrowLeft, Stethoscope, FileText, CalendarDays, Camera } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 import { DentalChart, DentalChartMode } from "@/components/doctor/DentalChart";
 import { format } from "date-fns";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
+import { Image as ImageIcon, Stethoscope as DiagnosisIcon, ClipboardList } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function DoctorPatientHistory() {
     const [searchTerm, setSearchTerm] = useState("");
     const [searching, setSearching] = useState(false);
     const [member, setMember] = useState<any>(null);
     const [visits, setVisits] = useState<any[]>([]);
+    const [activeStages, setActiveStages] = useState<any[]>([]);
     const [dentalRecords, setDentalRecords] = useState<Record<number, string>>({});
     const { toast } = useToast();
 
@@ -56,11 +68,21 @@ export default function DoctorPatientHistory() {
 
     const fetchMemberHistory = async (memberId: string) => {
         // Fetch visits
+        // Fetch visits with clinical details
         const { data: visitsData, error: visitsError } = await supabase
             .from("visits")
-            .select("*, branches(name), doctor:doctor_id(full_name), bills(total_benefit_cost, bill_items(service_name))")
+            .select(`
+                *, 
+                branches(name), 
+                doctor:doctor_id(full_name), 
+                dependants(full_name),
+                bills(
+                    total_benefit_cost, 
+                    bill_items(service_name)
+                ),
+                service_stages(*)
+            `)
             .eq("member_id", memberId)
-            .eq("status", "completed") // Only show completed visits
             .order("created_at", { ascending: false });
 
         if (visitsError) {
@@ -83,6 +105,17 @@ export default function DoctorPatientHistory() {
                 recordsMap[record.tooth_number] = record.status;
             });
             setDentalRecords(recordsMap);
+        }
+
+        // Fetch active stages
+        const { data: stagesData } = await supabase
+            .from("service_stages")
+            .select("*, services(name)")
+            .eq("member_id", memberId)
+            .eq("status", "in_progress");
+
+        if (stagesData) {
+            setActiveStages(stagesData);
         }
     };
 
@@ -177,6 +210,12 @@ export default function DoctorPatientHistory() {
                                 onToothClick={() => { }} // Not interactive in history view
                                 selectedTeeth={[]}
                                 toothStatus={dentalRecords}
+                                toothStages={activeStages.reduce((acc, s) => {
+                                    if (s.tooth_number) {
+                                        acc[s.tooth_number] = { current: s.current_stage, total: s.total_stages };
+                                    }
+                                    return acc;
+                                }, {} as Record<number, { current: number, total: number }>)}
                                 mode={chartMode}
                             />
                         </CardContent>
@@ -198,23 +237,164 @@ export default function DoctorPatientHistory() {
                                         <thead>
                                             <tr className="text-left text-sm text-muted-foreground">
                                                 <th className="py-3 pr-3 font-semibold">Date</th>
-                                                <th className="py-3 px-3 font-semibold">Doctor</th>
-                                                <th className="py-3 px-3 font-semibold">Branch</th>
-                                                <th className="py-3 px-3 font-semibold">Services</th>
-                                                <th className="py-3 pl-3 font-semibold text-right">Cost</th>
+                                                <th className="py-3 px-3 font-semibold">Patient</th>
+                                                <th className="py-3 px-3 font-semibold">Clinical Info</th>
+                                                <th className="py-3 px-3 font-semibold">Status</th>
+                                                <th className="py-3 pl-3 font-semibold text-right">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-border">
                                             {visits.map(visit => (
                                                 <tr key={visit.id} className="hover:bg-muted/50">
-                                                    <td className="py-3 pr-3 text-sm">{format(new Date(visit.created_at), 'MMM d, yyyy')}</td>
-                                                    <td className="py-3 px-3 text-sm">{visit.doctor?.full_name || 'N/A'}</td>
-                                                    <td className="py-3 px-3 text-sm">{visit.branches?.name || 'N/A'}</td>
-                                                    <td className="py-3 px-3 text-sm max-w-[200px] truncate">
-                                                        {visit.bills?.[0]?.bill_items?.map((item: any) => item.service_name).join(", ") || 'N/A'}
+                                                    <td className="py-3 pr-3 text-sm">
+                                                        <div className="font-medium">{format(new Date(visit.created_at), 'MMM d, yyyy')}</div>
+                                                        <div className="text-[10px] text-muted-foreground">{visit.branches?.name}</div>
                                                     </td>
-                                                    <td className="py-3 pl-3 text-sm font-medium text-right text-destructive">
-                                                        -KES {Number(visit.bills?.[0]?.total_benefit_cost || 0).toLocaleString()}
+                                                    <td className="py-3 px-3 text-sm">
+                                                        <div>{visit.dependants?.full_name || 'Principal'}</div>
+                                                        <div className="text-[10px] text-muted-foreground">Dr. {visit.doctor?.full_name || 'N/A'}</div>
+                                                    </td>
+                                                    <td className="py-3 px-3 text-sm max-w-[320px]">
+                                                        <div className="space-y-1.5">
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {/* Show Bill Items */}
+                                                                {visit.bills?.[0]?.bill_items?.map((item: any, idx: number) => (
+                                                                    <Badge key={idx} variant="secondary" className="text-[10px] py-0 px-1.5 h-4 bg-slate-100 text-slate-700 hover:bg-slate-100">
+                                                                        {item.service_name}
+                                                                    </Badge>
+                                                                ))}
+                                                                {/* Show Stages Specifically with Blue Theme */}
+                                                                {visit.service_stages?.map((stage: any, idx: number) => (
+                                                                    <Badge key={`stage-${idx}`} variant="outline" className="text-[10px] py-0 px-1.5 h-4 border-blue-200 bg-blue-50 text-blue-700 font-bold">
+                                                                        {stage.tooth_number ? `Tooth #${stage.tooth_number}` : 'General'} • Stage {stage.current_stage}
+                                                                    </Badge>
+                                                                ))}
+                                                            </div>
+                                                            {visit.diagnosis && (
+                                                                <div className="flex items-start gap-1.5 text-xs text-muted-foreground bg-orange-50/50 p-1 px-2 rounded border border-orange-100 italic">
+                                                                    <DiagnosisIcon className="w-3 h-3 mt-0.5 text-orange-500" />
+                                                                    <span className="truncate">{visit.diagnosis}</span>
+                                                                </div>
+                                                            )}
+                                                            {visit.xray_urls && visit.xray_urls.length > 0 && (
+                                                                <div className="flex gap-2 pt-1 items-center">
+                                                                    <div className="flex -space-x-2">
+                                                                        {visit.xray_urls.slice(0, 3).map((url: string, idx: number) => (
+                                                                            <div key={idx} className="h-7 w-7 rounded-full border-2 border-white bg-slate-100 overflow-hidden shadow-sm hover:z-10 transition-transform hover:scale-110">
+                                                                                <img src={url} alt="X-ray" className="h-full w-full object-cover" />
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                    {visit.xray_urls.length > 3 && (
+                                                                        <span className="text-[10px] text-muted-foreground font-medium pl-1">+{visit.xray_urls.length - 3}</span>
+                                                                    )}
+                                                                    <Badge variant="outline" className="text-[9px] h-4 py-0 bg-blue-50 text-blue-600 border-blue-100 flex items-center gap-1 font-semibold">
+                                                                        <Camera className="w-2.5 h-2.5" /> {visit.xray_urls.length} Radiographs
+                                                                    </Badge>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-3 px-3 text-sm">
+                                                        <Badge
+                                                            variant={visit.status === 'completed' ? 'success' : 'outline'}
+                                                            className={cn(
+                                                                "capitalize text-[10px] px-2 h-5",
+                                                                visit.status === 'completed' ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-emerald-200" : "bg-blue-50 text-blue-700 border-blue-200"
+                                                            )}
+                                                        >
+                                                            {visit.status}
+                                                        </Badge>
+                                                    </td>
+                                                    <td className="py-3 pl-3 text-sm text-right">
+                                                        <Dialog>
+                                                            <DialogTrigger asChild>
+                                                                <Button variant="default" size="sm" className="h-8 bg-blue-600 hover:bg-blue-700 text-xs gap-2 shadow-sm">
+                                                                    <FileText className="w-3.5 h-3.5" />
+                                                                    View Details
+                                                                </Button>
+                                                            </DialogTrigger>
+                                                            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                                                                <DialogHeader>
+                                                                    <DialogTitle className="flex items-center gap-2">
+                                                                        <DiagnosisIcon className="w-5 h-5 text-primary" />
+                                                                        Clinical Record - {format(new Date(visit.created_at), 'PPP')}
+                                                                    </DialogTitle>
+                                                                    <DialogDescription>Full medical details for this visit.</DialogDescription>
+                                                                </DialogHeader>
+
+                                                                <div className="space-y-6 pt-4">
+                                                                    <div className="grid grid-cols-2 gap-4">
+                                                                        <div className="p-3 bg-muted/30 rounded-lg">
+                                                                            <Label className="text-[10px] uppercase font-bold text-muted-foreground">Patient</Label>
+                                                                            <p className="font-medium text-sm">{visit.dependants?.full_name || member.full_name}</p>
+                                                                        </div>
+                                                                        <div className="p-3 bg-muted/30 rounded-lg">
+                                                                            <Label className="text-[10px] uppercase font-bold text-muted-foreground">Provider/Location</Label>
+                                                                            <p className="font-medium text-sm">Dr. {visit.doctor?.full_name} @ {visit.branches?.name}</p>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div className="space-y-2">
+                                                                        <Label className="flex items-center gap-2 text-primary font-bold"><DiagnosisIcon className="w-4 h-4" /> Diagnosis</Label>
+                                                                        <div className="p-4 bg-white border rounded-lg text-sm leading-relaxed">
+                                                                            {visit.diagnosis || 'No clinical diagnosis recorded.'}
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {visit.treatment_notes && (
+                                                                        <div className="space-y-2">
+                                                                            <Label className="flex items-center gap-2 text-primary font-bold"><ClipboardList className="w-4 h-4" /> Treatment Notes</Label>
+                                                                            <div className="p-4 bg-white border rounded-lg text-sm leading-relaxed">
+                                                                                {visit.treatment_notes}
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+
+                                                                    {visit.service_stages && visit.service_stages.length > 0 && (
+                                                                        <div className="space-y-2">
+                                                                            <Label className="font-bold flex items-center gap-2"><History className="w-4 h-4" /> Procedures & Stages</Label>
+                                                                            <div className="space-y-2">
+                                                                                {visit.service_stages.map((stage: any) => (
+                                                                                    <div key={stage.id} className="flex justify-between items-center p-3 bg-blue-50/50 border border-blue-100 rounded-lg">
+                                                                                        <div>
+                                                                                            <span className="font-medium text-sm">
+                                                                                                {stage.tooth_number ? `Tooth #${stage.tooth_number}` : 'General'}
+                                                                                            </span>
+                                                                                            <p className="text-[10px] text-muted-foreground">Performing Stage {stage.current_stage} of {stage.total_stages}</p>
+                                                                                        </div>
+                                                                                        <Badge className="bg-blue-600">Stage {stage.current_stage}</Badge>
+                                                                                    </div>
+                                                                                ))}
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+
+                                                                    {visit.xray_urls && visit.xray_urls.length > 0 && (
+                                                                        <div className="space-y-2">
+                                                                            <Label className="flex items-center gap-2 text-primary font-bold"><Camera className="w-4 h-4" /> Radiographs (X-Rays)</Label>
+                                                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                                                                {visit.xray_urls.map((url: string, idx: number) => (
+                                                                                    <Dialog key={idx}>
+                                                                                        <DialogTrigger asChild>
+                                                                                            <div className="cursor-pointer group relative aspect-square rounded-lg border overflow-hidden hover:ring-2 ring-primary transition-all">
+                                                                                                <img src={url} alt="X-ray" className="h-full w-full object-cover" />
+                                                                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                                                                                    <ImageIcon className="text-white w-6 h-6" />
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        </DialogTrigger>
+                                                                                        <DialogContent className="max-w-4xl p-0 bg-black border-0">
+                                                                                            <img src={url} alt="Full resolution X-ray" className="w-full max-h-[90vh] object-contain" />
+                                                                                        </DialogContent>
+                                                                                    </Dialog>
+                                                                                ))}
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </DialogContent>
+                                                        </Dialog>
                                                     </td>
                                                 </tr>
                                             ))}

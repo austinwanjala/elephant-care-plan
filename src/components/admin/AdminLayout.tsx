@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { NotificationBell } from "../notifications/NotificationBell";
+import PortalMessages from "../PortalMessages";
 
 interface AdminLayoutProps {
   children?: ReactNode; // Made optional as Outlet will be used for nested routes

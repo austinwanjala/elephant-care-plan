@@ -94,6 +94,7 @@ import AuditorMembers from "./pages/auditor/Members";
 import AuditorVisits from "./pages/auditor/Visits";
 import AuditorFinancials from "./pages/auditor/Financials";
 import AuditorLogs from "./pages/auditor/Logs";
+import StaffMessages from "./pages/staff/Messages";
 
 const queryClient = new QueryClient();
 
@@ -133,6 +134,7 @@ const App = () => (
             <Route path="billing" element={<ReceptionBilling />} />
             <Route path="appointments" element={<ReceptionAppointments />} />
             <Route path="search" element={<ReceptionSearchMember />} />
+            <Route path="messages" element={<StaffMessages />} />
           </Route>
 
           {/* Doctor Routes */}
@@ -142,6 +144,7 @@ const App = () => (
             <Route path="schedule" element={<DoctorSchedule />} />
             <Route path="consultation/:visitId" element={<Consultation />} />
             <Route path="history" element={<DoctorPatientHistory />} />
+            <Route path="messages" element={<StaffMessages />} />
           </Route>
 
           {/* Branch Director Routes */}
@@ -152,6 +155,7 @@ const App = () => (
             <Route path="performance" element={<DirectorPerformance />} />
             <Route path="reports" element={<DirectorReports />} />
             <Route path="staff" element={<AdminStaff />} />
+            <Route path="messages" element={<StaffMessages />} />
           </Route>
 
           {/* Marketer Routes */}
@@ -161,6 +165,7 @@ const App = () => (
             <Route path="referrals" element={<MarketerReferrals />} />
             <Route path="earnings" element={<MarketerEarnings />} />
             <Route path="links" element={<MarketerLinks />} />
+            <Route path="messages" element={<StaffMessages />} />
           </Route>
 
           {/* Admin Routes */}
@@ -182,6 +187,7 @@ const App = () => (
             <Route path="notifications" element={<AdminNotifications />} />
             <Route path="reports" element={<AdminReports />} />
             <Route path="whatsapp" element={<AdminWhatsApp />} />
+            <Route path="messages" element={<StaffMessages />} />
           </Route>
 
           {/* Super Admin Routes */}
@@ -204,6 +210,7 @@ const App = () => (
             <Route path="notifications" element={<AdminNotifications />} />
             <Route path="reports" element={<AdminReports />} />
             <Route path="whatsapp" element={<AdminWhatsApp />} />
+            <Route path="messages" element={<StaffMessages />} />
           </Route>
 
           {/* Finance Routes */}
@@ -212,6 +219,7 @@ const App = () => (
             <Route path="marketer-payments" element={<AdminMarketerClaims />} />
             <Route path="branch-payments" element={<AdminBranchPayments />} />
             <Route path="history" element={<AdminBranchPayments />} />
+            <Route path="messages" element={<StaffMessages />} />
           </Route>
 
           {/* Auditor Routes */}
@@ -221,6 +229,7 @@ const App = () => (
             <Route path="visits" element={<AuditorVisits />} />
             <Route path="financials" element={<AuditorFinancials />} />
             <Route path="logs" element={<AuditorLogs />} />
+            <Route path="messages" element={<StaffMessages />} />
           </Route>
 
           {/* 404 Route */}

@@ -49,7 +49,7 @@ export default function ReceptionBilling() {
         setLoading(true);
         const { data, error } = await supabase
             .from("visits")
-            .select("*, members(id, full_name, phone, member_number, coverage_balance, biometric_data), bills(*, bill_items(*))")
+            .select("*, members(id, full_name, phone, member_number, coverage_balance, biometric_data), branches(name), bills(*, bill_items(*))")
             .eq("status", "billed")
             .order("updated_at", { ascending: false });
 
@@ -86,10 +86,10 @@ export default function ReceptionBilling() {
         setProcessingId(visit.id);
         console.log("Attempting finalize_invoice_rpc (v2) with:", { p_bill_id: billId, p_receptionist_id: receptionistId });
         try {
-            const { data, error } = await supabase.rpc('finalize_invoice_rpc', {
+            const { data, error } = await (supabase.rpc as any)('finalize_invoice_rpc', {
                 p_bill_id: billId,
                 p_receptionist_id: receptionistId
-            } as any);
+            });
 
             if (error) {
                 console.error("RPC Error:", error);
@@ -269,6 +269,7 @@ export default function ReceptionBilling() {
                                         <TableRow>
                                             <TableHead>Date</TableHead>
                                             <TableHead>Patient</TableHead>
+                                            <TableHead>Branch</TableHead>
                                             <TableHead>Services</TableHead>
                                             <TableHead>Benefit Cost</TableHead>
                                             <TableHead>Action</TableHead>
@@ -288,6 +289,9 @@ export default function ReceptionBilling() {
                                                         <TableCell>
                                                             <div className="font-medium text-slate-900">{visit.members?.full_name}</div>
                                                             <div className="text-xs text-muted-foreground">{visit.members?.member_number}</div>
+                                                        </TableCell>
+                                                        <TableCell className="text-sm text-slate-600">
+                                                            {visit.branches?.name || "N/A"}
                                                         </TableCell>
                                                         <TableCell>
                                                             <div className="max-w-[200px] truncate text-slate-600">
@@ -317,6 +321,7 @@ export default function ReceptionBilling() {
                                                                                 <TableHeader className="bg-slate-50">
                                                                                     <TableRow>
                                                                                         <TableHead>Service</TableHead>
+                                                                                        <TableHead>Tooth</TableHead>
                                                                                         <TableHead className="text-right">Benefit</TableHead>
                                                                                     </TableRow>
                                                                                 </TableHeader>
@@ -324,6 +329,13 @@ export default function ReceptionBilling() {
                                                                                     {bill?.bill_items?.map((item: any) => (
                                                                                         <TableRow key={item.id}>
                                                                                             <TableCell>{item.service_name}</TableCell>
+                                                                                            <TableCell>
+                                                                                                {item.tooth_number ? (
+                                                                                                    <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50">
+                                                                                                        #{item.tooth_number}
+                                                                                                    </Badge>
+                                                                                                ) : "—"}
+                                                                                            </TableCell>
                                                                                             <TableCell className="text-right">KES {Number(item.benefit_cost).toLocaleString()}</TableCell>
                                                                                         </TableRow>
                                                                                     ))}

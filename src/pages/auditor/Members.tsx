@@ -25,7 +25,7 @@ export default function AuditorMembers() {
 
         let query = supabase
             .from("members")
-            .select("*, membership_categories(name)", { count: "exact" })
+            .select("*, membership_categories(name), branches(name)", { count: "exact" })
             .order("created_at", { ascending: false })
             .range(from, to);
 
@@ -51,6 +51,7 @@ export default function AuditorMembers() {
             "Member Number": m.member_number,
             "Full Name": m.full_name,
             "Phone": m.phone,
+            "Branch": m.branches?.name || "N/A",
             "Category": m.membership_categories?.name || "N/A",
             "Status": m.is_active ? "Active" : "Inactive",
             "Joined Date": format(new Date(m.created_at), "yyyy-MM-dd")
@@ -91,6 +92,7 @@ export default function AuditorMembers() {
                             <TableRow>
                                 <TableHead>Member #</TableHead>
                                 <TableHead>Name</TableHead>
+                                <TableHead>Branch</TableHead>
                                 <TableHead>Category</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead>Date Added</TableHead>
@@ -109,6 +111,7 @@ export default function AuditorMembers() {
                                             <div className="font-medium">{member.full_name}</div>
                                             <div className="text-xs text-muted-foreground">{member.phone}</div>
                                         </TableCell>
+                                        <TableCell>{member.branches?.name || "N/A"}</TableCell>
                                         <TableCell>{member.membership_categories?.name || "N/A"}</TableCell>
                                         <TableCell><Badge variant={member.is_active ? "default" : "destructive"}>{member.is_active ? "Active" : "Inactive"}</Badge></TableCell>
                                         <TableCell>{format(new Date(member.created_at), "MMM d, yyyy")}</TableCell>
@@ -124,6 +127,6 @@ export default function AuditorMembers() {
                     </div>
                 </CardContent>
             </Card>
-        </div>
+        </div >
     );
 }

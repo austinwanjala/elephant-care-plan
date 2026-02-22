@@ -70,6 +70,7 @@ export function AdminSidebar() {
     { title: "Services", url: `${basePath}/services`, icon: Stethoscope },
     { title: "Branch Payments", url: `${basePath}/branch-payments`, icon: DollarSign },
     { title: "Marketer Claims", url: `${basePath}/marketer-claims`, icon: ClipboardList },
+    { title: "Messages", url: `${basePath}/messages`, icon: MessageSquare },
   ];
 
   // Conditionally add System Logs

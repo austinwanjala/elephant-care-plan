@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Search, Plus, MoreHorizontal, Edit, Trash2, Fingerprint, Download, Loader2, ShieldCheck, History, Users } from "lucide-react";
+import { Search, Plus, MoreHorizontal, Edit, Trash2, Fingerprint, Download, Loader2, ShieldCheck, History, Users, Image as ImageIcon } from "lucide-react";
 import { BiometricCapture } from "@/components/BiometricCapture";
 import { exportToCsv } from "@/utils/csvExport";
 
@@ -312,6 +312,7 @@ export default function AdminMembers() {
                 <TableHead>Member #</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Phone</TableHead>
+                <TableHead>Branch</TableHead>
                 <TableHead>Coverage</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead></TableHead>
@@ -325,6 +326,11 @@ export default function AdminMembers() {
                   <TableCell className="font-mono">{m.member_number}</TableCell>
                   <TableCell className="font-medium">{m.full_name}</TableCell>
                   <TableCell>{m.phone}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="font-normal">
+                      {m.branches?.name || "No Branch"}
+                    </Badge>
+                  </TableCell>
                   <TableCell>KES {m.coverage_balance.toLocaleString()}</TableCell>
                   <TableCell>
                     <Badge variant={m.is_active ? "default" : "destructive"}>
@@ -444,6 +450,7 @@ function MemberHistoryDialog({ open, onOpenChange, member }: { open: boolean, on
             branches(name),
             doctor:doctor_id(full_name),
             dependants(full_name),
+            xray_urls,
             bills(
               id,
               total_benefit_cost,
@@ -515,7 +522,7 @@ function MemberHistoryDialog({ open, onOpenChange, member }: { open: boolean, on
                   <TableHead>Patient</TableHead>
                   <TableHead>Services & Stages</TableHead>
                   <TableHead>Teeth</TableHead>
-                  <TableHead>Diagnosis</TableHead>
+                  <TableHead>Clinical Info</TableHead>
                   <TableHead>Cost</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
@@ -540,7 +547,7 @@ function MemberHistoryDialog({ open, onOpenChange, member }: { open: boolean, on
                           return (
                             <div key={item.id} className="text-xs">
                               {item.service_name}
-                              {stage && (
+                              {stage && !item.service_name.includes("Stage") && (
                                 <Badge variant="secondary" className="ml-2 text-[10px] px-1 py-0 h-4">
                                   Stage {stage.current_stage}/{stage.total_stages}
                                 </Badge>
@@ -559,8 +566,36 @@ function MemberHistoryDialog({ open, onOpenChange, member }: { open: boolean, on
                         {(!visit.treatedTeeth || visit.treatedTeeth.length === 0) && "-"}
                       </div>
                     </TableCell>
-                    <TableCell className="max-w-[150px] truncate" title={visit.diagnosis || ''}>{visit.diagnosis || '-'}</TableCell>
-                    <TableCell>KES {(visit.bills?.[0]?.total_benefit_cost || 0).toLocaleString()}</TableCell>
+                    <TableCell>
+                      <div className="space-y-2">
+                        <div className="max-w-[150px] truncate text-sm" title={visit.diagnosis || ''}>
+                          {visit.diagnosis || '-'}
+                        </div>
+                        {visit.xray_urls && visit.xray_urls.length > 0 && (
+                          <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide">
+                            {visit.xray_urls.map((url: string, idx: number) => (
+                              <Dialog key={idx}>
+                                <DialogTrigger asChild>
+                                  <div className="relative cursor-pointer group rounded border overflow-hidden h-10 w-10 flex-shrink-0 bg-slate-100">
+                                    <img src={url} alt="X-ray thumbnail" className="h-full w-full object-cover transition-opacity group-hover:opacity-80" />
+                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <ImageIcon className="h-4 w-4 text-white drop-shadow-md" />
+                                    </div>
+                                  </div>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-4xl p-1 bg-black/90 border-0">
+                                  <DialogHeader className="hidden"><DialogTitle>X-Ray View</DialogTitle></DialogHeader>
+                                  <div className="flex items-center justify-center min-h-[50vh]">
+                                    <img src={url} alt="X-ray clinical view" className="max-h-[85vh] w-auto object-contain" />
+                                  </div>
+                                </DialogContent>
+                              </Dialog>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-medium">KES {(visit.bills?.[0]?.total_benefit_cost || 0).toLocaleString()}</TableCell>
                     <TableCell>
                       <Badge variant="outline">{visit.status}</Badge>
                     </TableCell>

@@ -11,7 +11,8 @@ import {
     X,
     ShieldCheck,
     Activity,
-    History
+    History,
+    MessageSquare
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -85,6 +86,7 @@ export const AuditorLayout = () => {
         { icon: Activity, label: "Visits", href: "/auditor/visits" },
         { icon: CreditCard, label: "Financials", href: "/auditor/financials" },
         { icon: History, label: "System Logs", href: "/auditor/logs" },
+        { icon: MessageSquare, label: "Messages", href: "/auditor/messages" },
     ];
 
     return (

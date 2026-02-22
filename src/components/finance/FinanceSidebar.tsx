@@ -1,14 +1,15 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { useSidebar, Sidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { DollarSign, History, LogOut, LayoutDashboard, Users, Building2 } from "lucide-react";
+import { DollarSign, History, LogOut, LayoutDashboard, Users, Building2, MessageSquare } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 const menuItems = [
-  { title: "Dashboard", url: "/finance", icon: LayoutDashboard },
-  { title: "Marketer Payments", url: "/finance/marketer-payments", icon: Users },
-  { title: "Branch Payments", url: "/finance/branch-payments", icon: Building2 },
-  { title: "Payment History", url: "/finance/history", icon: History },
+    { title: "Dashboard", url: "/finance", icon: LayoutDashboard },
+    { title: "Marketer Payments", url: "/finance/marketer-payments", icon: Users },
+    { title: "Branch Payments", url: "/finance/branch-payments", icon: Building2 },
+    { title: "Payment History", url: "/finance/history", icon: History },
+    { title: "Messages", url: "/finance/messages", icon: MessageSquare },
 ];
 
 export function FinanceSidebar() {

@@ -20,6 +20,7 @@ interface ReferredMember {
     is_active: boolean;
     coverage_balance: number;
     membership_categories: { name: string } | null;
+    branches: { name: string } | null;
 }
 
 interface ReferralActivity {
@@ -75,7 +76,7 @@ export default function MarketerReferrals() {
         setLoading(true);
         const { data, error } = await supabase
             .from("members")
-            .select("id, full_name, member_number, email, phone, created_at, is_active, coverage_balance, membership_categories(name)")
+            .select("id, full_name, member_number, email, phone, created_at, is_active, coverage_balance, membership_categories(name), branches(name)")
             .eq("marketer_id", id)
             .order("created_at", { ascending: false });
 
@@ -130,6 +131,7 @@ export default function MarketerReferrals() {
                                                 <th className="py-3 pr-3 font-semibold">Name</th>
                                                 <th className="py-3 px-3 font-semibold">Member #</th>
                                                 <th className="py-3 px-3 font-semibold">Joined Date</th>
+                                                <th className="py-3 px-3 font-semibold">Branch</th>
                                                 <th className="py-3 px-3 font-semibold">Status</th>
                                                 <th className="py-3 pl-3 font-semibold text-right">Coverage</th>
                                             </tr>
@@ -140,6 +142,7 @@ export default function MarketerReferrals() {
                                                     <td className="py-3 pr-3 text-sm font-medium">{member.full_name}</td>
                                                     <td className="py-3 px-3 text-sm font-mono">{member.member_number}</td>
                                                     <td className="py-3 px-3 text-sm">{format(new Date(member.created_at), 'MMM d, yyyy')}</td>
+                                                    <td className="py-3 px-3 text-sm">{member.branches?.name || 'N/A'}</td>
                                                     <td className="py-3 px-3 text-sm">
                                                         <Badge variant={member.is_active ? "default" : "secondary"} className={member.is_active ? "bg-green-600" : ""}>{member.is_active ? "Active" : "Inactive"}</Badge>
                                                     </td>

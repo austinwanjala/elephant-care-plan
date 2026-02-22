@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -17,6 +17,7 @@ serve(async (req) => {
     }
 
     try {
+        console.log("[send-whatsapp] Incoming request...");
         const payload: WhatsAppPayload = await req.json();
         const { phone, template, data } = payload;
 
@@ -75,7 +76,7 @@ serve(async (req) => {
         console.log("[send-whatsapp] Meta Response:", result);
 
         if (!response.ok) {
-            // Fallback logic could go here, or we let the caller handle it.
+            console.error("[send-whatsapp] Meta API Error Details:", JSON.stringify(result));
             return new Response(JSON.stringify({ error: result }), {
                 status: response.status,
                 headers: { ...corsHeaders, "Content-Type": "application/json" }

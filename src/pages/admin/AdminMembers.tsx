@@ -34,6 +34,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Search, Plus, MoreHorizontal, Edit, Trash2, Fingerprint, Download, Loader2, ShieldCheck, History, Users } from "lucide-react";
 import { BiometricCapture } from "@/components/BiometricCapture";
 import { exportToCsv } from "@/utils/csvExport";

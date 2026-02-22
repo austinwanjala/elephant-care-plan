@@ -181,6 +181,7 @@ const App = () => (
             <Route path="logs" element={<AdminLogs />} />
             <Route path="notifications" element={<AdminNotifications />} />
             <Route path="reports" element={<AdminReports />} />
+            <Route path="whatsapp" element={<AdminWhatsApp />} />
           </Route>
 
           {/* Super Admin Routes */}
@@ -202,6 +203,7 @@ const App = () => (
             <Route path="permissions" element={<AdminPermissions />} />
             <Route path="notifications" element={<AdminNotifications />} />
             <Route path="reports" element={<AdminReports />} />
+            <Route path="whatsapp" element={<AdminWhatsApp />} />
           </Route>
 
           {/* Finance Routes */}

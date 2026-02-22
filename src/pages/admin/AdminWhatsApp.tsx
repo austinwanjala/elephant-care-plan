@@ -64,7 +64,12 @@ export default function AdminWhatsApp() {
             toast({ title: "Test message queued", description: "Check logs for status updates." });
             loadLogs();
         } catch (error: any) {
-            toast({ title: "Send failed", description: error.message, variant: "destructive" });
+            console.error("[AdminWhatsApp] handleSendTest error:", error);
+            toast({
+                title: "Send failed",
+                description: error.message || "The Edge Function returned an error. Check Meta credentials.",
+                variant: "destructive"
+            });
         } finally {
             setSending(false);
         }

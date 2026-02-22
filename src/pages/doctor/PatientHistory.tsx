@@ -20,7 +20,6 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog";
 import { Image as ImageIcon, Stethoscope as DiagnosisIcon, ClipboardList } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 export default function DoctorPatientHistory() {
     const [searchTerm, setSearchTerm] = useState("");

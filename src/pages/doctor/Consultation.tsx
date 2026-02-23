@@ -137,12 +137,12 @@ export default function Consultation() {
             }
 
             // Fetch ALL multi-stage treatments to check history and progression
-            let stagesQuery = supabase
+            let stagesQuery = (supabase as any)
                 .from("service_stages")
-                .select("*, services(name), tooth_number, related_bill_id")
+                .select("*, services(name, stage_names), tooth_number, related_bill_id")
                 .eq("member_id", data.member_id);
 
-            if (data.dependant_id) {
+            if (data.dependant_id && data.dependant_id !== "") {
                 stagesQuery = stagesQuery.eq("dependant_id", data.dependant_id);
             } else {
                 stagesQuery = stagesQuery.is("dependant_id", null);
@@ -169,7 +169,7 @@ export default function Consultation() {
                     status,
                     doctor:doctor_id(full_name),
                     branches(name),
-                    service_stages(*)
+                    service_stages(*, services(name, stage_names))
                 `)
                 .eq("member_id", data.member_id)
                 .neq("id", visitId) // Exclude current visit
@@ -1126,31 +1126,42 @@ export default function Consultation() {
                                 <CardDescription>This patient has ongoing treatments that require multiple visits.</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                {activeStages.map(stage => (
-                                    <div key={stage.id} className="flex flex-col sm:flex-row sm:items-center justify-between bg-white p-4 rounded-lg border shadow-sm gap-4">
-                                        <div>
+                                {activeStages.map(stage => {
+                                    const nextStageNum = stage.current_stage + 1;
+                                    const isFinalStage = nextStageNum === stage.total_stages;
+                                    const stageNames: string[] = Array.isArray(stage.services?.stage_names) ? stage.services.stage_names : [];
+                                    const nextStageName = stageNames[nextStageNum - 1] || null;
+
+                                    return (
+                                        <div key={stage.id} className="flex flex-col sm:flex-row sm:items-center justify-between bg-white p-4 rounded-lg border shadow-sm gap-4 transition-all hover:border-blue-300">
                                             <div>
-                                                <h4 className="font-bold text-foreground">{stage.services.name} {stage.tooth_number && <span className="text-sm font-normal text-muted-foreground">(Tooth #{stage.tooth_number})</span>}</h4>
-                                                <p className="text-sm text-muted-foreground">
-                                                    Currently at <span className="font-medium text-blue-600">Stage {stage.current_stage}</span> of {stage.total_stages}
-                                                </p>
+                                                <div>
+                                                    <h4 className="font-bold text-foreground text-base">{stage.services?.name} {stage.tooth_number && <span className="text-sm font-normal text-muted-foreground">(Tooth #{stage.tooth_number})</span>}</h4>
+                                                    <p className="text-sm text-blue-700 font-medium">
+                                                        Continue Stage {nextStageNum} of {stage.total_stages}
+                                                        {nextStageName ? ` — ${nextStageName}` : ''}
+                                                    </p>
+                                                    <p className="text-[10px] text-muted-foreground">
+                                                        Last visit completed Stage {stage.current_stage}
+                                                    </p>
+                                                </div>
                                             </div>
+                                            <Button
+                                                size="sm"
+                                                className={cn("font-bold gap-2 w-full sm:w-auto", isFinalStage ? "bg-emerald-600 hover:bg-emerald-700" : "bg-blue-600 hover:bg-blue-700")}
+                                                onClick={() => handleContinueStage(stage)}
+                                                disabled={selectedServices.some(s => s.service.stageId === stage.id || s.service.stage_id === stage.id)}
+                                            >
+                                                {selectedServices.some(s => s.service.stageId === stage.id || s.service.stage_id === stage.id)
+                                                    ? "Added to List"
+                                                    : isFinalStage
+                                                        ? "Complete Final Stage"
+                                                        : `Complete Stage ${nextStageNum}`
+                                                }
+                                            </Button>
                                         </div>
-                                        <Button
-                                            size="sm"
-                                            className={stage.current_stage + 1 === stage.total_stages ? "bg-green-600 hover:bg-green-700 w-full sm:w-auto" : "w-full sm:w-auto"}
-                                            onClick={() => handleContinueStage(stage)}
-                                            disabled={selectedServices.some(s => s.service.stageId === stage.id)}
-                                        >
-                                            {selectedServices.some(s => s.service.stageId === stage.id)
-                                                ? "Added to Bill"
-                                                : stage.current_stage + 1 === stage.total_stages
-                                                    ? "Complete Final Stage"
-                                                    : `Complete Stage ${stage.current_stage + 1}`
-                                            }
-                                        </Button>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </CardContent>
                         </Card>
                     )}
@@ -1456,11 +1467,16 @@ export default function Consultation() {
                                                 <Badge className="text-[10px] px-1 py-0 h-5 bg-blue-600">
                                                     At Stage {stage.current_stage}
                                                 </Badge>
-                                                {stage.current_stage < stage.total_stages ? (
-                                                    <span className="text-[9px] text-blue-500 mt-1 font-medium">
-                                                        Awaiting Stage {stage.current_stage + 1}
-                                                    </span>
-                                                ) : (
+                                                {stage.current_stage < stage.total_stages ? (() => {
+                                                    const nextNum = stage.current_stage + 1;
+                                                    const names = Array.isArray(stage.services?.stage_names) ? stage.services.stage_names : [];
+                                                    const nextName = names[nextNum - 1];
+                                                    return (
+                                                        <span className="text-[9px] text-blue-500 mt-1 font-medium italic">
+                                                            Next: Stage {nextNum}{nextName ? ` — ${nextName}` : ''}
+                                                        </span>
+                                                    );
+                                                })() : (
                                                     <span className="text-[9px] text-emerald-600 mt-1 font-bold">
                                                         Final Session Soon
                                                     </span>
@@ -1625,11 +1641,16 @@ export default function Consultation() {
                                             <div className="space-y-2">
                                                 <Label className="text-[10px] uppercase font-bold text-muted-foreground">Procedures Performed</Label>
                                                 <div className="flex flex-wrap gap-2">
-                                                    {v.service_stages.map((stage: any) => (
-                                                        <Badge key={stage.id} variant="secondary" className="bg-blue-50 text-blue-700 border-blue-100">
-                                                            {stage.tooth_number ? `Tooth #${stage.tooth_number}` : 'General'}: Stage {stage.current_stage}
-                                                        </Badge>
-                                                    ))}
+                                                    {v.service_stages.map((stage: any) => {
+                                                        const names = Array.isArray(stage.services?.stage_names) ? stage.services.stage_names : [];
+                                                        const stageName = names[stage.current_stage - 1];
+                                                        return (
+                                                            <Badge key={stage.id} variant="secondary" className="bg-blue-50 text-blue-700 border-blue-100 flex flex-col items-start gap-0 py-1 px-2 h-auto text-left">
+                                                                <span className="font-bold">{stage.tooth_number ? `Tooth #${stage.tooth_number}` : 'General'}: {stage.services?.name || 'Procedure'}</span>
+                                                                <span className="text-[9px] opacity-80 font-medium">Stage {stage.current_stage}{stageName ? ` — ${stageName}` : ''}</span>
+                                                            </Badge>
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
                                         )}

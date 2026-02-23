@@ -517,18 +517,18 @@ export default function Consultation() {
                     h.tooth_number == tooth && h.service_id === service.id
                 );
 
-                // 2. Check Active: Is this SAME stage already in progress?
-                const isCurrentStageActive = activeStages.some(as =>
+                // 2. Check Active: Is ANY stage already in progress?
+                const isAnyStageActive = activeStages.some(as =>
                     as.tooth_number === tooth &&
                     as.service_id === service.id &&
-                    as.current_stage === startStage
+                    as.status === 'in_progress'
                 );
 
                 // 3. Multi-stage progression check
                 const maxDone = getMaxStageForSelection(service.id, [tooth]);
                 const isServiceMultiStage = service.is_multi_stage || (service.total_stages && service.total_stages > 1);
 
-                if (isCurrentStageActive) {
+                if (isAnyStageActive) {
                     blockedTeeth.push(tooth);
                 } else if (!isServiceMultiStage && hasExistingRecord) {
                     blockedTeeth.push(tooth);
@@ -579,22 +579,15 @@ export default function Consultation() {
             return;
         }
 
-        // Check active stages to auto-continue existing treatments
-        if (selectedTeeth.length > 0) {
-            const continueTeeth: number[] = [];
+        let teethToProcess = [...selectedTeeth];
 
-            selectedTeeth.forEach(tooth => {
-                const existingStage = activeStages.find(stage =>
-                    stage.service_id === serviceId &&
-                    stage.tooth_number === tooth
-                );
-                if (existingStage) {
-                    continueTeeth.push(tooth);
-                }
-            });
+        // 1. Check active stages to auto-continue existing treatments
+        if (teethToProcess.length > 0) {
+            const continueTeeth = teethToProcess.filter(tooth =>
+                activeStages.some(stage => stage.service_id === serviceId && stage.tooth_number === tooth)
+            );
 
             if (continueTeeth.length > 0) {
-                // Auto-continue logic
                 const newSelections = [...selectedServices];
                 let addedcontinue = 0;
                 continueTeeth.forEach(tooth => {
@@ -604,21 +597,21 @@ export default function Consultation() {
                     );
                     if (existingStage) {
                         const nextStage = existingStage.current_stage + 1;
-                        if (nextStage > existingStage.total_stages) return;
-
-                        const serviceUpdate = {
-                            ...service,
-                            benefit_cost: 0,
-                            startAtStage: nextStage,
-                            is_multi_stage_update: true,
-                            related_bill_id: existingStage.related_bill_id,
-                            stage_id: existingStage.id
-                        };
-
-                        // Check if already added
-                        if (!newSelections.find(s => s.service.id === service.id && s.tooth_number === tooth)) {
-                            newSelections.push({ service: serviceUpdate, tooth_number: tooth });
-                            addedcontinue++;
+                        if (nextStage <= existingStage.total_stages) {
+                            const serviceUpdate = {
+                                ...service,
+                                benefit_cost: 0,
+                                startAtStage: nextStage,
+                                is_multi_stage: true,
+                                is_multi_stage_update: true,
+                                related_bill_id: existingStage.related_bill_id,
+                                stage_id: existingStage.id,
+                                total_stages: service.total_stages || existingStage.total_stages
+                            };
+                            if (!newSelections.find(s => s.service.id === service.id && s.tooth_number === tooth)) {
+                                newSelections.push({ service: serviceUpdate, tooth_number: tooth });
+                                addedcontinue++;
+                            }
                         }
                     }
                 });
@@ -628,35 +621,21 @@ export default function Consultation() {
                     toast({ title: "Continuing Treatment", description: `Added next stage for ${addedcontinue} teeth.` });
                 }
 
-                // If all selected teeth were continuations, we are done.
-                if (continueTeeth.length === selectedTeeth.length) {
+                // Remove handled teeth from the list
+                teethToProcess = teethToProcess.filter(t => !continueTeeth.includes(t));
+
+                if (teethToProcess.length === 0) {
                     setSelectedTeeth([]);
                     return;
                 }
-
-                // Otherwise, we might have mixed selection. 
-                // But wait, performAddService will block the ones we just added? 
-                // No, performAddService checks selectedTeeth. 
-                // We should probably clear selection of handled teeth?
-                // Or just let performAddService handle the "New" ones.
-                // However, performAddService will block the ones that have active stages (which we just handled). 
-                // So calling performAddService with ALL selectedTeeth is safe (it will block continueTeeth).
             }
         }
-
-        // If we handled some continuations, we need to be careful not to double-add in performAddService.
-        // Since performAddService reads current state, and we just called setSelectedServices (async), 
-        // performAddService will NOT see our updates.
-        // However, performAddService checks `activeStages` now (thanks to our previous edit).
-        // So if we added a continuation because of an active stage, performAddService will BLOCK adding a "New Start" for that same tooth/service.
-        // So it IS safe to fall through to performAddService!
-        // So it IS safe to fall through to performAddService!
 
         // If it's a multi-stage service, prompt for stage selection for NEW starts
         const isMultiStage = service.is_multi_stage || (service.total_stages && service.total_stages > 1);
         if (isMultiStage) {
             // Check if we already have an active stage for General (if no teeth selected)
-            if (selectedTeeth.length === 0) {
+            if (teethToProcess.length === 0) {
                 const existingStage = activeStages.find(stage =>
                     stage.service_id === serviceId &&
                     stage.tooth_number === null
@@ -672,9 +651,11 @@ export default function Consultation() {
                         ...service,
                         benefit_cost: 0,
                         startAtStage: nextStage,
+                        is_multi_stage: true,
                         is_multi_stage_update: true,
                         related_bill_id: existingStage.related_bill_id,
-                        stage_id: existingStage.id
+                        stage_id: existingStage.id,
+                        total_stages: service.total_stages || existingStage.total_stages
                     };
                     if (!selectedServices.find(s => s.service.id === serviceId && s.tooth_number === null)) {
                         setSelectedServices([...selectedServices, { service: serviceUpdate, tooth_number: null }]);
@@ -684,7 +665,7 @@ export default function Consultation() {
             }
 
             // Set default stage to next available
-            const maxStage = getMaxStageForSelection(service.id, selectedTeeth);
+            const maxStage = getMaxStageForSelection(service.id, teethToProcess);
             const nextSuggested = maxStage + 1;
 
             if (nextSuggested > service.total_stages) {
@@ -733,13 +714,15 @@ export default function Consultation() {
         // Create a 'virtual' service object for the bill
         const stageService = {
             id: stage.service_id,
-            name: stage.services.name, // Use base name, handleFinalize will add the suffix
+            name: stage.services?.name || 'Treatment', // Use base name
             benefit_cost: 0, // No charge for subsequent stages
             branch_compensation: 0,
             real_cost: 0,
+            is_multi_stage: true,
             is_multi_stage_update: true,
             startAtStage: nextStageNum, // CRITICAL: handleFinalize expects this for updating the DB
             total_stages: stage.total_stages,
+            stage_names: stage.services?.stage_names || [], // Keep the names
             stageId: stage.id,
             nextStage: nextStageNum,
             isFinal: isFinal,
@@ -920,7 +903,9 @@ export default function Consultation() {
                     const qty = s.service.quantity || 1;
                     let itemName = s.service.name;
                     if (s.service.is_multi_stage_update) {
-                        itemName += ` (Stage ${s.service.startAtStage}/${s.service.total_stages || '?'})`;
+                        const currentStage = s.service.startAtStage;
+                        const stageName = s.service.stage_names?.[currentStage - 1];
+                        itemName += ` (Stage ${currentStage}/${s.service.total_stages || '?'}${stageName ? `: ${stageName}` : ''})`;
                     } else if (qty > 1) {
                         itemName += ` (x${qty})`;
                     }
@@ -968,10 +953,14 @@ export default function Consultation() {
 
                 const itemsToInsert = newMultiStageServices.map(s => {
                     const qty = s.service.quantity || 1;
+                    const curStage = s.service.startAtStage || 1;
+                    const stageName = s.service.stage_names?.[curStage - 1];
+                    const suffix = curStage === 1 ? " - Full Payment" : "";
+
                     return {
                         bill_id: lockedBill.id,
                         service_id: s.service.id,
-                        service_name: s.service.name + " (Stage 1 - Full Payment)" + (qty > 1 ? ` (x${qty})` : ""),
+                        service_name: `${s.service.name} (Stage ${curStage}${stageName ? `: ${stageName}` : ''}${suffix})${qty > 1 ? ` (x${qty})` : ""}`,
                         quantity: qty,
                         unit_cost: s.service.benefit_cost || 0,
                         total_cost: (s.service.benefit_cost || 0) * qty,
@@ -1007,9 +996,9 @@ export default function Consultation() {
                         dependant_id: visit.dependant_id || null,
                         visit_id: visitId,
                         tooth_number: item.tooth_number || null,
-                        current_stage: 1,
+                        current_stage: item.service.startAtStage || 1,
                         selected_tooth: item.tooth_number || null, // Ensure selected_tooth is set
-                        total_stages: item.service.total_stages,
+                        total_stages: item.service.total_stages || 1,
                         status: 'in_progress',
                         related_bill_id: (lockedBill as any).id,
                         pending_claim_id: (pendingClaim as any).id, // Link to pending claim
@@ -1256,7 +1245,7 @@ export default function Consultation() {
                                                         <Badge className="bg-blue-600">Tooth #{stage.tooth_number || 'General'}</Badge>
                                                     </div>
                                                     <p className="text-sm text-slate-600 font-medium italic">
-                                                        Last recorded progress: Stage {stage.current_stage} of {stage.total_stages}
+                                                        Last recorded progress: Stage {stage.current_stage} of {stage.total_stages || stage.services?.total_stages || '?'}
                                                         {stage.services?.stage_names?.[stage.current_stage - 1] && ` (${stage.services.stage_names[stage.current_stage - 1]})`}
                                                     </p>
                                                 </div>
@@ -1624,7 +1613,7 @@ export default function Consultation() {
                                                     <div className="font-semibold">{s.service.name}</div>
                                                     {(s.service.is_multi_stage || (s.service.total_stages && s.service.total_stages > 1)) && (
                                                         <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-blue-200">
-                                                            Stage {s.service.startAtStage || 1} of {s.service.total_stages}
+                                                            Stage {s.service.startAtStage || 1} of {s.service.total_stages || '?'}
                                                             {s.service.stage_names?.[(s.service.startAtStage || 1) - 1] && ` — ${s.service.stage_names[(s.service.startAtStage || 1) - 1]}`}
                                                         </Badge>
                                                     )}

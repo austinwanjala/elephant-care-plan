@@ -111,7 +111,7 @@ export default function RegisterVisit() {
     const fetchActiveStages = async (memberId: string) => {
         const { data } = await (supabase as any)
             .from("service_stages")
-            .select("*, services(name, stage_names)")
+            .select("*, services(name, stage_names, total_stages)")
             .eq("member_id", memberId)
             .eq("status", "in_progress");
 
@@ -395,8 +395,9 @@ export default function RegisterVisit() {
                                                 {getStagesForPatient(member.id).length > 0 && (
                                                     <div className="flex gap-1 flex-wrap mt-1">
                                                         {getStagesForPatient(member.id).map(s => (
-                                                            <Badge key={s.id} className="bg-blue-600 text-white animate-pulse shadow-sm font-black text-[10px] px-2 py-0.5 uppercase tracking-tight">
-                                                                {s.services?.name || 'Treatment'}: Stage {s.current_stage}/{s.total_stages}
+                                                            <Badge key={s.id} className="bg-blue-600 text-white animate-pulse shadow-sm font-black text-[11px] px-3 py-1 uppercase tracking-tight flex items-center gap-1.5 whitespace-nowrap">
+                                                                <div className="h-2 w-2 rounded-full bg-white/80" />
+                                                                {s.services?.name || 'Procedure'}: Stage {s.current_stage}/{s.total_stages || s.services?.total_stages || '?'}
                                                             </Badge>
                                                         ))}
                                                     </div>
@@ -417,8 +418,9 @@ export default function RegisterVisit() {
                                                     {getStagesForPatient(dep.id).length > 0 && (
                                                         <div className="flex gap-1 flex-wrap mt-1">
                                                             {getStagesForPatient(dep.id).map(s => (
-                                                                <Badge key={s.id} className="bg-blue-600 text-white animate-pulse shadow-sm font-black text-[10px] px-2 py-0.5 uppercase tracking-tight">
-                                                                    {s.services?.name || 'Treatment'}: Stage {s.current_stage}/{s.total_stages}
+                                                                <Badge key={s.id} className="bg-blue-600 text-white animate-pulse shadow-sm font-black text-[11px] px-3 py-1 uppercase tracking-tight flex items-center gap-1.5 whitespace-nowrap">
+                                                                    <div className="h-2 w-2 rounded-full bg-white/80" />
+                                                                    {s.services?.name || 'Procedure'}: Stage {s.current_stage}/{s.total_stages || s.services?.total_stages || '?'}
                                                                 </Badge>
                                                             ))}
                                                         </div>
@@ -468,8 +470,7 @@ export default function RegisterVisit() {
                                                         </Badge>
                                                         {s.current_stage < s.total_stages && (
                                                             <span className="text-[9px] text-blue-600 font-bold mt-1 uppercase tracking-tighter">
-                                                                Awaiting Stage {s.current_stage + 1}
-                                                                {s.services?.stage_names?.[s.current_stage] && ` (${s.services.stage_names[s.current_stage]})`}
+                                                                Awaiting {s.services?.stage_names?.[s.current_stage] ? `Next: ${s.services.stage_names[s.current_stage]}` : `Stage ${s.current_stage + 1}`}
                                                             </span>
                                                         )}
                                                     </div>

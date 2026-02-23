@@ -84,6 +84,7 @@ import AdminPermissions from "./pages/admin/AdminPermissions";
 import AdminReports from "./pages/admin/AdminReports";
 import AdminNotifications from "./pages/admin/AdminNotifications";
 import AdminWhatsApp from "./pages/admin/AdminWhatsApp";
+import AdminMedicalRecords from "./pages/admin/MedicalRecords";
 
 // Finance Pages
 import FinanceDashboard from "./pages/finance/Dashboard";
@@ -177,6 +178,7 @@ const App = () => (
             <Route path="visits" element={<AdminVisits />} />
             <Route path="appointments" element={<AdminAppointments />} />
             <Route path="services" element={<AdminServices />} />
+            <Route path="medical-records" element={<AdminMedicalRecords />} />
             <Route path="branch-payments" element={<AdminBranchPayments />} />
             <Route path="marketer-claims" element={<AdminMarketerClaims />} />
             <Route path="commission-settings" element={<AdminCommissionSettings />} />
@@ -199,6 +201,7 @@ const App = () => (
             <Route path="visits" element={<AdminVisits />} />
             <Route path="appointments" element={<AdminAppointments />} />
             <Route path="services" element={<AdminServices />} />
+            <Route path="medical-records" element={<AdminMedicalRecords />} />
             <Route path="branch-payments" element={<AdminBranchPayments />} />
             <Route path="marketer-claims" element={<AdminMarketerClaims />} />
             <Route path="commission-settings" element={<AdminCommissionSettings />} />

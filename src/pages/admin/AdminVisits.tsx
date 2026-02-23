@@ -119,6 +119,7 @@ export default function AdminVisits() {
         doctor:doctor_id(full_name),
         receptionist:receptionist_id(full_name),
         xray_urls,
+        periodontal_status,
         bills(
           id,
           total_benefit_cost,
@@ -126,7 +127,7 @@ export default function AdminVisits() {
           total_profit_loss,
           is_claimable,
           payment_status,
-          bill_items(service_name, quantity, unit_cost, total_cost, benefit_cost, branch_compensation, tooth_number)
+          bill_items(service_name, quantity, unit_cost, total_cost, benefit_cost, branch_compensation, tooth_number, service_id)
         )
       `)
       .order("created_at", { ascending: false });
@@ -482,6 +483,11 @@ export default function AdminVisits() {
                         <p className="text-sm bg-slate-50 rounded-lg p-3 border leading-relaxed min-h-[60px]">
                           {selectedVisit.diagnosis || <span className="italic text-muted-foreground">No diagnosis recorded</span>}
                         </p>
+                        {selectedVisit.periodontal_status && (
+                          <Badge variant="outline" className="mt-2 bg-amber-50 text-amber-700 border-amber-200 uppercase font-bold text-[10px]">
+                            Periodontal: {selectedVisit.periodontal_status}
+                          </Badge>
+                        )}
                       </div>
                       <div className="space-y-1">
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Treatment Notes</p>

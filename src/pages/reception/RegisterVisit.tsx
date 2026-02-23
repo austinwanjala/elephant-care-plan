@@ -393,9 +393,13 @@ export default function RegisterVisit() {
                                                 <span className="font-bold text-lg">{member.full_name}</span>
                                                 <Badge variant="outline" className="bg-slate-50 border-slate-200 text-slate-600">Principal</Badge>
                                                 {getStagesForPatient(member.id).length > 0 && (
-                                                    <Badge className="bg-blue-600 text-white animate-pulse shadow-sm font-black text-[10px] px-2 py-0.5 uppercase tracking-tight">
-                                                        Ongoing Treatment
-                                                    </Badge>
+                                                    <div className="flex gap-1 flex-wrap mt-1">
+                                                        {getStagesForPatient(member.id).map(s => (
+                                                            <Badge key={s.id} className="bg-blue-600 text-white animate-pulse shadow-sm font-black text-[10px] px-2 py-0.5 uppercase tracking-tight">
+                                                                {s.services?.name || 'Treatment'}: Stage {s.current_stage}/{s.total_stages}
+                                                            </Badge>
+                                                        ))}
+                                                    </div>
                                                 )}
                                             </div>
                                         </Label>
@@ -406,12 +410,18 @@ export default function RegisterVisit() {
                                         <div key={dep.id} className={`flex items-center space-x-3 rounded-lg border p-4 cursor-pointer transition-colors ${selectedPatientId === dep.id ? 'bg-primary/5 border-primary' : 'hover:bg-muted/50'}`}>
                                             <RadioGroupItem value={dep.id} id={dep.id} />
                                             <Label htmlFor={dep.id} className="flex-1 cursor-pointer">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-bold text-lg">{dep.full_name}</span>
+                                                <div className="flex flex-col">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-bold text-lg">{dep.full_name}</span>
+                                                    </div>
                                                     {getStagesForPatient(dep.id).length > 0 && (
-                                                        <Badge className="bg-blue-600 text-white animate-pulse shadow-sm font-black text-[10px] px-2 py-0.5 uppercase tracking-tight">
-                                                            Ongoing Treatment
-                                                        </Badge>
+                                                        <div className="flex gap-1 flex-wrap mt-1">
+                                                            {getStagesForPatient(dep.id).map(s => (
+                                                                <Badge key={s.id} className="bg-blue-600 text-white animate-pulse shadow-sm font-black text-[10px] px-2 py-0.5 uppercase tracking-tight">
+                                                                    {s.services?.name || 'Treatment'}: Stage {s.current_stage}/{s.total_stages}
+                                                                </Badge>
+                                                            ))}
+                                                        </div>
                                                     )}
                                                 </div>
                                                 <div className="text-sm font-medium text-slate-500">{dep.relationship} • {dep.id_number}</div>
@@ -444,18 +454,24 @@ export default function RegisterVisit() {
                                             {getStagesForPatient(selectedPatientId).map(s => (
                                                 <div key={s.id} className="bg-white p-3 rounded-xl border border-blue-100 flex justify-between items-center group">
                                                     <div className="flex flex-col">
-                                                        <span className="font-extrabold text-slate-900">
-                                                            {s.services?.name || 'Ongoing Treatment'}
+                                                        <span className="font-extrabold text-slate-900 leading-tight">
+                                                            {s.services?.name}
                                                         </span>
-                                                        <span className="text-xs text-slate-500">
+                                                        <span className="text-[10px] text-slate-500 font-medium">
                                                             {s.tooth_number ? `Tooth #${s.tooth_number}` : 'General Procedure'}
+                                                            {s.services?.stage_names?.[s.current_stage - 1] && ` • Completed ${s.services.stage_names[s.current_stage - 1]}`}
                                                         </span>
                                                     </div>
-                                                    <div className="text-right">
+                                                    <div className="text-right flex flex-col items-end">
                                                         <Badge className="bg-blue-600 text-white font-bold px-3">
                                                             Stage {s.current_stage} of {s.total_stages}
                                                         </Badge>
-                                                        <p className="text-[10px] text-blue-700 font-bold mt-1 uppercase tracking-tighter">In Progress</p>
+                                                        {s.current_stage < s.total_stages && (
+                                                            <span className="text-[9px] text-blue-600 font-bold mt-1 uppercase tracking-tighter">
+                                                                Awaiting Stage {s.current_stage + 1}
+                                                                {s.services?.stage_names?.[s.current_stage] && ` (${s.services.stage_names[s.current_stage]})`}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 </div>
                                             ))}

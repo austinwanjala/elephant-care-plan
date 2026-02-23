@@ -34,7 +34,6 @@ export default function RegisterVisit() {
     const [selectedDoctorId, setSelectedDoctorId] = useState<string>("");
     const [selectedDependant, setSelectedDependant] = useState<any>(null);
     const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
-    const [memberSearchResults, setMemberSearchResults] = useState<any[]>([]);
     const { toast } = useToast();
     const navigate = useNavigate();
 
@@ -106,53 +105,6 @@ export default function RegisterVisit() {
         }
     };
 
-    const [activeStages, setActiveStages] = useState<any[]>([]);
-
-    const fetchActiveStages = async (memberId: string) => {
-        const { data } = await (supabase as any)
-            .from("service_stages")
-            .select("*, services(name, stage_names, total_stages)")
-            .eq("member_id", memberId)
-            .eq("status", "in_progress");
-
-        if (data) setActiveStages(data);
-        else setActiveStages([]);
-    };
-
-    // Returns stages for a given patient (principal or dependant)
-    const getStagesForPatient = (patientId: string) => {
-        if (!member) return [];
-        if (patientId === member.id) {
-            // Principal member: stages with no dependant
-            return activeStages.filter(s => s.member_id === member.id && !s.dependant_id);
-        } else {
-            // Dependant: stages assigned to that dependant
-            return activeStages.filter(s => s.member_id === member.id && s.dependant_id === patientId);
-        }
-    };
-
-    const loadMemberData = async (data: any) => {
-        setMember(data);
-        setSelectedPatientId(data.id);
-        setMemberSearchResults([]); // clear search results list
-        fetchActiveStages(data.id);
-
-        const { data: dependantsData } = await supabase
-            .from("dependants")
-            .select("*")
-            .eq("member_id", data.id)
-            .eq("is_active", true);
-
-        if (dependantsData) setDependants(dependantsData);
-
-        if (data.biometric_data) {
-            setBiometricsVerified(false);
-        } else {
-            setBiometricsVerified(true);
-            toast({ title: "No Biometric Data", description: "Principal member has no registered biometric data. Proceeding without biometric verification.", variant: "default" });
-        }
-    };
-
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
         const term = searchTerm.trim();
@@ -163,26 +115,45 @@ export default function RegisterVisit() {
         setDependants([]);
         setSelectedPatientId("");
         setBiometricsVerified(false);
-        setActiveStages([]);
-        setMemberSearchResults([]);
 
         try {
+            // Use ilike with wildcards and double quotes for all fields to handle spaces and partial matches
             const { data, error } = await supabase
                 .from("members")
                 .select("*, membership_categories(name), branches(name)")
-                .or(`phone.ilike."%${term}%",id_number.ilike."%${term}%",member_number.ilike."%${term}%",full_name.ilike."%${term}%"`);
+                .or(`phone.ilike."%${term}%",id_number.ilike."%${term}%",member_number.ilike."%${term}%",full_name.ilike."%${term}%"`)
+                .maybeSingle();
 
-            if (error) throw error;
+            if (error) {
+                if (error.code === 'PGRST116') {
+                    throw new Error("Multiple members found. Please enter a more specific ID, Phone, or Member Number.");
+                }
+                throw error;
+            }
 
-            if (!data || data.length === 0) {
-                toast({ title: "Member not found", description: "No member found matching that criteria.", variant: "destructive" });
-            } else if (data.length === 1) {
-                // Exactly one result — load directly
-                await loadMemberData(data[0]);
+            if (data) {
+                setMember(data);
+                setSelectedPatientId(data.id);
+
+                // Fetch dependants
+                const { data: dependantsData } = await supabase
+                    .from("dependants")
+                    .select("*")
+                    .eq("member_id", data.id)
+                    .eq("is_active", true);
+
+                if (dependantsData) {
+                    setDependants(dependantsData);
+                }
+
+                if (data.biometric_data) {
+                    setBiometricsVerified(false);
+                } else {
+                    setBiometricsVerified(true);
+                    toast({ title: "No Biometric Data", description: "Principal member has no registered biometric data. Proceeding without biometric verification.", variant: "default" });
+                }
             } else {
-                // Multiple results — let receptionist pick
-                setMemberSearchResults(data);
-                toast({ title: `${data.length} members found`, description: "Please select the correct member from the list below." });
+                toast({ title: "Member not found", description: "No member found matching that criteria.", variant: "destructive" });
             }
         } catch (error: any) {
             toast({ title: "Search failed", description: error.message, variant: "destructive" });
@@ -277,59 +248,6 @@ export default function RegisterVisit() {
                 </CardContent>
             </Card>
 
-            {/* Multiple members picker */}
-            {memberSearchResults.length > 1 && !member && (
-                <Card className="border-amber-300">
-                    <CardHeader className="bg-amber-50">
-                        <CardTitle className="flex items-center gap-2 text-amber-900">
-                            <Users className="h-5 w-5" />
-                            {memberSearchResults.length} Members Found — Select the Correct One
-                        </CardTitle>
-                        <CardDescription className="text-amber-700">
-                            Multiple members match your search. Click "Select" on the right patient to proceed.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="pt-4">
-                        <div className="space-y-3">
-                            {memberSearchResults.map((result) => (
-                                <div
-                                    key={result.id}
-                                    className="flex items-center justify-between gap-4 p-4 border rounded-xl hover:bg-muted/50 transition-colors"
-                                >
-                                    <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1 text-sm">
-                                        <div>
-                                            <p className="font-bold text-foreground">{result.full_name}</p>
-                                            <p className="text-xs text-muted-foreground">#{result.member_number}</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-muted-foreground">ID</p>
-                                            <p className="font-medium">{result.id_number}</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-muted-foreground">Phone</p>
-                                            <p className="font-medium">{result.phone}</p>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <Badge variant={result.is_active ? "default" : "destructive"} className="text-xs">
-                                                {result.is_active ? "Active" : "Inactive"}
-                                            </Badge>
-                                            <span className="text-xs text-muted-foreground">{result.membership_categories?.name || "N/A"}</span>
-                                        </div>
-                                    </div>
-                                    <Button
-                                        size="sm"
-                                        className="shrink-0"
-                                        onClick={() => loadMemberData(result)}
-                                    >
-                                        <ArrowRight className="h-4 w-4 mr-1" /> Select
-                                    </Button>
-                                </div>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
             {member && (
                 <div className="space-y-6">
                     <Card className="border-primary/50">
@@ -383,50 +301,21 @@ export default function RegisterVisit() {
                                 <CardTitle className="text-lg">Select Patient</CardTitle>
                                 <CardDescription>Who is receiving treatment today?</CardDescription>
                             </CardHeader>
-                            <CardContent className="space-y-4">
+                            <CardContent>
                                 <RadioGroup value={selectedPatientId} onValueChange={setSelectedPatientId} className="grid grid-cols-1 gap-4">
-                                    {/* Principal Member */}
                                     <div className={`flex items-center space-x-3 rounded-lg border p-4 cursor-pointer transition-colors ${selectedPatientId === member.id ? 'bg-primary/5 border-primary' : 'hover:bg-muted/50'}`}>
                                         <RadioGroupItem value={member.id} id={member.id} />
-                                        <Label htmlFor={member.id} className="flex-1 cursor-pointer">
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-bold text-lg">{member.full_name}</span>
-                                                <Badge variant="outline" className="bg-slate-50 border-slate-200 text-slate-600">Principal</Badge>
-                                                {getStagesForPatient(member.id).length > 0 && (
-                                                    <div className="flex gap-1 flex-wrap mt-1">
-                                                        {getStagesForPatient(member.id).map(s => (
-                                                            <Badge key={s.id} className="bg-blue-600 text-white animate-pulse shadow-sm font-black text-[11px] px-3 py-1 uppercase tracking-tight flex items-center gap-1.5 whitespace-nowrap">
-                                                                <div className="h-2 w-2 rounded-full bg-white/80" />
-                                                                {s.services?.name || 'Procedure'}: Stage {s.current_stage}/{s.total_stages || s.services?.total_stages || '?'}
-                                                            </Badge>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
+                                        <Label htmlFor={member.id} className="flex-1 cursor-pointer font-medium">
+                                            {member.full_name} <Badge variant="outline" className="ml-2">Principal</Badge>
                                         </Label>
                                     </div>
 
-                                    {/* Dependants */}
                                     {dependants.map((dep) => (
                                         <div key={dep.id} className={`flex items-center space-x-3 rounded-lg border p-4 cursor-pointer transition-colors ${selectedPatientId === dep.id ? 'bg-primary/5 border-primary' : 'hover:bg-muted/50'}`}>
                                             <RadioGroupItem value={dep.id} id={dep.id} />
                                             <Label htmlFor={dep.id} className="flex-1 cursor-pointer">
-                                                <div className="flex flex-col">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="font-bold text-lg">{dep.full_name}</span>
-                                                    </div>
-                                                    {getStagesForPatient(dep.id).length > 0 && (
-                                                        <div className="flex gap-1 flex-wrap mt-1">
-                                                            {getStagesForPatient(dep.id).map(s => (
-                                                                <Badge key={s.id} className="bg-blue-600 text-white animate-pulse shadow-sm font-black text-[11px] px-3 py-1 uppercase tracking-tight flex items-center gap-1.5 whitespace-nowrap">
-                                                                    <div className="h-2 w-2 rounded-full bg-white/80" />
-                                                                    {s.services?.name || 'Procedure'}: Stage {s.current_stage}/{s.total_stages || s.services?.total_stages || '?'}
-                                                                </Badge>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <div className="text-sm font-medium text-slate-500">{dep.relationship} • {dep.id_number}</div>
+                                                <div className="font-medium">{dep.full_name}</div>
+                                                <div className="text-sm text-muted-foreground">{dep.relationship} • {dep.id_number}</div>
                                             </Label>
                                             <Button
                                                 variant="ghost"
@@ -444,45 +333,6 @@ export default function RegisterVisit() {
                                         </div>
                                     ))}
                                 </RadioGroup>
-
-                                {/* Per-patient active stage detail banner */}
-                                {selectedPatientId && getStagesForPatient(selectedPatientId).length > 0 && (
-                                    <div className="p-5 border-2 border-blue-200 bg-blue-50/50 rounded-2xl space-y-3 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
-                                        <div className="flex items-center gap-2 text-blue-900 font-black uppercase tracking-wider text-xs">
-                                            <Info className="h-4 w-4" />
-                                            Ongoing Multi-Stage Treatment Detected
-                                        </div>
-                                        <div className="space-y-2">
-                                            {getStagesForPatient(selectedPatientId).map(s => (
-                                                <div key={s.id} className="bg-white p-3 rounded-xl border border-blue-100 flex justify-between items-center group">
-                                                    <div className="flex flex-col">
-                                                        <span className="font-extrabold text-slate-900 leading-tight">
-                                                            {s.services?.name}
-                                                        </span>
-                                                        <span className="text-[10px] text-slate-500 font-medium">
-                                                            {s.tooth_number ? `Tooth #${s.tooth_number}` : 'General Procedure'}
-                                                            {s.services?.stage_names?.[s.current_stage - 1] && ` • Completed ${s.services.stage_names[s.current_stage - 1]}`}
-                                                        </span>
-                                                    </div>
-                                                    <div className="text-right flex flex-col items-end">
-                                                        <Badge className="bg-blue-600 text-white font-bold px-3">
-                                                            Stage {s.current_stage} of {s.total_stages}
-                                                        </Badge>
-                                                        {s.current_stage < s.total_stages && (
-                                                            <span className="text-[9px] text-blue-600 font-bold mt-1 uppercase tracking-tighter">
-                                                                Awaiting {s.services?.stage_names?.[s.current_stage] ? `Next: ${s.services.stage_names[s.current_stage]}` : `Stage ${s.current_stage + 1}`}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <div className="pt-2 border-t border-blue-200/50 flex items-center gap-2 text-blue-700 font-medium text-xs italic">
-                                            <CheckCircle className="h-3 w-3" />
-                                            No new charges will be applied for these treatments today.
-                                        </div>
-                                    </div>
-                                )}
                             </CardContent>
                         </Card>
                     )}

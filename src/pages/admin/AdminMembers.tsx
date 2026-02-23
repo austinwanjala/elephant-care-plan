@@ -451,7 +451,6 @@ function MemberHistoryDialog({ open, onOpenChange, member }: { open: boolean, on
             doctor:doctor_id(full_name),
             dependants(full_name),
             xray_urls,
-            periodontal_status,
             bills(
               id,
               total_benefit_cost,
@@ -478,7 +477,7 @@ function MemberHistoryDialog({ open, onOpenChange, member }: { open: boolean, on
     // Fetch service stages to show progress
     const { data: stagesData } = await supabase
       .from("service_stages")
-      .select("*, services(stage_names)")
+      .select("*")
       .eq("member_id", member.id);
 
     if (visitsData) {
@@ -551,7 +550,6 @@ function MemberHistoryDialog({ open, onOpenChange, member }: { open: boolean, on
                               {stage && !item.service_name.includes("Stage") && (
                                 <Badge variant="secondary" className="ml-2 text-[10px] px-1 py-0 h-4">
                                   Stage {stage.current_stage}/{stage.total_stages}
-                                  {stage.services?.stage_names?.[stage.current_stage - 1] && ` — ${stage.services.stage_names[stage.current_stage - 1]}`}
                                 </Badge>
                               )}
                             </div>
@@ -573,11 +571,6 @@ function MemberHistoryDialog({ open, onOpenChange, member }: { open: boolean, on
                         <div className="max-w-[150px] truncate text-sm" title={visit.diagnosis || ''}>
                           {visit.diagnosis || '-'}
                         </div>
-                        {visit.periodontal_status && (
-                          <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200 uppercase font-bold">
-                            {visit.periodontal_status}
-                          </Badge>
-                        )}
                         {visit.xray_urls && visit.xray_urls.length > 0 && (
                           <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide">
                             {visit.xray_urls.map((url: string, idx: number) => (

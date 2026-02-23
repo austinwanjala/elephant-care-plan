@@ -45,7 +45,7 @@ export default function DirectorRevenue() {
         // Fetch Pending/Unlocked Multi-Stage Claims
         const { data: pending, error: pendingError } = await (supabase as any)
             .from("pending_claims")
-            .select("*, services(name, stage_names, total_stages), members(full_name)")
+            .select("*, services(name), members(full_name)")
             .eq("branch_id", branchId)
             .eq("released_to_director", true)
             .eq("approved_by_director", false)
@@ -390,15 +390,7 @@ export default function DirectorRevenue() {
                                     <TableRow key={claim.id} className="bg-white">
                                         <TableCell>{format(new Date(claim.updated_at), 'MMM d, yyyy')}</TableCell>
                                         <TableCell>{claim.members?.full_name}</TableCell>
-                                        <TableCell>
-                                            <div className="font-medium text-slate-900">{claim.services?.name}</div>
-                                            {claim.services?.stage_names && (
-                                                <div className="text-[10px] text-muted-foreground italic bg-slate-100 px-1.5 py-0.5 rounded inline-block mt-0.5">
-                                                    Progress: 1 to {claim.services.total_stages}
-                                                    <span className="ml-1 opacity-60">({claim.services.stage_names.join(" → ")})</span>
-                                                </div>
-                                            )}
-                                        </TableCell>
+                                        <TableCell>{claim.services?.name}</TableCell>
                                         <TableCell className="font-bold text-amber-700">KES {Number(claim.locked_amount).toLocaleString()}</TableCell>
                                         <TableCell>
                                             <Button

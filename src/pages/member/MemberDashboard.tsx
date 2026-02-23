@@ -133,6 +133,28 @@ const MemberDashboard = () => {
     }
   }
 
+  interface ServiceStage {
+    id: string;
+    current_stage: number;
+    total_stages: number;
+    status: string;
+    tooth_number: number | null;
+    services: { name: string };
+  }
+
+  const [activeStages, setActiveStages] = useState<ServiceStage[]>([]);
+
+  const fetchActiveStages = async (memberId: string) => {
+    const { data } = await (supabase as any)
+      .from("service_stages")
+      .select("*, services(name)")
+      .eq("member_id", memberId)
+      .eq("status", "in_progress")
+      .order("updated_at", { ascending: false });
+
+    if (data) setActiveStages(data as any);
+  };
+
   const fetchVisits = async (userId: string) => {
     const { data: memberData } = await supabase
       .from("members")
@@ -141,6 +163,7 @@ const MemberDashboard = () => {
       .single();
 
     if (memberData) {
+      fetchActiveStages(memberData.id); // Fetch active stages too
       const { data, error } = await supabase
         .from("visits")
         .select(`
@@ -375,6 +398,56 @@ const MemberDashboard = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
+                {activeStages.length > 0 && (
+                  <div className="mb-8 space-y-4">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+                      <h3 className="text-sm font-bold text-blue-800 uppercase tracking-wider">Ongoing Treatment{activeStages.length > 1 ? 's' : ''}</h3>
+                    </div>
+                    <div className="grid gap-4">
+                      {activeStages.map((stage) => {
+                        const nextStage = stage.current_stage + 1;
+                        const isFinal = nextStage > stage.total_stages;
+                        const progress = (stage.current_stage / stage.total_stages) * 100;
+                        return (
+                          <div key={stage.id} className="p-4 border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-sky-50 rounded-xl space-y-3 shadow-sm">
+                            <div className="flex justify-between items-start gap-2">
+                              <div>
+                                <p className="font-bold text-blue-900 text-base">{stage.services.name}</p>
+                                <p className="text-xs text-blue-700">Tooth #{stage.tooth_number || 'General'} · Status: In Progress</p>
+                              </div>
+                              <Badge className={`shrink-0 ${isFinal ? 'bg-emerald-600' : 'bg-blue-600'}`}>
+                                {isFinal ? `Final Stage (${stage.current_stage}/${stage.total_stages})` : `Stage ${stage.current_stage} of ${stage.total_stages}`}
+                              </Badge>
+                            </div>
+                            {!isFinal && (
+                              <p className="text-xs text-blue-700 font-medium">
+                                Next visit: Stage {nextStage} will be performed
+                              </p>
+                            )}
+                            <div className="space-y-1">
+                              <div className="flex justify-between text-[10px] font-bold uppercase text-blue-700">
+                                <span>Progress</span>
+                                <span>{Math.round(progress)}% ({stage.current_stage}/{stage.total_stages} stages done)</span>
+                              </div>
+                              <Progress value={progress} className="h-2" />
+                              <div className="flex gap-1 mt-1">
+                                {Array.from({ length: stage.total_stages }, (_, i) => (
+                                  <div
+                                    key={i}
+                                    className={`flex-1 h-1.5 rounded-full ${i < stage.current_stage ? 'bg-blue-500' : 'bg-blue-100'
+                                      }`}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>

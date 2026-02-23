@@ -50,6 +50,7 @@ interface Service {
   is_active: boolean;
   is_multi_stage: boolean;
   total_stages: number;
+  stage_names: string[];
 }
 
 interface Branch {
@@ -78,7 +79,8 @@ export default function AdminServices() {
     benefitCost: "",
     approvalType: "all_branches" as "all_branches" | "pre_approved_only",
     isMultiStage: false,
-    totalStages: 2
+    totalStages: 2,
+    stageNames: ["Stage 1", "Stage 2"] as string[],
   });
   const { toast } = useToast();
 
@@ -107,7 +109,8 @@ export default function AdminServices() {
         benefit_cost: parseFloat(formData.benefitCost),
         approval_type: formData.approvalType,
         is_multi_stage: formData.isMultiStage,
-        total_stages: formData.isMultiStage ? formData.totalStages : 1
+        total_stages: formData.isMultiStage ? formData.totalStages : 1,
+        stage_names: formData.isMultiStage ? formData.stageNames.slice(0, formData.totalStages) : []
       });
 
       if (error) throw error;
@@ -134,7 +137,8 @@ export default function AdminServices() {
           benefit_cost: parseFloat(formData.benefitCost),
           approval_type: formData.approvalType,
           is_multi_stage: formData.isMultiStage,
-          total_stages: formData.isMultiStage ? formData.totalStages : 1
+          total_stages: formData.isMultiStage ? formData.totalStages : 1,
+          stage_names: formData.isMultiStage ? formData.stageNames.slice(0, formData.totalStages) : []
         })
         .eq("id", selectedService.id);
 
@@ -211,6 +215,12 @@ export default function AdminServices() {
 
   const openEditDialog = (service: Service) => {
     setSelectedService(service);
+    const existingNames: string[] = Array.isArray(service.stage_names) ? service.stage_names : [];
+    const totalStages = service.total_stages || 2;
+    // Pad or trim stage names to match total_stages
+    const stageNames = Array.from({ length: totalStages }, (_, i) =>
+      existingNames[i] || `Stage ${i + 1}`
+    );
     setFormData({
       name: service.name || "",
       realCost: (service.real_cost ?? 0).toString(),
@@ -218,7 +228,8 @@ export default function AdminServices() {
       benefitCost: (service.benefit_cost ?? 0).toString(),
       approvalType: service.approval_type || "all_branches",
       isMultiStage: service.is_multi_stage || false,
-      totalStages: service.total_stages || 2
+      totalStages,
+      stageNames,
     });
     setEditDialogOpen(true);
   };
@@ -242,8 +253,24 @@ export default function AdminServices() {
       benefitCost: "",
       approvalType: "all_branches",
       isMultiStage: false,
-      totalStages: 2
+      totalStages: 2,
+      stageNames: ["Stage 1", "Stage 2"],
     });
+  };
+
+  // Helper: resize stage names array when totalStages changes
+  const handleTotalStagesChange = (val: string) => {
+    const n = parseInt(val) || 2;
+    const existing = formData.stageNames;
+    const stageNames = Array.from({ length: n }, (_, i) => existing[i] || `Stage ${i + 1}`);
+    setFormData({ ...formData, totalStages: n, stageNames });
+  };
+
+  // Helper: update a single stage name by index
+  const handleStageNameChange = (index: number, value: string) => {
+    const stageNames = [...formData.stageNames];
+    stageNames[index] = value;
+    setFormData({ ...formData, stageNames });
   };
 
   const handleExport = () => {
@@ -366,14 +393,34 @@ export default function AdminServices() {
                 </div>
 
                 {formData.isMultiStage && (
-                  <div className="space-y-2">
-                    <Label>Total Stages</Label>
-                    <Input
-                      type="number"
-                      min="2"
-                      value={formData.totalStages}
-                      onChange={(e) => setFormData({ ...formData, totalStages: parseInt(e.target.value) || 2 })}
-                    />
+                  <div className="space-y-3 border rounded-lg p-4 bg-muted/30">
+                    <div className="space-y-2">
+                      <Label>Total Stages</Label>
+                      <Input
+                        type="number"
+                        min="2"
+                        max="10"
+                        value={formData.totalStages}
+                        onChange={(e) => handleTotalStagesChange(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold">Stage Names</Label>
+                      <p className="text-xs text-muted-foreground">Give each stage a descriptive name that will appear in the Doctor portal.</p>
+                      <div className="space-y-2">
+                        {Array.from({ length: formData.totalStages }, (_, i) => (
+                          <div key={i} className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-muted-foreground w-16 shrink-0">Stage {i + 1}</span>
+                            <Input
+                              value={formData.stageNames[i] || ""}
+                              onChange={(e) => handleStageNameChange(i, e.target.value)}
+                              placeholder={`e.g., ${["Consultation", "Procedure", "Review", "Follow-Up"][i] || `Stage ${i + 1}`}`}
+                              className="h-8 text-sm"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 )}
                 <Button onClick={handleAddService} className="btn-primary">
@@ -401,9 +448,28 @@ export default function AdminServices() {
               </TableRow>
             </TableHeader>
             <TableBody>
+              {/* Table row — add multi-stage badge to the name cell */}
               {services.map((service) => (
                 <TableRow key={service.id}>
-                  <TableCell className="font-medium">{service.name}</TableCell>
+                  <TableCell className="font-medium">
+                    <div className="flex flex-col gap-1">
+                      <span>{service.name}</span>
+                      {service.is_multi_stage && (
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <Badge variant="outline" className="text-[10px] text-blue-700 border-blue-300 h-5">
+                            {service.total_stages} Stages
+                          </Badge>
+                          {Array.isArray(service.stage_names) && service.stage_names.length > 0 &&
+                            service.stage_names.map((sn, i) => (
+                              <Badge key={i} variant="secondary" className="text-[10px] h-5">
+                                {i + 1}: {sn}
+                              </Badge>
+                            ))
+                          }
+                        </div>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell>KES {(service.real_cost ?? 0).toLocaleString()}</TableCell>
                   <TableCell>KES {(service.branch_compensation ?? 0).toLocaleString()}</TableCell>
                   <TableCell>KES {(service.benefit_cost ?? 0).toLocaleString()}</TableCell>
@@ -448,11 +514,11 @@ export default function AdminServices() {
 
       {/* Edit Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="flex flex-col max-h-[90vh]">
+          <DialogHeader className="shrink-0">
             <DialogTitle className="font-serif">Edit Service</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-4 py-4 overflow-y-auto pr-1">
             <div className="space-y-2">
               <Label>Procedure Name</Label>
               <Input
@@ -517,14 +583,34 @@ export default function AdminServices() {
             </div>
 
             {formData.isMultiStage && (
-              <div className="space-y-2">
-                <Label>Total Stages</Label>
-                <Input
-                  type="number"
-                  min="2"
-                  value={formData.totalStages}
-                  onChange={(e) => setFormData({ ...formData, totalStages: parseInt(e.target.value) || 2 })}
-                />
+              <div className="space-y-3 border rounded-lg p-4 bg-muted/30">
+                <div className="space-y-2">
+                  <Label>Total Stages</Label>
+                  <Input
+                    type="number"
+                    min="2"
+                    max="10"
+                    value={formData.totalStages}
+                    onChange={(e) => handleTotalStagesChange(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Stage Names</Label>
+                  <p className="text-xs text-muted-foreground">Give each stage a descriptive name that will appear in the Doctor portal.</p>
+                  <div className="space-y-2">
+                    {Array.from({ length: formData.totalStages }, (_, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-muted-foreground w-16 shrink-0">Stage {i + 1}</span>
+                        <Input
+                          value={formData.stageNames[i] || ""}
+                          onChange={(e) => handleStageNameChange(i, e.target.value)}
+                          placeholder={`e.g., ${["Consultation", "Procedure", "Review", "Follow-Up"][i] || `Stage ${i + 1}`}`}
+                          className="h-8 text-sm"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
 

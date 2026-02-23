@@ -198,19 +198,19 @@ export default function Consultation() {
                     if (r.condition) conditions[r.tooth_number] = r.condition;
                     else if (r.status) conditions[r.tooth_number] = r.status;
 
-                    // If record is from a DIFFERENT visit, it is historical and locked
-                    if (r.visit_id !== visitId) {
+                    // If record is from a DIFFERENT visit OR if diagnosis was previously locked in this visit
+                    if (r.visit_id !== visitId || data.diagnosis_locked_at) {
                         history[r.tooth_number] = true;
                     }
                 });
                 setToothConditions(conditions);
                 setExistingConditions(history);
 
-                // If we have existing records (history) OR current visit records, default to treatment mode
-                // so doctor can immediately start treating existing conditions.
-                // Unless it's a fresh visit with NO history.
-                if (records.length > 0 && !data.diagnosis_locked_at) {
+                // Auto-switch to treatment mode only if specifically locked
+                if (data.diagnosis_locked_at) {
                     setConsultationMode('treatment');
+                } else {
+                    setConsultationMode('diagnosis');
                 }
 
                 // For display in Treatment Mode, we want to overlay treatment status (e.g. in_progress)
@@ -337,9 +337,13 @@ export default function Consultation() {
 
     const handleToothClick = (toothId: number) => {
         if (consultationMode === 'diagnosis') {
-            // Check if tooth has historical diagnosis
+            // Check if tooth has historical diagnosis or locked in current session
             if (existingConditions[toothId]) {
-                toast({ title: "Locked", description: "This diagnosis is from a previous visit and cannot be edited.", variant: "secondary" });
+                toast({
+                    title: "Diagnosis Locked",
+                    description: "This condition has already been saved/finalized and cannot be modified. You can still diagnose other unmarked teeth.",
+                    variant: "secondary"
+                });
                 return;
             }
 
@@ -419,6 +423,14 @@ export default function Consultation() {
             });
 
             setDiagnosisLockedAt(new Date().toISOString());
+
+            // Lock the teeth currently in toothConditions so they can't be toggled anymore
+            const newLockedHistory = { ...existingConditions };
+            Object.keys(toothConditions).forEach(tn => {
+                newLockedHistory[parseInt(tn)] = true;
+            });
+            setExistingConditions(newLockedHistory);
+
             setConsultationMode('treatment');
             setSelectedTeeth([]);
 
@@ -1199,7 +1211,7 @@ export default function Consultation() {
                         <CardContent>
 
                             {/* Diagnosis Toolbar */}
-                            {consultationMode === 'treatment' && !diagnosisLockedAt && (
+                            {consultationMode === 'treatment' && (
                                 <div className="mb-4 flex justify-end">
                                     <Button variant="outline" size="sm" onClick={() => setConsultationMode('diagnosis')}>
                                         <Plus className="w-4 h-4 mr-2" /> Add/Edit Diagnosis
@@ -1213,11 +1225,11 @@ export default function Consultation() {
                                         <Label className="text-xs uppercase tracking-wider text-muted-foreground font-bold">Diagnosis Tools</Label>
                                         <div className="flex flex-wrap gap-2">
                                             {[
-                                                { id: 'decay', label: 'Decay', color: 'bg-red-500', border: 'border-red-200' },
-                                                { id: 'missing', label: 'Missing', color: 'bg-yellow-400', border: 'border-yellow-200' },
-                                                { id: 'filled', label: 'Filled', color: 'bg-green-500', border: 'border-green-200' },
-                                                { id: 'crowned', label: 'Crowned', color: 'bg-blue-500', border: 'border-blue-200' },
-                                                { id: 'partial_denture', label: 'Pt. Denture', color: 'bg-pink-500', border: 'border-pink-200' },
+                                                { id: 'decay', label: 'Decay', color: 'bg-red-700', border: 'border-red-300' },
+                                                { id: 'missing', label: 'Missing', color: 'bg-amber-600', border: 'border-amber-200' },
+                                                { id: 'filled', label: 'Filled', color: 'bg-emerald-700', border: 'border-emerald-300' },
+                                                { id: 'crowned', label: 'Crowned', color: 'bg-blue-800', border: 'border-blue-300' },
+                                                { id: 'partial_denture', label: 'Pt. Denture', color: 'bg-fuchsia-700', border: 'border-fuchsia-300' },
                                             ].map(tool => (
                                                 <button
                                                     key={tool.id}

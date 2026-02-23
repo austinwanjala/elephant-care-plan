@@ -150,35 +150,49 @@ export default function Consultation() {
 
             // Fetch ALL multi-stage treatments to check history and progression
             // NOTE: service_stages is not in generated types — cast as any so query actually executes
+            // Fetch ACTIVE stages using the RPC as requested
+            const { data: activeFromRpc, error: rpcError } = await (supabase as any).rpc('get_active_stages_for_patient', {
+                p_member_id: data.member_id,
+                p_dependant_id: data.dependant_id || null
+            });
+
+            console.log("[Consultation] active stages from RPC →", { activeFromRpc, rpcError });
+
+            // We still need all stages (including completed) for progression checks (getMaxStageForSelection)
+            // AND we need to enrich RPC results with stage_names from services table.
             const supabaseAny = supabase as any;
-            let stagesQuery = supabaseAny
+            let allStagesQuery = supabaseAny
                 .from("service_stages")
                 .select("*, services(name, stage_names), tooth_number, related_bill_id")
                 .eq("member_id", data.member_id);
 
             if (data.dependant_id) {
-                stagesQuery = stagesQuery.eq("dependant_id", data.dependant_id);
+                allStagesQuery = allStagesQuery.eq("dependant_id", data.dependant_id);
             } else {
-                stagesQuery = stagesQuery.is("dependant_id", null);
+                allStagesQuery = allStagesQuery.is("dependant_id", null);
             }
 
-            const { data: stages, error: stagesError } = await stagesQuery;
+            const { data: allStages, error: stagesError } = await allStagesQuery;
 
-            console.log("[Consultation] service_stages fetch →", { stages, stagesError });
+            console.log("[Consultation] all service_stages fetch →", { allStages, stagesError });
 
-            if (stages && stages.length > 0) {
-                const active = stages.filter((s: any) => s.status === 'in_progress');
-                console.log("[Consultation] Active stages →", active);
-                // Store active ones for auto-continuation
-                setActiveStages(active);
-                // Store everything for progression checks
-                setAllMemberStages(stages);
+            if (allStages) {
+                setAllMemberStages(allStages);
 
-                // Auto-detect follow-up visit: if patient has active stages and visit
-                // was just registered (no diagnosis locked), switch to treatment mode
-                if (active.length > 0 && !data.diagnosis_locked_at) {
-                    setIsFollowUpVisit(true);
-                    setConsultationMode('treatment');
+                // Use RPC results to identify which ones are TRULY active (security/logic check)
+                // But take the enriched data from allStages (which includes joined service info)
+                if (activeFromRpc && activeFromRpc.length > 0) {
+                    const activeIds = activeFromRpc.map((a: any) => a.id);
+                    const active = allStages.filter((s: any) => activeIds.includes(s.id));
+                    console.log("[Consultation] Enriched active stages →", active);
+                    setActiveStages(active);
+
+                    if (active.length > 0 && !data.diagnosis_locked_at) {
+                        setIsFollowUpVisit(true);
+                        setConsultationMode('treatment');
+                    }
+                } else {
+                    setActiveStages([]);
                 }
             }
 
@@ -194,7 +208,7 @@ export default function Consultation() {
                     status,
                     doctor:doctor_id(full_name),
                     branches(name),
-                    service_stages(*)
+                    service_stages(*, services(name, stage_names))
                 `)
                 .eq("member_id", data.member_id)
                 .neq("id", visitId) // Exclude current visit
@@ -405,12 +419,14 @@ export default function Consultation() {
             // Treatment Mode - Select for service
             const activeStage = activeStages.find(s => s.tooth_number === toothId);
             if (activeStage) {
-                toast({
-                    title: "Ongoing Treatment",
-                    description: `Tooth #${toothId} has an ongoing ${activeStage.services.name}. Use the "Ongoing Treatments" panel to progress stages.`,
-                    variant: "destructive"
-                });
-                return;
+                // If it's already in selectedTeeth, then clicking it again should toggle selection off (handled below)
+                if (!selectedTeeth.includes(toothId)) {
+                    toast({
+                        title: "Ongoing Treatment",
+                        description: `Tooth #${toothId} has an ongoing ${activeStage.services?.name || 'treatment'}. Select this tooth then choose the same service to continue, or use the "Ongoing Treatments" panel.`,
+                        variant: "secondary"
+                    });
+                }
             }
 
             // Safety Check: Is this tooth selectable?
@@ -516,17 +532,16 @@ export default function Consultation() {
                     h.tooth_number == tooth && h.service_id === service.id
                 );
 
-                // 2. Check Active: Is this SAME stage already in progress?
-                const isCurrentStageActive = activeStages.some(as =>
-                    as.tooth_number === tooth &&
-                    as.service_id === service.id &&
-                    as.current_stage === startStage
+                // 2. Check Active: Block if ANY active treatment exists for this tooth
+                // Use numeric/status fields from activeStages only.
+                const activeOnTooth = activeStages.find(as =>
+                    as.tooth_number === tooth && as.status === 'in_progress'
                 );
 
                 // 3. Multi-stage progression check
                 const maxDone = getMaxStageForSelection(service.id, [tooth]);
 
-                if (isCurrentStageActive) {
+                if (activeOnTooth) {
                     blockedTeeth.push(tooth);
                 } else if (!service.is_multi_stage && hasExistingRecord) {
                     blockedTeeth.push(tooth);
@@ -637,7 +652,12 @@ export default function Consultation() {
                         };
 
                         // Check if already added
-                        if (!newSelections.find(s => s.service.id === service.id && s.tooth_number === tooth)) {
+                        const isRepetition = newSelections.find(s =>
+                            (s.service.stage_id && s.service.stage_id === existingStage.id) ||
+                            (s.service.id === service.id && s.tooth_number === tooth)
+                        );
+
+                        if (!isRepetition) {
                             newSelections.push({ service: serviceUpdate, tooth_number: tooth });
                             addedcontinue++;
                         }
@@ -696,7 +716,7 @@ export default function Consultation() {
                         related_bill_id: existingStage.related_bill_id,
                         stage_id: existingStage.id
                     };
-                    if (!selectedServices.find(s => s.service.id === serviceId && s.tooth_number === null)) {
+                    if (!selectedServices.find(s => (s.service.stage_id && s.service.stage_id === existingStage.id) || (s.service.id === serviceId && s.tooth_number === null))) {
                         setSelectedServices([...selectedServices, { service: serviceUpdate, tooth_number: null }]);
                     }
                     return;
@@ -734,8 +754,13 @@ export default function Consultation() {
     };
 
     const handleContinueStage = (stage: any) => {
-        if (selectedServices.find(s => s.service.stageId === stage.id)) {
-            toast({ title: "Already Added", description: "This stage progression is already in the list.", variant: "secondary" });
+        const isAlreadySelected = selectedServices.some(s =>
+            (s.service.stage_id && s.service.stage_id === stage.id) ||
+            (s.service.id === stage.service_id && s.tooth_number === stage.tooth_number)
+        );
+
+        if (isAlreadySelected) {
+            toast({ title: "Already Added", description: "This treatment progression is already in your selection list.", variant: "secondary" });
             return;
         }
         setPendingContinueStage(stage);
@@ -757,10 +782,13 @@ export default function Consultation() {
             benefit_cost: 0, // No charge for subsequent stages
             branch_compensation: 0,
             real_cost: 0,
+            is_multi_stage: true,
             is_multi_stage_update: true,
             startAtStage: nextStageNum, // CRITICAL: handleFinalize expects this for updating the DB
             total_stages: stage.total_stages,
+            stage_id: stage.id,
             stageId: stage.id,
+            stage_names: stage.services.stage_names,
             nextStage: nextStageNum,
             isFinal: isFinal,
             notes: stageNotes // Attach notes
@@ -1008,12 +1036,12 @@ export default function Consultation() {
                         visit_id: visitId,
                         tooth_number: item.tooth_number || null,
                         current_stage: 1,
-                        selected_tooth: item.tooth_number || null, // Ensure selected_tooth is set
+                        selected_tooth: item.tooth_number || null,
                         total_stages: item.service.total_stages,
-                        status: 'in_progress',
+                        status: item.service.total_stages === 1 ? 'completed' : 'in_progress',
                         related_bill_id: lockedBill.id,
                         pending_claim_id: pendingClaim.id, // Link to pending claim
-                        notes: `Started in visit ${visitId} on tooth ${item.tooth_number}`
+                        notes: `Started in visit ${visitId}${item.tooth_number ? ` on tooth ${item.tooth_number}` : ''}`
                     });
 
                     // Audit Log for Start
@@ -1074,6 +1102,10 @@ export default function Consultation() {
                 const currentStage = item.service.startAtStage; // This holds the *next* stage
                 const isFinal = currentStage === item.service.total_stages;
 
+                const stageNames = item.service.stage_names || [];
+                const stageName = stageNames[currentStage - 1] || null;
+                const docNotes = `Stage ${currentStage}: ${stageName ?? ''}`.trim();
+
                 const { error: stageUpdateError } = await (supabase as any)
                     .from("service_stages")
                     .update({
@@ -1081,9 +1113,10 @@ export default function Consultation() {
                         status: isFinal ? 'completed' : 'in_progress',
                         updated_at: new Date().toISOString(),
                         visit_id: visitId,
-                        notes: item.service.notes // Save notes here
+                        notes: item.service.notes, // Save notes here
+                        doctor_notes: docNotes
                     })
-                    .eq("id", item.service.stageId || item.service.stage_id);
+                    .eq("id", item.service.stage_id);
 
                 if (stageUpdateError) {
                     console.error("Error updating service stage:", stageUpdateError);
@@ -1268,9 +1301,12 @@ export default function Consultation() {
                             <CardContent className="space-y-4">
                                 {activeStages.map(stage => {
                                     const nextStageNum = stage.current_stage + 1;
-                                    const isFinalStage = nextStageNum > stage.total_stages;
+                                    const isFinalStage = nextStageNum === stage.total_stages;
                                     const progress = (stage.current_stage / stage.total_stages) * 100;
-                                    const isAlreadyAdded = selectedServices.some(s => s.service.stage_id === stage.id || s.service.stageId === stage.id);
+                                    const isAlreadyAdded = selectedServices.some(s =>
+                                        (s.service.stage_id === stage.id || s.service.stageId === stage.id) ||
+                                        (s.service.id === stage.service_id && s.tooth_number === stage.tooth_number && s.service.is_multi_stage_update)
+                                    );
                                     const isCompletedThisSession = completedStagesThisSession.includes(stage.id);
 
                                     // Resolve stage names from the service
@@ -1290,18 +1326,12 @@ export default function Consultation() {
                                                     </div>
                                                     <div className="flex items-center gap-3 text-sm flex-wrap">
                                                         <span className="font-bold text-blue-900">
-                                                            Stage {stage.current_stage} of {stage.total_stages}
-                                                            {currentStageName && (
-                                                                <span className="ml-1 font-normal text-blue-700">— {currentStageName}</span>
-                                                            )}
+                                                            Continue Stage {nextStageNum} of {stage.total_stages}
+                                                            {nextStageName ? ` — ${nextStageName}` : ''}
                                                         </span>
                                                         {isFinalStage ? (
                                                             <span className="text-emerald-700 font-bold text-xs bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">Final Stage</span>
-                                                        ) : (
-                                                            <span className="text-slate-500 text-xs">
-                                                                Next: Stage {nextStageNum}{nextStageName ? ` — ${nextStageName}` : ''}
-                                                            </span>
-                                                        )}
+                                                        ) : null}
                                                     </div>
                                                     {stage.notes && (
                                                         <p className="text-xs text-slate-500 italic mt-1">Last notes: {stage.notes}</p>
@@ -1487,7 +1517,9 @@ export default function Consultation() {
                                     // Add existing active stages
                                     activeStages.forEach(s => {
                                         if (s.tooth_number) {
-                                            stages[s.tooth_number] = { current: s.current_stage, total: s.total_stages };
+                                            // Show the NEXT stage (the one we are continuing) on the chart 
+                                            // to match the headline text and button.
+                                            stages[s.tooth_number] = { current: s.current_stage + 1, total: s.total_stages };
                                         }
                                     });
                                     // Override with session selections (if incrementing or starting)
@@ -1522,40 +1554,64 @@ export default function Consultation() {
                                             Add Procedure for Selected Teeth ({selectedTeeth.join(", ")})
                                         </Label>
 
-                                        {/* Show Active Stages Hint */}
-                                        {selectedTeeth.some(t => activeStages.some(s => s.tooth_number === t)) && (
-                                            <div className="mb-4 space-y-2">
-                                                {selectedTeeth.map(t => {
-                                                    const stage = activeStages.find(s => s.tooth_number === t);
-                                                    if (!stage) return null;
-                                                    return (
-                                                        <div key={stage.id} className="flex items-center justify-between p-2 bg-amber-50 border border-amber-200 rounded-lg text-xs">
-                                                            <div className="flex items-center gap-2">
-                                                                <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                                                                <span className="font-bold text-amber-900">Tooth {t}:</span>
-                                                                <span className="text-amber-800">{stage.services?.name}</span>
-                                                            </div>
-                                                            <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-300 font-bold">
-                                                                Stage {stage.current_stage} Completed
-                                                            </Badge>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-                                        <select
-                                            className="flex h-11 w-full rounded-md border border-input bg-white px-3 py-2 text-sm mt-2 shadow-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                            onChange={(e) => {
-                                                addService(e.target.value);
-                                                e.target.value = "";
-                                            }}
-                                            defaultValue=""
-                                        >
-                                            <option value="" disabled>Select a procedure to perform on these teeth...</option>
-                                            {availableServices.map(s => (
-                                                <option key={s.id} value={s.id}>{s.name}</option>
-                                            ))}
-                                        </select>
+                                        {(() => {
+                                            const activeForSelected = activeStages.filter(s => selectedTeeth.includes(s.tooth_number));
+
+                                            if (activeForSelected.length > 0) {
+                                                return (
+                                                    <div className="space-y-4">
+                                                        {activeForSelected.map(active => {
+                                                            const stageNumber = active.current_stage + 1; // Logic: numeric only
+                                                            const totalStages = active.total_stages;
+                                                            const stageNames = active.services?.stage_names || [];
+                                                            const stageName = stageNames[stageNumber - 1] || null;
+                                                            const isFinal = stageNumber === totalStages;
+
+                                                            return (
+                                                                <div key={active.id} className="p-4 bg-white border border-blue-200 rounded-lg shadow-sm">
+                                                                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                                                        <div>
+                                                                            <p className="text-sm font-bold text-slate-900">{active.services?.name} (Tooth #{active.tooth_number})</p>
+                                                                            <p className="text-xs text-blue-700 font-medium">
+                                                                                Continue Stage {stageNumber} of {totalStages}{stageName ? ` — ${stageName}` : ''}
+                                                                            </p>
+                                                                        </div>
+                                                                        <Button
+                                                                            size="sm"
+                                                                            className={cn("font-bold gap-2", isFinal ? "bg-emerald-600" : "bg-blue-600")}
+                                                                            onClick={() => handleContinueStage(active)}
+                                                                        >
+                                                                            <CheckCircle2 className="w-4 h-4" />
+                                                                            {isFinal ? 'Complete Final Stage' : `Complete Stage ${stageNumber}`}
+                                                                        </Button>
+                                                                    </div>
+                                                                    <div className="mt-3 p-2 bg-amber-50 border border-amber-100 rounded text-[10px] text-amber-800 flex items-center gap-2">
+                                                                        <AlertTriangle className="w-3 h-3" />
+                                                                        Selection Locked: You must continue or complete this treatment before starting another service on this tooth.
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                );
+                                            }
+
+                                            return (
+                                                <select
+                                                    className="flex h-11 w-full rounded-md border border-input bg-white px-3 py-2 text-sm mt-2 shadow-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                                    onChange={(e) => {
+                                                        addService(e.target.value);
+                                                        e.target.value = "";
+                                                    }}
+                                                    defaultValue=""
+                                                >
+                                                    <option value="" disabled>Select a procedure to perform on these teeth...</option>
+                                                    {availableServices.map(s => (
+                                                        <option key={s.id} value={s.id}>{s.name}</option>
+                                                    ))}
+                                                </select>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                             )}
@@ -1655,29 +1711,61 @@ export default function Consultation() {
                                 <span className="font-bold text-green-600">KES {visit.members.coverage_balance?.toLocaleString()}</span>
                             </div>
 
-                            {isFollowUpVisit && activeStages.length > 0 ? (
+                            {selectedServices.some(s => s.service.is_multi_stage) && (
                                 <div className="pt-2 border-t">
-                                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800 space-y-1">
-                                        <p className="font-bold text-blue-900">Follow-Up Visit — No New Charges</p>
-                                        <p>Billing was completed at Stage 1. Stage progression only.</p>
-                                        {activeStages.map(s => (
-                                            <p key={s.id} className="font-medium">
-                                                • {s.services?.name}: Stage {s.current_stage} → {s.current_stage + 1} of {s.total_stages}
-                                            </p>
+                                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800 space-y-2">
+                                        <p className="font-bold text-blue-900 flex items-center gap-1">
+                                            <History className="w-3 h-3" /> multi-stage progression
+                                        </p>
+                                        {selectedServices.filter(s => s.service.is_multi_stage).map((s, idx) => (
+                                            <div key={idx} className="flex flex-col gap-0.5 border-b border-blue-100 last:border-0 pb-1 last:pb-0">
+                                                <p className="font-semibold text-blue-900">
+                                                    {s.tooth_number ? `Tooth #${s.tooth_number}: ` : ''}{s.service.name}
+                                                </p>
+                                                <p className="flex justify-between">
+                                                    <span>Action:</span>
+                                                    <span className="font-bold">
+                                                        {s.service.is_multi_stage_update
+                                                            ? `Progressing to Stage ${s.service.startAtStage}`
+                                                            : `Starting at Stage ${s.service.startAtStage || 1}`
+                                                        }
+                                                    </span>
+                                                </p>
+                                                <p className="flex justify-between">
+                                                    <span>Cost:</span>
+                                                    <span className={s.service.benefit_cost > 0 ? "font-bold text-red-600" : "font-bold text-green-600"}>
+                                                        {s.service.benefit_cost > 0 ? `KES ${s.service.benefit_cost.toLocaleString()}` : "FREE (Covered in Stage 1)"}
+                                                    </span>
+                                                </p>
+                                            </div>
                                         ))}
                                     </div>
                                 </div>
-                            ) : (
-                                <div className="pt-2 border-t">
-                                    <Label>Services to Bill</Label>
-                                    <div className="mt-2 space-y-1">
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-muted-foreground">Procedures selected:</span>
-                                            <span className="font-semibold">{selectedServices.filter(s => !s.service.is_multi_stage_update).length}</span>
-                                        </div>
+                            )}
+
+                            <div className="pt-2 border-t">
+                                <Label className="text-xs uppercase text-muted-foreground font-bold">Visit Summary</Label>
+                                <div className="mt-2 space-y-2">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-muted-foreground">New Procedures:</span>
+                                        <span className="font-semibold text-foreground">
+                                            {selectedServices.filter(s => !s.service.is_multi_stage_update).length}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-muted-foreground">Follow-up Stages:</span>
+                                        <span className="font-semibold text-blue-600">
+                                            {selectedServices.filter(s => s.service.is_multi_stage_update).length}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between text-sm pt-1 border-t">
+                                        <span className="font-bold">Total Benefit Cost:</span>
+                                        <span className="font-bold text-red-600">
+                                            KES {selectedServices.reduce((acc, s) => acc + (s.service.benefit_cost || 0), 0).toLocaleString()}
+                                        </span>
                                     </div>
                                 </div>
-                            )}
+                            </div>
                         </CardContent>
                     </Card>
 
@@ -1878,11 +1966,16 @@ export default function Consultation() {
                                             <div className="space-y-2">
                                                 <Label className="text-[10px] uppercase font-bold text-muted-foreground">Procedures Performed</Label>
                                                 <div className="flex flex-wrap gap-2">
-                                                    {v.service_stages.map((stage: any) => (
-                                                        <Badge key={stage.id} variant="secondary" className="bg-blue-50 text-blue-700 border-blue-100">
-                                                            {stage.tooth_number ? `Tooth #${stage.tooth_number}` : 'General'}: Stage {stage.current_stage}
-                                                        </Badge>
-                                                    ))}
+                                                    {v.service_stages.map((stage: any) => {
+                                                        const stageNames: string[] = Array.isArray(stage.services?.stage_names) ? stage.services.stage_names : [];
+                                                        const stageName = stageNames[stage.current_stage - 1];
+                                                        return (
+                                                            <Badge key={stage.id} variant="secondary" className="bg-blue-50 text-blue-700 border-blue-100 py-1 px-2 h-auto text-left flex-col items-start gap-0">
+                                                                <span className="font-bold">{stage.tooth_number ? `Tooth #${stage.tooth_number}` : 'General'}: {stage.services?.name || 'Procedure'}</span>
+                                                                <span className="text-[9px] opacity-80">Stage {stage.current_stage}{stageName ? ` — ${stageName}` : ''}</span>
+                                                            </Badge>
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
                                         )}

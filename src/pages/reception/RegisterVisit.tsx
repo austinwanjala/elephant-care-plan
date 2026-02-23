@@ -34,7 +34,6 @@ export default function RegisterVisit() {
     const [selectedDoctorId, setSelectedDoctorId] = useState<string>("");
     const [selectedDependant, setSelectedDependant] = useState<any>(null);
     const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
-    const [memberSearchResults, setMemberSearchResults] = useState<any[]>([]);
     const { toast } = useToast();
     const navigate = useNavigate();
 
@@ -106,41 +105,6 @@ export default function RegisterVisit() {
         }
     };
 
-    const [activeStages, setActiveStages] = useState<any[]>([]);
-
-    const fetchActiveStages = async (memberId: string) => {
-        const { data } = await (supabase as any)
-            .from("service_stages")
-            .select("*, services(name)")
-            .eq("member_id", memberId)
-            .eq("status", "in_progress");
-
-        if (data) setActiveStages(data);
-        else setActiveStages([]);
-    };
-
-    const loadMemberData = async (data: any) => {
-        setMember(data);
-        setSelectedPatientId(data.id);
-        setMemberSearchResults([]); // clear search results list
-        fetchActiveStages(data.id);
-
-        const { data: dependantsData } = await supabase
-            .from("dependants")
-            .select("*")
-            .eq("member_id", data.id)
-            .eq("is_active", true);
-
-        if (dependantsData) setDependants(dependantsData);
-
-        if (data.biometric_data) {
-            setBiometricsVerified(false);
-        } else {
-            setBiometricsVerified(true);
-            toast({ title: "No Biometric Data", description: "Principal member has no registered biometric data. Proceeding without biometric verification.", variant: "default" });
-        }
-    };
-
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
         const term = searchTerm.trim();
@@ -151,26 +115,45 @@ export default function RegisterVisit() {
         setDependants([]);
         setSelectedPatientId("");
         setBiometricsVerified(false);
-        setActiveStages([]);
-        setMemberSearchResults([]);
 
         try {
+            // Use ilike with wildcards and double quotes for all fields to handle spaces and partial matches
             const { data, error } = await supabase
                 .from("members")
                 .select("*, membership_categories(name), branches(name)")
-                .or(`phone.ilike."%${term}%",id_number.ilike."%${term}%",member_number.ilike."%${term}%",full_name.ilike."%${term}%"`);
+                .or(`phone.ilike."%${term}%",id_number.ilike."%${term}%",member_number.ilike."%${term}%",full_name.ilike."%${term}%"`)
+                .maybeSingle();
 
-            if (error) throw error;
+            if (error) {
+                if (error.code === 'PGRST116') {
+                    throw new Error("Multiple members found. Please enter a more specific ID, Phone, or Member Number.");
+                }
+                throw error;
+            }
 
-            if (!data || data.length === 0) {
-                toast({ title: "Member not found", description: "No member found matching that criteria.", variant: "destructive" });
-            } else if (data.length === 1) {
-                // Exactly one result — load directly
-                await loadMemberData(data[0]);
+            if (data) {
+                setMember(data);
+                setSelectedPatientId(data.id);
+
+                // Fetch dependants
+                const { data: dependantsData } = await supabase
+                    .from("dependants")
+                    .select("*")
+                    .eq("member_id", data.id)
+                    .eq("is_active", true);
+
+                if (dependantsData) {
+                    setDependants(dependantsData);
+                }
+
+                if (data.biometric_data) {
+                    setBiometricsVerified(false);
+                } else {
+                    setBiometricsVerified(true);
+                    toast({ title: "No Biometric Data", description: "Principal member has no registered biometric data. Proceeding without biometric verification.", variant: "default" });
+                }
             } else {
-                // Multiple results — let receptionist pick
-                setMemberSearchResults(data);
-                toast({ title: `${data.length} members found`, description: "Please select the correct member from the list below." });
+                toast({ title: "Member not found", description: "No member found matching that criteria.", variant: "destructive" });
             }
         } catch (error: any) {
             toast({ title: "Search failed", description: error.message, variant: "destructive" });
@@ -265,59 +248,6 @@ export default function RegisterVisit() {
                 </CardContent>
             </Card>
 
-            {/* Multiple members picker */}
-            {memberSearchResults.length > 1 && !member && (
-                <Card className="border-amber-300">
-                    <CardHeader className="bg-amber-50">
-                        <CardTitle className="flex items-center gap-2 text-amber-900">
-                            <Users className="h-5 w-5" />
-                            {memberSearchResults.length} Members Found — Select the Correct One
-                        </CardTitle>
-                        <CardDescription className="text-amber-700">
-                            Multiple members match your search. Click "Select" on the right patient to proceed.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="pt-4">
-                        <div className="space-y-3">
-                            {memberSearchResults.map((result) => (
-                                <div
-                                    key={result.id}
-                                    className="flex items-center justify-between gap-4 p-4 border rounded-xl hover:bg-muted/50 transition-colors"
-                                >
-                                    <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1 text-sm">
-                                        <div>
-                                            <p className="font-bold text-foreground">{result.full_name}</p>
-                                            <p className="text-xs text-muted-foreground">#{result.member_number}</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-muted-foreground">ID</p>
-                                            <p className="font-medium">{result.id_number}</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-muted-foreground">Phone</p>
-                                            <p className="font-medium">{result.phone}</p>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <Badge variant={result.is_active ? "default" : "destructive"} className="text-xs">
-                                                {result.is_active ? "Active" : "Inactive"}
-                                            </Badge>
-                                            <span className="text-xs text-muted-foreground">{result.membership_categories?.name || "N/A"}</span>
-                                        </div>
-                                    </div>
-                                    <Button
-                                        size="sm"
-                                        className="shrink-0"
-                                        onClick={() => loadMemberData(result)}
-                                    >
-                                        <ArrowRight className="h-4 w-4 mr-1" /> Select
-                                    </Button>
-                                </div>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
             {member && (
                 <div className="space-y-6">
                     <Card className="border-primary/50">
@@ -360,25 +290,6 @@ export default function RegisterVisit() {
                                 <div className="bg-destructive/10 text-destructive p-3 rounded-md flex items-center gap-2">
                                     <UserX className="h-5 w-5" />
                                     <span className="font-medium">Member is inactive. Advise payment before service.</span>
-                                </div>
-                            )}
-                            {activeStages.length > 0 && (
-                                <div className="mt-4 p-4 border border-blue-200 bg-blue-50 rounded-lg space-y-2">
-                                    <div className="flex items-center gap-2 text-blue-800 font-bold">
-                                        <Info className="h-5 w-5" />
-                                        Ongoing Multi-Stage Treatment Detected
-                                    </div>
-                                    <div className="space-y-1">
-                                        {activeStages.filter(as =>
-                                            as.member_id === member.id &&
-                                            (selectedPatientId === member.id ? as.dependant_id === null : as.dependant_id === selectedPatientId)
-                                        ).map(as => (
-                                            <p key={as.id} className="text-sm text-blue-700">
-                                                • {as.services.name} {as.tooth_number ? `(Tooth #${as.tooth_number})` : ''} — <span className="font-bold">Stage {as.current_stage} of {as.total_stages}</span>
-                                            </p>
-                                        ))}
-                                    </div>
-                                    <p className="text-xs text-blue-600 italic">No new charges will be applied for this treatment today.</p>
                                 </div>
                             )}
                         </CardContent>

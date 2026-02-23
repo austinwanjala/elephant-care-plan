@@ -111,12 +111,24 @@ export default function RegisterVisit() {
     const fetchActiveStages = async (memberId: string) => {
         const { data } = await (supabase as any)
             .from("service_stages")
-            .select("*, services(name)")
+            .select("*, services(name, stage_names)")
             .eq("member_id", memberId)
             .eq("status", "in_progress");
 
         if (data) setActiveStages(data);
         else setActiveStages([]);
+    };
+
+    // Returns stages for a given patient (principal or dependant)
+    const getStagesForPatient = (patientId: string) => {
+        if (!member) return [];
+        if (patientId === member.id) {
+            // Principal member: stages with no dependant
+            return activeStages.filter(s => s.member_id === member.id && !s.dependant_id);
+        } else {
+            // Dependant: stages assigned to that dependant
+            return activeStages.filter(s => s.member_id === member.id && s.dependant_id === patientId);
+        }
     };
 
     const loadMemberData = async (data: any) => {
@@ -362,25 +374,6 @@ export default function RegisterVisit() {
                                     <span className="font-medium">Member is inactive. Advise payment before service.</span>
                                 </div>
                             )}
-                            {activeStages.length > 0 && (
-                                <div className="mt-4 p-4 border border-blue-200 bg-blue-50 rounded-lg space-y-2">
-                                    <div className="flex items-center gap-2 text-blue-800 font-bold">
-                                        <Info className="h-5 w-5" />
-                                        Ongoing Multi-Stage Treatment Detected
-                                    </div>
-                                    <div className="space-y-1">
-                                        {activeStages.filter(as =>
-                                            as.member_id === member.id &&
-                                            (selectedPatientId === member.id ? as.dependant_id === null : as.dependant_id === selectedPatientId)
-                                        ).map(as => (
-                                            <p key={as.id} className="text-sm text-blue-700">
-                                                • {as.services.name} {as.tooth_number ? `(Tooth #${as.tooth_number})` : ''} — <span className="font-bold">Stage {as.current_stage} of {as.total_stages}</span>
-                                            </p>
-                                        ))}
-                                    </div>
-                                    <p className="text-xs text-blue-600 italic">No new charges will be applied for this treatment today.</p>
-                                </div>
-                            )}
                         </CardContent>
                     </Card>
 
@@ -390,21 +383,38 @@ export default function RegisterVisit() {
                                 <CardTitle className="text-lg">Select Patient</CardTitle>
                                 <CardDescription>Who is receiving treatment today?</CardDescription>
                             </CardHeader>
-                            <CardContent>
+                            <CardContent className="space-y-4">
                                 <RadioGroup value={selectedPatientId} onValueChange={setSelectedPatientId} className="grid grid-cols-1 gap-4">
+                                    {/* Principal Member */}
                                     <div className={`flex items-center space-x-3 rounded-lg border p-4 cursor-pointer transition-colors ${selectedPatientId === member.id ? 'bg-primary/5 border-primary' : 'hover:bg-muted/50'}`}>
                                         <RadioGroupItem value={member.id} id={member.id} />
-                                        <Label htmlFor={member.id} className="flex-1 cursor-pointer font-medium">
-                                            {member.full_name} <Badge variant="outline" className="ml-2">Principal</Badge>
+                                        <Label htmlFor={member.id} className="flex-1 cursor-pointer">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-bold text-lg">{member.full_name}</span>
+                                                <Badge variant="outline" className="bg-slate-50 border-slate-200 text-slate-600">Principal</Badge>
+                                                {getStagesForPatient(member.id).length > 0 && (
+                                                    <Badge className="bg-blue-600 text-white animate-pulse shadow-sm font-black text-[10px] px-2 py-0.5 uppercase tracking-tight">
+                                                        Ongoing Treatment
+                                                    </Badge>
+                                                )}
+                                            </div>
                                         </Label>
                                     </div>
 
+                                    {/* Dependants */}
                                     {dependants.map((dep) => (
                                         <div key={dep.id} className={`flex items-center space-x-3 rounded-lg border p-4 cursor-pointer transition-colors ${selectedPatientId === dep.id ? 'bg-primary/5 border-primary' : 'hover:bg-muted/50'}`}>
                                             <RadioGroupItem value={dep.id} id={dep.id} />
                                             <Label htmlFor={dep.id} className="flex-1 cursor-pointer">
-                                                <div className="font-medium">{dep.full_name}</div>
-                                                <div className="text-sm text-muted-foreground">{dep.relationship} • {dep.id_number}</div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-bold text-lg">{dep.full_name}</span>
+                                                    {getStagesForPatient(dep.id).length > 0 && (
+                                                        <Badge className="bg-blue-600 text-white animate-pulse shadow-sm font-black text-[10px] px-2 py-0.5 uppercase tracking-tight">
+                                                            Ongoing Treatment
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                                <div className="text-sm font-medium text-slate-500">{dep.relationship} • {dep.id_number}</div>
                                             </Label>
                                             <Button
                                                 variant="ghost"
@@ -422,6 +432,40 @@ export default function RegisterVisit() {
                                         </div>
                                     ))}
                                 </RadioGroup>
+
+                                {/* Per-patient active stage detail banner */}
+                                {selectedPatientId && getStagesForPatient(selectedPatientId).length > 0 && (
+                                    <div className="p-5 border-2 border-blue-200 bg-blue-50/50 rounded-2xl space-y-3 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+                                        <div className="flex items-center gap-2 text-blue-900 font-black uppercase tracking-wider text-xs">
+                                            <Info className="h-4 w-4" />
+                                            Ongoing Multi-Stage Treatment Detected
+                                        </div>
+                                        <div className="space-y-2">
+                                            {getStagesForPatient(selectedPatientId).map(s => (
+                                                <div key={s.id} className="bg-white p-3 rounded-xl border border-blue-100 flex justify-between items-center group">
+                                                    <div className="flex flex-col">
+                                                        <span className="font-extrabold text-slate-900">
+                                                            {s.services?.name || 'Ongoing Treatment'}
+                                                        </span>
+                                                        <span className="text-xs text-slate-500">
+                                                            {s.tooth_number ? `Tooth #${s.tooth_number}` : 'General Procedure'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <Badge className="bg-blue-600 text-white font-bold px-3">
+                                                            Stage {s.current_stage} of {s.total_stages}
+                                                        </Badge>
+                                                        <p className="text-[10px] text-blue-700 font-bold mt-1 uppercase tracking-tighter">In Progress</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="pt-2 border-t border-blue-200/50 flex items-center gap-2 text-blue-700 font-medium text-xs italic">
+                                            <CheckCircle className="h-3 w-3" />
+                                            No new charges will be applied for these treatments today.
+                                        </div>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
                     )}

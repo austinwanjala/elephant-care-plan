@@ -13,6 +13,8 @@ import {
   DollarSign,
   Users,
   RefreshCw,
+  Activity,
+  CheckCircle2,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -79,6 +81,7 @@ const MemberDashboard = () => {
   const [dependants, setDependants] = useState<Dependant[]>([]);
   const [visits, setVisits] = useState<Visit[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [ongoingTreatments, setOngoingTreatments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -101,6 +104,7 @@ const MemberDashboard = () => {
       fetchVisits(user.id),
       fetchPayments(user.id),
       fetchDependants(user.id),
+      fetchOngoingTreatments(user.id),
     ]);
     setLoading(false);
   };
@@ -132,6 +136,30 @@ const MemberDashboard = () => {
       if (data) setDependants(data);
     }
   }
+
+  const fetchOngoingTreatments = async (userId: string) => {
+    const { data: memberData } = await supabase.from("members").select("id").eq("user_id", userId).single();
+    if (!memberData) return;
+
+    const { data: rawStages } = await (supabase as any)
+      .from("service_stages")
+      .select("*")
+      .eq("member_id", memberData.id)
+      .eq("status", "in_progress");
+
+    if (rawStages && rawStages.length > 0) {
+      const serviceIds = [...new Set(rawStages.map((s: any) => s.service_id))];
+      const { data: servicesData } = await (supabase as any)
+        .from("services")
+        .select("id, name")
+        .in("id", serviceIds);
+      const servicesMap: Record<string, any> = {};
+      (servicesData || []).forEach((svc: any) => { servicesMap[svc.id] = svc; });
+      setOngoingTreatments(rawStages.map((s: any) => ({ ...s, serviceName: servicesMap[s.service_id]?.name || 'Service' })));
+    } else {
+      setOngoingTreatments([]);
+    }
+  };
 
   const fetchVisits = async (userId: string) => {
     const { data: memberData } = await supabase
@@ -335,6 +363,63 @@ const MemberDashboard = () => {
               benefit_limit: member.benefit_limit || 0,
               id_number: member.id_number,
             }} />}
+
+            {/* Ongoing Treatment Panel */}
+            {ongoingTreatments.length > 0 && (
+              <Card className="border-blue-300 bg-gradient-to-br from-blue-50 to-white shadow-md">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-blue-900">
+                    <Activity className="h-5 w-5 animate-pulse" />
+                    Ongoing Treatment
+                  </CardTitle>
+                  <CardDescription className="text-blue-600 text-xs">Active multi-stage procedures</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {ongoingTreatments.map((t: any) => {
+                    const progress = Math.round((t.current_stage / t.total_stages) * 100);
+                    const nextStage = t.current_stage + 1;
+                    const isNearComplete = nextStage === t.total_stages;
+                    return (
+                      <div key={t.id} className="bg-white rounded-xl border border-blue-100 p-3 space-y-2 shadow-sm">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-bold text-sm text-slate-900">{t.serviceName}</p>
+                            {t.tooth_number && (
+                              <p className="text-xs text-blue-600">Tooth #{t.tooth_number}</p>
+                            )}
+                          </div>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isNearComplete ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-blue-100 text-blue-700 border border-blue-200'}`}>
+                            {isNearComplete ? 'Almost Done' : 'In Progress'}
+                          </span>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-[10px] font-semibold text-blue-800">
+                            <span>Stage {t.current_stage} of {t.total_stages} completed</span>
+                            <span>{progress}%</span>
+                          </div>
+                          <div className="h-2 w-full bg-blue-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-blue-500 rounded-full transition-all"
+                              style={{ width: `${progress}%` }}
+                            />
+                          </div>
+                          <div className="flex gap-1">
+                            {Array.from({ length: t.total_stages }, (_, i) => (
+                              <div
+                                key={i}
+                                className={`flex-1 h-1 rounded-full ${i < t.current_stage ? 'bg-blue-500' : 'bg-slate-200'
+                                  }`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-slate-500">Next visit: Stage {nextStage} of {t.total_stages}</p>
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            )}
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Search, UserCheck, UserX, Fingerprint, ArrowRight, Loader2, CheckCircle, ArrowLeft, Users, Info } from "lucide-react";
+import { Search, UserCheck, UserX, Fingerprint, ArrowRight, Loader2, CheckCircle, ArrowLeft, Users, Activity, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, Link } from "react-router-dom";
 import { BiometricCapture } from "@/components/BiometricCapture";
@@ -34,6 +34,7 @@ export default function RegisterVisit() {
     const [selectedDoctorId, setSelectedDoctorId] = useState<string>("");
     const [selectedDependant, setSelectedDependant] = useState<any>(null);
     const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+    const [ongoingStages, setOngoingStages] = useState<any[]>([]);
     const { toast } = useToast();
     const navigate = useNavigate();
 
@@ -144,6 +145,26 @@ export default function RegisterVisit() {
 
                 if (dependantsData) {
                     setDependants(dependantsData);
+                }
+
+                // Fetch ongoing multi-stage treatments
+                const { data: rawStages } = await (supabase as any)
+                    .from("service_stages")
+                    .select("*")
+                    .eq("member_id", data.id)
+                    .eq("status", "in_progress");
+
+                if (rawStages && rawStages.length > 0) {
+                    const serviceIds = [...new Set(rawStages.map((s: any) => s.service_id))];
+                    const { data: servicesData } = await (supabase as any)
+                        .from("services")
+                        .select("id, name")
+                        .in("id", serviceIds);
+                    const servicesMap: Record<string, any> = {};
+                    (servicesData || []).forEach((svc: any) => { servicesMap[svc.id] = svc; });
+                    setOngoingStages(rawStages.map((s: any) => ({ ...s, serviceName: servicesMap[s.service_id]?.name || 'Unknown Service' })));
+                } else {
+                    setOngoingStages([]);
                 }
 
                 if (data.biometric_data) {
@@ -297,41 +318,201 @@ export default function RegisterVisit() {
 
                     {member.is_active && (
                         <Card>
-                            <CardHeader>
+                            <CardHeader className="pb-3">
                                 <CardTitle className="text-lg">Select Patient</CardTitle>
-                                <CardDescription>Who is receiving treatment today?</CardDescription>
+                                <CardDescription>Who is receiving treatment today? Select to see their status.</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <RadioGroup value={selectedPatientId} onValueChange={setSelectedPatientId} className="grid grid-cols-1 gap-4">
-                                    <div className={`flex items-center space-x-3 rounded-lg border p-4 cursor-pointer transition-colors ${selectedPatientId === member.id ? 'bg-primary/5 border-primary' : 'hover:bg-muted/50'}`}>
-                                        <RadioGroupItem value={member.id} id={member.id} />
-                                        <Label htmlFor={member.id} className="flex-1 cursor-pointer font-medium">
-                                            {member.full_name} <Badge variant="outline" className="ml-2">Principal</Badge>
-                                        </Label>
-                                    </div>
+                                <RadioGroup value={selectedPatientId} onValueChange={setSelectedPatientId} className="space-y-3">
 
-                                    {dependants.map((dep) => (
-                                        <div key={dep.id} className={`flex items-center space-x-3 rounded-lg border p-4 cursor-pointer transition-colors ${selectedPatientId === dep.id ? 'bg-primary/5 border-primary' : 'hover:bg-muted/50'}`}>
-                                            <RadioGroupItem value={dep.id} id={dep.id} />
-                                            <Label htmlFor={dep.id} className="flex-1 cursor-pointer">
-                                                <div className="font-medium">{dep.full_name}</div>
-                                                <div className="text-sm text-muted-foreground">{dep.relationship} • {dep.id_number}</div>
-                                            </Label>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-8 w-8 p-0"
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                    setSelectedDependant(dep);
-                                                    setDetailsDialogOpen(true);
-                                                }}
+                                    {/* ── Principal Member ── */}
+                                    {(() => {
+                                        const isSelected = selectedPatientId === member.id;
+                                        const principalStages = ongoingStages.filter((s: any) => !s.dependant_id);
+
+                                        return (
+                                            <div className={`rounded-xl border-2 transition-all duration-200 overflow-hidden ${isSelected ? 'border-primary bg-primary/5 shadow-md' : 'border-border hover:border-primary/40 hover:bg-muted/30'
+                                                }`}>
+                                                {/* Radio Row */}
+                                                <div
+                                                    className="flex items-center gap-3 p-4 cursor-pointer"
+                                                    onClick={() => setSelectedPatientId(member.id)}
+                                                >
+                                                    <RadioGroupItem value={member.id} id={`radio-${member.id}`} />
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <span className="font-semibold text-base">{member.full_name}</span>
+                                                            <Badge variant="outline" className="text-xs">Principal</Badge>
+                                                            <Badge variant={member.is_active ? 'default' : 'destructive'} className="text-xs">
+                                                                {member.is_active ? 'Active' : 'Inactive'}
+                                                            </Badge>
+                                                            {principalStages.length > 0 && (
+                                                                <Badge className="text-xs bg-blue-600">
+                                                                    {principalStages.length} Ongoing
+                                                                </Badge>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-xs text-muted-foreground mt-0.5">{member.id_number} • {member.phone}</p>
+                                                    </div>
+                                                </div>
+
+                                                {/* Status Panel — shown when selected */}
+                                                {isSelected && (
+                                                    <div className="border-t bg-white/70 px-4 py-3 space-y-3">
+                                                        <div className="grid grid-cols-2 gap-3 text-sm">
+                                                            <div className="space-y-0.5">
+                                                                <p className="text-[10px] font-bold uppercase text-muted-foreground">Coverage Balance</p>
+                                                                <p className="font-bold text-primary text-base">KES {member.coverage_balance?.toLocaleString() || 0}</p>
+                                                            </div>
+                                                            <div className="space-y-0.5">
+                                                                <p className="text-[10px] font-bold uppercase text-muted-foreground">Scheme</p>
+                                                                <p className="font-medium">{member.membership_categories?.name || 'N/A'}</p>
+                                                            </div>
+                                                            <div className="space-y-0.5">
+                                                                <p className="text-[10px] font-bold uppercase text-muted-foreground">Branch</p>
+                                                                <p className="font-medium">{member.branches?.name || 'N/A'}</p>
+                                                            </div>
+                                                            <div className="space-y-0.5">
+                                                                <p className="text-[10px] font-bold uppercase text-muted-foreground">Member #</p>
+                                                                <p className="font-medium">{member.member_number}</p>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Ongoing treatments for principal */}
+                                                        {principalStages.length > 0 && (
+                                                            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-2">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <Activity className="h-3.5 w-3.5 text-blue-600 animate-pulse" />
+                                                                    <span className="text-xs font-black text-blue-900 uppercase tracking-wide">Ongoing Treatments</span>
+                                                                </div>
+                                                                {principalStages.map((s: any) => (
+                                                                    <div key={s.id} className="flex items-center justify-between bg-white rounded border border-blue-100 px-2.5 py-1.5">
+                                                                        <div>
+                                                                            <p className="text-xs font-semibold text-blue-900">{s.serviceName}</p>
+                                                                            {s.tooth_number && <p className="text-[10px] text-blue-500">Tooth #{s.tooth_number}</p>}
+                                                                        </div>
+                                                                        <span className="text-[10px] font-bold bg-blue-600 text-white px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                                                                            Stage {s.current_stage}/{s.total_stages}
+                                                                        </span>
+                                                                    </div>
+                                                                ))}
+                                                                <p className="text-[10px] text-blue-600 font-medium">↳ Follow-up visit — no new charges</p>
+                                                            </div>
+                                                        )}
+
+                                                        {!member.is_active && (
+                                                            <div className="flex items-center gap-2 text-xs text-destructive bg-destructive/10 px-3 py-2 rounded-lg font-medium">
+                                                                <UserX className="h-3.5 w-3.5 shrink-0" />
+                                                                Member inactive — advise payment before service
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })()}
+
+                                    {/* ── Dependants ── */}
+                                    {dependants.map((dep) => {
+                                        const isSelected = selectedPatientId === dep.id;
+                                        const depStages = ongoingStages.filter((s: any) => s.dependant_id === dep.id);
+                                        const age = dep.dob
+                                            ? Math.floor((Date.now() - new Date(dep.dob).getTime()) / (1000 * 60 * 60 * 24 * 365.25))
+                                            : null;
+
+                                        return (
+                                            <div
+                                                key={dep.id}
+                                                className={`rounded-xl border-2 transition-all duration-200 overflow-hidden ${isSelected ? 'border-primary bg-primary/5 shadow-md' : 'border-border hover:border-primary/40 hover:bg-muted/30'
+                                                    }`}
                                             >
-                                                <Info className="h-4 w-4 text-muted-foreground" />
-                                            </Button>
-                                        </div>
-                                    ))}
+                                                {/* Radio Row */}
+                                                <div
+                                                    className="flex items-center gap-3 p-4 cursor-pointer"
+                                                    onClick={() => setSelectedPatientId(dep.id)}
+                                                >
+                                                    <RadioGroupItem value={dep.id} id={`radio-${dep.id}`} />
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <span className="font-semibold text-base">{dep.full_name}</span>
+                                                            <Badge variant="outline" className="text-xs capitalize">{dep.relationship}</Badge>
+                                                            <Badge variant="secondary" className="text-xs">Covered</Badge>
+                                                            {depStages.length > 0 && (
+                                                                <Badge className="text-xs bg-blue-600">
+                                                                    {depStages.length} Ongoing
+                                                                </Badge>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-xs text-muted-foreground mt-0.5">
+                                                            {dep.id_number}{age !== null ? ` • ${age} yrs` : ''}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                {/* Status Panel — shown when selected */}
+                                                {isSelected && (
+                                                    <div className="border-t bg-white/70 px-4 py-3 space-y-3">
+                                                        <div className="grid grid-cols-2 gap-3 text-sm">
+                                                            <div className="space-y-0.5">
+                                                                <p className="text-[10px] font-bold uppercase text-muted-foreground">Coverage</p>
+                                                                <p className="font-bold text-primary text-base">KES {member.coverage_balance?.toLocaleString() || 0}</p>
+                                                                <p className="text-[10px] text-muted-foreground">Shared from principal</p>
+                                                            </div>
+                                                            <div className="space-y-0.5">
+                                                                <p className="text-[10px] font-bold uppercase text-muted-foreground">Date of Birth</p>
+                                                                <p className="font-medium">
+                                                                    {dep.dob ? new Date(dep.dob).toLocaleDateString() : 'N/A'}
+                                                                    {age !== null && <span className="text-muted-foreground text-xs ml-1">({age} yrs)</span>}
+                                                                </p>
+                                                            </div>
+                                                            <div className="space-y-0.5">
+                                                                <p className="text-[10px] font-bold uppercase text-muted-foreground">ID / Birth Cert</p>
+                                                                <p className="font-medium">{dep.id_number}</p>
+                                                            </div>
+                                                            <div className="space-y-0.5">
+                                                                <p className="text-[10px] font-bold uppercase text-muted-foreground">Relationship</p>
+                                                                <p className="font-medium capitalize">{dep.relationship}</p>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Dependant photo if available */}
+                                                        {dep.image_url && (
+                                                            <div className="flex items-center gap-3 bg-muted/30 rounded-lg p-2">
+                                                                <img
+                                                                    src={dep.image_url}
+                                                                    alt={dep.full_name}
+                                                                    className="h-14 w-11 object-cover rounded border"
+                                                                />
+                                                                <div className="text-xs text-muted-foreground">ID photo on file</div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Ongoing treatments for this dependant */}
+                                                        {depStages.length > 0 && (
+                                                            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-2">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <Activity className="h-3.5 w-3.5 text-blue-600 animate-pulse" />
+                                                                    <span className="text-xs font-black text-blue-900 uppercase tracking-wide">Ongoing Treatments</span>
+                                                                </div>
+                                                                {depStages.map((s: any) => (
+                                                                    <div key={s.id} className="flex items-center justify-between bg-white rounded border border-blue-100 px-2.5 py-1.5">
+                                                                        <div>
+                                                                            <p className="text-xs font-semibold text-blue-900">{s.serviceName}</p>
+                                                                            {s.tooth_number && <p className="text-[10px] text-blue-500">Tooth #{s.tooth_number}</p>}
+                                                                        </div>
+                                                                        <span className="text-[10px] font-bold bg-blue-600 text-white px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                                                                            Stage {s.current_stage}/{s.total_stages}
+                                                                        </span>
+                                                                    </div>
+                                                                ))}
+                                                                <p className="text-[10px] text-blue-600 font-medium">↳ Follow-up visit — no new charges</p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
                                 </RadioGroup>
                             </CardContent>
                         </Card>

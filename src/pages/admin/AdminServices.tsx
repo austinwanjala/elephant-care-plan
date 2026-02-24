@@ -50,6 +50,7 @@ interface Service {
   is_active: boolean;
   is_multi_stage: boolean;
   total_stages: number;
+  stage_names: string[];
 }
 
 interface Branch {
@@ -78,7 +79,8 @@ export default function AdminServices() {
     benefitCost: "",
     approvalType: "all_branches" as "all_branches" | "pre_approved_only",
     isMultiStage: false,
-    totalStages: 2
+    totalStages: 2,
+    stageNames: [] as string[]
   });
   const { toast } = useToast();
 
@@ -107,7 +109,8 @@ export default function AdminServices() {
         benefit_cost: parseFloat(formData.benefitCost),
         approval_type: formData.approvalType,
         is_multi_stage: formData.isMultiStage,
-        total_stages: formData.isMultiStage ? formData.totalStages : 1
+        total_stages: formData.isMultiStage ? formData.totalStages : 1,
+        stage_names: formData.isMultiStage ? formData.stageNames : []
       });
 
       if (error) throw error;
@@ -134,7 +137,8 @@ export default function AdminServices() {
           benefit_cost: parseFloat(formData.benefitCost),
           approval_type: formData.approvalType,
           is_multi_stage: formData.isMultiStage,
-          total_stages: formData.isMultiStage ? formData.totalStages : 1
+          total_stages: formData.isMultiStage ? formData.totalStages : 1,
+          stage_names: formData.isMultiStage ? formData.stageNames : []
         })
         .eq("id", selectedService.id);
 
@@ -218,7 +222,8 @@ export default function AdminServices() {
       benefitCost: (service.benefit_cost ?? 0).toString(),
       approvalType: service.approval_type || "all_branches",
       isMultiStage: service.is_multi_stage || false,
-      totalStages: service.total_stages || 2
+      totalStages: service.total_stages || 2,
+      stageNames: service.stage_names || []
     });
     setEditDialogOpen(true);
   };
@@ -242,7 +247,8 @@ export default function AdminServices() {
       benefitCost: "",
       approvalType: "all_branches",
       isMultiStage: false,
-      totalStages: 2
+      totalStages: 2,
+      stageNames: []
     });
   };
 
@@ -284,7 +290,7 @@ export default function AdminServices() {
                 <Plus className="mr-2 h-4 w-4" /> Add Service
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="font-serif">Add New Service</DialogTitle>
               </DialogHeader>
@@ -366,14 +372,47 @@ export default function AdminServices() {
                 </div>
 
                 {formData.isMultiStage && (
-                  <div className="space-y-2">
-                    <Label>Total Stages</Label>
-                    <Input
-                      type="number"
-                      min="2"
-                      value={formData.totalStages}
-                      onChange={(e) => setFormData({ ...formData, totalStages: parseInt(e.target.value) || 2 })}
-                    />
+                  <div className="space-y-4 border-t pt-4 mt-2">
+                    <div className="space-y-2">
+                      <Label>Total Stages</Label>
+                      <Input
+                        type="number"
+                        min="2"
+                        value={formData.totalStages}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 2;
+                          const newNames = [...formData.stageNames];
+                          if (newNames.length < val) {
+                            for (let i = newNames.length; i < val; i++) newNames.push("");
+                          } else if (newNames.length > val) {
+                            newNames.splice(val);
+                          }
+                          setFormData({ ...formData, totalStages: val, stageNames: newNames });
+                        }}
+                      />
+                    </div>
+
+                    <div className="space-y-3">
+                      <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Stage Names (Display Only)</Label>
+                      <div className="grid gap-3 max-h-48 overflow-y-auto pr-2">
+                        {Array.from({ length: formData.totalStages }).map((_, i) => (
+                          <div key={i} className="flex gap-2 items-center">
+                            <Badge variant="outline" className="h-10 w-10 shrink-0 flex items-center justify-center font-bold">
+                              {i + 1}
+                            </Badge>
+                            <Input
+                              placeholder={`Stage ${i + 1} Name (e.g., Extirpation)`}
+                              value={formData.stageNames[i] || ""}
+                              onChange={(e) => {
+                                const newNames = [...formData.stageNames];
+                                newNames[i] = e.target.value;
+                                setFormData({ ...formData, stageNames: newNames });
+                              }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 )}
                 <Button onClick={handleAddService} className="btn-primary">
@@ -448,7 +487,7 @@ export default function AdminServices() {
 
       {/* Edit Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-serif">Edit Service</DialogTitle>
           </DialogHeader>
@@ -517,14 +556,47 @@ export default function AdminServices() {
             </div>
 
             {formData.isMultiStage && (
-              <div className="space-y-2">
-                <Label>Total Stages</Label>
-                <Input
-                  type="number"
-                  min="2"
-                  value={formData.totalStages}
-                  onChange={(e) => setFormData({ ...formData, totalStages: parseInt(e.target.value) || 2 })}
-                />
+              <div className="space-y-4 border-t pt-4 mt-2">
+                <div className="space-y-2">
+                  <Label>Total Stages</Label>
+                  <Input
+                    type="number"
+                    min="2"
+                    value={formData.totalStages}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value) || 2;
+                      const newNames = [...formData.stageNames];
+                      if (newNames.length < val) {
+                        for (let i = newNames.length; i < val; i++) newNames.push("");
+                      } else if (newNames.length > val) {
+                        newNames.splice(val);
+                      }
+                      setFormData({ ...formData, totalStages: val, stageNames: newNames });
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-3">
+                  <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Stage Names (Display Only)</Label>
+                  <div className="grid gap-3 max-h-48 overflow-y-auto pr-2">
+                    {Array.from({ length: formData.totalStages }).map((_, i) => (
+                      <div key={i} className="flex gap-2 items-center">
+                        <Badge variant="outline" className="h-10 w-10 shrink-0 flex items-center justify-center font-bold">
+                          {i + 1}
+                        </Badge>
+                        <Input
+                          placeholder={`Stage ${i + 1} Name (e.g., Extirpation)`}
+                          value={formData.stageNames[i] || ""}
+                          onChange={(e) => {
+                            const newNames = [...formData.stageNames];
+                            newNames[i] = e.target.value;
+                            setFormData({ ...formData, stageNames: newNames });
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
 
@@ -537,7 +609,7 @@ export default function AdminServices() {
 
       {/* Pre-approval Dialog */}
       <Dialog open={preapprovalDialogOpen} onOpenChange={setPreapprovalDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-serif">Manage Pre-Approved Branches</DialogTitle>
           </DialogHeader>

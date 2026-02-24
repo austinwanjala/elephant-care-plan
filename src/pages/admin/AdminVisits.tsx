@@ -20,6 +20,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
+import { Label } from "@/components/ui/label";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,14 +46,26 @@ interface Visit {
   branches: { name: string } | null;
   receptionist: { full_name: string } | null;
   doctor: { full_name: string } | null;
+  periodontal_status: string | null;
   xray_urls: string[] | null;
-  bills: { total_benefit_cost: number; total_branch_compensation: number; total_profit_loss: number; bill_items: { service_name: string }[] }[] | null;
+  bills: {
+    total_benefit_cost: number;
+    total_branch_compensation: number;
+    total_profit_loss: number;
+    bill_items: {
+      service_name: string;
+      current_stage?: number;
+      total_stages?: number;
+    }[]
+  }[] | null;
 }
 
 export default function AdminVisits() {
   const [visits, setVisits] = useState<Visit[]>([]);
   const [loading, setLoading] = useState(true);
   const [date, setDate] = useState<DateRange | undefined>(undefined);
+  const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -61,17 +74,32 @@ export default function AdminVisits() {
 
   const loadVisits = async () => {
     setLoading(true);
-    // Updated query to include aliased joins for doctor and receptionist names
     let query = (supabase as any)
       .from("visits")
       .select(`
-        *, 
+        id,
+        created_at,
+        status,
+        diagnosis,
+        treatment_notes,
+        benefit_deducted,
+        branch_compensation,
+        profit_loss,
+        notes,
+        periodontal_status,
+        xray_urls,
         members(full_name, member_number), 
         branches(name), 
         doctor:doctor_id(full_name), 
         receptionist:receptionist_id(full_name), 
-        xray_urls,
-        bills(total_benefit_cost, total_branch_compensation, total_profit_loss, bill_items(service_name))
+        bills(
+          total_benefit_cost, 
+          total_branch_compensation, 
+          total_profit_loss, 
+          bill_items(
+            service_name
+          )
+        )
       `)
       .order("created_at", { ascending: false });
 
@@ -327,14 +355,27 @@ export default function AdminVisits() {
                           KES {profitLoss.toLocaleString()}
                         </TableCell>
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                            onClick={() => setDeleteId(visit.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-primary hover:bg-primary/10"
+                              onClick={() => {
+                                setSelectedVisit(visit);
+                                setDetailsOpen(true);
+                              }}
+                            >
+                              <History className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => setDeleteId(visit.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
@@ -347,6 +388,7 @@ export default function AdminVisits() {
       </Card>
 
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+        {/* ... (existing content) */}
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
@@ -365,6 +407,163 @@ export default function AdminVisits() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Visit Details Modal */}
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-serif">Visit Details</DialogTitle>
+          </DialogHeader>
+
+          {selectedVisit && (
+            <div className="space-y-8 py-4">
+              {/* Header Info */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 p-6 rounded-xl bg-slate-50 border shadow-sm">
+                <div>
+                  <Label className="text-[10px] uppercase font-bold text-muted-foreground">Patient</Label>
+                  <p className="font-bold text-slate-900">{selectedVisit.members?.full_name}</p>
+                  <p className="text-xs text-muted-foreground">{selectedVisit.members?.member_number}</p>
+                </div>
+                <div>
+                  <Label className="text-[10px] uppercase font-bold text-muted-foreground">Date & Time</Label>
+                  <p className="font-bold text-slate-900">{format(new Date(selectedVisit.created_at), "MMM d, yyyy")}</p>
+                  <p className="text-xs text-muted-foreground">{format(new Date(selectedVisit.created_at), "HH:mm")}</p>
+                </div>
+                <div>
+                  <Label className="text-[10px] uppercase font-bold text-muted-foreground">Branch</Label>
+                  <p className="font-bold text-slate-900">{selectedVisit.branches?.name}</p>
+                </div>
+                <div>
+                  <Label className="text-[10px] uppercase font-bold text-muted-foreground">Status</Label>
+                  <div className="mt-1">{getStatusBadge(selectedVisit.status)}</div>
+                </div>
+              </div>
+
+              {/* Clinical Details */}
+              <div className="grid md:grid-cols-2 gap-8">
+                <div className="space-y-6">
+                  <div className="space-y-3">
+                    <h3 className="font-bold text-lg border-b pb-2 flex items-center gap-2">
+                      <History className="w-5 h-5 text-primary" /> Clinical Assessment
+                    </h3>
+
+                    {selectedVisit.periodontal_status && (
+                      <div className="bg-primary/5 rounded-lg p-3 border border-primary/20">
+                        <Label className="text-[10px] uppercase font-bold text-primary">Periodontal Status</Label>
+                        <p className="font-bold text-primary">{selectedVisit.periodontal_status.toUpperCase()}</p>
+                      </div>
+                    )}
+
+                    <div>
+                      <Label className="text-xs font-bold text-muted-foreground">Diagnosis</Label>
+                      <div className="mt-1 p-3 rounded-lg bg-slate-50 border min-h-[60px] text-sm">
+                        {selectedVisit.diagnosis || "No diagnosis recorded."}
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label className="text-xs font-bold text-muted-foreground">Treatment Notes</Label>
+                      <div className="mt-1 p-3 rounded-lg bg-slate-50 border min-h-[60px] text-sm italic">
+                        {selectedVisit.treatment_notes || "No treatment notes."}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h3 className="font-bold text-lg border-b pb-2">Medical Staff</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-3 rounded-lg border bg-slate-50/50">
+                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">Attending Doctor</Label>
+                        <p className="font-medium">{selectedVisit.doctor?.full_name || "N/A"}</p>
+                      </div>
+                      <div className="p-3 rounded-lg border bg-slate-50/50">
+                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">Receptionist</Label>
+                        <p className="font-medium">{selectedVisit.receptionist?.full_name || "N/A"}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <h3 className="font-bold text-lg border-b pb-2 flex items-center gap-2">
+                    <ImageIcon className="w-5 h-5 text-primary" /> Radiographs (X-Rays)
+                  </h3>
+                  {selectedVisit.xray_urls && selectedVisit.xray_urls.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-4">
+                      {selectedVisit.xray_urls.map((url, idx) => (
+                        <Dialog key={idx}>
+                          <DialogTrigger asChild>
+                            <div className="aspect-square rounded-xl border-2 border-slate-200 overflow-hidden cursor-zoom-in hover:border-primary transition-all shadow-sm group relative">
+                              <img src={url} alt={`X-ray ${idx + 1}`} className="w-full h-full object-cover" />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                <span className="text-white text-xs font-bold">View Larger</span>
+                              </div>
+                            </div>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-5xl p-0 bg-black border-0">
+                            <img src={url} className="max-h-[90vh] w-auto mx-auto object-contain" alt="X-ray viewing" />
+                          </DialogContent>
+                        </Dialog>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="h-40 flex flex-col items-center justify-center border-2 border-dashed rounded-xl text-muted-foreground bg-slate-50">
+                      <ImageIcon className="w-10 h-10 mb-2 opacity-20" />
+                      <p className="text-sm">No X-rays uploaded for this visit.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Services & Billing */}
+              <div className="space-y-4">
+                <h3 className="font-bold text-lg border-b pb-2">Services & Billing Summary</h3>
+                <Table className="border rounded-xl">
+                  <TableHeader className="bg-slate-50">
+                    <TableRow>
+                      <TableHead>Service Name</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {selectedVisit.bills?.[0]?.bill_items?.map((item, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="font-medium">{item.service_name}</TableCell>
+                        <TableCell>
+                          {item.total_stages ? (
+                            <Badge variant="secondary" className="bg-blue-50 text-blue-700">
+                              Stage {item.current_stage} of {item.total_stages}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline">Service Item</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right font-mono italic text-xs text-muted-foreground">Included in Total</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+
+                <div className="flex justify-end pt-4">
+                  <div className="w-full sm:w-80 space-y-3 bg-slate-50 p-6 rounded-xl border shadow-sm">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Admin Profit/Loss:</span>
+                      <span className={cn("font-bold", (selectedVisit.bills?.[0]?.total_profit_loss || 0) >= 0 ? "text-success" : "text-destructive")}>
+                        KES {(selectedVisit.bills?.[0]?.total_profit_loss || 0).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="border-t pt-2 flex justify-between font-bold text-lg">
+                      <span>Benefit Deducted:</span>
+                      <span className="text-destructive">KES {(selectedVisit.bills?.[0]?.total_benefit_cost || 0).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

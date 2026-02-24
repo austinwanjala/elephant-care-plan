@@ -3,7 +3,7 @@ import { useNavigate, Outlet } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { NotificationBell } from "../notifications/NotificationBell";
 import { ReceptionSidebar } from "./ReceptionSidebar";
-import PortalMessages from "../PortalMessages";
+
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
@@ -12,16 +12,26 @@ interface ReceptionLayoutProps {
     children?: ReactNode;
 }
 
+import { useSystemSettings } from "@/hooks/useSystemSettings";
+
 export function ReceptionLayout({ children }: ReceptionLayoutProps) {
     const [loading, setLoading] = useState(true);
     const [authorized, setAuthorized] = useState(false);
     const [userName, setUserName] = useState<string | null>(null);
+    const [role, setRole] = useState<string | null>(null);
     const navigate = useNavigate();
     const { toast } = useToast();
+    const { settings } = useSystemSettings();
 
     useEffect(() => {
         checkAuth();
     }, []);
+
+    useEffect(() => {
+        if (settings.maintenance_mode === "true" && role !== "admin" && role !== "super_admin") {
+            navigate("/maintenance");
+        }
+    }, [settings.maintenance_mode, role, navigate]);
 
     const checkAuth = async () => {
         setLoading(true); // Ensure loading starts
@@ -49,8 +59,10 @@ export function ReceptionLayout({ children }: ReceptionLayoutProps) {
             return;
         }
 
-        // @ts-ignore
-        if (roleData?.role !== "receptionist" && roleData?.role !== "admin") {
+        const userRole = roleData?.role as string;
+        setRole(userRole);
+
+        if (userRole !== "receptionist" && userRole !== "admin") {
             toast({
                 title: "Access Denied",
                 description: "You must be a receptionist to view this page.",
@@ -60,6 +72,7 @@ export function ReceptionLayout({ children }: ReceptionLayoutProps) {
             setLoading(false);
             return;
         }
+
 
         // Fetch Receptionist Name
         const { data: staffData } = await supabase

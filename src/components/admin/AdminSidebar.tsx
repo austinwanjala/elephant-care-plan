@@ -33,6 +33,8 @@ import { supabase } from "@/integrations/supabase/client";
 
 import { usePermissions } from "@/hooks/usePermissions";
 
+import { useSystemSettings } from "@/hooks/useSystemSettings";
+
 export function AdminSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
@@ -42,6 +44,7 @@ export function AdminSidebar() {
   const [basePath, setBasePath] = useState("/admin");
   const [roleLabel, setRoleLabel] = useState("Admin");
   const { hasPermission, loading: permsLoading } = usePermissions();
+  const { settings } = useSystemSettings();
 
   useEffect(() => {
     const checkRole = async () => {
@@ -70,6 +73,7 @@ export function AdminSidebar() {
     { title: "Services", url: `${basePath}/services`, icon: Stethoscope },
     { title: "Branch Payments", url: `${basePath}/branch-payments`, icon: DollarSign },
     { title: "Marketer Claims", url: `${basePath}/marketer-claims`, icon: ClipboardList },
+    { title: "Payments", url: `${basePath}/payments`, icon: DollarSign },
     { title: "Messages", url: `${basePath}/messages`, icon: MessageSquare },
   ];
 
@@ -148,12 +152,13 @@ export function AdminSidebar() {
           </div>
           {!collapsed && (
             <div>
-              <span className="text-lg font-serif font-bold text-foreground">Elephant Dental</span>
+              <span className="text-lg font-serif font-bold text-foreground">{settings.app_name || "Elephant Dental"}</span>
               <span className="ml-2 px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">{roleLabel}</span>
             </div>
           )}
         </div>
       </SidebarHeader>
+
 
       <SidebarContent>
         <SidebarGroup>

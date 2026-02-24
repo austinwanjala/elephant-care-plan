@@ -24,6 +24,25 @@ export function MemberLayout({ children }: MemberLayoutProps) {
 
   useEffect(() => {
     checkAuthAndMaintenance();
+
+    // Subscribe to maintenance mode changes
+    const channel = supabase
+      .channel('maintenance_updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'system_settings',
+          filter: 'key=eq.maintenance_mode'
+        },
+        () => checkAuthAndMaintenance()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const checkAuthAndMaintenance = async () => {

@@ -39,41 +39,27 @@ export default function StaffMessages() {
             setCurrentUser(staffMember);
             fetchStaff(staffMember.id);
             fetchMessages(staffMember.id);
-            subscribeToMessages(staffMember.id);
         }
     };
 
-    const fetchStaff = async (currentStaffId: string) => {
-        const { data } = await supabase
-            .from("staff")
-            .select("id, full_name, role, branches(name)")
-            .neq("id", currentStaffId);
-        setStaff(data || []);
-    };
+    useEffect(() => {
+        if (!currentUser) return;
 
-    const fetchMessages = async (currentStaffId: string) => {
-        const { data } = await supabase
-            .from("portal_messages")
-            .select("*, sender:staff!portal_messages_sender_id_fkey(full_name)")
-            .or(`recipient_id.eq.${currentStaffId},sender_id.eq.${currentStaffId}`)
-            .order("created_at", { ascending: true });
-
-        setMessages(data || []);
-    };
-
-    const subscribeToMessages = (currentStaffId: string) => {
         const channel = supabase
-            .channel('portal_messages_global')
+            .channel(`messages-${currentUser.id}`)
             .on(
                 'postgres_changes',
                 {
                     event: 'INSERT',
                     schema: 'public',
                     table: 'portal_messages',
-                    filter: `recipient_id=eq.${currentStaffId}`
                 },
                 (payload) => {
-                    setMessages(prev => [...prev, payload.new]);
+                    // Check if message is already in list (for sender who added it manually)
+                    setMessages(prev => {
+                        if (prev.find(m => m.id === payload.new.id)) return prev;
+                        return [...prev, payload.new];
+                    });
                 }
             )
             .subscribe();
@@ -81,6 +67,48 @@ export default function StaffMessages() {
         return () => {
             supabase.removeChannel(channel);
         };
+    }, [currentUser]);
+
+    useEffect(() => {
+        if (selectedStaff && currentUser) {
+            markMessagesAsRead(selectedStaff.id);
+        }
+    }, [selectedStaff, messages, currentUser]); // Added currentUser to dependencies
+
+    const markMessagesAsRead = async (senderId: string) => {
+        const unreadIds = messages
+            .filter(m => m.sender_id === senderId && m.recipient_id === currentUser.id && !m.is_read)
+            .map(m => m.id);
+
+        if (unreadIds.length > 0) {
+            const { error } = await supabase
+                .from("portal_messages")
+                .update({ is_read: true })
+                .in("id", unreadIds);
+
+            if (!error) {
+                setMessages(prev => prev.map(m => unreadIds.includes(m.id) ? { ...m, is_read: true } : m));
+            }
+        }
+    };
+
+    const fetchStaff = async (currentStaffId: string) => {
+        const { data } = await supabase
+            .from("staff")
+            .select("id, full_name, role, phone, email, branches(name)")
+            .neq("id", currentStaffId)
+            .neq("role", "member"); // Ensure patients/members don't show up in staff list
+        setStaff(data || []);
+    };
+
+    const fetchMessages = async (currentStaffId: string) => {
+        const { data } = await supabase
+            .from("portal_messages")
+            .select("*, sender:staff!portal_messages_sender_id_fkey(full_name), is_read")
+            .or(`recipient_id.eq.${currentStaffId},sender_id.eq.${currentStaffId}`)
+            .order("created_at", { ascending: true });
+
+        setMessages(data || []);
     };
 
     useEffect(() => {
@@ -94,21 +122,22 @@ export default function StaffMessages() {
 
         setLoading(true);
         try {
-            const { error } = await supabase.from("portal_messages").insert({
+            const { data, error } = await supabase.from("portal_messages").insert({
                 sender_id: currentUser.id,
                 recipient_id: selectedStaff.id,
                 content: newMessage,
-                branch_id: currentUser.branch_id
-            });
+                branch_id: currentUser.branch_id,
+                is_read: false
+            }).select().single();
 
             if (error) throw error;
 
-            setMessages(prev => [...prev, {
-                sender_id: currentUser.id,
-                recipient_id: selectedStaff.id,
-                content: newMessage,
-                created_at: new Date().toISOString()
-            }]);
+            if (data) {
+                setMessages(prev => {
+                    if (prev.find(m => m.id === data.id)) return prev;
+                    return [...prev, data];
+                });
+            }
 
             setNewMessage("");
         } catch (error: any) {
@@ -118,10 +147,23 @@ export default function StaffMessages() {
         }
     };
 
-    const filteredStaff = staff.filter(s =>
-        s.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (s.branches?.name || '').toLowerCase().includes(searchTerm.toLowerCase())
+    const filteredStaff = staff.sort((a, b) => {
+        // Sort by last message date
+        const lastA = [...messages].reverse().find(m =>
+            (m.sender_id === a.id && m.recipient_id === currentUser.id) ||
+            (m.sender_id === currentUser.id && m.recipient_id === a.id)
+        )?.created_at || '0';
+        const lastB = [...messages].reverse().find(m =>
+            (m.sender_id === b.id && m.recipient_id === currentUser.id) ||
+            (m.sender_id === currentUser.id && m.recipient_id === b.id)
+        )?.created_at || '0';
+        return new Date(lastB).getTime() - new Date(lastA).getTime();
+    }).filter(s =>
+        s.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        s.role?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (s.branches?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        s.phone?.includes(searchTerm) ||
+        s.email?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     if (!currentUser) return (
@@ -153,44 +195,50 @@ export default function StaffMessages() {
                     <ScrollArea className="flex-1">
                         <div className="p-2 space-y-1">
                             {filteredStaff.map(s => {
-                                const lastMsg = [...messages].reverse().find(m =>
-                                    (m.sender_id === s.id && m.recipient_id === currentUser.id) ||
-                                    (m.sender_id === currentUser.id && m.recipient_id === s.id)
-                                );
+                                const unreadCount = messages.filter(m =>
+                                    m.sender_id === s.id &&
+                                    m.recipient_id === currentUser.id &&
+                                    !m.is_read
+                                ).length;
 
                                 return (
                                     <button
                                         key={s.id}
                                         onClick={() => setSelectedStaff(s)}
                                         className={cn(
-                                            "w-full flex items-center gap-3 p-3 rounded-xl transition-all text-left",
+                                            "w-full flex items-center gap-3 p-3 rounded-xl transition-all text-left group relative",
                                             selectedStaff?.id === s.id
                                                 ? "bg-blue-600 text-white shadow-md shadow-blue-100"
                                                 : "hover:bg-slate-100 text-slate-900"
                                         )}
                                     >
                                         <div className={cn(
-                                            "h-12 w-12 rounded-full flex items-center justify-center",
+                                            "h-12 w-12 rounded-full flex items-center justify-center relative",
                                             selectedStaff?.id === s.id ? "bg-blue-400" : "bg-slate-200 text-slate-500"
                                         )}>
                                             <User className="h-6 w-6" />
+                                            {unreadCount > 0 && selectedStaff?.id !== s.id && (
+                                                <div className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold h-5 w-5 rounded-full flex items-center justify-center border-2 border-white">
+                                                    {unreadCount}
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="flex-1 overflow-hidden">
                                             <div className="flex justify-between items-center">
                                                 <div className="font-semibold truncate">{s.full_name}</div>
                                             </div>
                                             <div className={cn(
-                                                "text-[10px] uppercase font-bold tracking-wider",
+                                                "text-[10px] uppercase font-bold tracking-wider mb-0.5",
                                                 selectedStaff?.id === s.id ? "text-blue-100" : "text-slate-500"
                                             )}>{s.role} • {s.branches?.name || 'N/A'}</div>
-                                            {lastMsg && (
-                                                <div className={cn(
-                                                    "text-xs truncate mt-0.5",
-                                                    selectedStaff?.id === s.id ? "text-blue-50" : "text-slate-400"
-                                                )}>
-                                                    {lastMsg.content}
-                                                </div>
-                                            )}
+                                            <div className={cn(
+                                                "text-[9px] font-medium opacity-70",
+                                                selectedStaff?.id === s.id ? "text-blue-50" : "text-slate-400"
+                                            )}>
+                                                {s.phone && <span>{s.phone}</span>}
+                                                {s.phone && s.email && <span> • </span>}
+                                                {s.email && <span className="truncate">{s.email}</span>}
+                                            </div>
                                         </div>
                                     </button>
                                 );
@@ -208,11 +256,25 @@ export default function StaffMessages() {
                                     <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
                                         <User className="h-6 w-6" />
                                     </div>
-                                    <div>
+                                    <div className="flex-1">
                                         <CardTitle className="text-lg">{selectedStaff.full_name}</CardTitle>
-                                        <CardDescription className="text-xs">
-                                            {selectedStaff.role} • {selectedStaff.branches?.name}
-                                        </CardDescription>
+                                        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground mt-0.5">
+                                            <span className="font-bold text-slate-700">{selectedStaff.role}</span>
+                                            <span>•</span>
+                                            <span>{selectedStaff.branches?.name}</span>
+                                            {selectedStaff.phone && (
+                                                <>
+                                                    <span>•</span>
+                                                    <span className="flex items-center gap-1 font-medium text-blue-600">{selectedStaff.phone}</span>
+                                                </>
+                                            )}
+                                            {selectedStaff.email && (
+                                                <>
+                                                    <span>•</span>
+                                                    <span className="opacity-70">{selectedStaff.email}</span>
+                                                </>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </CardHeader>

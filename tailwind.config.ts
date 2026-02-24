@@ -101,8 +101,8 @@ export default {
         "pulse-soft": "pulse-soft 2s ease-in-out infinite",
       },
       boxShadow: {
-        'primary': '0 10px 30px -10px hsla(174, 62%, 38%, 0.4)',
-        'accent': '0 10px 30px -10px hsla(35, 95%, 55%, 0.4)',
+        'primary': 'var(--shadow-primary)',
+        'accent': 'var(--shadow-accent)',
         'card': '0 10px 40px -15px rgba(0, 0, 0, 0.1)',
       },
     },

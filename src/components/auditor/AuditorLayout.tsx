@@ -19,6 +19,8 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { NotificationBell } from "../notifications/NotificationBell";
 
+import { useSystemSettings } from "@/hooks/useSystemSettings";
+
 export const AuditorLayout = () => {
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -26,6 +28,15 @@ export const AuditorLayout = () => {
     const location = useLocation();
     const navigate = useNavigate(); // Add hook usage
     const { toast } = useToast();
+    const { settings } = useSystemSettings();
+
+    const [role, setRole] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (settings.maintenance_mode === "true" && role !== "admin" && role !== "super_admin") {
+            navigate("/maintenance");
+        }
+    }, [settings.maintenance_mode, role, navigate]);
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -43,8 +54,10 @@ export const AuditorLayout = () => {
                 .eq("user_id", user.id)
                 .single();
 
-            // @ts-ignore
-            if (roleData?.role !== "auditor" && roleData?.role !== "super_admin" && roleData?.role !== "admin") {
+            const userRole = roleData?.role as string;
+            setRole(userRole);
+
+            if (userRole !== "auditor" && userRole !== "super_admin" && userRole !== "admin") {
                 toast({
                     title: "Access Denied",
                     description: "This portal is restricted to Auditors.",
@@ -54,9 +67,8 @@ export const AuditorLayout = () => {
                 return;
             }
 
+
             // Fetch Auditor Name (from staff table, assuming auditors are staff or separate)
-            // If audits table exists, check there? No, user management is usually centralized.
-            // Let's check 'staff' table first.
             const { data: staffData } = await supabase
                 .from("staff")
                 .select("full_name")
@@ -64,10 +76,6 @@ export const AuditorLayout = () => {
                 .maybeSingle();
 
             if (staffData) {
-                // Use a separate state for name, or reuse userEmail but that's confusing.
-                // Let's just update the display logic to prefer name.
-                // We don't have a specific state for name in AuditorLayout yet except maybe inside 'userEmail' hack?
-                // No, let's add a state.
                 setUserName(staffData.full_name);
             }
         };
@@ -102,8 +110,8 @@ export const AuditorLayout = () => {
                     <div className="p-6 border-b border-slate-800 flex items-center gap-3">
                         <ShieldCheck className="h-8 w-8 text-emerald-400" />
                         <div>
-                            <h1 className="font-bold text-xl tracking-wide">Auditor Portal</h1>
-                            <p className="text-xs text-slate-400">Read-Only Access</p>
+                            <h1 className="font-bold text-xl tracking-wide">{settings.app_name || "Elephant Dental"}</h1>
+                            <p className="text-xs text-slate-400">Auditor Portal</p>
                         </div>
                         <button
                             className="ml-auto lg:hidden"
@@ -112,6 +120,7 @@ export const AuditorLayout = () => {
                             <X className="h-6 w-6" />
                         </button>
                     </div>
+
 
                     <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
                         {navItems.map((item) => {

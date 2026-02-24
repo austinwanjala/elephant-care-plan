@@ -12,11 +12,14 @@ const menuItems = [
     { title: "Messages", url: "/doctor/messages", icon: MessageSquare },
 ];
 
+import { useSystemSettings } from "@/hooks/useSystemSettings";
+
 export function DoctorSidebar() {
     const { state } = useSidebar();
     const collapsed = state === "collapsed";
     const navigate = useNavigate();
     const location = useLocation();
+    const { settings } = useSystemSettings();
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
@@ -37,12 +40,13 @@ export function DoctorSidebar() {
                     </div>
                     {!collapsed && (
                         <div>
-                            <span className="text-lg font-serif font-bold text-foreground">Elephant Dental</span>
+                            <span className="text-lg font-serif font-bold text-foreground">{settings.app_name || "Elephant Dental"}</span>
                             <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">Doctor</span>
                         </div>
                     )}
                 </div>
             </SidebarHeader>
+
 
             <SidebarContent>
                 <SidebarGroup>

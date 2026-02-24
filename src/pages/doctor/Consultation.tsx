@@ -19,6 +19,7 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
+    DialogTrigger,
 } from "@/components/ui/dialog";
 import {
     Select,
@@ -89,6 +90,8 @@ export default function Consultation() {
     const [stageNotes, setStageNotes] = useState("");
     const [continueStageDialogOpen, setContinueStageDialogOpen] = useState(false);
     const [pendingContinueStage, setPendingContinueStage] = useState<any>(null);
+    const [skipRemainingStages, setSkipRemainingStages] = useState(false);
+    const [followAllStages, setFollowAllStages] = useState(false);
     const [treatmentJustCompleted, setTreatmentJustCompleted] = useState<{ name: string; tooth: number | null; stages: number } | null>(null);
 
     useEffect(() => {
@@ -328,6 +331,13 @@ export default function Consultation() {
     useEffect(() => {
         const effectiveStatus: Record<number, string> = { ...toothConditions };
 
+        // Overlay completed multi-stage treatments (Orange)
+        allMemberStages.forEach(stage => {
+            if (stage.tooth_number && stage.status === 'completed') {
+                effectiveStatus[stage.tooth_number] = 'multi_stage_completed';
+            }
+        });
+
         // Overlay active stages (In Progress)
         activeStages.forEach(stage => {
             if (stage.tooth_number) {
@@ -335,13 +345,15 @@ export default function Consultation() {
             }
         });
 
-        // Overlay current selections? 
-        // DentalChart handles selection visually via `selectedTeeth` prop, but we might want to show 'planned' color?
-        // 'Selected' usually implies 'Planned' in this context.
-        // But `selectedTeeth` prop is array of IDs.
+        // Overlay current session selections for multi-stage completion
+        selectedServices.forEach(s => {
+            if (s.tooth_number && s.service.is_multi_stage_update && s.service.isFinal) {
+                effectiveStatus[s.tooth_number] = 'multi_stage_completed';
+            }
+        });
 
         setToothStatus(effectiveStatus);
-    }, [toothConditions, activeStages]);
+    }, [toothConditions, activeStages, allMemberStages, selectedServices]);
 
     const loadServices = async (branchId: string) => {
         const { data: servicesData, error: servicesError } = await supabase
@@ -736,6 +748,8 @@ export default function Consultation() {
         }
         setPendingContinueStage(stage);
         setStageNotes(""); // Reset notes
+        setSkipRemainingStages(false);
+        setFollowAllStages(false);
         setContinueStageDialogOpen(true);
     };
 
@@ -743,15 +757,21 @@ export default function Consultation() {
         if (!pendingContinueStage) return;
 
         const stage = pendingContinueStage;
-        const nextStageNum = stage.current_stage + 1;
-        const isFinal = nextStageNum === stage.total_stages;
+        const nextStageNum = followAllStages ? stage.total_stages : stage.current_stage + 1;
+        const isFinal = skipRemainingStages || followAllStages || nextStageNum === stage.total_stages;
 
         // Resolve display name for this stage
         const stageNames: string[] = Array.isArray(stage.services?.stage_names) ? stage.services.stage_names : [];
-        const stageName: string | null = stageNames[nextStageNum - 1] || null;
-        const displayName = stageName
-            ? `${stage.services.name} — ${stageName}`
-            : stage.services.name;
+        let stageName: string | null = stageNames[nextStageNum - 1] || null;
+
+        let displayName = stage.services.name;
+        if (followAllStages) {
+            displayName += " — ALL REMAINING STAGES COMPLETED";
+        } else if (skipRemainingStages) {
+            displayName += ` — TREATMENT COMPLETED AT STAGE ${nextStageNum} (Remainder Skipped)`;
+        } else if (stageName) {
+            displayName += ` — ${stageName}`;
+        }
 
         // Create a 'virtual' service object for the bill
         const stageService = {
@@ -766,16 +786,22 @@ export default function Consultation() {
             stageId: stage.id,
             nextStage: nextStageNum,
             isFinal: isFinal,
-            notes: stageNotes,
-            related_bill_id: stage.related_bill_id
+            notes: stageNotes + (skipRemainingStages ? " (Skipped remaining stages)" : "") + (followAllStages ? " (Followed all stages today)" : ""),
+            related_bill_id: stage.related_bill_id,
+            skipRemaining: skipRemainingStages,
+            followedAll: followAllStages
         };
 
         setSelectedServices([...selectedServices, { service: stageService, tooth_number: stage.tooth_number }]);
 
         if (isFinal) {
             toast({
-                title: `Final Stage Scheduled`,
-                description: `Stage ${nextStageNum}/${stage.total_stages} of "${stage.services.name}" added. Submit to complete the treatment.`
+                title: `Treatment Marked for Completion`,
+                description: followAllStages
+                    ? `Recording all remaining stages for "${stage.services.name}".`
+                    : skipRemainingStages
+                        ? `Recording Stage ${nextStageNum} and closing the treatment.`
+                        : `Final stage of "${stage.services.name}" added.`
             });
         } else {
             toast({ title: "Stage Added", description: `Stage ${nextStageNum}/${stage.total_stages} scheduled for completion.` });
@@ -1906,15 +1932,57 @@ export default function Consultation() {
                                     </div>
                                 </div>
 
-                                <div className="space-y-2">
-                                    <Label className="font-semibold">Stage Notes <span className="text-muted-foreground font-normal text-xs">(optional)</span></Label>
+                                <div className="space-y-4">
+                                    <Label className="font-semibold block text-blue-900 mb-2">Stage Completion Notes <span className="text-muted-foreground font-normal text-xs">(optional)</span></Label>
                                     <Textarea
                                         placeholder={`Describe what was done in ${getStageName(pendingContinueStage.services, nextStageNum)}...`}
                                         value={stageNotes}
                                         onChange={(e) => setStageNotes(e.target.value)}
-                                        className="min-h-[90px]"
+                                        className="min-h-[90px] border-blue-200"
                                     />
                                 </div>
+
+                                {/* Advanced Completion Options if more than 2 stages total */}
+                                {pendingContinueStage.total_stages > 2 && !isFinal && (
+                                    <div className="pt-4 border-t border-blue-100 flex flex-col gap-2">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Advanced Options</p>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <Button
+                                                variant="outline"
+                                                type="button"
+                                                size="sm"
+                                                className={cn(
+                                                    "text-xs h-auto py-2 px-3 flex flex-col gap-1 items-start text-left border-dashed",
+                                                    skipRemainingStages ? "bg-amber-100 border-amber-300 text-amber-800" : "hover:bg-amber-50 border-amber-200 text-amber-600"
+                                                )}
+                                                onClick={() => {
+                                                    setSkipRemainingStages(!skipRemainingStages);
+                                                    setFollowAllStages(false);
+                                                }}
+                                            >
+                                                <span className="font-bold">Skip Remaining Stages</span>
+                                                <span className="text-[9px] opacity-70">Marks treatment as completed today.</span>
+                                            </Button>
+
+                                            <Button
+                                                variant="outline"
+                                                type="button"
+                                                size="sm"
+                                                className={cn(
+                                                    "text-xs h-auto py-2 px-3 flex flex-col gap-1 items-start text-left border-dashed",
+                                                    followAllStages ? "bg-emerald-100 border-emerald-300 text-emerald-800" : "hover:bg-emerald-50 border-emerald-200 text-emerald-600"
+                                                )}
+                                                onClick={() => {
+                                                    setFollowAllStages(!followAllStages);
+                                                    setSkipRemainingStages(false);
+                                                }}
+                                            >
+                                                <span className="font-bold">Follow All Stages</span>
+                                                <span className="text-[9px] opacity-70">Complete all remaining steps at once.</span>
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         );
                     })()}

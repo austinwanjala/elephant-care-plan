@@ -11,16 +11,26 @@ interface DirectorLayoutProps {
     children?: ReactNode;
 }
 
+import { useSystemSettings } from "@/hooks/useSystemSettings";
+
 export function DirectorLayout({ children }: DirectorLayoutProps) {
     const [loading, setLoading] = useState(true);
     const [authorized, setAuthorized] = useState(false);
     const [userName, setUserName] = useState<string | null>(null);
+    const [role, setRole] = useState<string | null>(null);
     const navigate = useNavigate();
     const { toast } = useToast();
+    const { settings } = useSystemSettings();
 
     useEffect(() => {
         checkAuth();
     }, []);
+
+    useEffect(() => {
+        if (settings.maintenance_mode === "true" && role !== "admin" && role !== "super_admin") {
+            navigate("/maintenance");
+        }
+    }, [settings.maintenance_mode, role, navigate]);
 
     const checkAuth = async () => {
         setLoading(true); // Ensure loading starts
@@ -48,8 +58,10 @@ export function DirectorLayout({ children }: DirectorLayoutProps) {
             return;
         }
 
-        // @ts-ignore
-        if (roleData?.role !== "branch_director" && roleData?.role !== "admin") {
+        const userRole = roleData?.role as string;
+        setRole(userRole);
+
+        if (userRole !== "branch_director" && userRole !== "admin") {
             toast({
                 title: "Access Denied",
                 description: "You must be a Branch Director to view this page.",
@@ -59,6 +71,7 @@ export function DirectorLayout({ children }: DirectorLayoutProps) {
             setLoading(false);
             return;
         }
+
 
         // Fetch Director Name
         const { data: staffData } = await supabase

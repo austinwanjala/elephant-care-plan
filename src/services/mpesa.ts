@@ -1,74 +1,19 @@
-import { supabase } from "@/integrations/supabase/client";
+import { kopokopoService } from "./kopokopo";
 
-export interface MpesaRequest {
-    amount: number;
-    phone: string;
-    member_id: string;
-    coverage_amount?: number;
-}
-
+/**
+ * @deprecated Use kopokopoService instead.
+ * Redirecting mpesaService to kopokopoService to ensure all STK pushes go through KopoKopo.
+ */
 export const mpesaService = {
-    /**
-     * Initiates an STK Push request to the user's phone.
-     */
-    initiateStkPush: async (request: MpesaRequest) => {
-        const { data, error } = await supabase.functions.invoke("mpesa-stk-push", {
-            body: request
+    initiateStkPush: async (request: { amount: number; phone: string; member_id: string; coverage_amount?: number }) => {
+        console.warn("mpesaService is deprecated. Redirecting to kopokopoService.");
+        return kopokopoService.initiateStkPush({
+            amount: request.amount,
+            phone: request.phone,
+            memberId: request.member_id,
+            coverageAmount: request.coverage_amount,
+            paymentType: "Legacy M-Pesa Migration",
+            invoiceNumber: `MIG-${Date.now()}`
         });
-
-        if (error) {
-            let errorMessage = error.message;
-            if (error instanceof Error && 'context' in error) {
-                try {
-                    // @ts-ignore
-                    const body = await error.context.json();
-                    if (body && body.error) {
-                        errorMessage = body.error;
-                    }
-                } catch (e) {}
-            }
-            throw new Error(errorMessage);
-        }
-        return data; // Contains CheckoutRequestID
-    },
-
-    /**
-     * Listens for payment status updates for a specific transaction.
-     */
-    subscribeToCheckoutStatus: (checkoutId: string, onUpdate: (payload: any) => void) => {
-        console.log(`Subscribing to updates for checkout: ${checkoutId}`);
-        
-        return supabase
-            .channel(`payment-tracking-${checkoutId}`)
-            .on(
-                'postgres_changes',
-                {
-                    event: 'UPDATE',
-                    schema: 'public',
-                    table: 'payments',
-                    filter: `mpesa_checkout_request_id=eq.${checkoutId}`
-                },
-                (payload) => {
-                    console.log("Payment update detected:", payload.new);
-                    onUpdate(payload.new);
-                }
-            )
-            .subscribe((status) => {
-                console.log(`Subscription status for ${checkoutId}:`, status);
-            });
-    },
-
-    /**
-     * Manually check the status of a payment in the database.
-     */
-    checkPaymentStatus: async (checkoutId: string) => {
-        const { data, error } = await supabase
-            .from("payments")
-            .select("*")
-            .eq("mpesa_checkout_request_id", checkoutId)
-            .maybeSingle();
-        
-        if (error) throw error;
-        return data;
     }
 };

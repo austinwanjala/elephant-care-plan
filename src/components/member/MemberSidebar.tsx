@@ -33,11 +33,14 @@ const menuItems = [
   { title: "Profile", url: "/dashboard/profile", icon: User },
 ];
 
+import { useSystemSettings } from "@/hooks/useSystemSettings";
+
 export function MemberSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
   const navigate = useNavigate();
+  const { settings } = useSystemSettings();
 
   const isActive = (path: string) => {
     if (path === "/dashboard") {
@@ -60,12 +63,13 @@ export function MemberSidebar() {
           </div>
           {!collapsed && (
             <div>
-              <span className="text-lg font-serif font-bold text-foreground">Elephant Dental</span>
+              <span className="text-lg font-serif font-bold text-foreground">{settings.app_name || "Elephant Dental"}</span>
               <span className="ml-2 px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">Member</span>
             </div>
           )}
         </div>
       </SidebarHeader>
+
 
       <SidebarContent>
         <SidebarGroup>

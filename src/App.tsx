@@ -84,6 +84,7 @@ import AdminPermissions from "./pages/admin/AdminPermissions";
 import AdminReports from "./pages/admin/AdminReports";
 import AdminNotifications from "./pages/admin/AdminNotifications";
 import AdminWhatsApp from "./pages/admin/AdminWhatsApp";
+import AdminPayments from "./pages/admin/AdminPayments";
 
 // Finance Pages
 import FinanceDashboard from "./pages/finance/Dashboard";
@@ -95,11 +96,13 @@ import AuditorVisits from "./pages/auditor/Visits";
 import AuditorFinancials from "./pages/auditor/Financials";
 import AuditorLogs from "./pages/auditor/Logs";
 import StaffMessages from "./pages/staff/Messages";
+import { DynamicTheme } from "./components/DynamicTheme";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
+    <DynamicTheme />
     <TooltipProvider>
       <Toaster />
       <Sonner />
@@ -187,6 +190,7 @@ const App = () => (
             <Route path="notifications" element={<AdminNotifications />} />
             <Route path="reports" element={<AdminReports />} />
             <Route path="whatsapp" element={<AdminWhatsApp />} />
+            <Route path="payments" element={<AdminPayments />} />
             <Route path="messages" element={<StaffMessages />} />
           </Route>
 
@@ -210,6 +214,7 @@ const App = () => (
             <Route path="notifications" element={<AdminNotifications />} />
             <Route path="reports" element={<AdminReports />} />
             <Route path="whatsapp" element={<AdminWhatsApp />} />
+            <Route path="payments" element={<AdminPayments />} />
             <Route path="messages" element={<StaffMessages />} />
           </Route>
 

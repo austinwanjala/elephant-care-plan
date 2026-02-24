@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, ArrowLeft, DollarSign, AlertCircle } from "lucide-react";
-import { mpesaService } from "@/services/mpesa";
+import { kopokopoService } from "@/services/kopokopo";
 
 interface MemberInfo {
   id: string;
@@ -89,7 +89,7 @@ const MemberSchemeSelection = () => {
     setLoading(false);
   };
 
-  const handleMpesaPayment = async (e: React.FormEvent) => {
+  const handleKopoKopoPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!member || !selectedCategory) {
       toast({ title: "Selection Required", description: "Please select a membership scheme.", variant: "destructive" });
@@ -103,43 +103,81 @@ const MemberSchemeSelection = () => {
     setSubmitting(true);
 
     try {
-      const totalPayment = selectedCategory.payment_amount + selectedCategory.registration_fee + selectedCategory.management_fee;
+      const totalPaymentAmount = selectedCategory.payment_amount + selectedCategory.registration_fee + selectedCategory.management_fee;
 
-      const response = await mpesaService.initiateStkPush({
-        amount: totalPayment,
-        phone: phoneNumber.replace("+", ""),
-        member_id: member.id,
-        coverage_amount: selectedCategory.benefit_amount
+      const response = await kopokopoService.initiateStkPush({
+        amount: totalPaymentAmount,
+        phone: phoneNumber,
+        memberId: member.id,
+        coverageAmount: selectedCategory.benefit_amount,
+        paymentType: "Scheme Activation",
+        invoiceNumber: `SCHEME-${Date.now()}`
       });
 
-      const checkoutId = response.CheckoutRequestID;
-
-      // TEST MODE: Immediately mark as completed and activate scheme
-      const { error: updateError } = await supabase
-        .from("payments")
-        .update({ 
-            status: 'completed', 
-            mpesa_reference: `SCHEME-${Math.random().toString(36).substring(7).toUpperCase()}`,
-            payment_date: new Date().toISOString()
-        })
-        .eq("mpesa_checkout_request_id", checkoutId);
-
-      if (updateError) throw updateError;
-
-      // Update member profile directly to ensure immediate access
-      await supabase.from("members").update({
-        membership_category_id: selectedCategory.id,
-        is_active: true,
-        benefit_limit: (member.benefit_limit || 0) + selectedCategory.benefit_amount,
-        coverage_balance: (member.coverage_balance || 0) + selectedCategory.benefit_amount
-      }).eq("id", member.id);
+      const resourceId = response.resource_id;
 
       toast({
-        title: "Scheme Activated (Test Mode)",
-        description: `Your ${selectedCategory.name} membership is now active.`,
+        title: "Payment Initiated",
+        description: "Please check your phone for the M-Pesa STK push prompt.",
       });
 
-      navigate("/dashboard");
+      // Listen for payment status updates via Realtime
+      const channel = supabase
+        .channel('payment-status')
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'payments',
+            filter: `kopo_resource_id=eq.${resourceId}`
+          },
+          (payload) => {
+            console.log("Payment update received:", payload.new);
+            if (payload.new.status === 'completed') {
+              toast({
+                title: "Payment Successful",
+                description: `Your ${selectedCategory.name} membership is now active.`,
+              });
+              channel.unsubscribe();
+              navigate("/dashboard");
+            } else if (payload.new.status === 'failed') {
+              toast({
+                title: "Payment Failed",
+                description: "The payment request was cancelled or failed. Please try again.",
+                variant: "destructive"
+              });
+              setSubmitting(false);
+              channel.unsubscribe();
+            }
+          }
+        )
+        .subscribe();
+
+      // Optional: Polling fallback for safety
+      let attempts = 0;
+      const interval = setInterval(async () => {
+        attempts++;
+        if (attempts > 30) { // 2 minutes max
+          clearInterval(interval);
+          return;
+        }
+
+        const { data: payment } = await supabase
+          .from("payments")
+          .select("status")
+          .eq("kopo_resource_id", resourceId)
+          .single();
+
+        if (payment?.status === 'completed') {
+          clearInterval(interval);
+          toast({ title: "Payment Verified", description: "Your scheme is now active!" });
+          navigate("/dashboard");
+        } else if (payment?.status === 'failed') {
+          clearInterval(interval);
+          setSubmitting(false);
+        }
+      }, 4000);
 
     } catch (error: any) {
       toast({ title: "Request Failed", description: error.message, variant: "destructive" });
@@ -176,7 +214,7 @@ const MemberSchemeSelection = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="px-0 pb-0">
-          <form onSubmit={handleMpesaPayment} className="space-y-6">
+          <form onSubmit={handleKopoKopoPayment} className="space-y-6">
             <div className="space-y-4">
               <Label>Membership Scheme</Label>
               <div className="grid gap-3">
@@ -239,7 +277,7 @@ const MemberSchemeSelection = () => {
 
                 <div className="p-3 bg-blue-50 text-blue-700 text-sm rounded-md flex gap-2">
                   <AlertCircle className="h-5 w-5 shrink-0" />
-                  <p><b>Test Mode:</b> Scheme will be activated immediately after the prompt is sent.</p>
+                  <p><b>Live Mode:</b> Scheme will be activated once payment is confirmed via M-Pesa.</p>
                 </div>
 
                 <Button type="submit" className="w-full btn-primary" disabled={submitting}>

@@ -143,14 +143,14 @@ export function DentalChart({
                 {title}
             </h3>
 
-            <div className="space-y-12 bg-white/50 p-6 sm:p-10 rounded-xl border shadow-inner overflow-x-auto relative">
+            <div className="bg-white/50 p-4 sm:p-8 rounded-xl border shadow-inner overflow-x-auto relative">
                 {/* Background decorative elements to suggest jaw arch */}
                 <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px bg-slate-200/50 w-full" />
 
                 {effectiveMode === 'mixed' ? (
-                    <div className="flex flex-col items-center gap-12 min-w-[600px] relative">
+                    <div className="flex flex-col items-center gap-8 sm:gap-12 relative w-fit mx-auto">
                         {/* Upper Jaw Group */}
-                        <div className="relative p-6 rounded-[2.5rem] bg-gradient-to-b from-orange-50/80 to-red-50/20 border border-orange-100 shadow-sm">
+                        <div className="relative p-4 sm:p-6 rounded-[2rem] sm:rounded-[2.5rem] bg-gradient-to-b from-orange-50/80 to-red-50/20 border border-orange-100 shadow-sm">
                             <h4 className="absolute -top-3 left-1/2 -translate-x-1/2 bg-white px-3 py-0.5 text-[10px] font-bold text-orange-400 uppercase tracking-widest border border-orange-100 rounded-full shadow-sm">Upper Jaw</h4>
 
                             <div className="flex flex-col items-center gap-2">
@@ -190,7 +190,7 @@ export function DentalChart({
                         </div>
 
                         {/* Lower Jaw Group */}
-                        <div className="relative p-6 rounded-[2.5rem] bg-gradient-to-t from-orange-50/80 to-red-50/20 border border-orange-100 shadow-sm">
+                        <div className="relative p-4 sm:p-6 rounded-[2rem] sm:rounded-[2.5rem] bg-gradient-to-t from-orange-50/80 to-red-50/20 border border-orange-100 shadow-sm">
                             <h4 className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-white px-3 py-0.5 text-[10px] font-bold text-orange-400 uppercase tracking-widest border border-orange-100 rounded-full shadow-sm">Lower Jaw</h4>
 
                             <div className="flex flex-col items-center gap-2">
@@ -232,56 +232,52 @@ export function DentalChart({
                         </div>
                     </div>
                 ) : (
-                    <>
-                        {/* Standard Layout (Adult/Child) */}
-                        {/* Standard Layout (Adult/Child) */}
-                        <div className="space-y-8 min-w-[600px] py-4">
-                            <div className="space-y-2">
-                                <div className="flex justify-between px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                    <span>Right</span>
-                                    <span className="text-primary/60">Upper Jaw</span>
-                                    <span>Left</span>
-                                </div>
-                                <div className="flex justify-center gap-1 sm:gap-2 bg-white/50 p-4 rounded-xl border border-slate-100 shadow-sm">
-                                    {upperJaw.map((id) => (
-                                        <Tooth
-                                            key={id}
-                                            id={id}
-                                            isSelected={selectedTeeth.includes(id)}
-                                            status={toothStatus[id]}
-                                            stage={toothStages[id]}
-                                            onClick={() => onToothClick(id)}
-                                            imageSrc={getToothImage(id)}
-                                            disabled={disabledTeeth.includes(id)}
-                                        />
-                                    ))}
-                                </div>
+                    <div className="space-y-8 py-4 w-fit mx-auto">
+                        <div className="space-y-2">
+                            <div className="flex justify-between px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                <span>Right</span>
+                                <span className="text-primary/60">Upper Jaw</span>
+                                <span>Left</span>
                             </div>
-
-                            <div className="space-y-2">
-                                <div className="flex justify-center gap-1 sm:gap-2 bg-white/50 p-4 rounded-xl border border-slate-100 shadow-sm">
-                                    {lowerJaw.map((id) => (
-                                        <Tooth
-                                            key={id}
-                                            id={id}
-                                            isSelected={selectedTeeth.includes(id)}
-                                            status={toothStatus[id]}
-                                            stage={toothStages[id]}
-                                            onClick={() => onToothClick(id)}
-                                            isLower
-                                            imageSrc={getToothImage(id)}
-                                            disabled={disabledTeeth.includes(id)}
-                                        />
-                                    ))}
-                                </div>
-                                <div className="flex justify-between px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                    <span>Right</span>
-                                    <span className="text-primary/60">Lower Jaw</span>
-                                    <span>Left</span>
-                                </div>
+                            <div className="flex justify-center gap-0.5 sm:gap-2 bg-white/50 p-3 sm:p-4 rounded-xl border border-slate-100 shadow-sm">
+                                {upperJaw.map((id) => (
+                                    <Tooth
+                                        key={id}
+                                        id={id}
+                                        isSelected={selectedTeeth.includes(id)}
+                                        status={toothStatus[id]}
+                                        stage={toothStages[id]}
+                                        onClick={() => onToothClick(id)}
+                                        imageSrc={getToothImage(id)}
+                                        disabled={disabledTeeth.includes(id)}
+                                    />
+                                ))}
                             </div>
                         </div>
-                    </>
+
+                        <div className="space-y-2">
+                            <div className="flex justify-center gap-0.5 sm:gap-2 bg-white/50 p-3 sm:p-4 rounded-xl border border-slate-100 shadow-sm">
+                                {lowerJaw.map((id) => (
+                                    <Tooth
+                                        key={id}
+                                        id={id}
+                                        isSelected={selectedTeeth.includes(id)}
+                                        status={toothStatus[id]}
+                                        stage={toothStages[id]}
+                                        onClick={() => onToothClick(id)}
+                                        isLower
+                                        imageSrc={getToothImage(id)}
+                                        disabled={disabledTeeth.includes(id)}
+                                    />
+                                ))}
+                            </div>
+                            <div className="flex justify-between px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                <span>Right</span>
+                                <span className="text-primary/60">Lower Jaw</span>
+                                <span>Left</span>
+                            </div>
+                        </div>
+                    </div>
                 )}
             </div>
 
@@ -336,8 +332,9 @@ function Tooth({ id, isSelected, status, stage, onClick, isLower, imageSrc, smal
     if (status === 'planned') colorClass = "fill-cyan-400 stroke-cyan-600";
     if (status === 'in_progress') colorClass = "fill-amber-400 stroke-amber-600 animate-pulse";
     if (status === 'completed') colorClass = "fill-blue-500 stroke-blue-700";
+    if (status === 'multi_stage_completed') colorClass = "fill-orange-500 stroke-orange-700";
 
-    if (isSelected) colorClass = "fill-orange-400 stroke-orange-600 stroke-2";
+    if (isSelected) colorClass = "fill-cyan-400 stroke-cyan-600 stroke-2";
 
     // Anatomical Sizing based on tooth type
     let sizeClass = small ? "w-5 h-6" : "w-7 h-8";
@@ -375,7 +372,7 @@ function Tooth({ id, isSelected, status, stage, onClick, isLower, imageSrc, smal
         <div
             onClick={disabled ? undefined : onClick}
             className={cn(
-                "group relative flex flex-col items-center transition-all duration-200",
+                "group relative flex flex-col items-center transition-all duration-200 shrink-0",
                 disabled ? "cursor-not-allowed opacity-50 grayscale" : "cursor-pointer",
                 !imageSrc && !disabled && (isSelected ? "scale-125 z-10" : "hover:-translate-y-1")
             )}
@@ -410,6 +407,7 @@ function Tooth({ id, isSelected, status, stage, onClick, isLower, imageSrc, smal
                             status === 'missing' && "bg-yellow-400",
                             status === 'partial_denture' && "bg-pink-600",
                             status === 'in_progress' && "bg-amber-500",
+                            status === 'multi_stage_completed' && "bg-orange-500",
                         )} />
                     )}
                     {/* Stage Indicator Overlay */}

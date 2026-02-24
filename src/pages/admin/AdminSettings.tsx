@@ -20,7 +20,7 @@ export default function AdminSettings() {
     app_name: "Elephant Dental",
     hero_title: "Dental Insurance That Doubles Your Investment",
     hero_subtitle: "Pay KES 500, get KES 1,000 coverage. Simple, affordable dental care for you and your family.",
-    primary_color: "#176157",
+    primary_color: "#32CD32",
     footer_text: "Providing accessible oral healthcare for everyone across Kenya.",
     copyright_text: "© 2024 Elephant Dental Hospital. All rights reserved.",
     contact_phone: "+254 700 000 000",
@@ -100,8 +100,8 @@ export default function AdminSettings() {
                     <Label className="text-base font-bold text-red-900">Enable Maintenance Mode</Label>
                     <p className="text-sm text-muted-foreground">Members will see a maintenance page upon login.</p>
                   </div>
-                  <Switch 
-                    checked={settings.maintenance_mode === "true"} 
+                  <Switch
+                    checked={settings.maintenance_mode === "true"}
                     onCheckedChange={(checked) => handleSaveSetting("maintenance_mode", checked.toString())}
                     disabled={saving === "maintenance_mode"}
                   />
@@ -120,7 +120,7 @@ export default function AdminSettings() {
                   <div className="space-y-2">
                     <Label>Application Name</Label>
                     <div className="flex gap-2">
-                      <Input value={settings.app_name} onChange={e => setSettings({...settings, app_name: e.target.value})} />
+                      <Input value={settings.app_name} onChange={e => setSettings({ ...settings, app_name: e.target.value })} />
                       <Button size="sm" onClick={() => handleSaveSetting("app_name", settings.app_name)} disabled={saving === "app_name"}>
                         {saving === "app_name" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                       </Button>
@@ -128,14 +128,14 @@ export default function AdminSettings() {
                   </div>
                   <div className="space-y-2">
                     <Label>Hero Title</Label>
-                    <Textarea value={settings.hero_title} onChange={e => setSettings({...settings, hero_title: e.target.value})} />
+                    <Textarea value={settings.hero_title} onChange={e => setSettings({ ...settings, hero_title: e.target.value })} />
                     <Button size="sm" className="w-full" onClick={() => handleSaveSetting("hero_title", settings.hero_title)} disabled={saving === "hero_title"}>
                       {saving === "hero_title" ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />} Save Title
                     </Button>
                   </div>
                   <div className="space-y-2">
                     <Label>Hero Subtitle</Label>
-                    <Textarea value={settings.hero_subtitle} onChange={e => setSettings({...settings, hero_subtitle: e.target.value})} />
+                    <Textarea value={settings.hero_subtitle} onChange={e => setSettings({ ...settings, hero_subtitle: e.target.value })} />
                     <Button size="sm" className="w-full" onClick={() => handleSaveSetting("hero_subtitle", settings.hero_subtitle)} disabled={saving === "hero_subtitle"}>
                       {saving === "hero_subtitle" ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />} Save Subtitle
                     </Button>
@@ -150,14 +150,14 @@ export default function AdminSettings() {
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <Label>Footer Description</Label>
-                    <Textarea value={settings.footer_text} onChange={e => setSettings({...settings, footer_text: e.target.value})} />
+                    <Textarea value={settings.footer_text} onChange={e => setSettings({ ...settings, footer_text: e.target.value })} />
                     <Button size="sm" className="w-full" onClick={() => handleSaveSetting("footer_text", settings.footer_text)} disabled={saving === "footer_text"}>
                       {saving === "footer_text" ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />} Save Footer Text
                     </Button>
                   </div>
                   <div className="space-y-2">
                     <Label>Copyright Text</Label>
-                    <Input value={settings.copyright_text} onChange={e => setSettings({...settings, copyright_text: e.target.value})} />
+                    <Input value={settings.copyright_text} onChange={e => setSettings({ ...settings, copyright_text: e.target.value })} />
                     <Button size="sm" className="w-full" onClick={() => handleSaveSetting("copyright_text", settings.copyright_text)} disabled={saving === "copyright_text"}>
                       {saving === "copyright_text" ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />} Save Copyright
                     </Button>
@@ -165,11 +165,11 @@ export default function AdminSettings() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label className="flex items-center gap-1"><Phone className="h-3 w-3" /> Phone</Label>
-                      <Input value={settings.contact_phone} onChange={e => setSettings({...settings, contact_phone: e.target.value})} />
+                      <Input value={settings.contact_phone} onChange={e => setSettings({ ...settings, contact_phone: e.target.value })} />
                     </div>
                     <div className="space-y-2">
                       <Label className="flex items-center gap-1"><Mail className="h-3 w-3" /> Email</Label>
-                      <Input value={settings.contact_email} onChange={e => setSettings({...settings, contact_email: e.target.value})} />
+                      <Input value={settings.contact_email} onChange={e => setSettings({ ...settings, contact_email: e.target.value })} />
                     </div>
                     <Button size="sm" className="col-span-2" onClick={() => {
                       handleSaveSetting("contact_phone", settings.contact_phone);
@@ -187,8 +187,8 @@ export default function AdminSettings() {
                   <div className="space-y-2">
                     <Label>Primary Theme Color (Hex)</Label>
                     <div className="flex gap-2">
-                      <Input type="color" className="w-12 p-1 h-10" value={settings.primary_color} onChange={e => setSettings({...settings, primary_color: e.target.value})} />
-                      <Input value={settings.primary_color} onChange={e => setSettings({...settings, primary_color: e.target.value})} />
+                      <Input type="color" className="w-12 p-1 h-10" value={settings.primary_color} onChange={e => setSettings({ ...settings, primary_color: e.target.value })} />
+                      <Input value={settings.primary_color} onChange={e => setSettings({ ...settings, primary_color: e.target.value })} />
                       <Button size="sm" onClick={() => handleSaveSetting("primary_color", settings.primary_color)} disabled={saving === "primary_color"}>
                         {saving === "primary_color" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                       </Button>

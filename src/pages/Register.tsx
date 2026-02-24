@@ -30,7 +30,10 @@ interface Dependant {
   idNumber: string;
 }
 
+import { useSystemSettings } from "@/hooks/useSystemSettings";
+
 const Register = () => {
+  const { settings } = useSystemSettings();
   const [formData, setFormData] = useState({
     fullName: "",
     phone: "",
@@ -221,8 +224,9 @@ const Register = () => {
             <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
               <span className="text-xl">🐘</span>
             </div>
-            <span className="text-xl font-serif font-bold text-foreground">Elephant Dental</span>
+            <span className="text-xl font-serif font-bold text-foreground">{settings.app_name || "Elephant Dental"}</span>
           </div>
+
 
           <h1 className="text-3xl font-serif font-bold text-foreground mb-2">Member Registration</h1>
           <p className="text-muted-foreground mb-8">Join the Elephant Care Plan today.</p>
@@ -241,12 +245,10 @@ const Register = () => {
                       queryParams: {
                         access_type: 'offline',
                         prompt: 'consent',
-                      },
-                      data: {
-                        role: 'member' // Default role for Google Sign Up
                       }
                     }
                   });
+
                   if (error) throw error;
                 } catch (error: any) {
                   toast({

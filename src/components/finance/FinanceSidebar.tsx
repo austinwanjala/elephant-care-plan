@@ -12,9 +12,12 @@ const menuItems = [
     { title: "Messages", url: "/finance/messages", icon: MessageSquare },
 ];
 
+import { useSystemSettings } from "@/hooks/useSystemSettings";
+
 export function FinanceSidebar() {
     const navigate = useNavigate();
     const location = useLocation();
+    const { settings } = useSystemSettings();
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
@@ -29,11 +32,12 @@ export function FinanceSidebar() {
                         <DollarSign className="text-white h-6 w-6" />
                     </div>
                     <div className="flex flex-col">
-                        <span className="text-lg font-serif font-bold text-foreground">Elephant Dental</span>
+                        <span className="text-lg font-serif font-bold text-foreground">{settings.app_name || "Elephant Dental"}</span>
                         <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] rounded-full w-fit">Finance</span>
                     </div>
                 </div>
             </SidebarHeader>
+
             <SidebarContent>
                 <SidebarGroup>
                     <SidebarGroupLabel>Treasury</SidebarGroupLabel>

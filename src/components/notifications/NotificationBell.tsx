@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Bell, Reply, Send, X } from "lucide-react";
+import { Bell, Reply, Send, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
     Popover,
@@ -10,13 +10,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDistanceToNow } from "date-fns";
-import { Textarea } from "@/components/ui/textarea"; // Ensure this exists or use Input
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 
 export function NotificationBell() {
     const [notifications, setNotifications] = useState<any[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [open, setOpen] = useState(false);
+    const [currentUser, setCurrentUser] = useState<any>(null);
+    const [currentStaff, setCurrentStaff] = useState<any>(null);
 
     // Reply State
     const [replyingTo, setReplyingTo] = useState<string | null>(null);
@@ -25,29 +27,70 @@ export function NotificationBell() {
     const { toast } = useToast();
 
     useEffect(() => {
-        fetchNotifications();
+        initSession();
+    }, []);
 
-        // Subscribe to new notifications
-        const channel = supabase
-            .channel("notifications")
+    const initSession = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        setCurrentUser(user);
+
+        // Also fetch staff info if this is a staff member
+        const { data: staff } = await supabase
+            .from("staff")
+            .select("id")
+            .eq("user_id", user.id)
+            .maybeSingle();
+        setCurrentStaff(staff);
+
+        fetchNotifications(user.id, staff);
+    };
+
+    useEffect(() => {
+        if (!currentUser) return;
+
+        // 1. Subscribe to notifications
+        const notifChannel = supabase
+            .channel(`notifications-${currentUser.id}`)
             .on(
                 "postgres_changes",
                 {
                     event: "INSERT",
                     schema: "public",
                     table: "notifications",
-                    filter: `recipient_id=eq.${supabase.auth.getUser().then(({ data }) => data.user?.id)}`,
+                    filter: `recipient_id=eq.${currentUser.id}`,
                 },
-                (payload) => {
-                    fetchNotifications();
+                () => {
+                    fetchNotifications(currentUser.id, currentStaff);
                 }
             )
             .subscribe();
 
+        // 2. Subscribe to portal_messages if current user is staff
+        let msgChannel: any = null;
+        if (currentStaff) {
+            msgChannel = supabase
+                .channel(`portal-notifs-${currentStaff.id}`)
+                .on(
+                    "postgres_changes",
+                    {
+                        event: "INSERT",
+                        schema: "public",
+                        table: "portal_messages",
+                        filter: `recipient_id=eq.${currentStaff.id}`,
+                    },
+                    () => {
+                        fetchNotifications(currentUser.id, currentStaff);
+                    }
+                )
+                .subscribe();
+        }
+
         return () => {
-            supabase.removeChannel(channel);
+            supabase.removeChannel(notifChannel);
+            if (msgChannel) supabase.removeChannel(msgChannel);
         };
-    }, []);
+    }, [currentUser, currentStaff]);
 
     useEffect(() => {
         if (!open) {
@@ -56,43 +99,86 @@ export function NotificationBell() {
         }
     }, [open]);
 
-    const fetchNotifications = async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        const { data } = await supabase
+    const fetchNotifications = async (userId: string, staff: any) => {
+        // Fetch regular notifications
+        const { data: notifs } = await supabase
             .from("notifications")
             .select("*")
-            .eq("recipient_id", user.id)
+            .eq("recipient_id", userId)
             .order("created_at", { ascending: false })
             .limit(20);
 
-        if (data) {
-            setNotifications(data);
-            setUnreadCount(data.filter((n) => !n.is_read).length);
+        let combined = [...(notifs || [])];
+
+        // If staff, also fetch unread portal messages as "notifications"
+        if (staff) {
+            const { data: msgs } = await supabase
+                .from("portal_messages")
+                .select("*, sender:staff!portal_messages_sender_id_fkey(full_name)")
+                .eq("recipient_id", staff.id)
+                .eq("is_read", false)
+                .order("created_at", { ascending: false })
+                .limit(10);
+
+            if (msgs) {
+                const msgNotifs = msgs.map(m => ({
+                    id: m.id,
+                    title: `Message from ${m.sender?.full_name || 'Staff'}`,
+                    message: m.content,
+                    created_at: m.created_at,
+                    is_read: false,
+                    type: 'message',
+                    sender_id: m.sender_id,
+                    is_portal_message: true
+                }));
+                combined = [...msgNotifs, ...combined].sort((a, b) =>
+                    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                );
+            }
         }
+
+        setNotifications(combined);
+        setUnreadCount(combined.filter((n) => !n.is_read).length);
     };
 
-    const markAsRead = async (id: string) => {
-        await supabase
-            .from("notifications")
-            .update({ is_read: true })
-            .eq("id", id);
+    const markAsRead = async (notification: any) => {
+        if (notification.is_portal_message) {
+            // It's a portal message, mark it as read in portal_messages table
+            await supabase
+                .from("portal_messages")
+                .update({ is_read: true })
+                .eq("id", notification.id);
+        } else {
+            // It's a regular notification
+            await supabase
+                .from("notifications")
+                .update({ is_read: true })
+                .eq("id", notification.id);
+        }
 
         // Optimistic update
-        setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+        setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, is_read: true } : n));
         setUnreadCount(prev => Math.max(0, prev - 1));
     };
 
     const markAllAsRead = async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        if (!currentUser) return;
 
+        // Mark regular notifications as read
         await supabase
             .from("notifications")
             .update({ is_read: true })
-            .eq("recipient_id", user.id)
+            .eq("recipient_id", currentUser.id)
             .eq("is_read", false);
+
+        // If staff, also mark portal messages as read
+        if (currentStaff) {
+            await supabase
+                .from("portal_messages")
+                .update({ is_read: true })
+                .eq("recipient_id", currentStaff.id)
+                .eq("is_read", false);
+        }
 
         setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
         setUnreadCount(0);
@@ -103,19 +189,29 @@ export function NotificationBell() {
 
         setSendingReply(true);
         try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) throw new Error("Not authenticated");
+            if (!currentUser) throw new Error("Not authenticated");
 
-            const { error } = await supabase.from("notifications").insert({
-                sender_id: user.id,
-                recipient_id: notification.sender_id, // Reply to sender
-                title: `Re: ${notification.title}`,
-                message: replyMessage,
-                parent_id: notification.id,
-                is_read: false
-            });
-
-            if (error) throw error;
+            if (notification.is_portal_message && currentStaff) {
+                // Reply via portal_messages
+                const { error } = await supabase.from("portal_messages").insert({
+                    sender_id: currentStaff.id,
+                    recipient_id: notification.sender_id,
+                    content: replyMessage,
+                    branch_id: currentStaff.branch_id
+                });
+                if (error) throw error;
+            } else {
+                // Reply via notifications
+                const { error } = await supabase.from("notifications").insert({
+                    sender_id: currentUser.id,
+                    recipient_id: notification.sender_id, // Reply to sender
+                    title: `Re: ${notification.title}`,
+                    message: replyMessage,
+                    parent_id: notification.id,
+                    is_read: false
+                });
+                if (error) throw error;
+            }
 
             toast({ title: "Reply sent", description: "Your reply has been sent." });
             setReplyingTo(null);
@@ -147,7 +243,6 @@ export function NotificationBell() {
                     <div className="flex gap-2">
                         <Button variant="ghost" size="sm" className="h-auto text-xs text-blue-600 font-bold" onClick={() => {
                             setOpen(false);
-                            // Determine route based on current path or just use a generic /messages if we fix routing
                             const path = window.location.pathname;
                             const prefix = path.split('/')[1];
                             if (prefix && prefix !== 'login' && prefix !== 'register') {
@@ -179,7 +274,7 @@ export function NotificationBell() {
                                 >
                                     <div
                                         className="cursor-pointer"
-                                        onClick={() => markAsRead(notification.id)}
+                                        onClick={() => markAsRead(notification)}
                                     >
                                         <div className="flex justify-between items-start gap-2">
                                             <h5 className={`text-sm ${!notification.is_read ? "font-semibold" : "font-medium"}`}>
@@ -194,7 +289,6 @@ export function NotificationBell() {
                                         </p>
                                     </div>
 
-                                    {/* Reply Action */}
                                     {notification.sender_id && (
                                         <div className="mt-2">
                                             {replyingTo === notification.id ? (

@@ -6,10 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Loader2, CreditCard, Phone, CheckCircle2, AlertCircle } from "lucide-react";
+import { Loader2, CreditCard, Phone, CheckCircle2, AlertCircle, ShieldCheck } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import { mpesaService } from "@/services/mpesa";
+import { kopokopoService } from "@/services/kopokopo";
 
 interface Payment {
   id: string;
@@ -18,6 +18,9 @@ interface Payment {
   status: string | null;
   payment_date: string | null;
   mpesa_reference: string | null;
+  mpesa_code: string | null;
+  reference: string | null;
+  kopo_resource_id: string | null;
   created_at: string;
 }
 
@@ -63,7 +66,7 @@ export default function MemberPayments() {
     fetchPayments();
   }, []);
 
-  const handleMpesaPayment = async () => {
+  const handleKopoKopoPayment = async () => {
     if (!amount || !phoneNumber || !memberId) {
       toast({ title: "Error", description: "Please enter amount and phone number", variant: "destructive" });
       return;
@@ -71,36 +74,88 @@ export default function MemberPayments() {
 
     setProcessing(true);
     try {
-      const response = await mpesaService.initiateStkPush({
+      const response = await kopokopoService.initiateStkPush({
         amount: parseFloat(amount),
-        phone: phoneNumber.replace("+", ""),
-        member_id: memberId,
-        coverage_amount: parseFloat(amount)
+        phone: phoneNumber,
+        memberId: memberId,
+        coverageAmount: parseFloat(amount),
+        paymentType: "Manual Top-up",
+        invoiceNumber: `TOPUP-${Date.now()}`
       });
 
-      const checkoutId = response.CheckoutRequestID;
-
-      // TEST MODE: Immediately mark as completed
-      const { error: updateError } = await supabase
-        .from("payments")
-        .update({ 
-            status: 'completed', 
-            mpesa_reference: `TEST-${Math.random().toString(36).substring(7).toUpperCase()}`,
-            payment_date: new Date().toISOString()
-        })
-        .eq("mpesa_checkout_request_id", checkoutId);
-
-      if (updateError) throw updateError;
+      const resourceId = response.resource_id;
 
       toast({
-        title: "Payment Successful (Test Mode)",
-        description: `KES ${parseFloat(amount).toLocaleString()} has been added to your coverage.`,
+        title: "Payment Initiated",
+        description: "Please check your phone for the M-Pesa STK push prompt.",
       });
 
-      setProcessing(false);
-      setPayDialogOpen(false);
-      setAmount("");
-      fetchPayments();
+      // Listen for payment status updates via Realtime
+      const channel = supabase
+        .channel('topup-status')
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'payments',
+            filter: `kopo_resource_id=eq.${resourceId}`
+          },
+          (payload) => {
+            if (payload.new.status === 'completed') {
+              toast({
+                title: "Payment Successful",
+                description: `KES ${parseFloat(amount).toLocaleString()} has been added to your coverage.`,
+              });
+              channel.unsubscribe();
+              setProcessing(false);
+              setPayDialogOpen(false);
+              setAmount("");
+              fetchPayments();
+            } else if (payload.new.status === 'failed') {
+              toast({
+                title: "Payment Failed",
+                description: "The payment request was cancelled or failed.",
+                variant: "destructive"
+              });
+              setProcessing(false);
+              channel.unsubscribe();
+            }
+          }
+        )
+        .subscribe();
+
+      // Fallback polling + Remote Verification
+      let attempts = 0;
+      const interval = setInterval(async () => {
+        attempts++;
+        if (attempts > 30) {
+          clearInterval(interval);
+          return;
+        }
+
+        // Periodically trigger a remote status check to force a DB update if the webhook was missed
+        if (attempts % 3 === 0) {
+          await kopokopoService.checkStatus(resourceId).catch(console.error);
+        }
+
+        const { data: payment } = await supabase
+          .from("payments")
+          .select("status")
+          .eq("kopo_resource_id", resourceId)
+          .single();
+
+        if (payment?.status === 'completed') {
+          clearInterval(interval);
+          fetchPayments();
+          setPayDialogOpen(false);
+          setProcessing(false);
+          setAmount("");
+        } else if (payment?.status === 'failed') {
+          clearInterval(interval);
+          setProcessing(false);
+        }
+      }, 4000);
 
     } catch (error: any) {
       toast({ title: "Request Failed", description: error.message, variant: "destructive" });
@@ -134,15 +189,18 @@ export default function MemberPayments() {
         </div>
         <Dialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-green-600 hover:bg-green-700">
-              <CreditCard className="mr-2 h-4 w-4" /> Add Funds (M-Pesa)
+            <Button className="bg-[#49B249] hover:bg-[#3d943d] text-white shadow-lg transition-all hover:scale-105">
+              <Phone className="mr-2 h-4 w-4" /> Pay with M-Pesa
             </Button>
           </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>M-Pesa Payment</DialogTitle>
-              <DialogDescription>
-                Enter amount to top up your coverage balance.
+          <DialogContent className="sm:max-w-md border-t-4 border-[#49B249]">
+            <DialogHeader className="flex flex-col items-center justify-center pb-4 border-b">
+              <div className="w-16 h-16 bg-[#49B249] rounded-full flex items-center justify-center mb-2 shadow-inner">
+                <span className="text-white font-bold text-2xl tracking-tighter italic">M</span>
+              </div>
+              <DialogTitle className="text-2xl font-bold text-[#49B249]">M-Pesa Payment</DialogTitle>
+              <DialogDescription className="text-center">
+                Fast, secure payment via Lipa Na M-Pesa STK Push.
               </DialogDescription>
             </DialogHeader>
 
@@ -164,17 +222,28 @@ export default function MemberPayments() {
                   onChange={(e) => setPhoneNumber(e.target.value)}
                 />
               </div>
-              <div className="p-3 bg-blue-50 text-blue-700 text-sm rounded-md flex gap-2">
-                <AlertCircle className="h-5 w-5 shrink-0" />
-                <p><b>Test Mode:</b> Payment will be marked as successful immediately after the prompt is sent.</p>
+              <div className="p-4 bg-green-50 border border-green-100 text-green-800 text-sm rounded-lg flex gap-3 italic">
+                <div className="bg-[#49B249] p-1.5 rounded-full h-fit mt-0.5">
+                  <ShieldCheck className="h-4 w-4 text-white" />
+                </div>
+                <div>
+                  <p className="font-semibold mb-0.5">Secure Transaction</p>
+                  <p className="text-xs opacity-90">Unlock your phone after clicking "Send" to enter your M-Pesa PIN.</p>
+                </div>
               </div>
             </div>
 
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setPayDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleMpesaPayment} disabled={processing} className="bg-green-600 hover:bg-green-700">
-                {processing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Phone className="mr-2 h-4 w-4" />}
-                Send Request
+            <DialogFooter className="sm:justify-center pt-2">
+              <Button
+                onClick={handleKopoKopoPayment}
+                disabled={processing}
+                className="w-full bg-[#49B249] hover:bg-[#3d943d] text-white text-lg h-12 rounded-xl font-bold shadow-md transition-all active:scale-95"
+              >
+                {processing ? (
+                  <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Processing...</>
+                ) : (
+                  <>Send STK Push Prompt</>
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -196,14 +265,14 @@ export default function MemberPayments() {
               <CardContent className="p-0">
                 <div className="flex items-center justify-between p-4 sm:p-6">
                   <div className="flex items-center gap-4">
-                    <div className={`h-10 w-10 rounded-full flex items-center justify-center ${payment.status === 'completed' ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-500'
+                    <div className={`h-10 w-10 rounded-full flex items-center justify-center ${payment.status === 'completed' ? 'bg-[#49B249]/10 text-[#49B249]' : 'bg-slate-100 text-slate-500'
                       }`}>
                       {payment.status === 'completed' ? <CheckCircle2 className="h-5 w-5" /> : <CreditCard className="h-5 w-5" />}
                     </div>
                     <div>
                       <div className="font-bold text-lg">KES {payment.amount.toLocaleString()}</div>
                       <div className="text-sm text-muted-foreground">
-                        Coverage: <span className="text-green-600 font-medium">+KES {payment.coverage_added.toLocaleString()}</span>
+                        Coverage: <span className="text-[#49B249] font-medium">+KES {payment.coverage_added.toLocaleString()}</span>
                       </div>
                     </div>
                   </div>
@@ -215,9 +284,9 @@ export default function MemberPayments() {
                     <div className="text-xs text-muted-foreground font-mono">
                       {format(new Date(payment.payment_date || payment.created_at), "MMM d, yyyy • HH:mm")}
                     </div>
-                    {payment.mpesa_reference && (
+                    {(payment.mpesa_code || payment.reference || payment.mpesa_reference || payment.kopo_resource_id) && (
                       <div className="text-[10px] text-muted-foreground mt-1 font-mono bg-slate-50 px-2 py-0.5 rounded inline-block">
-                        Ref: {payment.mpesa_reference}
+                        Ref: {payment.mpesa_code || payment.reference || payment.mpesa_reference || payment.kopo_resource_id}
                       </div>
                     )}
                   </div>

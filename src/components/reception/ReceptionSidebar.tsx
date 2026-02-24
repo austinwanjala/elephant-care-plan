@@ -15,11 +15,14 @@ const menuItems = [
     { title: "Messages", url: "/reception/messages", icon: MessageSquare },
 ];
 
+import { useSystemSettings } from "@/hooks/useSystemSettings";
+
 export function ReceptionSidebar() {
     const { state } = useSidebar();
     const collapsed = state === "collapsed";
     const navigate = useNavigate();
     const location = useLocation();
+    const { settings } = useSystemSettings();
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
@@ -58,12 +61,13 @@ export function ReceptionSidebar() {
                     </div>
                     {!collapsed && (
                         <div>
-                            <span className="text-lg font-serif font-bold text-foreground">Elephant Dental</span>
+                            <span className="text-lg font-serif font-bold text-foreground">{settings.app_name || "Elephant Dental"}</span>
                             <span className="ml-2 px-2 py-0.5 bg-secondary text-secondary-foreground text-xs rounded-full">Reception</span>
                         </div>
                     )}
                 </div>
             </SidebarHeader>
+
 
             <SidebarContent>
                 <SidebarGroup>

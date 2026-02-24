@@ -2,3 +2,6 @@ project_id = "jjndhaxdxbbupmxiaixk"
 
 [functions."mpesa-callback"]
 verify_jwt = false
+
+[functions.kopokopo]
+verify_jwt = false

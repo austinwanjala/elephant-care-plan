@@ -326,24 +326,49 @@ function Tooth({ id, isSelected, status, stage, onClick, isLower, imageSrc, smal
     }
 
     let colorClass = "fill-white stroke-slate-300 hover:stroke-slate-500";
-    if (status === 'decay') colorClass = "fill-red-100 stroke-red-500";
-    if (status === 'missing') colorClass = "fill-yellow-100 stroke-yellow-500 opacity-60";
-    if (status === 'filled') colorClass = "fill-green-100 stroke-green-500";
-    if (status === 'crowned') colorClass = "fill-blue-100 stroke-blue-500";
-    if (status === 'partial_denture') colorClass = "fill-pink-100 stroke-pink-500";
+    if (status === 'decay') colorClass = "fill-red-500 stroke-red-700";
+    if (status === 'missing') colorClass = "fill-yellow-400 stroke-yellow-600 opacity-80";
+    if (status === 'filled') colorClass = "fill-green-500 stroke-green-700";
+    if (status === 'crowned') colorClass = "fill-blue-500 stroke-blue-700";
+    if (status === 'partial_denture') colorClass = "fill-pink-500 stroke-pink-700";
 
     // Legacy support or Treatment statuses
-    if (status === 'planned') colorClass = "fill-cyan-100 stroke-cyan-500";
-    if (status === 'in_progress') colorClass = "fill-amber-100 stroke-amber-500 animate-pulse";
-    if (status === 'completed') colorClass = "fill-blue-100 stroke-blue-500"; // Can map to crowned or kept separate
+    if (status === 'planned') colorClass = "fill-cyan-400 stroke-cyan-600";
+    if (status === 'in_progress') colorClass = "fill-amber-400 stroke-amber-600 animate-pulse";
+    if (status === 'completed') colorClass = "fill-blue-500 stroke-blue-700";
 
-    if (isSelected) colorClass = "fill-orange-100 stroke-orange-500 stroke-2";
+    if (isSelected) colorClass = "fill-orange-400 stroke-orange-600 stroke-2";
+
+    // Anatomical Sizing based on tooth type
+    let sizeClass = small ? "w-5 h-6" : "w-7 h-8";
+    let svgWidth = "28";
+    let svgHeight = "32";
+
+    if (!small) {
+        if (lastDigit >= 6) { // Molars
+            sizeClass = "w-10 h-10";
+            svgWidth = "38";
+            svgHeight = "40";
+        } else if (lastDigit >= 4) { // Premolars
+            sizeClass = "w-8 h-9";
+            svgWidth = "32";
+            svgHeight = "36";
+        } else if (lastDigit === 3) { // Canines
+            sizeClass = "w-7 h-9";
+            svgWidth = "28";
+            svgHeight = "36";
+        } else { // Incisors
+            sizeClass = "w-7 h-8";
+            svgWidth = "28";
+            svgHeight = "32";
+        }
+    }
 
     // For images, we might want different overlay/border styles when selected
     const imageContainerClass = cn(
         "relative flex items-center justify-center transition-all duration-200",
-        small ? "w-5 h-6" : "w-7 h-8",
-        isSelected ? "scale-110 z-10 drop-shadow-md" : "hover:-translate-y-1"
+        sizeClass,
+        isSelected ? "scale-110 z-10 drop-shadow-[0_0_8px_rgba(249,115,22,0.6)]" : "hover:-translate-y-1"
     );
 
     return (
@@ -352,7 +377,7 @@ function Tooth({ id, isSelected, status, stage, onClick, isLower, imageSrc, smal
             className={cn(
                 "group relative flex flex-col items-center transition-all duration-200",
                 disabled ? "cursor-not-allowed opacity-50 grayscale" : "cursor-pointer",
-                !imageSrc && !disabled && (isSelected ? "scale-110 z-10" : "hover:-translate-y-1")
+                !imageSrc && !disabled && (isSelected ? "scale-125 z-10" : "hover:-translate-y-1")
             )}
         >
             {!isLower && <span className={cn("text-[8px] font-bold mb-1", isSelected ? "text-orange-600" : "text-slate-400")}>{id}</span>}
@@ -369,21 +394,21 @@ function Tooth({ id, isSelected, status, stage, onClick, isLower, imageSrc, smal
                             status === 'decay' && "drop-shadow-[0_0_2px_rgba(239,68,68,0.8)]",
                             status === 'filled' && "drop-shadow-[0_0_2px_rgba(34,197,94,0.8)]",
                             status === 'crowned' && "drop-shadow-[0_0_2px_rgba(59,130,246,0.8)]",
-                            status === 'missing' && "opacity-40 grayscale", // Keep strict grayscale for missing
+                            status === 'missing' && "opacity-20 grayscale", // Stronger missing state
                             status === 'partial_denture' && "drop-shadow-[0_0_2px_rgba(236,72,153,0.8)]",
                             status === 'in_progress' && "drop-shadow-[0_0_2px_rgba(245,158,11,0.8)]",
-                            isSelected && "drop-shadow-[0_0_4px_rgba(249,115,22,0.9)]"
+                            isSelected && "drop-shadow-[0_0_6px_rgba(249,115,22,1)]"
                         )}
                     />
                     {/* Status Overlays for images if needed */}
                     {status && (
                         <div className={cn(
-                            "absolute inset-0 opacity-30 rounded-full mix-blend-multiply",
+                            "absolute inset-0 opacity-60 rounded-full mix-blend-multiply",
                             status === 'decay' && "bg-red-500",
-                            status === 'filled' && "bg-green-500",
-                            status === 'crowned' && "bg-blue-500",
-                            status === 'missing' && "bg-yellow-500",
-                            status === 'partial_denture' && "bg-pink-500",
+                            status === 'filled' && "bg-green-600",
+                            status === 'crowned' && "bg-blue-600",
+                            status === 'missing' && "bg-yellow-400",
+                            status === 'partial_denture' && "bg-pink-600",
                             status === 'in_progress' && "bg-amber-500",
                         )} />
                     )}
@@ -398,7 +423,7 @@ function Tooth({ id, isSelected, status, stage, onClick, isLower, imageSrc, smal
                 </div>
             ) : (
                 <div className="relative">
-                    <svg width="28" height="32" viewBox="0 0 20 24" className={cn("transition-all drop-shadow-sm", colorClass)}>
+                    <svg width={svgWidth} height={svgHeight} viewBox="0 0 20 24" className={cn("transition-all drop-shadow-sm", colorClass)}>
                         <path d={toothPath} strokeWidth="1.5" />
                     </svg>
                     {stage && (

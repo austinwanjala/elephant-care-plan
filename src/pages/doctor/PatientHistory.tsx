@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Search, User, History, Loader2, ArrowLeft, Stethoscope, FileText, CalendarDays, Camera } from "lucide-react";
+import { Search, User, History, Loader2, ArrowLeft, Stethoscope, FileText, CalendarDays, Camera, ArrowRight, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
@@ -28,7 +28,16 @@ export default function DoctorPatientHistory() {
     const [visits, setVisits] = useState<any[]>([]);
     const [activeStages, setActiveStages] = useState<any[]>([]);
     const [dentalRecords, setDentalRecords] = useState<Record<number, string>>({});
+    const [searchResults, setSearchResults] = useState<any[]>([]);
+    const [selectionDialogOpen, setSelectionDialogOpen] = useState(false);
     const { toast } = useToast();
+
+    const getStageName = (service: any, stageNum: number) => {
+        if (service?.stage_names && service.stage_names[stageNum - 1]) {
+            return service.stage_names[stageNum - 1];
+        }
+        return `Stage ${stageNum}`;
+    };
 
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -42,19 +51,15 @@ export default function DoctorPatientHistory() {
             const { data, error } = await supabase
                 .from("members")
                 .select("*, membership_categories(name), branches(name)")
-                .or(`phone.ilike."%${searchTerm}%",id_number.ilike."%${searchTerm}%",member_number.ilike."%${searchTerm}%",full_name.ilike."%${searchTerm}%"`)
-                .maybeSingle();
+                .or(`phone.ilike."%${searchTerm}%",id_number.ilike."%${searchTerm}%",member_number.ilike."%${searchTerm}%",full_name.ilike."%${searchTerm}%"`);
 
-            if (error) {
-                if (error.code === 'PGRST116') {
-                    throw new Error("Multiple members found. Please be more specific.");
-                }
-                throw error;
-            }
+            if (error) throw error;
 
-            if (data) {
-                setMember(data);
-                fetchMemberHistory(data.id);
+            if (data && data.length > 1) {
+                setSearchResults(data);
+                setSelectionDialogOpen(true);
+            } else if (data && data.length === 1) {
+                handleSelectMember(data[0]);
             } else {
                 toast({ title: "Member not found", description: "No member found matching that criteria.", variant: "destructive" });
             }
@@ -63,6 +68,12 @@ export default function DoctorPatientHistory() {
         } finally {
             setSearching(false);
         }
+    };
+
+    const handleSelectMember = async (patient: any) => {
+        setMember(patient);
+        setSelectionDialogOpen(false);
+        fetchMemberHistory(patient.id);
     };
 
     const fetchMemberHistory = async (memberId: string) => {
@@ -79,7 +90,7 @@ export default function DoctorPatientHistory() {
                     total_benefit_cost, 
                     bill_items(service_name)
                 ),
-                service_stages(*)
+                service_stages(*, services(name, stage_names))
             `)
             .eq("member_id", memberId)
             .order("created_at", { ascending: false });
@@ -109,7 +120,7 @@ export default function DoctorPatientHistory() {
         // Fetch active stages
         const { data: stagesData } = await supabase
             .from("service_stages")
-            .select("*, services(name)")
+            .select("*, services(name, stage_names)")
             .eq("member_id", memberId)
             .eq("status", "in_progress");
 
@@ -265,7 +276,7 @@ export default function DoctorPatientHistory() {
                                                                 {/* Show Stages Specifically with Blue Theme */}
                                                                 {visit.service_stages?.map((stage: any, idx: number) => (
                                                                     <Badge key={`stage-${idx}`} variant="outline" className="text-[10px] py-0 px-1.5 h-4 border-blue-200 bg-blue-50 text-blue-700 font-bold">
-                                                                        {stage.tooth_number ? `Tooth #${stage.tooth_number}` : 'General'} • Stage {stage.current_stage}
+                                                                        {stage.tooth_number ? `Tooth #${stage.tooth_number}` : 'General'} • {getStageName(stage.services, stage.current_stage)}
                                                                     </Badge>
                                                                 ))}
                                                             </div>
@@ -360,9 +371,9 @@ export default function DoctorPatientHistory() {
                                                                                             <span className="font-medium text-sm">
                                                                                                 {stage.tooth_number ? `Tooth #${stage.tooth_number}` : 'General'}
                                                                                             </span>
-                                                                                            <p className="text-[10px] text-muted-foreground">Performing Stage {stage.current_stage} of {stage.total_stages}</p>
+                                                                                            <p className="text-[10px] text-muted-foreground">Performing {getStageName(stage.services, stage.current_stage)} of {stage.total_stages}</p>
                                                                                         </div>
-                                                                                        <Badge className="bg-blue-600">Stage {stage.current_stage}</Badge>
+                                                                                        <Badge className="bg-blue-600">{getStageName(stage.services, stage.current_stage)}</Badge>
                                                                                     </div>
                                                                                 ))}
                                                                             </div>
@@ -405,6 +416,32 @@ export default function DoctorPatientHistory() {
                     </Card>
                 </div>
             )}
+            <Dialog open={selectionDialogOpen} onOpenChange={setSelectionDialogOpen}>
+                <DialogContent className="max-w-xl">
+                    <DialogHeader>
+                        <DialogTitle>Select Patient</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <p className="text-sm text-muted-foreground">Multiple matches found. Please select the correct patient to view history.</p>
+                        <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+                            {searchResults.map((m) => (
+                                <div
+                                    key={m.id}
+                                    className="p-4 border rounded-lg hover:border-primary cursor-pointer transition-colors flex justify-between items-center group"
+                                    onClick={() => handleSelectMember(m)}
+                                >
+                                    <div>
+                                        <div className="font-bold group-hover:text-primary transition-colors">{m.full_name}</div>
+                                        <div className="text-xs text-muted-foreground">#{m.member_number} • {m.phone} • {m.id_number}</div>
+                                        <div className="text-[10px] mt-1 text-primary/70">{m.membership_categories?.name} @ {m.branches?.name}</div>
+                                    </div>
+                                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

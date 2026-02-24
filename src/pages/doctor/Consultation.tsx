@@ -203,7 +203,7 @@ export default function Consultation() {
                     status,
                     doctor:doctor_id(full_name),
                     branches(name),
-                    service_stages(*)
+                    service_stages(*, services(name, stage_names))
                 `)
                 .eq("member_id", data.member_id)
                 .neq("id", visitId) // Exclude current visit
@@ -367,6 +367,13 @@ export default function Consultation() {
         }) || [];
 
         setAvailableServices(filteredServices);
+    };
+
+    const getStageName = (service: any, stageNum: number) => {
+        if (service?.stage_names && service.stage_names[stageNum - 1]) {
+            return service.stage_names[stageNum - 1];
+        }
+        return `Stage ${stageNum}`;
     };
 
     const handleToothClick = (toothId: number) => {
@@ -1680,7 +1687,7 @@ export default function Consultation() {
                                                     <div className="font-semibold">{s.service.name}</div>
                                                     {s.service.is_multi_stage && (
                                                         <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-blue-200">
-                                                            Stage {s.service.startAtStage || 1} of {s.service.total_stages}
+                                                            {getStageName(s.service, s.service.startAtStage || 1)} of {s.service.total_stages}
                                                         </Badge>
                                                     )}
                                                 </div>
@@ -1725,11 +1732,11 @@ export default function Consultation() {
                                             </div>
                                             <div className="flex flex-col items-end">
                                                 <Badge className="text-[10px] px-1 py-0 h-5 bg-blue-600">
-                                                    At Stage {stage.current_stage}
+                                                    {getStageName(stage.services, stage.current_stage)}
                                                 </Badge>
                                                 {stage.current_stage < stage.total_stages ? (
                                                     <span className="text-[9px] text-blue-500 mt-1 font-medium">
-                                                        Awaiting Stage {stage.current_stage + 1}
+                                                        Awaiting: {getStageName(stage.services, stage.current_stage + 1)}
                                                     </span>
                                                 ) : (
                                                     <span className="text-[9px] text-emerald-600 mt-1 font-bold">
@@ -1903,7 +1910,7 @@ export default function Consultation() {
                                 <div className="space-y-2">
                                     <Label className="font-semibold">Stage Notes <span className="text-muted-foreground font-normal text-xs">(optional)</span></Label>
                                     <Textarea
-                                        placeholder={`Describe what was done in Stage ${nextStageNum}...`}
+                                        placeholder={`Describe what was done in ${getStageName(pendingContinueStage.services, nextStageNum)}...`}
                                         value={stageNotes}
                                         onChange={(e) => setStageNotes(e.target.value)}
                                         className="min-h-[90px]"
@@ -1985,7 +1992,7 @@ export default function Consultation() {
                                                 <div className="flex flex-wrap gap-2">
                                                     {v.service_stages.map((stage: any) => (
                                                         <Badge key={stage.id} variant="secondary" className="bg-blue-50 text-blue-700 border-blue-100">
-                                                            {stage.tooth_number ? `Tooth #${stage.tooth_number}` : 'General'}: Stage {stage.current_stage}
+                                                            {stage.tooth_number ? `Tooth #${stage.tooth_number}` : 'General'}: {stage.current_stage}
                                                         </Badge>
                                                     ))}
                                                 </div>

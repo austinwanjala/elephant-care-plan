@@ -35,6 +35,8 @@ export default function RegisterVisit() {
     const [selectedDependant, setSelectedDependant] = useState<any>(null);
     const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
     const [ongoingStages, setOngoingStages] = useState<any[]>([]);
+    const [searchResults, setSearchResults] = useState<any[]>([]);
+    const [selectionDialogOpen, setSelectionDialogOpen] = useState(false);
     const { toast } = useToast();
     const navigate = useNavigate();
 
@@ -122,57 +124,15 @@ export default function RegisterVisit() {
             const { data, error } = await supabase
                 .from("members")
                 .select("*, membership_categories(name), branches(name)")
-                .or(`phone.ilike."%${term}%",id_number.ilike."%${term}%",member_number.ilike."%${term}%",full_name.ilike."%${term}%"`)
-                .maybeSingle();
+                .or(`phone.ilike."%${term}%",id_number.ilike."%${term}%",member_number.ilike."%${term}%",full_name.ilike."%${term}%"`);
 
-            if (error) {
-                if (error.code === 'PGRST116') {
-                    throw new Error("Multiple members found. Please enter a more specific ID, Phone, or Member Number.");
-                }
-                throw error;
-            }
+            if (error) throw error;
 
-            if (data) {
-                setMember(data);
-                setSelectedPatientId(data.id);
-
-                // Fetch dependants
-                const { data: dependantsData } = await supabase
-                    .from("dependants")
-                    .select("*")
-                    .eq("member_id", data.id)
-                    .eq("is_active", true);
-
-                if (dependantsData) {
-                    setDependants(dependantsData);
-                }
-
-                // Fetch ongoing multi-stage treatments
-                const { data: rawStages } = await (supabase as any)
-                    .from("service_stages")
-                    .select("*")
-                    .eq("member_id", data.id)
-                    .eq("status", "in_progress");
-
-                if (rawStages && rawStages.length > 0) {
-                    const serviceIds = [...new Set(rawStages.map((s: any) => s.service_id))];
-                    const { data: servicesData } = await (supabase as any)
-                        .from("services")
-                        .select("id, name")
-                        .in("id", serviceIds);
-                    const servicesMap: Record<string, any> = {};
-                    (servicesData || []).forEach((svc: any) => { servicesMap[svc.id] = svc; });
-                    setOngoingStages(rawStages.map((s: any) => ({ ...s, serviceName: servicesMap[s.service_id]?.name || 'Unknown Service' })));
-                } else {
-                    setOngoingStages([]);
-                }
-
-                if (data.biometric_data) {
-                    setBiometricsVerified(false);
-                } else {
-                    setBiometricsVerified(true);
-                    toast({ title: "No Biometric Data", description: "Principal member has no registered biometric data. Proceeding without biometric verification.", variant: "default" });
-                }
+            if (data && data.length > 1) {
+                setSearchResults(data);
+                setSelectionDialogOpen(true);
+            } else if (data && data.length === 1) {
+                handleSelectMember(data[0]);
             } else {
                 toast({ title: "Member not found", description: "No member found matching that criteria.", variant: "destructive" });
             }
@@ -180,6 +140,49 @@ export default function RegisterVisit() {
             toast({ title: "Search failed", description: error.message, variant: "destructive" });
         } finally {
             setSearching(false);
+        }
+    };
+
+    const handleSelectMember = async (data: any) => {
+        setMember(data);
+        setSelectedPatientId(data.id);
+        setSelectionDialogOpen(false);
+
+        // Fetch dependants
+        const { data: dependantsData } = await supabase
+            .from("dependants")
+            .select("*")
+            .eq("member_id", data.id)
+            .eq("is_active", true);
+
+        if (dependantsData) {
+            setDependants(dependantsData);
+        }
+
+        // Fetch ongoing multi-stage treatments
+        const { data: rawStages } = await (supabase as any)
+            .from("service_stages")
+            .select("*")
+            .eq("member_id", data.id)
+            .eq("status", "in_progress");
+
+        if (rawStages && rawStages.length > 0) {
+            const serviceIds = [...new Set(rawStages.map((s: any) => s.service_id))];
+            const { data: servicesData } = await (supabase as any)
+                .from("services")
+                .select("id, name")
+                .in("id", serviceIds);
+            const servicesMap: Record<string, any> = {};
+            (servicesData || []).forEach((svc: any) => { servicesMap[svc.id] = svc; });
+            setOngoingStages(rawStages.map((s: any) => ({ ...s, serviceName: servicesMap[s.service_id]?.name || 'Unknown Service' })));
+        } else {
+            setOngoingStages([]);
+        }
+
+        if (data.biometric_data) {
+            setBiometricsVerified(false);
+        } else {
+            setBiometricsVerified(true);
         }
     };
 
@@ -613,6 +616,33 @@ export default function RegisterVisit() {
                             </div>
                         </div>
                     )}
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={selectionDialogOpen} onOpenChange={setSelectionDialogOpen}>
+                <DialogContent className="max-w-xl">
+                    <DialogHeader>
+                        <DialogTitle>Select Member</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <p className="text-sm text-muted-foreground">Multiple matches found. Please select the correct member.</p>
+                        <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+                            {searchResults.map((m) => (
+                                <div
+                                    key={m.id}
+                                    className="p-4 border rounded-lg hover:border-primary cursor-pointer transition-colors flex justify-between items-center group"
+                                    onClick={() => handleSelectMember(m)}
+                                >
+                                    <div>
+                                        <div className="font-bold group-hover:text-primary transition-colors">{m.full_name}</div>
+                                        <div className="text-xs text-muted-foreground">#{m.member_number} • {m.phone} • {m.id_number}</div>
+                                        <div className="text-[10px] mt-1 text-primary/70">{m.membership_categories?.name} @ {m.branches?.name}</div>
+                                    </div>
+                                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </DialogContent>
             </Dialog>
         </div>

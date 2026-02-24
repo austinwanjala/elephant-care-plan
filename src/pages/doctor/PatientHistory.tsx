@@ -34,10 +34,9 @@ export default function DoctorPatientHistory() {
     const { toast } = useToast();
 
     const getStageName = (service: any, stageNum: number) => {
-        if (service?.stage_names && service.stage_names[stageNum - 1]) {
-            return service.stage_names[stageNum - 1];
-        }
-        return `Stage ${stageNum}`;
+        const total = service?.total_stages || '?';
+        const customName = (service?.stage_names && service.stage_names[stageNum - 1]) ? ` - ${service.stage_names[stageNum - 1]}` : '';
+        return `Stage ${stageNum} of ${total}${customName}`;
     };
 
     const handleSearch = async (e: React.FormEvent) => {
@@ -421,7 +420,7 @@ export default function DoctorPatientHistory() {
                                                                                             <span className="font-medium text-sm">
                                                                                                 {stage.tooth_number ? `Tooth #${stage.tooth_number}` : 'General'}
                                                                                             </span>
-                                                                                            <p className="text-[10px] text-muted-foreground">Performing {getStageName(stage.services, stage.current_stage)} of {stage.total_stages}</p>
+                                                                                            <p className="text-[10px] text-muted-foreground">Performing {getStageName(stage.services, stage.current_stage)}</p>
                                                                                         </div>
                                                                                         <Badge className="bg-blue-600">{getStageName(stage.services, stage.current_stage)}</Badge>
                                                                                     </div>

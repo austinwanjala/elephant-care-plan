@@ -370,10 +370,9 @@ export default function Consultation() {
     };
 
     const getStageName = (service: any, stageNum: number) => {
-        if (service?.stage_names && service.stage_names[stageNum - 1]) {
-            return service.stage_names[stageNum - 1];
-        }
-        return `Stage ${stageNum}`;
+        const total = service?.total_stages || '?';
+        const customName = (service?.stage_names && service.stage_names[stageNum - 1]) ? ` - ${service.stage_names[stageNum - 1]}` : '';
+        return `Stage ${stageNum} of ${total}${customName}`;
     };
 
     const handleToothClick = (toothId: number) => {
@@ -1687,7 +1686,7 @@ export default function Consultation() {
                                                     <div className="font-semibold">{s.service.name}</div>
                                                     {s.service.is_multi_stage && (
                                                         <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-blue-200">
-                                                            {getStageName(s.service, s.service.startAtStage || 1)} of {s.service.total_stages}
+                                                            {getStageName(s.service, s.service.startAtStage || 1)}
                                                         </Badge>
                                                     )}
                                                 </div>
@@ -1881,7 +1880,7 @@ export default function Consultation() {
 
                                     <div className="space-y-1">
                                         <div className="flex justify-between text-xs font-bold text-blue-900">
-                                            <span>Completing Stage {nextStageNum} of {pendingContinueStage.total_stages}{stageName ? ` — ${stageName.toUpperCase()}` : ''}</span>
+                                            <span>Completing {getStageName(pendingContinueStage.services, nextStageNum)}</span>
                                             <span>{Math.round((nextStageNum / pendingContinueStage.total_stages) * 100)}%</span>
                                         </div>
                                         <div className="h-2 w-full bg-blue-100 rounded-full overflow-hidden">

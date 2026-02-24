@@ -30,6 +30,7 @@ export default function DoctorPatientHistory() {
     const [dentalRecords, setDentalRecords] = useState<Record<number, string>>({});
     const [searchResults, setSearchResults] = useState<any[]>([]);
     const [selectionDialogOpen, setSelectionDialogOpen] = useState(false);
+    const [selectedDependant, setSelectedDependant] = useState<any>(null);
     const { toast } = useToast();
 
     const getStageName = (service: any, stageNum: number) => {
@@ -48,20 +49,35 @@ export default function DoctorPatientHistory() {
         setDentalRecords({});
 
         try {
-            const { data, error } = await supabase
+            // 1. Search Members
+            const { data: memberMatches } = await supabase
                 .from("members")
                 .select("*, membership_categories(name), branches(name)")
                 .or(`phone.ilike."%${searchTerm}%",id_number.ilike."%${searchTerm}%",member_number.ilike."%${searchTerm}%",full_name.ilike."%${searchTerm}%"`);
 
-            if (error) throw error;
+            // 2. Search Dependants
+            const { data: dependantMatches } = await supabase
+                .from("dependants")
+                .select("*, members(*, membership_categories(name), branches(name))")
+                .or(`full_name.ilike."%${searchTerm}%",id_number.ilike."%${searchTerm}%"`);
 
-            if (data && data.length > 1) {
-                setSearchResults(data);
+            const combinedResults = [
+                ...(memberMatches || []).map(m => ({ ...m, resultType: 'principal' })),
+                ...(dependantMatches || []).map(d => ({
+                    ...d,
+                    resultType: 'dependant',
+                    principalData: d.members,
+                    dependentName: d.full_name
+                }))
+            ];
+
+            if (combinedResults.length > 1) {
+                setSearchResults(combinedResults);
                 setSelectionDialogOpen(true);
-            } else if (data && data.length === 1) {
-                handleSelectMember(data[0]);
+            } else if (combinedResults.length === 1) {
+                handleSelectMember(combinedResults[0]);
             } else {
-                toast({ title: "Member not found", description: "No member found matching that criteria.", variant: "destructive" });
+                toast({ title: "No matches found", description: "No member or dependant found matching that criteria.", variant: "destructive" });
             }
         } catch (error: any) {
             toast({ title: "Search failed", description: error.message, variant: "destructive" });
@@ -70,16 +86,22 @@ export default function DoctorPatientHistory() {
         }
     };
 
-    const handleSelectMember = async (patient: any) => {
-        setMember(patient);
+    const handleSelectMember = async (result: any) => {
         setSelectionDialogOpen(false);
-        fetchMemberHistory(patient.id);
+        if (result.resultType === 'dependant') {
+            setMember(result.principalData);
+            setSelectedDependant(result);
+            fetchMemberHistory(result.member_id, result.id);
+        } else {
+            setMember(result);
+            setSelectedDependant(null);
+            fetchMemberHistory(result.id, null);
+        }
     };
 
-    const fetchMemberHistory = async (memberId: string) => {
-        // Fetch visits
+    const fetchMemberHistory = async (memberId: string, dependantId: string | null = null) => {
         // Fetch visits with clinical details
-        const { data: visitsData, error: visitsError } = await supabase
+        let visitsQuery = (supabase as any)
             .from("visits")
             .select(`
                 *, 
@@ -92,8 +114,15 @@ export default function DoctorPatientHistory() {
                 ),
                 service_stages(*, services(name, stage_names))
             `)
-            .eq("member_id", memberId)
-            .order("created_at", { ascending: false });
+            .eq("member_id", memberId);
+
+        if (dependantId) {
+            visitsQuery = visitsQuery.eq("dependant_id", dependantId);
+        } else {
+            visitsQuery = visitsQuery.is("dependant_id", null);
+        }
+
+        const { data: visitsData, error: visitsError } = await visitsQuery.order("created_at", { ascending: false });
 
         if (visitsError) {
             toast({ title: "Error fetching visits", description: visitsError.message, variant: "destructive" });
@@ -102,10 +131,18 @@ export default function DoctorPatientHistory() {
         }
 
         // Fetch dental records
-        const { data: dentalRecordsData, error: dentalRecordsError } = await supabase
+        let dentalQuery = (supabase as any)
             .from("dental_records")
             .select("tooth_number, status")
             .eq("member_id", memberId);
+
+        if (dependantId) {
+            dentalQuery = dentalQuery.eq("dependant_id", dependantId);
+        } else {
+            dentalQuery = dentalQuery.is("dependant_id", null);
+        }
+
+        const { data: dentalRecordsData, error: dentalRecordsError } = await dentalQuery;
 
         if (dentalRecordsError) {
             toast({ title: "Error fetching dental records", description: dentalRecordsError.message, variant: "destructive" });
@@ -118,11 +155,19 @@ export default function DoctorPatientHistory() {
         }
 
         // Fetch active stages
-        const { data: stagesData } = await supabase
+        let stagesQuery = (supabase as any)
             .from("service_stages")
             .select("*, services(name, stage_names)")
             .eq("member_id", memberId)
             .eq("status", "in_progress");
+
+        if (dependantId) {
+            stagesQuery = stagesQuery.eq("dependant_id", dependantId);
+        } else {
+            stagesQuery = stagesQuery.is("dependant_id", null);
+        }
+
+        const { data: stagesData } = await stagesQuery;
 
         if (stagesData) {
             setActiveStages(stagesData);
@@ -137,8 +182,8 @@ export default function DoctorPatientHistory() {
     };
 
     let chartMode: DentalChartMode = 'adult';
-    if (member?.dob) {
-        const age = calculateAge(member.dob);
+    if (selectedDependant?.dob || member?.dob) {
+        const age = calculateAge(selectedDependant?.dob || member.dob);
         if (age <= 14) chartMode = 'mixed';
         else chartMode = 'adult';
     }
@@ -180,8 +225,13 @@ export default function DoctorPatientHistory() {
                         <CardHeader className="bg-primary/5">
                             <div className="flex justify-between items-start">
                                 <div>
-                                    <CardTitle>{member.full_name}</CardTitle>
-                                    <CardDescription>Member #{member.member_number}</CardDescription>
+                                    <div className="flex items-center gap-2">
+                                        <CardTitle>{selectedDependant ? selectedDependant.full_name : member.full_name}</CardTitle>
+                                        {selectedDependant && <Badge variant="secondary" className="bg-blue-50 text-blue-700">Dependant</Badge>}
+                                    </div>
+                                    <CardDescription>
+                                        {selectedDependant ? `Dependent of ${member.full_name}` : `Member #${member.member_number}`}
+                                    </CardDescription>
                                 </div>
                                 <Badge variant={member.is_active ? "default" : "destructive"}>
                                     {member.is_active ? "Active" : "Inactive"}
@@ -213,7 +263,7 @@ export default function DoctorPatientHistory() {
                             <CardTitle className="flex items-center gap-2">
                                 <Stethoscope className="h-5 w-5" /> Dental Chart History
                             </CardTitle>
-                            <CardDescription>Current and historical dental records for {member.full_name}.</CardDescription>
+                            <CardDescription>Current and historical dental records for {selectedDependant ? selectedDependant.full_name : member.full_name}.</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <DentalChart
@@ -307,7 +357,7 @@ export default function DoctorPatientHistory() {
                                                     </td>
                                                     <td className="py-3 px-3 text-sm">
                                                         <Badge
-                                                            variant={visit.status === 'completed' ? 'success' : 'outline'}
+                                                            variant={visit.status === 'completed' ? 'default' : 'outline'}
                                                             className={cn(
                                                                 "capitalize text-[10px] px-2 h-5",
                                                                 visit.status === 'completed' ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-emerald-200" : "bg-blue-50 text-blue-700 border-blue-200"
@@ -426,14 +476,24 @@ export default function DoctorPatientHistory() {
                         <div className="space-y-2 max-h-[60vh] overflow-y-auto">
                             {searchResults.map((m) => (
                                 <div
-                                    key={m.id}
+                                    key={m.resultType === 'dependant' ? `dep-${m.id}` : `mem-${m.id}`}
                                     className="p-4 border rounded-lg hover:border-primary cursor-pointer transition-colors flex justify-between items-center group"
                                     onClick={() => handleSelectMember(m)}
                                 >
                                     <div>
-                                        <div className="font-bold group-hover:text-primary transition-colors">{m.full_name}</div>
-                                        <div className="text-xs text-muted-foreground">#{m.member_number} • {m.phone} • {m.id_number}</div>
-                                        <div className="text-[10px] mt-1 text-primary/70">{m.membership_categories?.name} @ {m.branches?.name}</div>
+                                        <div className="font-bold group-hover:text-primary transition-colors">
+                                            {m.full_name}
+                                            {m.resultType === 'dependant' && <span className="ml-2 text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded uppercase">Dependant</span>}
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">
+                                            {m.resultType === 'dependant'
+                                                ? `Dep. of ${m.principalData?.full_name} (#${m.principalData?.member_number})`
+                                                : `#${m.member_number} • ${m.phone} • ${m.id_number}`
+                                            }
+                                        </div>
+                                        <div className="text-[10px] mt-1 text-primary/70">
+                                            {m.membership_categories?.name || m.principalData?.membership_categories?.name} @ {m.branches?.name || m.principalData?.branches?.name}
+                                        </div>
                                     </div>
                                     <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
                                 </div>

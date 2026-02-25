@@ -120,23 +120,52 @@ export default function RegisterVisit() {
         setBiometricsVerified(false);
 
         try {
-            // Use ilike with wildcards and double quotes for all fields to handle spaces and partial matches
-            const { data, error } = await supabase
+            // 1. Search Members (Principal)
+            const { data: principalMatches, error: principalError } = await supabase
                 .from("members")
                 .select("*, membership_categories(name), branches(name)")
                 .or(`phone.ilike."%${term}%",id_number.ilike."%${term}%",member_number.ilike."%${term}%",full_name.ilike."%${term}%"`);
 
-            if (error) throw error;
+            if (principalError) throw principalError;
 
-            if (data && data.length > 1) {
-                setSearchResults(data);
+            // 2. Search Dependants
+            const { data: dependantMatches, error: dependantError } = await supabase
+                .from("dependants")
+                .select("member_id")
+                .or(`full_name.ilike."%${term}%",id_number.ilike."%${term}%"`);
+
+            if (dependantError) throw dependantError;
+
+            // Collect all unique member IDs
+            const foundMemberIds = new Set(principalMatches?.map(m => m.id) || []);
+            const additionalMemberIds = (dependantMatches || [])
+                .map(d => d.member_id)
+                .filter(id => !foundMemberIds.has(id));
+
+            let allResults = [...(principalMatches || [])];
+
+            // If we found dependants whose principals aren't in the list, fetch them
+            if (additionalMemberIds.length > 0) {
+                const { data: extraMembers, error: extraError } = await supabase
+                    .from("members")
+                    .select("*, membership_categories(name), branches(name)")
+                    .in("id", additionalMemberIds);
+
+                if (!extraError && extraMembers) {
+                    allResults = [...allResults, ...extraMembers];
+                }
+            }
+
+            if (allResults.length > 1) {
+                setSearchResults(allResults);
                 setSelectionDialogOpen(true);
-            } else if (data && data.length === 1) {
-                handleSelectMember(data[0]);
+            } else if (allResults.length === 1) {
+                handleSelectMember(allResults[0]);
             } else {
                 toast({ title: "Member not found", description: "No member found matching that criteria.", variant: "destructive" });
             }
         } catch (error: any) {
+            console.error("Search error:", error);
             toast({ title: "Search failed", description: error.message, variant: "destructive" });
         } finally {
             setSearching(false);

@@ -27,25 +27,54 @@ export default function ReceptionSearchMember() {
         setMember(null);
 
         try {
-            const { data, error } = await supabase
+            // 1. Search Principals
+            const { data: principalMatches, error: principalError } = await supabase
                 .from("members")
                 .select("*, membership_categories(name), branches(name), dependants(*)")
-                .or(`phone.ilike."%${term}%",id_number.ilike."%${term}%",member_number.ilike."%${term}%",full_name.ilike."%${term}%"`)
-                .maybeSingle();
+                .or(`phone.ilike."%${term}%",id_number.ilike."%${term}%",member_number.ilike."%${term}%",full_name.ilike."%${term}%"`);
 
-            if (error) {
-                if (error.code === 'PGRST116') {
-                    throw new Error("Multiple members found. Please be more specific.");
+            if (principalError) throw principalError;
+
+            // 2. Search Dependants
+            const { data: dependantMatches, error: dependantError } = await supabase
+                .from("dependants")
+                .select("member_id")
+                .or(`full_name.ilike."%${term}%",id_number.ilike."%${term}%"`);
+
+            if (dependantError) throw dependantError;
+
+            let allResults = [...(principalMatches || [])];
+
+            // Collect unique member IDs from dependants that weren't found in principal search
+            const foundIds = new Set(allResults.map(m => m.id));
+            const missingIds = (dependantMatches || [])
+                .map(d => d.member_id)
+                .filter(id => !foundIds.has(id));
+
+            if (missingIds.length > 0) {
+                const { data: extraMembers, error: extraError } = await supabase
+                    .from("members")
+                    .select("*, membership_categories(name), branches(name), dependants(*)")
+                    .in("id", missingIds);
+
+                if (!extraError && extraMembers) {
+                    allResults = [...allResults, ...extraMembers];
                 }
-                throw error;
             }
 
-            if (data) {
-                setMember(data);
+            if (allResults.length > 0) {
+                // If multiple results, just take the first one or throw error similar to previous behavior
+                // The RegisterVisit page handles multiple results better with a dialog, 
+                // but here we follow the original logic of maybeSingle/Single
+                if (allResults.length > 1) {
+                    toast({ title: "Note", description: "Multiple members found. Showing the closest match." });
+                }
+                setMember(allResults[0]);
             } else {
                 toast({ title: "Member not found", description: "No member found matching that criteria.", variant: "destructive" });
             }
         } catch (error: any) {
+            console.error("Search error:", error);
             toast({ title: "Search failed", description: error.message, variant: "destructive" });
         } finally {
             setSearching(false);

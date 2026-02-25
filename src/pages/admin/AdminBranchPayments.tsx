@@ -57,8 +57,12 @@ export default function AdminBranchPayments() {
   const fetchUserRole = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const { data } = await supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
-      setUserRole(data?.role || null);
+      const { data: rolesData } = await supabase.from("user_roles").select("role").eq("user_id", user.id);
+      const roles = rolesData?.map(r => r.role) || [];
+      if (roles.includes('super_admin')) setUserRole('super_admin');
+      else if (roles.includes('admin')) setUserRole('admin');
+      else if (roles.includes('finance')) setUserRole('finance');
+      else if (roles.length > 0) setUserRole(roles[0]);
     }
   };
 
@@ -112,11 +116,11 @@ export default function AdminBranchPayments() {
 
       if (error) throw error;
 
-      toast({ 
-        title: isApproval ? "Claim Approved" : "Payment Recorded", 
-        description: isApproval ? "Sent to Finance for payment." : "Claim has been marked as paid." 
+      toast({
+        title: isApproval ? "Claim Approved" : "Payment Recorded",
+        description: isApproval ? "Sent to Finance for payment." : "Claim has been marked as paid."
       });
-      
+
       setActionDialogOpen(false);
       // Force a refresh of the data
       await loadData();
@@ -130,9 +134,9 @@ export default function AdminBranchPayments() {
   if (loading) return <div className="flex items-center justify-center min-h-[400px]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
   const isFinance = userRole === 'finance' || userRole === 'super_admin';
-  
+
   // Filter logic: Admin sees pending, Finance sees approved
-  const activeClaims = claims.filter(c => 
+  const activeClaims = claims.filter(c =>
     isFinance ? c.status === 'approved' : c.status === 'pending'
   );
 
@@ -181,9 +185,9 @@ export default function AdminBranchPayments() {
                         <TableCell>{claim.staff?.full_name}</TableCell>
                         <TableCell className="text-lg font-bold text-blue-700">KES {Number(claim.amount).toLocaleString()}</TableCell>
                         <TableCell>
-                          <Button 
-                            size="sm" 
-                            onClick={() => { setSelectedClaim(claim); setActionNotes(""); setActionDialogOpen(true); }} 
+                          <Button
+                            size="sm"
+                            onClick={() => { setSelectedClaim(claim); setActionNotes(""); setActionDialogOpen(true); }}
                             className={isFinance ? "bg-green-600 hover:bg-green-700" : "bg-primary"}
                           >
                             {isFinance ? <><DollarSign className="mr-2 h-4 w-4" /> Pay Claim</> : <><ShieldCheck className="mr-2 h-4 w-4" /> Approve</>}
@@ -218,9 +222,9 @@ export default function AdminBranchPayments() {
                       <TableCell className="font-bold">KES {Number(claim.amount).toLocaleString()}</TableCell>
                       <TableCell>
                         <Badge className={
-                          claim.status === 'paid' ? 'bg-green-100 text-green-800' : 
-                          claim.status === 'approved' ? 'bg-blue-100 text-blue-800' : 
-                          'bg-amber-100 text-amber-800'
+                          claim.status === 'paid' ? 'bg-green-100 text-green-800' :
+                            claim.status === 'approved' ? 'bg-blue-100 text-blue-800' :
+                              'bg-amber-100 text-amber-800'
                         }>
                           {claim.status.toUpperCase()}
                         </Badge>
@@ -241,7 +245,7 @@ export default function AdminBranchPayments() {
               {isFinance ? "Confirm Payout" : "Approve Branch Claim"}
             </DialogTitle>
             <DialogDescription>
-              {isFinance 
+              {isFinance
                 ? `Record the final payment of KES ${Number(selectedClaim?.amount).toLocaleString()} to ${selectedClaim?.branches?.name}.`
                 : `Verify and approve the revenue claim for ${selectedClaim?.branches?.name}.`
               }

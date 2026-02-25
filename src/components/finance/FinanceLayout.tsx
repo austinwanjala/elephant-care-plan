@@ -32,12 +32,13 @@ export function FinanceLayout() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) { navigate("/login"); return; }
 
-        const { data: roleData } = await supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
+        const { data: rolesData } = await supabase.from("user_roles").select("role").eq("user_id", user.id);
+        const roles = rolesData?.map(r => r.role) || [];
 
-        const userRole = roleData?.role as string;
-        setRole(userRole);
+        const hasFinanceAccess = roles.includes("finance") || roles.includes("super_admin") || roles.includes("admin");
+        setRole(roles.includes("super_admin") ? "super_admin" : (roles.includes("admin") ? "admin" : roles[0]));
 
-        if (userRole !== "finance" && userRole !== "super_admin" && userRole !== "admin") {
+        if (!hasFinanceAccess) {
             toast({ title: "Access Denied", description: "Finance privileges required.", variant: "destructive" });
             navigate("/");
             return;

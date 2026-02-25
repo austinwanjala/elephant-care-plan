@@ -41,11 +41,17 @@ export function MarketerLayout({ children }: MarketerLayoutProps) {
             return;
         }
 
-        const { data: roleData, error: roleError } = await supabase
+        const { data: rolesData, error: roleError } = await supabase
             .from("user_roles")
             .select("role")
-            .eq("user_id", user.id)
-            .maybeSingle();
+            .eq("user_id", user.id);
+
+        const roles = rolesData?.map(v => v.role) || [];
+        const hasAccess = roles.includes("marketer") || roles.includes("admin") || roles.includes("super_admin");
+
+        if (roles.includes("super_admin")) setRole("super_admin");
+        else if (roles.includes("admin")) setRole("admin");
+        else if (roles.length > 0) setRole(roles[0]);
 
         if (roleError) {
             toast({
@@ -58,10 +64,7 @@ export function MarketerLayout({ children }: MarketerLayoutProps) {
             return;
         }
 
-        const userRole = roleData?.role as string;
-        setRole(userRole);
-
-        if (userRole !== "marketer" && userRole !== "admin") {
+        if (!hasAccess) {
             toast({
                 title: "Access Denied",
                 description: "You must be a Marketer to view this page.",

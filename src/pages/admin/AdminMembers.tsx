@@ -256,19 +256,31 @@ export default function AdminMembers() {
     setLoading(true);
     try {
       const { data: { user: adminUser } } = await supabase.auth.getUser();
-      const { error } = await supabase.functions.invoke("admin-reset-password", {
+      const { data, error } = await supabase.functions.invoke("admin-reset-password", {
         body: {
           email: resettingUser.email,
           password: newPassword,
           admin_id: adminUser?.id
         }
       });
-      if (error) throw error;
-      toast({ title: "Success", description: `Password for ${resettingUser.full_name} has been reset and notification sent.` });
+
+      if (error) {
+        let errorMessage = error.message;
+        try {
+          const errorContext = await error.context?.json();
+          if (errorContext?.error) errorMessage = errorContext.error;
+        } catch (e) {
+          console.error("Failed to parse error context:", e);
+        }
+        throw new Error(errorMessage);
+      }
+
+      toast({ title: "Success", description: `Password for ${resettingUser.full_name} has been updated.` });
       setResetPasswordOpen(false);
       setResettingUser(null);
       setNewPassword("");
     } catch (error: any) {
+      console.error("Reset password error:", error);
       toast({ title: "Reset failed", description: error.message, variant: "destructive" });
     } finally {
       setLoading(false);
@@ -469,7 +481,7 @@ export default function AdminMembers() {
           <DialogHeader>
             <DialogTitle className="font-serif text-xl">Reset Member Password</DialogTitle>
             <DialogDescription>
-              Set a new password for {resettingUser?.full_name}. This will be sent to them via SMS/Email.
+              Set a new password for {resettingUser?.full_name}.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -488,7 +500,7 @@ export default function AdminMembers() {
               </div>
             </div>
             <Button onClick={handleResetPassword} className="w-full bg-red-600 hover:bg-red-700" disabled={loading}>
-              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Confirm Reset & Notify"}
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Confirm Reset"}
             </Button>
           </div>
         </DialogContent>

@@ -35,13 +35,13 @@ export function usePermissions() {
                 }
 
                 // 1. Get User Role
-                const { data: roleData } = await supabase
+                const { data: rolesData } = await supabase
                     .from('user_roles')
                     .select('role')
-                    .eq('user_id', user.id)
-                    .maybeSingle();
+                    .eq('user_id', user.id);
 
-                const userRole = roleData?.role;
+                const roles = rolesData?.map(r => r.role) || [];
+                const userRole = roles.includes('super_admin') ? 'super_admin' : (roles.includes('admin') ? 'admin' : (roles.length > 0 ? roles[0] : null));
 
                 if (mounted) setRole(userRole);
 

@@ -77,6 +77,35 @@ async function verifySignature(payload: string, signature: string, apiKey: strin
   }
 }
 
+// Function to send SMS confirmation via KopoKopo Messaging API
+async function sendSmsConfirmation(phone: string, message: string, token: string) {
+  try {
+    const response = await fetch("https://api.kopokopo.com/api/v1/sms_batches", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      body: JSON.stringify({
+        sms_batch: {
+          recipients: [phone],
+          message: message
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("[kopokopo] SMS sending failed:", errorText);
+    } else {
+      console.log("[kopokopo] SMS confirmation sent to:", phone);
+    }
+  } catch (e) {
+    console.error("[kopokopo] SMS helper error:", e.message);
+  }
+}
+
 serve(async (req) => {
   const { method, url } = req;
   const path = new URL(url).pathname;
@@ -163,6 +192,12 @@ serve(async (req) => {
 
         if (payment) {
           await supabase.from("members").update({ is_active: true }).eq("id", payment.member_id);
+
+          // Send SMS Confirmation to the user
+          const smsToken = await getAccessToken();
+          const smsMessage = `Confirmed! We have received your payment of KES ${payment.amount} (Ref: ${mpesaCode}). Your Elephant Care coverage is now active. Thank you!`;
+          await sendSmsConfirmation(payment.phone_used || eventData.sender_phone, smsMessage, smsToken);
+
           await supabase.from("system_logs").insert({
             action: "KOPOKOPO_PAYMENT_SUCCESS",
             details: {

@@ -77,6 +77,9 @@ export default function AdminMembers() {
   const [biometricDialogOpen, setBiometricDialogOpen] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [dependantsDialogOpen, setDependantsDialogOpen] = useState(false);
+  const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
+  const [resettingUser, setResettingUser] = useState<any>(null);
+  const [newPassword, setNewPassword] = useState("");
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -113,10 +116,13 @@ export default function AdminMembers() {
     try {
       if (!formData.dob) throw new Error("Date of Birth is required.");
 
-      const dobDate = new Date(formData.dob);
-      const ageDiffMs = Date.now() - dobDate.getTime();
-      const ageDate = new Date(ageDiffMs);
-      const calculatedAge = Math.abs(ageDate.getUTCFullYear() - 1970);
+      const today = new Date();
+      const birthDate = new Date(formData.dob);
+      let calculatedAge = today.getFullYear() - birthDate.getFullYear();
+      const m = today.getMonth() - birthDate.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        calculatedAge--;
+      }
 
       const { data, error } = await supabase.functions.invoke("admin-create-user", {
         body: {
@@ -175,10 +181,14 @@ export default function AdminMembers() {
       let age = selectedMember.age;
 
       if (formData.dob) {
-        const dobDate = new Date(formData.dob);
-        const ageDiffMs = Date.now() - dobDate.getTime();
-        const ageDate = new Date(ageDiffMs);
-        age = Math.abs(ageDate.getUTCFullYear() - 1970);
+        const today = new Date();
+        const birthDate = new Date(formData.dob);
+        let calculatedAge = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+          calculatedAge--;
+        }
+        age = calculatedAge;
       }
 
       const updates: any = {
@@ -233,6 +243,45 @@ export default function AdminMembers() {
       loadData();
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!newPassword || newPassword.length < 6) {
+      toast({ title: "Invalid password", description: "Password must be at least 6 characters.", variant: "destructive" });
+      return;
+    }
+    setLoading(true);
+    try {
+      const { data: { user: adminUser } } = await supabase.auth.getUser();
+      const { data, error } = await supabase.functions.invoke("admin-reset-password", {
+        body: {
+          email: resettingUser.email,
+          password: newPassword,
+          admin_id: adminUser?.id
+        }
+      });
+
+      if (error) {
+        let errorMessage = error.message;
+        try {
+          const errorContext = await error.context?.json();
+          if (errorContext?.error) errorMessage = errorContext.error;
+        } catch (e) {
+          console.error("Failed to parse error context:", e);
+        }
+        throw new Error(errorMessage);
+      }
+
+      toast({ title: "Success", description: `Password for ${resettingUser.full_name} has been updated.` });
+      setResetPasswordOpen(false);
+      setResettingUser(null);
+      setNewPassword("");
+    } catch (error: any) {
+      console.error("Reset password error:", error);
+      toast({ title: "Reset failed", description: error.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -342,6 +391,7 @@ export default function AdminMembers() {
                       <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => { setSelectedMember(m); setFormData({ ...formData, fullName: m.full_name, phone: m.phone, idNumber: m.id_number, dob: m.dob || "", branchId: m.branch_id || "", membershipCategoryId: m.membership_category_id || "", whatsappOptIn: (m as any).whatsapp_opt_in || false } as any); setEditDialogOpen(true); }}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => { setResettingUser(m); setResetPasswordOpen(true); }}><ShieldCheck className="mr-2 h-4 w-4" /> Reset Password</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => { setSelectedMember(m); setDependantsDialogOpen(true); }}><Users className="mr-2 h-4 w-4" /> View Dependants</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => { setSelectedMember(m); setHistoryDialogOpen(true); }}><History className="mr-2 h-4 w-4" /> View History</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => { setSelectedMember(m); setBiometricDialogOpen(true); }}><Fingerprint className="mr-2 h-4 w-4" /> Biometric</DropdownMenuItem>
@@ -426,6 +476,35 @@ export default function AdminMembers() {
           member={selectedMember}
         />
       )}
+      <Dialog open={resetPasswordOpen} onOpenChange={setResetPasswordOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-xl">Reset Member Password</DialogTitle>
+            <DialogDescription>
+              Set a new password for {resettingUser?.full_name}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>New Manual Password</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="text"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Enter new password"
+                />
+                <Button variant="outline" onClick={() => setNewPassword(Math.random().toString(36).slice(-8))}>
+                  Generate
+                </Button>
+              </div>
+            </div>
+            <Button onClick={handleResetPassword} className="w-full bg-red-600 hover:bg-red-700" disabled={loading}>
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Confirm Reset"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -482,13 +561,13 @@ function MemberHistoryDialog({ open, onOpenChange, member }: { open: boolean, on
 
     if (visitsData) {
       // Map dental records and stages to visits
-      const enhancedVisits = visitsData.map(v => {
+      const enhancedVisits = (visitsData as any[]).map(v => {
         const visitTeeth = dentalData
-          ?.filter(d => d.visit_id === v.id)
-          .map(d => d.tooth_number)
-          .sort((a, b) => (a || 0) - (b || 0)) || [];
+          ?.filter(d => (d as any).visit_id === v.id)
+          .map(d => (d as any).tooth_number)
+          .sort((a, b) => ((a as number) || 0) - ((b as number) || 0)) || [];
 
-        const visitStages = stagesData?.filter(s => s.visit_id === v.id) || [];
+        const visitStages = (stagesData as any[])?.filter(s => s.visit_id === v.id) || [];
 
         return {
           ...v,
@@ -567,12 +646,40 @@ function MemberHistoryDialog({ open, onOpenChange, member }: { open: boolean, on
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="space-y-2">
-                        <div className="max-w-[150px] truncate text-sm" title={visit.diagnosis || ''}>
-                          {visit.diagnosis || '-'}
+                      <div className="space-y-2 min-w-[180px]">
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase block">Diagnosis & Status</span>
+                          <div className="text-xs font-medium" title={visit.diagnosis || ''}>
+                            {visit.diagnosis || '-'}
+                          </div>
+                          {visit.periodontal_status && visit.periodontal_status.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {visit.periodontal_status.map((s: string) => (
+                                <Badge key={s} variant="secondary" className="text-[9px] px-1 py-0 h-3.5 capitalize bg-slate-100">{s}</Badge>
+                              ))}
+                            </div>
+                          )}
                         </div>
+
+                        {(visit.treatment_done || visit.tca) && (
+                          <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                            {visit.treatment_done && (
+                              <div className="space-y-0.5">
+                                <span className="text-[10px] font-bold text-muted-foreground uppercase block">Treatment Done</span>
+                                <p className="text-xs leading-tight italic text-slate-600" title={visit.treatment_done}>{visit.treatment_done}</p>
+                              </div>
+                            )}
+                            {visit.tca && (
+                              <div className="space-y-0.5">
+                                <span className="text-[10px] font-bold text-blue-600 uppercase block">TCA / Next Steps</span>
+                                <p className="text-xs font-semibold text-blue-700" title={visit.tca}>{visit.tca}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
                         {visit.xray_urls && visit.xray_urls.length > 0 && (
-                          <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide">
+                          <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide pt-1">
                             {visit.xray_urls.map((url: string, idx: number) => (
                               <Dialog key={idx}>
                                 <DialogTrigger asChild>
@@ -661,6 +768,7 @@ function MemberDependantsDialog({ open, onOpenChange, member }: { open: boolean,
                 <TableRow>
                   <TableHead>Full Name</TableHead>
                   <TableHead>Relationship</TableHead>
+                  <TableHead>Gender</TableHead>
                   <TableHead>Age</TableHead>
                   <TableHead>DOB</TableHead>
                   <TableHead>ID / Birth Cert</TableHead>
@@ -671,6 +779,7 @@ function MemberDependantsDialog({ open, onOpenChange, member }: { open: boolean,
                   <TableRow key={dep.id}>
                     <TableCell className="font-medium">{dep.full_name}</TableCell>
                     <TableCell className="capitalize">{dep.relationship}</TableCell>
+                    <TableCell className="capitalize">{dep.gender || '-'}</TableCell>
                     <TableCell>{calculateAge(dep.dob)} yrs</TableCell>
                     <TableCell>{new Date(dep.dob).toLocaleDateString()}</TableCell>
                     <TableCell className="font-mono text-xs">{dep.document_number || dep.id_number || '-'}</TableCell>

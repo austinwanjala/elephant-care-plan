@@ -1,3 +1,5 @@
+// @ts-ignore
+// @ts-nocheck
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -6,7 +8,7 @@ const corsHeaders = {
 };
 
 interface SmsPayload {
-    type: 'welcome' | 'payment_confirmation' | 'billing_completion' | 'low_balance' | 'payment_failed' | 'otp' | 'appointment_booked' | 'appointment_reminder' | 'appointment_cancelled' | 'appointment_rescheduled' | 'appointment_pending';
+    type: 'welcome' | 'payment_confirmation' | 'billing_completion' | 'low_balance' | 'payment_failed' | 'otp' | 'appointment_booked' | 'appointment_reminder' | 'appointment_cancelled' | 'appointment_rescheduled' | 'appointment_pending' | 'password_reset';
     phone: string;
     email?: string;
     data: any;
@@ -24,7 +26,7 @@ const formatPhone = (phone: string) => {
     return cleaned;
 };
 
-serve(async (req) => {
+serve(async (req: Request) => {
     if (req.method === "OPTIONS") {
         return new Response("ok", { headers: corsHeaders });
     }
@@ -42,6 +44,10 @@ serve(async (req) => {
         let subject = "Elephant Dental Notification";
 
         switch (type) {
+            case 'password_reset':
+                message = `Hello ${data.name}, your password has been reset by the administrator. Your temporary password is: ${data.password}. Please log in and change it immediately.`;
+                subject = "Password Reset - Elephant Dental";
+                break;
             case 'otp':
                 message = `Your Elephant Dental verification code is: ${data.code}. Valid for 10 minutes.`;
                 subject = "Your Verification Code";

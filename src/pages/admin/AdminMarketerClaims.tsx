@@ -62,8 +62,12 @@ export default function AdminMarketerClaims() {
     const checkUserRole = async () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-            const { data } = await supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
-            setUserRole((data?.role as string) || "");
+            const { data: rolesData } = await supabase.from("user_roles").select("role").eq("user_id", user.id);
+            const roles = rolesData?.map(r => r.role) || [];
+            if (roles.includes('super_admin')) setUserRole('super_admin');
+            else if (roles.includes('admin')) setUserRole('admin');
+            else if (roles.includes('finance')) setUserRole('finance');
+            else if (roles.length > 0) setUserRole(roles[0]);
         }
     };
 

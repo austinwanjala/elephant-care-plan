@@ -44,8 +44,14 @@ export default function AdminStaff() {
   const fetchCurrentUserRole = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const { data } = await supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
-      const role = data?.role || null;
+      const { data: rolesData } = await supabase.from("user_roles").select("role").eq("user_id", user.id);
+      const roles = rolesData?.map(r => r.role) || [];
+
+      let role = null;
+      if (roles.includes('super_admin')) role = 'super_admin';
+      else if (roles.includes('admin')) role = 'admin';
+      else if (roles.length > 0) role = roles[0];
+
       setCurrentUserRole(role);
 
       if (role === 'branch_director') {

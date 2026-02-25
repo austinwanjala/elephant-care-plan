@@ -22,9 +22,10 @@ export function SuperAdminLayout() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) { navigate("/login"); return; }
 
-        const { data: roleData } = await supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
+        const { data: rolesData } = await supabase.from("user_roles").select("role").eq("user_id", user.id);
+        const roles = rolesData?.map(v => v.role) || [];
 
-        if (roleData?.role !== "super_admin") {
+        if (!roles.includes("super_admin")) {
             toast({ title: "Access Denied", description: "Super Admin privileges required.", variant: "destructive" });
             navigate("/");
             return;

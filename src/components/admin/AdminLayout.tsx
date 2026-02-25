@@ -32,11 +32,13 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       return;
     }
 
-    const { data: roleData, error: roleError } = await supabase
+    const { data: rolesData, error: roleError } = await supabase
       .from("user_roles")
       .select("role")
-      .eq("user_id", user.id)
-      .maybeSingle();
+      .eq("user_id", user.id);
+
+    const roles = rolesData?.map(r => r.role) || [];
+    const hasAdminAccess = roles.includes("admin") || roles.includes("super_admin");
 
     if (roleError) {
       toast({
@@ -49,7 +51,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       return;
     }
 
-    if (roleData?.role !== "admin") {
+    if (!hasAdminAccess) {
       toast({
         title: "Access denied",
         description: "You don't have admin privileges",

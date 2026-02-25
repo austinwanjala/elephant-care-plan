@@ -62,7 +62,7 @@ export function DoctorLayout({ children }: DoctorLayoutProps) {
         const userRole = roleData?.role as string;
         setRole(userRole);
 
-        if (userRole !== "doctor" && userRole !== "admin") {
+        if (userRole !== "doctor" && userRole !== "admin" && userRole !== "super_admin") {
             toast({
                 title: "Access Denied",
                 description: "You must be a doctor to view this page.",

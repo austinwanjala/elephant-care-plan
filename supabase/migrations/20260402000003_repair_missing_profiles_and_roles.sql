@@ -26,11 +26,17 @@ BEGIN
             v_role := 'member';
         END IF;
 
-        -- 1. Ensure Role Entry
+        -- 1. Ensure Exactly One Role Entry (Cleanup duplicates/old roles)
         IF v_role IS NOT NULL THEN
+            -- First check if they already have the correct role
             IF NOT EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = r.id AND role = v_role::public.app_role) THEN
+                -- If they don't have the correct one, we replace what they have
+                DELETE FROM public.user_roles WHERE user_id = r.id;
                 INSERT INTO public.user_roles (user_id, role)
                 VALUES (r.id, v_role::public.app_role);
+            ELSE
+                -- If they have the correct one, ensure they ONLY have that one
+                DELETE FROM public.user_roles WHERE user_id = r.id AND role != v_role::public.app_role;
             END IF;
         END IF;
 

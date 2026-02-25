@@ -149,20 +149,30 @@ const Login = () => {
 
   const checkUserRoleAndNavigate = async (userId: string) => {
     try {
-      let role = null;
+      let role: string | null = null;
       let attempts = 0;
       const maxAttempts = 5;
       const delayMs = 500;
 
       while (attempts < maxAttempts && role === null) {
-        const { data: roleData } = await supabase
+        const { data: rolesData, error: rolesError } = await supabase
           .from("user_roles")
           .select("role")
-          .eq("user_id", userId)
-          .maybeSingle();
+          .eq("user_id", userId);
 
-        if (roleData?.role) {
-          role = roleData.role;
+        if (rolesError) {
+          console.error("Error fetching roles:", rolesError);
+        } else if (rolesData && rolesData.length > 0) {
+          // If user has multiple roles, prioritize the most privileged ones
+          const roles = rolesData.map(r => r.role);
+          if (roles.includes("super_admin")) {
+            role = "super_admin";
+          } else if (roles.includes("admin")) {
+            role = "admin";
+          } else {
+            // Default to the first role found
+            role = roles[0];
+          }
           break;
         }
 

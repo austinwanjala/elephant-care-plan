@@ -96,9 +96,6 @@ export default function Consultation() {
     const [pendingContinueStage, setPendingContinueStage] = useState<any>(null);
     const [skipRemainingStages, setSkipRemainingStages] = useState(false);
     const [followAllStages, setFollowAllStages] = useState(false);
-    const [manualStageDialogOpen, setManualStageDialogOpen] = useState(false);
-    const [pendingManualStageJump, setPendingManualStageJump] = useState<any>(null);
-    const [selectedManualStageNumber, setSelectedManualStageNumber] = useState<number>(1);
     const [treatmentJustCompleted, setTreatmentJustCompleted] = useState<{ name: string; tooth: number | null; stages: number } | null>(null);
 
     useEffect(() => {
@@ -818,57 +815,6 @@ export default function Consultation() {
         setPendingContinueStage(null);
     };
 
-    const confirmManualJump = () => {
-        if (!pendingManualStageJump) return;
-
-        const stage = pendingManualStageJump;
-        const nextStageNum = selectedManualStageNumber;
-        const isFinal = nextStageNum === stage.total_stages;
-
-        // Resolve display name for this stage
-        const stageNames: string[] = Array.isArray(stage.services?.stage_names) ? stage.services.stage_names : [];
-        let stageName: string | null = stageNames[nextStageNum - 1] || null;
-
-        let displayName = stage.services.name;
-        if (stageName) {
-            displayName += ` — ${stageName}`;
-        }
-
-        // Create a 'virtual' service object for the bill
-        const stageService = {
-            id: stage.service_id,
-            name: displayName,
-            benefit_cost: 0, // No charge for subsequent stages
-            branch_compensation: 0,
-            real_cost: 0,
-            is_multi_stage_update: true,
-            is_manual_jump: true, // Mark for audit
-            previousStage: stage.current_stage,
-            startAtStage: nextStageNum,
-            total_stages: stage.total_stages,
-            stageId: stage.id,
-            nextStage: nextStageNum,
-            isFinal: isFinal,
-            notes: stageNotes + " (Manual stage selection used)",
-            related_bill_id: stage.related_bill_id
-        };
-
-        setSelectedServices([...selectedServices, { service: stageService, tooth_number: stage.tooth_number }]);
-
-        if (isFinal) {
-            toast({
-                title: `Treatment Marked for Completion`,
-                description: `Recording Stage ${nextStageNum} and closing the treatment.`
-            });
-        } else {
-            toast({ title: "Stage Jump Added", description: `Stage ${nextStageNum}/${stage.total_stages} scheduled via manual selection.` });
-        }
-
-        setManualStageDialogOpen(false);
-        setPendingManualStageJump(null);
-        setStageNotes("");
-    };
-
     const removeService = (index: number) => {
         const newServices = [...selectedServices];
         newServices.splice(index, 1);
@@ -1215,24 +1161,6 @@ export default function Consultation() {
                     },
                     user_id: currentUser?.id
                 });
-
-                if (item.service.is_manual_jump) {
-                    await (supabase as any).from("system_logs").insert({
-                        action: "multi_stage_manual_jump",
-                        details: {
-                            member_id: visit.member_id,
-                            dependant_id: visit.dependant_id || null,
-                            service_id: item.service.id,
-                            tooth_number: item.tooth_number,
-                            previous_stage: item.service.previousStage,
-                            new_stage: currentStage,
-                            doctor_id: doctorId,
-                            visit_id: visitId,
-                            note: "Manual stage selection used"
-                        },
-                        user_id: currentUser?.id
-                    });
-                }
 
                 if (isFinal) {
                     console.log("Final stage marked by doctor. Funds will be released after receptionist bills this visit.");
@@ -1887,31 +1815,7 @@ export default function Consultation() {
                                         <div className="w-full bg-slate-700 h-1 rounded-full mb-1">
                                             <div className="bg-blue-400 h-full rounded-full" style={{ width: `${(stage.current_stage / stage.total_stages) * 100}%` }} />
                                         </div>
-                                        <p className="text-[10px] text-slate-500 truncate mb-3">{stage.services?.name}</p>
-
-                                        <div className="flex flex-col gap-2">
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="w-full h-8 text-[11px] font-bold bg-blue-600 hover:bg-blue-500 text-white border-none rounded-lg shadow-sm"
-                                                onClick={() => handleContinueStage(stage)}
-                                            >
-                                                <CheckCircle2 className="w-3 h-3 mr-1" />
-                                                Complete Stage {stage.current_stage + 1}
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="w-full h-7 text-[10px] font-bold text-blue-400 hover:text-blue-300 hover:bg-blue-400/10 border border-blue-400/20 rounded-lg"
-                                                onClick={() => {
-                                                    setPendingManualStageJump(stage);
-                                                    setSelectedManualStageNumber(Math.min(stage.current_stage + 1, stage.total_stages));
-                                                    setManualStageDialogOpen(true);
-                                                }}
-                                            >
-                                                Select Next Treatment Stage
-                                            </Button>
-                                        </div>
+                                        <p className="text-[10px] text-slate-500 truncate">{stage.services?.name}</p>
                                     </div>
                                 ))}
                             </div>
@@ -2231,27 +2135,12 @@ export default function Consultation() {
                                         {v.service_stages && v.service_stages.length > 0 && (
                                             <div className="space-y-2">
                                                 <Label className="text-[10px] uppercase font-bold text-muted-foreground">Procedures Performed</Label>
-                                                <div className="flex flex-col gap-2">
-                                                    {v.service_stages.map((stage: any) => {
-                                                        const stageNames = stage.services?.stage_names || [];
-                                                        const name = stageNames[stage.current_stage - 1];
-                                                        return (
-                                                            <div key={stage.id} className="flex flex-col p-3 bg-blue-50/50 rounded-xl border border-blue-100/50 space-y-1">
-                                                                <div className="flex justify-between items-center">
-                                                                    <span className="font-bold text-xs text-blue-900">{stage.tooth_number ? `Tooth #${stage.tooth_number}` : 'General'}: {stage.services?.name}</span>
-                                                                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px]">
-                                                                        Stage {stage.current_stage} of {stage.total_stages}
-                                                                        {name ? ` — ${name}` : ''}
-                                                                    </Badge>
-                                                                </div>
-                                                                {stage.notes && (
-                                                                    <p className="text-[10px] italic text-slate-500 bg-white/50 p-1.5 rounded border border-dotted">
-                                                                        {stage.notes}
-                                                                    </p>
-                                                                )}
-                                                            </div>
-                                                        );
-                                                    })}
+                                                <div className="flex flex-wrap gap-2">
+                                                    {v.service_stages.map((stage: any) => (
+                                                        <Badge key={stage.id} variant="secondary" className="bg-blue-50 text-blue-700 border-blue-100">
+                                                            {stage.tooth_number ? `Tooth #${stage.tooth_number}` : 'General'}: {stage.current_stage}
+                                                        </Badge>
+                                                    ))}
                                                 </div>
                                             </div>
                                         )}
@@ -2465,79 +2354,6 @@ export default function Consultation() {
                         <Button variant="ghost" onClick={() => setIsPinsPostsModalOpen(false)} className="flex-1 sm:flex-none">Cancel</Button>
                         <Button onClick={handleConfirmPinsPosts} className="flex-1 sm:flex-none bg-primary hover:bg-primary/90 text-white px-8 shadow-md">
                             Add to Bill
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* Manual Stage Selection Modal */}
-            <Dialog open={manualStageDialogOpen} onOpenChange={setManualStageDialogOpen}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <Activity className="h-5 w-5 text-blue-600" />
-                            Select Next Treatment Stage
-                        </DialogTitle>
-                        <DialogDescription>
-                            Manually choose the next stage for this treatment.
-                        </DialogDescription>
-                    </DialogHeader>
-                    {pendingManualStageJump && (
-                        <div className="space-y-4 py-4">
-                            <div className="p-3 bg-blue-50 rounded-lg border border-blue-100 flex justify-between items-center">
-                                <span className="text-xs font-bold text-blue-900">{pendingManualStageJump.services?.name}</span>
-                                <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300">
-                                    Current: Stage {pendingManualStageJump.current_stage}
-                                </Badge>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label className="text-sm font-bold">Select Stage</Label>
-                                <Select
-                                    value={selectedManualStageNumber.toString()}
-                                    onValueChange={(val) => setSelectedManualStageNumber(parseInt(val))}
-                                >
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue placeholder="Select stage" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {Array.from({ length: pendingManualStageJump.total_stages }, (_, i) => i + 1)
-                                            .map((num) => {
-                                                const stageNames = Array.isArray(pendingManualStageJump.services?.stage_names) ? pendingManualStageJump.services.stage_names : [];
-                                                const name = stageNames[num - 1];
-                                                const isCurrent = num === pendingManualStageJump.current_stage;
-                                                const isPast = num < pendingManualStageJump.current_stage;
-                                                return (
-                                                    <SelectItem
-                                                        key={num}
-                                                        value={num.toString()}
-                                                        disabled={isCurrent || isPast}
-                                                        className={isCurrent ? "font-bold text-blue-600 bg-blue-50" : ""}
-                                                    >
-                                                        {num === pendingManualStageJump.current_stage ? "✔ " : ""}Stage {num} {name ? `— ${name}` : ''}
-                                                    </SelectItem>
-                                                );
-                                            })}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
-                                <div className="flex items-center gap-2 text-amber-800 font-bold text-xs uppercase tracking-wider">
-                                    <AlertTriangle className="w-4 h-4" />
-                                    Clinical Warning
-                                </div>
-                                <p className="text-xs text-amber-700 leading-relaxed font-medium">
-                                    “Selecting a later stage assumes the earlier stages are clinically not required. This action will be audited.”
-                                </p>
-                            </div>
-                        </div>
-                    )}
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setManualStageDialogOpen(false)}>Cancel</Button>
-                        <Button onClick={confirmManualJump} className="bg-blue-600 hover:bg-blue-700 text-white">
-                            <CheckCircle2 className="w-4 h-4 mr-2" />
-                            Confirm Stage Selection
                         </Button>
                     </DialogFooter>
                 </DialogContent>

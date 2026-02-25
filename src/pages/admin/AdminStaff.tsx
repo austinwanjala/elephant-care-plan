@@ -33,9 +33,6 @@ export default function AdminStaff() {
 
   const [editingUser, setEditingUser] = useState<any>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
-  const [resettingUser, setResettingUser] = useState<any>(null);
-  const [newPassword, setNewPassword] = useState("");
 
   useEffect(() => {
     loadData();
@@ -199,45 +196,6 @@ export default function AdminStaff() {
 
     } catch (error: any) {
       toast({ title: "Creation failed", description: error.message, variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResetPassword = async () => {
-    if (!newPassword || newPassword.length < 6) {
-      toast({ title: "Invalid password", description: "Password must be at least 6 characters.", variant: "destructive" });
-      return;
-    }
-    setLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { data, error } = await supabase.functions.invoke("admin-reset-password", {
-        body: {
-          email: resettingUser.email,
-          password: newPassword,
-          admin_id: user?.id
-        }
-      });
-
-      if (error) {
-        let errorMessage = error.message;
-        try {
-          const errorContext = await error.context?.json();
-          if (errorContext?.error) errorMessage = errorContext.error;
-        } catch (e) {
-          console.error("Failed to parse error context:", e);
-        }
-        throw new Error(errorMessage);
-      }
-
-      toast({ title: "Success", description: `Password for ${resettingUser.full_name} has been updated.` });
-      setResetPasswordOpen(false);
-      setResettingUser(null);
-      setNewPassword("");
-    } catch (error: any) {
-      console.error("Reset password error:", error);
-      toast({ title: "Reset failed", description: error.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -522,9 +480,6 @@ export default function AdminStaff() {
                           <DropdownMenuItem onClick={() => handleEditUser(u)}>
                             <Edit className="mr-2 h-4 w-4" /> Edit Details
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => { setResettingUser(u); setResetPasswordOpen(true); }}>
-                            <ShieldAlert className="mr-2 h-4 w-4" /> Reset Password
-                          </DropdownMenuItem>
                           <DropdownMenuItem className="text-destructive font-medium" onClick={() => handleDelete(u.user_id)}>
                             <Trash2 className="mr-2 h-4 w-4" /> Revoke Access
                           </DropdownMenuItem>
@@ -538,36 +493,6 @@ export default function AdminStaff() {
           </Table>
         </div>
       </Card>
-
-      <Dialog open={resetPasswordOpen} onOpenChange={setResetPasswordOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="font-serif text-xl">Reset User Password</DialogTitle>
-            <DialogDescription>
-              Set a new password for {resettingUser?.full_name}.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>New Manual Password</Label>
-              <div className="flex gap-2">
-                <Input
-                  type="text"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Enter new password"
-                />
-                <Button variant="outline" onClick={() => setNewPassword(Math.random().toString(36).slice(-8))}>
-                  Generate
-                </Button>
-              </div>
-            </div>
-            <Button onClick={handleResetPassword} className="w-full bg-red-600 hover:bg-red-700" disabled={loading}>
-              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Confirm Reset"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

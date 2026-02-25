@@ -28,22 +28,9 @@ interface Dependant {
   relationship: string;
   dob: string;
   idNumber: string;
-  gender: string;
 }
 
 import { useSystemSettings } from "@/hooks/useSystemSettings";
-
-const calculateAge = (dobString: string): number => {
-  if (!dobString) return 0;
-  const today = new Date();
-  const birthDate = new Date(dobString);
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const m = today.getMonth() - birthDate.getMonth();
-  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-    age--;
-  }
-  return age;
-};
 
 const Register = () => {
   const { settings } = useSystemSettings();
@@ -70,7 +57,6 @@ const Register = () => {
     relationship: "",
     dob: "",
     idNumber: "",
-    gender: "male",
   });
 
   const [consents, setConsents] = useState({
@@ -79,47 +65,6 @@ const Register = () => {
     signature: false,
   });
   const [loading, setLoading] = useState(false);
-
-  // Load persisted data on mount
-  useEffect(() => {
-    const savedData = localStorage.getItem("registration_form_data");
-    const savedReferral = localStorage.getItem("registration_referral_source");
-    const savedMarketer = localStorage.getItem("registration_selected_marketer");
-    const savedDependants = localStorage.getItem("registration_dependants");
-
-    if (savedData) setFormData(JSON.parse(savedData));
-    if (savedReferral) setReferralSource(savedReferral);
-    if (savedMarketer) setSelectedMarketer(JSON.parse(savedMarketer));
-    if (savedDependants) setDependants(JSON.parse(savedDependants));
-  }, []);
-
-  // Persist data on change
-  useEffect(() => {
-    localStorage.setItem("registration_form_data", JSON.stringify(formData));
-  }, [formData]);
-
-  useEffect(() => {
-    localStorage.setItem("registration_referral_source", referralSource);
-  }, [referralSource]);
-
-  useEffect(() => {
-    if (selectedMarketer) {
-      localStorage.setItem("registration_selected_marketer", JSON.stringify(selectedMarketer));
-    } else {
-      localStorage.removeItem("registration_selected_marketer");
-    }
-  }, [selectedMarketer]);
-
-  useEffect(() => {
-    localStorage.setItem("registration_dependants", JSON.stringify(dependants));
-  }, [dependants]);
-
-  const clearPersistedData = () => {
-    localStorage.removeItem("registration_form_data");
-    localStorage.removeItem("registration_referral_source");
-    localStorage.removeItem("registration_selected_marketer");
-    localStorage.removeItem("registration_dependants");
-  };
 
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -152,7 +97,7 @@ const Register = () => {
   };
 
   const addDependant = () => {
-    if (!newDep.fullName || !newDep.relationship || !newDep.dob || !newDep.gender) {
+    if (!newDep.fullName || !newDep.relationship || !newDep.dob) {
       toast({ title: "Missing Info", description: "Please fill in all dependant details.", variant: "destructive" });
       return;
     }
@@ -161,7 +106,7 @@ const Register = () => {
       return;
     }
     setDependants([...dependants, newDep]);
-    setNewDep({ fullName: "", relationship: "", dob: "", idNumber: "", gender: "male" });
+    setNewDep({ fullName: "", relationship: "", dob: "", idNumber: "" });
     setIsDependantModalOpen(false);
   };
 
@@ -205,8 +150,7 @@ const Register = () => {
             id_number: formData.idNumber,
             dob: formData.dob, // Include DOB
             marketer_id: selectedMarketer?.id || null,
-            marketer_code: selectedMarketer?.code || null,
-            dependants: dependants // Also store as JSON for backward compatibility/reference
+            marketer_code: selectedMarketer?.code || null
           }
         }
       });
@@ -218,58 +162,18 @@ const Register = () => {
 
       if (!authData.user) throw new Error("Registration failed. Please try again.");
 
-      // 2. Insert dependants properly into table
+      // 2. Insert dependants
       if (dependants.length > 0) {
-        // We need to wait a small bit for the trigger to finish insert
-        // The trigger on_auth_user_created handles creating the member record
+        const depsToInsert = dependants.map(d => ({
+          member_id: authData.user!.id,
+          full_name: d.fullName,
+          relationship: d.relationship,
+          dob: d.dob,
+          id_number: d.idNumber
+        }));
 
-        let memberId: string | null = null;
-        let retries = 5;
-
-        while (retries > 0 && !memberId) {
-          const { data: memberData } = await supabase
-            .from("members")
-            .select("id")
-            .eq("user_id", authData.user.id)
-            .maybeSingle();
-
-          if (memberData) {
-            memberId = memberData.id;
-          } else {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            retries--;
-          }
-        }
-
-        if (!memberId) {
-          console.error("Could not find member record after registration (retries exhausted)");
-        } else {
-          const depsToInsert = dependants.map(d => ({
-            member_id: memberId,
-            full_name: d.fullName,
-            relationship: d.relationship,
-            dob: d.dob,
-            id_number: d.idNumber,
-            gender: d.gender,
-            is_active: true
-          }));
-
-          const { error: depError } = await supabase.from("dependants").insert(depsToInsert);
-
-          if (depError) {
-            console.error("Error adding dependants:", depError);
-          } else {
-            // Log audit
-            await supabase.from("system_logs").insert({
-              action: "dependant_added_via_registration",
-              details: {
-                member_id: memberId,
-                count: dependants.length,
-                dependants: dependants.map(d => d.fullName)
-              }
-            });
-          }
-        }
+        const { error: depError } = await supabase.from("dependants").insert(depsToInsert);
+        if (depError) console.error("Error adding dependants:", depError);
       }
 
       // 3. Send Welcome SMS
@@ -290,7 +194,6 @@ const Register = () => {
         description: "Your account has been created. You can now log in.",
       });
 
-      clearPersistedData();
       navigate("/login");
     } catch (error: any) {
       toast({
@@ -392,14 +295,7 @@ const Register = () => {
                   <Input id="idNumber" placeholder="12345678" value={formData.idNumber} onChange={(e) => setFormData({ ...formData, idNumber: e.target.value })} required />
                 </div>
                 <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <Label htmlFor="dob">Date of Birth</Label>
-                    {formData.dob && (
-                      <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                        Age: {calculateAge(formData.dob)} yrs
-                      </span>
-                    )}
-                  </div>
+                  <Label htmlFor="dob">Date of Birth</Label>
                   <Input
                     id="dob"
                     type="date"
@@ -468,9 +364,7 @@ const Register = () => {
                         <Users className="h-4 w-4 text-primary" />
                         <div>
                           <p className="text-sm font-medium">{dep.fullName}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {dep.relationship} • {calculateAge(dep.dob)} yrs • {dep.gender} • ID: {dep.idNumber || 'N/A'}
-                          </p>
+                          <p className="text-xs text-muted-foreground">{dep.relationship} • {dep.dob} • ID: {dep.idNumber || 'N/A'}</p>
                         </div>
                       </div>
                       <Button type="button" variant="ghost" size="icon" onClick={() => removeDependant(idx)}>
@@ -584,14 +478,7 @@ const Register = () => {
               />
             </div>
             <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <Label>Date of Birth</Label>
-                {newDep.dob && (
-                  <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                    Age: {calculateAge(newDep.dob)} yrs
-                  </span>
-                )}
-              </div>
+              <Label>Date of Birth</Label>
               <Input
                 type="date"
                 value={newDep.dob}
@@ -609,19 +496,6 @@ const Register = () => {
                   onChange={(e) => setNewDep({ ...newDep, idNumber: e.target.value })}
                 />
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Gender</Label>
-              <Select value={newDep.gender} onValueChange={(v) => setNewDep({ ...newDep, gender: v })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select gender" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="male">Male</SelectItem>
-                  <SelectItem value="female">Female</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           </div>
           <DialogFooter>

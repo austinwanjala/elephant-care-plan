@@ -85,7 +85,6 @@ import AdminReports from "./pages/admin/AdminReports";
 import AdminNotifications from "./pages/admin/AdminNotifications";
 import AdminWhatsApp from "./pages/admin/AdminWhatsApp";
 import AdminPayments from "./pages/admin/AdminPayments";
-import AdminContent from "./pages/admin/AdminContent";
 
 // Finance Pages
 import FinanceDashboard from "./pages/finance/Dashboard";
@@ -216,7 +215,6 @@ const App = () => (
             <Route path="reports" element={<AdminReports />} />
             <Route path="whatsapp" element={<AdminWhatsApp />} />
             <Route path="payments" element={<AdminPayments />} />
-            <Route path="content" element={<AdminContent />} />
             <Route path="messages" element={<StaffMessages />} />
           </Route>
 

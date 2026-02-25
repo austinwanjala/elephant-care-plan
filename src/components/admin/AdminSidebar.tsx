@@ -98,7 +98,6 @@ export function AdminSidebar() {
 
   if (roleLabel === "Super Admin") {
     settingsMenuItems.push({ title: "Permissions", url: `${basePath}/permissions`, icon: ShieldAlert });
-    settingsMenuItems.push({ title: "Content Management", url: `${basePath}/content`, icon: FileText });
   }
 
   useEffect(() => {

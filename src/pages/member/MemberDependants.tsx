@@ -10,25 +10,12 @@ import { Loader2, ArrowLeft, Plus, Trash, Users, Camera, User, ImagePlus, AlertC
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-const calculateAge = (dob: string) => {
-  if (!dob) return 0;
-  const today = new Date();
-  const birthDate = new Date(dob);
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const m = today.getMonth() - birthDate.getMonth();
-  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-    age--;
-  }
-  return age;
-};
-
 interface Dependant {
   id: string;
   full_name: string;
   dob: string;
   id_number: string | null;
   relationship: string | null;
-  gender: string | null;
   image_url: string | null;
 }
 
@@ -43,7 +30,6 @@ const MemberDependants = () => {
     dob: "",
     idNumber: "",
     relationship: "",
-    gender: "male",
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -146,7 +132,6 @@ const MemberDependants = () => {
         dob: newDependant.dob,
         id_number: newDependant.idNumber,
         relationship: newDependant.relationship,
-        gender: newDependant.gender,
         image_url: imageUrl
       });
 
@@ -154,7 +139,7 @@ const MemberDependants = () => {
 
       toast({ title: "Dependant Added", description: `${newDependant.fullName} has been added.` });
       setDialogOpen(false);
-      setNewDependant({ fullName: "", dob: "", idNumber: "", relationship: "", gender: "male" });
+      setNewDependant({ fullName: "", dob: "", idNumber: "", relationship: "" });
       setImageFile(null);
       fetchDependants();
     } catch (error: any) {
@@ -226,14 +211,7 @@ const MemberDependants = () => {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <Label>Date of Birth *</Label>
-                      {newDependant.dob && (
-                        <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                          {calculateAge(newDependant.dob)} yrs
-                        </span>
-                      )}
-                    </div>
+                    <Label>Date of Birth *</Label>
                     <Input type="date" max={new Date().toISOString().split("T")[0]} value={newDependant.dob} onChange={e => setNewDependant({ ...newDependant, dob: e.target.value })} required />
                   </div>
                   <div className="space-y-2">
@@ -242,24 +220,9 @@ const MemberDependants = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Birth Cert / ID Number *</Label>
-                    <Input value={newDependant.idNumber} onChange={(e) => setNewDependant({ ...newDependant, idNumber: e.target.value })} required placeholder="Enter ID" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Gender *</Label>
-                    <select
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                      value={newDependant.gender}
-                      onChange={(e) => setNewDependant({ ...newDependant, gender: e.target.value })}
-                      required
-                    >
-                      <option value="male">Male</option>
-                      <option value="female">Female</option>
-                      <option value="other">Other</option>
-                    </select>
-                  </div>
+                <div className="space-y-2">
+                  <Label>Birth Cert / ID Number *</Label>
+                  <Input value={newDependant.idNumber} onChange={(e) => setNewDependant({ ...newDependant, idNumber: e.target.value })} required placeholder="Enter identification number" />
                 </div>
 
                 <div className="space-y-2">
@@ -332,7 +295,7 @@ const MemberDependants = () => {
                     <div>
                       <p className="font-semibold">{dep.full_name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {dep.relationship || "N/A"} • {calculateAge(dep.dob)} yrs • {dep.gender || "N/A"} • ID: {dep.id_number || "N/A"}
+                        {dep.relationship || "N/A"} • ID: {dep.id_number || "N/A"}
                       </p>
                     </div>
                   </div>

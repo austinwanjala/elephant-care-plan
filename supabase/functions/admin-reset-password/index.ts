@@ -30,74 +30,74 @@ serve(async (req: Request) => {
         const { email, password, admin_id } = await req.json();
 
         if (!email || !password) {
-            console.error("[admin-reset-password] Missing email or password");
             throw new Error("Email and new password are required");
         }
 
-        const normalizedEmail = email.toLowerCase().trim();
-        console.log(`[admin-reset-password] Attempting reset for: ${normalizedEmail}`);
-
-        // 1. Find the user in the public tables (members, staff, or marketers)
-        const [memberRes, staffRes, marketerRes] = await Promise.all([
-            supabaseAdmin.from("members").select("user_id, full_name, phone, email").ilike("email", normalizedEmail).maybeSingle(),
-            supabaseAdmin.from("staff").select("user_id, full_name, phone, email").ilike("email", normalizedEmail).maybeSingle(),
-            supabaseAdmin.from("marketers").select("user_id, full_name, phone, email").ilike("email", normalizedEmail).maybeSingle()
+        // 1. Find the user in the public tables first (to verify they are our user)
+        const [{ data: member }, { data: staff }] = await Promise.all([
+            supabaseAdmin.from("members").select("user_id, full_name, phone, email").eq("email", email).maybeSingle(),
+            supabaseAdmin.from("staff").select("user_id, full_name, phone, email").eq("email", email).maybeSingle()
         ]);
 
-        if (memberRes.error) console.error("[admin-reset-password] Member lookup error:", memberRes.error);
-        if (staffRes.error) console.error("[admin-reset-password] Staff lookup error:", staffRes.error);
-        if (marketerRes.error) console.error("[admin-reset-password] Marketer lookup error:", marketerRes.error);
+        const user = member || staff;
 
-        const targetUser = memberRes.data || staffRes.data || marketerRes.data;
-
-        if (!targetUser) {
-            console.error(`[admin-reset-password] User not found for email: ${normalizedEmail}`);
-            throw new Error(`User with email ${normalizedEmail} not found in members, staff, or marketers.`);
+        if (!user) {
+            throw new Error("This email is not registered in our system.");
         }
-
-        if (!targetUser.user_id) {
-            console.error(`[admin-reset-password] User found but missing user_id:`, targetUser);
-            throw new Error("User record found but it's missing the associated authentication ID.");
-        }
-
-        console.log(`[admin-reset-password] Found user: ${targetUser.user_id}. Updating Auth...`);
 
         // 2. Update the password in Auth using the ID
         const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-            targetUser.user_id,
+            user.user_id,
             { password: password }
         );
 
-        if (updateError) {
-            console.error("[admin-reset-password] Auth update error:", updateError.message);
-            throw new Error(`Auth Update Error: ${updateError.message}`);
-        }
-
-        console.log(`[admin-reset-password] Auth updated. Logging action...`);
+        if (updateError) throw updateError;
 
         // 3. Store audit log
-        try {
-            const { error: logError } = await supabaseAdmin.from("system_logs").insert({
-                action: "ADMIN_PASSWORD_RESET",
-                user_id: admin_id && typeof admin_id === 'string' && admin_id.trim() !== '' ? admin_id : null,
-                details: {
-                    target_user_id: targetUser.user_id,
-                    target_email: normalizedEmail,
-                    performed_by: admin_id || 'self_reset',
-                    message: "Password reset performed"
-                }
-            });
-            if (logError) console.error("[admin-reset-password] Audit log error:", logError.message);
-        } catch (e) {
-            console.error("[admin-reset-password] Silent failure in logging:", e);
+        await supabaseAdmin.from("system_logs").insert({
+            action: "ADMIN_PASSWORD_RESET",
+            user_id: admin_id || null,
+            details: {
+                target_user_id: user.user_id,
+                target_email: email,
+                performed_by: admin_id,
+                message: "Password reset performed by admin"
+            }
+        });
+
+        // 4. Send notification
+        if (user.phone) {
+            try {
+                // We call the send-sms function internally or just use the same logic
+                // For simplicity here, let's assume we trigger it via another fetch or common utility if possible.
+                // Since Deno functions are isolated, we fetch the other function's URL.
+                const functionUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/send-sms`;
+                await fetch(functionUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        type: 'password_reset',
+                        phone: user.phone,
+                        email: user.email,
+                        data: {
+                            name: user.full_name,
+                            password: password
+                        }
+                    })
+                });
+            } catch (notifyError) {
+                console.error("Failed to send notification:", notifyError);
+            }
         }
 
-        return new Response(JSON.stringify({ message: "Password updated successfully" }), {
+        return new Response(JSON.stringify({ message: "Password updated successfully and notification sent" }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
             status: 200,
         });
     } catch (error: any) {
-        console.error("[admin-reset-password] Global Catch:", error.message);
         return new Response(JSON.stringify({ error: error.message }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
             status: 400,

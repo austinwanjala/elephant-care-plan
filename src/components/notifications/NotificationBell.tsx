@@ -164,24 +164,35 @@ export function NotificationBell() {
     const markAllAsRead = async () => {
         if (!currentUser) return;
 
-        // Mark regular notifications as read
-        await supabase
-            .from("notifications")
-            .update({ is_read: true })
-            .eq("recipient_id", currentUser.id)
-            .eq("is_read", false);
-
-        // If staff, also mark portal messages as read
-        if (currentStaff) {
-            await supabase
-                .from("portal_messages")
+        try {
+            // Mark regular notifications as read
+            const { error: notifError } = await supabase
+                .from("notifications")
                 .update({ is_read: true })
-                .eq("recipient_id", currentStaff.id)
+                .eq("recipient_id", currentUser.id)
                 .eq("is_read", false);
-        }
 
-        setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-        setUnreadCount(0);
+            if (notifError) throw notifError;
+
+            // If staff, also mark portal messages as read
+            if (currentStaff) {
+                const { error: msgError } = await supabase
+                    .from("portal_messages")
+                    .update({ is_read: true })
+                    .eq("recipient_id", currentStaff.id)
+                    .eq("is_read", false);
+
+                if (msgError) throw msgError;
+            }
+
+            setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+            setUnreadCount(0);
+            toast({ title: "Done", description: "All notifications marked as read." });
+
+        } catch (error: any) {
+            console.error("Mark all as read error:", error);
+            toast({ title: "Error", description: "Failed to mark all as read: " + error.message, variant: "destructive" });
+        }
     }
 
     const handleReply = async (notification: any) => {

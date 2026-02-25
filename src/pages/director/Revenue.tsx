@@ -196,10 +196,21 @@ export default function DirectorRevenue() {
         try {
             setClaiming(true);
             // 1. Mark pending_claim as approved
-            await (supabase as any)
+            const { error: claimErr } = await (supabase as any)
                 .from("pending_claims")
                 .update({ approved_by_director: true, status: 'approved' })
                 .eq("id", claimId);
+
+            if (claimErr) throw claimErr;
+
+            // 2. Mark the original bill as claimable now that the director has approved the work
+            const claimObj = pendingMultiStageClaims.find(c => c.id === claimId);
+            if (claimObj && claimObj.bill_id) {
+                await (supabase as any)
+                    .from("bills")
+                    .update({ is_claimable: true })
+                    .eq("id", claimObj.bill_id);
+            }
 
             // 2. Insert into revenue_claims (Realized Revenue) or just let it flow into accumulated revenue?
             // The user requirement said: "Move locked amount into branch compensation".
@@ -287,27 +298,45 @@ export default function DirectorRevenue() {
                             <h3 className="text-4xl font-extrabold text-primary mb-1">KES {accumulatedRevenue.toLocaleString()}</h3>
                             <p className="text-base text-muted-foreground font-semibold mb-6">Unclaimed Branch Revenue</p>
                             <div className="w-full max-w-sm">
-                                {hasApprovedClaim ? (
-                                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl flex flex-col items-center gap-2 text-blue-700">
-                                        <Clock className="h-6 w-6 animate-pulse" />
-                                        <span className="font-bold text-center">Approved, waiting for payment</span>
-                                        <p className="text-[10px] text-center opacity-80">Finance is currently processing your payout.</p>
-                                    </div>
-                                ) : hasPendingClaim ? (
-                                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex flex-col items-center gap-2 text-amber-700">
-                                        <Clock className="h-6 w-6 animate-pulse" />
-                                        <span className="font-bold text-center">Claim Pending Approval</span>
-                                        <p className="text-[10px] text-center opacity-80">Admin is reviewing your revenue claim.</p>
-                                    </div>
-                                ) : (
+                                {availableToClaim > 0 ? (
                                     <Button
                                         className="w-full h-14 text-lg font-bold shadow-md hover:shadow-lg transition-all"
-                                        disabled={claiming || availableToClaim <= 0}
+                                        disabled={claiming}
                                         onClick={handleSubmitClaim}
                                     >
                                         {claiming ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CheckCircle2 className="mr-2 h-5 w-5" />}
-                                        {availableToClaim > 0 ? `Submit Claim (KES ${availableToClaim.toLocaleString()})` : 'All Revenue Claimed'}
+                                        Submit Claim (KES {availableToClaim.toLocaleString()})
                                     </Button>
+                                ) : (
+                                    <Button
+                                        className="w-full h-14 text-lg font-bold shadow-md bg-slate-100 text-slate-400"
+                                        disabled
+                                    >
+                                        All Revenue Claimed
+                                    </Button>
+                                )}
+
+                                {(hasApprovedClaim || hasPendingClaim) && (
+                                    <div className="mt-4 space-y-2">
+                                        {hasPendingClaim && (
+                                            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3 text-amber-700">
+                                                <Clock className="h-4 w-4 animate-pulse shrink-0" />
+                                                <div className="text-left">
+                                                    <p className="text-xs font-bold">Claim Pending Approval</p>
+                                                    <p className="text-[10px] opacity-80">Admin is reviewing your previous claim.</p>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {hasApprovedClaim && (
+                                            <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-3 text-blue-700">
+                                                <Clock className="h-4 w-4 animate-pulse shrink-0" />
+                                                <div className="text-left">
+                                                    <p className="text-xs font-bold">Approved, Waiting Payment</p>
+                                                    <p className="text-[10px] opacity-80">Finance is processing your payout.</p>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 )}
 
                                 {availableToClaim < accumulatedRevenue && accumulatedRevenue > 0 && !hasApprovedClaim && !hasPendingClaim && (

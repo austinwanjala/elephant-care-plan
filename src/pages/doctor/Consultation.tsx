@@ -6,7 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, Send, ArrowLeft, Trash2, Plus, AlertTriangle, Lock, Unlock, Image as ImageIcon, Upload, X, History, Camera, Stethoscope as DiagnosisIcon, ClipboardList, CheckCircle2, Activity } from "lucide-react";
+import {
+    Loader2, Save, Send, ArrowLeft, Trash2, Plus, AlertTriangle, Lock, Unlock,
+    Image as ImageIcon, Upload, X, History, Camera, Stethoscope as DiagnosisIcon,
+    ClipboardList, CheckCircle2, Activity, ShieldCheck, User, CreditCard, ChevronRight, CheckSquare
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
@@ -92,6 +96,9 @@ export default function Consultation() {
     const [pendingContinueStage, setPendingContinueStage] = useState<any>(null);
     const [skipRemainingStages, setSkipRemainingStages] = useState(false);
     const [followAllStages, setFollowAllStages] = useState(false);
+    const [manualStageDialogOpen, setManualStageDialogOpen] = useState(false);
+    const [pendingManualStageJump, setPendingManualStageJump] = useState<any>(null);
+    const [selectedManualStageNumber, setSelectedManualStageNumber] = useState<number>(1);
     const [treatmentJustCompleted, setTreatmentJustCompleted] = useState<{ name: string; tooth: number | null; stages: number } | null>(null);
 
     useEffect(() => {
@@ -811,6 +818,57 @@ export default function Consultation() {
         setPendingContinueStage(null);
     };
 
+    const confirmManualJump = () => {
+        if (!pendingManualStageJump) return;
+
+        const stage = pendingManualStageJump;
+        const nextStageNum = selectedManualStageNumber;
+        const isFinal = nextStageNum === stage.total_stages;
+
+        // Resolve display name for this stage
+        const stageNames: string[] = Array.isArray(stage.services?.stage_names) ? stage.services.stage_names : [];
+        let stageName: string | null = stageNames[nextStageNum - 1] || null;
+
+        let displayName = stage.services.name;
+        if (stageName) {
+            displayName += ` — ${stageName}`;
+        }
+
+        // Create a 'virtual' service object for the bill
+        const stageService = {
+            id: stage.service_id,
+            name: displayName,
+            benefit_cost: 0, // No charge for subsequent stages
+            branch_compensation: 0,
+            real_cost: 0,
+            is_multi_stage_update: true,
+            is_manual_jump: true, // Mark for audit
+            previousStage: stage.current_stage,
+            startAtStage: nextStageNum,
+            total_stages: stage.total_stages,
+            stageId: stage.id,
+            nextStage: nextStageNum,
+            isFinal: isFinal,
+            notes: stageNotes + " (Manual stage selection used)",
+            related_bill_id: stage.related_bill_id
+        };
+
+        setSelectedServices([...selectedServices, { service: stageService, tooth_number: stage.tooth_number }]);
+
+        if (isFinal) {
+            toast({
+                title: `Treatment Marked for Completion`,
+                description: `Recording Stage ${nextStageNum} and closing the treatment.`
+            });
+        } else {
+            toast({ title: "Stage Jump Added", description: `Stage ${nextStageNum}/${stage.total_stages} scheduled via manual selection.` });
+        }
+
+        setManualStageDialogOpen(false);
+        setPendingManualStageJump(null);
+        setStageNotes("");
+    };
+
     const removeService = (index: number) => {
         const newServices = [...selectedServices];
         newServices.splice(index, 1);
@@ -1117,13 +1175,14 @@ export default function Consultation() {
 
             for (const item of updates) {
                 const currentStage = item.service.startAtStage; // This holds the *next* stage
-                const isFinal = currentStage === item.service.total_stages;
+                const isFinal = item.service.isFinal || currentStage === item.service.total_stages;
 
                 const { error: stageUpdateError } = await (supabase as any)
                     .from("service_stages")
                     .update({
                         current_stage: currentStage,
-                        status: isFinal ? 'completed' : 'in_progress',
+                        status: 'in_progress', // Keep as in_progress; finalize_invoice_rpc will flip to completed
+                        marked_complete_by_doctor: isFinal,
                         updated_at: new Date().toISOString(),
                         visit_id: visitId,
                         notes: item.service.notes
@@ -1157,21 +1216,26 @@ export default function Consultation() {
                     user_id: currentUser?.id
                 });
 
+                if (item.service.is_manual_jump) {
+                    await (supabase as any).from("system_logs").insert({
+                        action: "multi_stage_manual_jump",
+                        details: {
+                            member_id: visit.member_id,
+                            dependant_id: visit.dependant_id || null,
+                            service_id: item.service.id,
+                            tooth_number: item.tooth_number,
+                            previous_stage: item.service.previousStage,
+                            new_stage: currentStage,
+                            doctor_id: doctorId,
+                            visit_id: visitId,
+                            note: "Manual stage selection used"
+                        },
+                        user_id: currentUser?.id
+                    });
+                }
+
                 if (isFinal) {
-                    console.log("Final stage completed. Unlocking compensation.");
-
-                    if (item.service.related_bill_id) {
-                        await (supabase as any)
-                            .from("bills")
-                            .update({ is_claimable: true })
-                            .eq("id", item.service.related_bill_id);
-                    }
-
-                    // Also unlock pending claim if present
-                    await (supabase as any)
-                        .from("pending_claims")
-                        .update({ status: 'ready_for_review', released_to_director: true, updated_at: new Date().toISOString() })
-                        .eq("bill_id", item.service.related_bill_id);
+                    console.log("Final stage marked by doctor. Funds will be released after receptionist bills this visit.");
 
                     // Track completed treatment for UI feedback
                     setTreatmentJustCompleted({
@@ -1277,48 +1341,93 @@ export default function Consultation() {
     const isChild = patientAge <= 14;
 
     return (
-        <div className="space-y-6 max-w-7xl mx-auto">
-            <div className="flex items-center gap-4 mb-6">
-                <Button variant="outline" size="icon" onClick={() => navigate("/doctor")}>
-                    <ArrowLeft className="h-4 w-4" />
-                </Button>
-                <div>
-                    <h1 className="text-2xl font-bold">Consultation - {patientName} {isChild && <span className="text-sm font-normal text-amber-600 ml-2">(Pediatric)</span>}</h1>
-                    <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-3">
-                            <p className="text-muted-foreground">Visit #{visitId?.slice(0, 8)} • ID: {visit.dependants?.document_number || visit.members.id_number || 'N/A'} • Age: {patientAge} yrs</p>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 text-[10px] uppercase font-bold tracking-wider border-blue-200 text-blue-700 bg-blue-50/50 hover:bg-blue-100"
-                                onClick={() => setIsHistoryDialogOpen(true)}
-                            >
-                                <History className="w-3 h-3 mr-1" />
-                                View Clinical History
-                            </Button>
+        <div className="space-y-6 max-w-[1600px] mx-auto pb-20">
+            {/* Premium Structured Patient Header */}
+            <div className="bg-white rounded-2xl border shadow-sm p-6 mb-6 overflow-hidden relative">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 blur-3xl" />
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div className="flex items-center gap-5">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => navigate("/doctor")}
+                            className="h-12 w-12 rounded-xl border bg-slate-50 hover:bg-slate-100 shrink-0 transition-all hover:scale-105"
+                        >
+                            <ArrowLeft className="h-6 w-6 text-slate-600" />
+                        </Button>
+                        <div className="space-y-1">
+                            <div className="flex items-center gap-3 flex-wrap">
+                                <h1 className="text-3xl font-black text-slate-900 tracking-tight">
+                                    {patientName}
+                                </h1>
+                                {isChild && (
+                                    <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-amber-200 px-3 py-1 font-bold">
+                                        Pediatric Patient
+                                    </Badge>
+                                )}
+                                <Badge variant="secondary" className="bg-slate-100 text-slate-600 px-3 py-1 font-mono">
+                                    Visit #{visitId?.slice(0, 8).toUpperCase()}
+                                </Badge>
+                            </div>
+                            <div className="flex items-center gap-4 text-sm font-medium text-slate-500 overflow-x-auto whitespace-nowrap pb-1">
+                                <span className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-primary" /> {visit.members.member_number}</span>
+                                <span className="h-1 w-1 rounded-full bg-slate-300" />
+                                <span>{patientAge} Years Old</span>
+                                <span className="h-1 w-1 rounded-full bg-slate-300" />
+                                <span className="flex items-center gap-1.5"><ClipboardList className="w-4 h-4" /> {visit.dependants?.document_number || visit.members.id_number || 'No ID Provided'}</span>
+                            </div>
                         </div>
-                        {visit.dependants && (
-                            <p className="text-sm text-muted-foreground">Principal Member: <span className="font-medium text-foreground">{visit.members.full_name}</span> ({visit.members.member_number})</p>
-                        )}
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <Button
+                            variant="outline"
+                            onClick={() => setIsHistoryDialogOpen(true)}
+                            className="bg-white hover:bg-blue-50 border-blue-200 text-blue-700 font-bold px-5 h-12 rounded-xl transition-all hover:border-blue-300 shadow-sm"
+                        >
+                            <History className="w-5 h-5 mr-2" />
+                            Clinical History
+                        </Button>
+                        <Dialog open={isXrayModalOpen} onOpenChange={setIsXrayModalOpen}>
+                            <DialogTrigger asChild>
+                                <Button
+                                    className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-5 h-12 rounded-xl shadow-lg transition-all active:scale-95"
+                                >
+                                    <ImageIcon className="w-5 h-5 mr-2" />
+                                    Radiographs {xrayUrls.length > 0 && `(${xrayUrls.length})`}
+                                </Button>
+                            </DialogTrigger>
+                        </Dialog>
                     </div>
                 </div>
+
+                {visit.dependants && (
+                    <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-2 text-sm">
+                        <span className="text-slate-400 font-medium">Principal Account:</span>
+                        <span className="font-bold text-slate-700">{visit.members.full_name}</span>
+                        <Badge variant="outline" className="text-[10px] font-bold px-1.5 h-5 leading-none bg-slate-50">{visit.members.member_number}</Badge>
+                    </div>
+                )}
             </div>
 
-            {/* Follow-up visit mode banner */}
+            {/* Follow-up / Ongoing Alert */}
             {activeStages.length > 0 && selectedServices.length === 0 && (
-                <div className="rounded-xl border-2 border-blue-400 bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 flex items-start gap-4 shadow-lg">
-                    <Activity className="h-6 w-6 shrink-0 mt-0.5 animate-pulse" />
-                    <div>
-                        <p className="font-black text-lg leading-tight">Follow-Up Visit — Ongoing Treatment Detected</p>
-                        <p className="text-blue-100 text-sm mt-1">
-                            This patient has {activeStages.length} active multi-stage treatment{activeStages.length > 1 ? 's' : ''}. Use the <strong>"Complete Stage"</strong> button below to continue. No new billing applies.
+                <div className="rounded-2xl border border-blue-200 bg-blue-50/80 p-5 flex items-start gap-4 shadow-sm backdrop-blur-sm animate-in fade-in slide-in-from-top-4 duration-500">
+                    <div className="p-3 bg-blue-600 rounded-xl shadow-lg shadow-blue-200">
+                        <Activity className="h-6 w-6 text-white animate-pulse" />
+                    </div>
+                    <div className="space-y-1">
+                        <p className="font-black text-xl text-blue-900 leading-tight">Ongoing Treatment Workflow</p>
+                        <p className="text-blue-700 font-medium text-sm">
+                            Patient has <span className="font-black underline">{activeStages.length} pending procedure(s)</span>.
+                            Use the <span className="bg-blue-200 px-1 rounded text-blue-900">Complete Stage</span> controls below to progress clinical work.
                         </p>
                     </div>
                 </div>
             )}
 
-            <div className="grid lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 space-y-6">
+            <div className="grid lg:grid-cols-4 gap-8 items-start">
+                <div className="lg:col-span-3 space-y-8">
                     {activeStages.length > 0 && (
                         <Card className="border-blue-300 bg-blue-50/80 shadow-md">
                             <CardHeader className="pb-3">
@@ -1422,7 +1531,10 @@ export default function Consultation() {
                         </Card>
                     )}
 
-                    <Card className={cn("transition-all", consultationMode === 'diagnosis' ? "border-orange-200 bg-orange-50/30" : "")}>
+                    <Card className={cn(
+                        "transition-all duration-500 rounded-2xl shadow-xl overflow-hidden border-none ring-1",
+                        consultationMode === 'diagnosis' ? "ring-orange-200 bg-white" : "ring-slate-200 bg-white"
+                    )}>
                         <CardHeader>
                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                 <div>
@@ -1696,140 +1808,203 @@ export default function Consultation() {
                         </CardContent>
                     </Card>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Billable Services</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="border rounded-md divide-y">
-                                {selectedServices.length === 0 ? (
-                                    <div className="p-4 text-center text-muted-foreground">No services added yet. Select teeth and choose a procedure.</div>
-                                ) : (
-                                    selectedServices.map((s, index) => (
-                                        <div key={`${s.service.id}-${index}`} className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white gap-2">
-                                            <div>
-                                                <div className="flex items-center gap-2">
-                                                    <div className="font-semibold">{s.service.name}</div>
-                                                    {s.service.is_multi_stage && (
-                                                        <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-blue-200">
-                                                            {getStageName(s.service, s.service.startAtStage || 1)}
-                                                        </Badge>
-                                                    )}
+                    {/* Billable Services - Updated Design */}
+                    <Card className="rounded-2xl shadow-xl border-none ring-1 ring-slate-100 overflow-hidden">
+                        <div className="bg-slate-50/80 px-6 py-4 border-b flex items-center justify-between">
+                            <CardTitle className="text-sm font-black uppercase tracking-widest text-slate-500">
+                                Billable Procedures
+                            </CardTitle>
+                            <Badge variant="outline" className="bg-white font-bold text-primary border-primary/20">
+                                {selectedServices.length} Items Selected
+                            </Badge>
+                        </div>
+                        <CardContent className="p-0">
+                            {selectedServices.length === 0 ? (
+                                <div className="p-12 text-center text-slate-400">
+                                    <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-dashed">
+                                        <Plus className="w-8 h-8 opacity-20" />
+                                    </div>
+                                    <p className="font-medium">No procedures added yet.</p>
+                                    <p className="text-xs">Select teeth and choose a procedure to begin billing.</p>
+                                </div>
+                            ) : (
+                                <div className="divide-y divide-slate-100">
+                                    {selectedServices.map((s, index) => (
+                                        <div key={`${s.service.id}-${index}`} className="p-5 flex items-center justify-between hover:bg-slate-50/50 transition-colors group">
+                                            <div className="flex items-start gap-4">
+                                                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-black shrink-0 border border-blue-100">
+                                                    {s.tooth_number || "G"}
                                                 </div>
-                                                <div className="text-xs text-muted-foreground mt-0.5">
-                                                    {s.tooth_number ? <span className="font-bold text-primary mr-2">Tooth #{s.tooth_number}</span> : <span className="mr-2 italic">No tooth specified</span>}
-                                                    Benefit: KES {s.service.benefit_cost.toLocaleString()}
+                                                <div className="space-y-0.5">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-bold text-slate-900">{s.service.name}</span>
+                                                        {s.service.is_multi_stage && (
+                                                            <Badge className="bg-blue-50 text-blue-700 hover:bg-blue-50 border-blue-100 text-[9px] px-1.5 h-4 font-bold uppercase">
+                                                                {getStageName(s.service, s.service.startAtStage || 1)}
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-xs text-slate-400 font-medium">
+                                                        {s.tooth_number ? `Tooth #${s.tooth_number}` : 'Full Arch / General'} • KES {s.service.benefit_cost.toLocaleString()}
+                                                    </p>
                                                 </div>
                                             </div>
-                                            <Button variant="ghost" size="icon" onClick={() => removeService(index)} className="self-end sm:self-center">
-                                                <Trash2 className="h-4 w-4 text-destructive" />
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => removeService(index)}
+                                                className="h-10 w-10 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg group-hover:opacity-100 opacity-50 transition-all"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
                                             </Button>
                                         </div>
-                                    ))
-                                )}
-                            </div>
+                                    ))}
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </div>
 
-                <div className="space-y-6">
-                    {/* Active Treatments Progress */}
+                {/* STICKY SIDEBAR: Eligibility & Summary */}
+                <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-6">
+                    {/* Active Treatments Summary Widget */}
                     {activeStages.length > 0 && (
-                        <Card className="border-blue-200 bg-blue-50/30">
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-sm font-bold flex items-center gap-2 text-blue-900">
-                                    <History className="w-4 h-4" />
-                                    Active Treatments
-                                </CardTitle>
-                                <CardDescription className="text-[10px] text-blue-700">Currently in progress for this member</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-2">
-                                    {activeStages.map((stage) => (
-                                        <div key={stage.id} className="text-xs p-2 bg-white rounded border border-blue-100 flex justify-between items-center shadow-sm">
-                                            <div>
-                                                <div className="font-semibold text-blue-900">
-                                                    {stage.tooth_number ? `Tooth ${stage.tooth_number}` : 'General'}
-                                                </div>
-                                                <div className="text-[10px] text-muted-foreground truncate max-w-[120px]">
-                                                    {stage.services?.name}
-                                                </div>
-                                            </div>
-                                            <div className="flex flex-col items-end">
-                                                <Badge className="text-[10px] px-1 py-0 h-5 bg-blue-600">
-                                                    {getStageName(stage.services, stage.current_stage)}
-                                                </Badge>
-                                                {stage.current_stage < stage.total_stages ? (
-                                                    <span className="text-[9px] text-blue-500 mt-1 font-medium">
-                                                        Awaiting: {getStageName(stage.services, stage.current_stage + 1)}
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-[9px] text-emerald-600 mt-1 font-bold">
-                                                        Final Session Soon
-                                                    </span>
-                                                )}
-                                            </div>
+                        <div className="bg-slate-900 rounded-2xl p-5 shadow-2xl overflow-hidden relative group border border-slate-800">
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 rounded-full -mr-12 -mt-12 transition-transform group-hover:scale-110" />
+                            <h3 className="text-slate-100 text-xs font-black uppercase tracking-widest mb-4 flex items-center gap-2">
+                                <Activity className="w-4 h-4 text-blue-400" />
+                                Case Overview
+                            </h3>
+                            <div className="space-y-3">
+                                {activeStages.map((stage) => (
+                                    <div key={stage.id} className="bg-slate-800/50 rounded-xl p-3 border border-slate-700/50">
+                                        <div className="flex justify-between items-start mb-1.5">
+                                            <span className="text-slate-300 font-bold text-xs">{stage.tooth_number ? `Tooth ${stage.tooth_number}` : 'General'}</span>
+                                            <Badge className="text-[9px] px-1.5 py-0 h-4 bg-blue-600/20 text-blue-400 border-none">
+                                                {getStageName(stage.services, stage.current_stage)}
+                                            </Badge>
                                         </div>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
+                                        <div className="w-full bg-slate-700 h-1 rounded-full mb-1">
+                                            <div className="bg-blue-400 h-full rounded-full" style={{ width: `${(stage.current_stage / stage.total_stages) * 100}%` }} />
+                                        </div>
+                                        <p className="text-[10px] text-slate-500 truncate mb-3">{stage.services?.name}</p>
+
+                                        <div className="flex flex-col gap-2">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="w-full h-8 text-[11px] font-bold bg-blue-600 hover:bg-blue-500 text-white border-none rounded-lg shadow-sm"
+                                                onClick={() => handleContinueStage(stage)}
+                                            >
+                                                <CheckCircle2 className="w-3 h-3 mr-1" />
+                                                Complete Stage {stage.current_stage + 1}
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="w-full h-7 text-[10px] font-bold text-blue-400 hover:text-blue-300 hover:bg-blue-400/10 border border-blue-400/20 rounded-lg"
+                                                onClick={() => {
+                                                    setPendingManualStageJump(stage);
+                                                    setSelectedManualStageNumber(Math.min(stage.current_stage + 1, stage.total_stages));
+                                                    setManualStageDialogOpen(true);
+                                                }}
+                                            >
+                                                Select Next Treatment Stage
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     )}
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Patient Eligibility</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4 text-sm">
-                            <div className="flex justify-between items-center">
-                                <span className="text-muted-foreground">Member Number</span>
-                                <span className="font-medium">{visit.members.member_number}</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                                <span className="text-muted-foreground">Coverage Balance</span>
-                                <span className="font-bold text-green-600">KES {visit.members.coverage_balance?.toLocaleString()}</span>
-                            </div>
-                            <div className="pt-2 border-t">
-                                <Label>Billing Summary</Label>
-                                <div className="mt-2 space-y-1">
-                                    <div className="flex justify-between">
-                                        <span>Total Benefit Cost:</span>
-                                        <span>KES {selectedServices.filter(s => !s.service.is_multi_stage_update).reduce((acc, s) => acc + Number(s.service.benefit_cost), 0).toLocaleString()}</span>
+                    {/* Eligibility & Billing Card */}
+                    <Card className="rounded-2xl shadow-xl border-none ring-1 ring-slate-100 overflow-hidden">
+                        <div className="p-6 space-y-6">
+                            <div className="space-y-4">
+                                <h3 className="text-slate-900 font-black text-sm uppercase tracking-widest flex items-center gap-2">
+                                    <ShieldCheck className="w-5 h-5 text-emerald-500" />
+                                    Eligibility Check
+                                </h3>
+
+                                <div className="space-y-3">
+                                    <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] font-black text-slate-400 uppercase leading-none mb-1">Coverage Balance</span>
+                                            <span className="text-lg font-black text-slate-900">KES {visit.members.coverage_balance?.toLocaleString()}</span>
+                                        </div>
+                                        <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600">
+                                            <CreditCard className="w-5 h-5" />
+                                        </div>
                                     </div>
-                                    <div className="flex justify-between font-bold text-primary">
-                                        <span>Estimated Coverage Deduction:</span>
-                                        <span>KES {Math.min(selectedServices.filter(s => !s.service.is_multi_stage_update).reduce((acc, s) => acc + Number(s.service.benefit_cost), 0), visit.members.coverage_balance || 0).toLocaleString()}</span>
+
+                                    <div className="p-4 bg-white rounded-xl border shadow-sm space-y-3">
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-slate-500 font-medium">Session Total</span>
+                                            <span className="font-bold text-slate-900">KES {selectedServices.filter(s => !s.service.is_multi_stage_update).reduce((acc, s) => acc + Number(s.service.benefit_cost), 0).toLocaleString()}</span>
+                                        </div>
+                                        <div className="h-px bg-slate-100 w-full" />
+                                        <div className="flex justify-between items-center">
+                                            <div className="flex flex-col">
+                                                <span className="text-[10px] font-black text-slate-400 uppercase">Estimated Deduction</span>
+                                                <span className="text-xl font-black text-primary">
+                                                    KES {Math.min(selectedServices.filter(s => !s.service.is_multi_stage_update).reduce((acc, s) => acc + Number(s.service.benefit_cost), 0), visit.members.coverage_balance || 0).toLocaleString()}
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </CardContent>
+
+                            {(() => {
+                                const hasOnlyFollowUps = selectedServices.length > 0 && selectedServices.every(s => s.service.is_multi_stage_update);
+                                const hasFinalStage = selectedServices.some(s => s.service.is_multi_stage_update && s.service.isFinal);
+                                const buttonLabel = hasFinalStage
+                                    ? "Complete Case"
+                                    : hasOnlyFollowUps
+                                        ? "Record Progress"
+                                        : "Submit Visit Bill";
+
+                                return (
+                                    <div className="space-y-3">
+                                        <Button
+                                            className={cn(
+                                                "w-full h-14 text-base font-black rounded-xl shadow-xl transition-all hover:scale-[1.02] active:scale-95 text-white",
+                                                hasFinalStage ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100" :
+                                                    hasOnlyFollowUps ? "bg-blue-700 hover:bg-blue-800 shadow-blue-100" :
+                                                        "bg-slate-900 hover:bg-slate-800 shadow-slate-200"
+                                            )}
+                                            onClick={handleFinalize}
+                                            disabled={submitting || selectedServices.length === 0}
+                                        >
+                                            {submitting ? (
+                                                <Loader2 className="animate-spin mr-2" />
+                                            ) : hasFinalStage ? (
+                                                <CheckSquare className="mr-2 h-5 w-5" />
+                                            ) : (
+                                                <Send className="mr-2 h-5 w-5" />
+                                            )}
+                                            {buttonLabel}
+                                        </Button>
+                                        <p className="text-[10px] text-center text-slate-400 font-medium italic">
+                                            * Submitting will lock the clinical record for this session.
+                                        </p>
+                                    </div>
+                                );
+                            })()}
+                        </div>
                     </Card>
 
-                    {(() => {
-                        const hasOnlyFollowUps = selectedServices.length > 0 && selectedServices.every(s => s.service.is_multi_stage_update);
-                        const hasFinalStage = selectedServices.some(s => s.service.is_multi_stage_update && s.service.isFinal);
-                        const buttonClass = hasFinalStage
-                            ? "w-full h-12 text-lg font-bold shadow-lg bg-emerald-600 hover:bg-emerald-700"
-                            : hasOnlyFollowUps
-                                ? "w-full h-12 text-lg font-bold shadow-lg bg-blue-700 hover:bg-blue-800"
-                                : "w-full h-12 text-lg font-bold shadow-lg bg-green-600 hover:bg-green-700";
-                        const buttonLabel = hasFinalStage
-                            ? "Complete Final Stage & Unlock Claim"
-                            : hasOnlyFollowUps
-                                ? "Record Stage Completion"
-                                : "Submit Bill";
-
-                        return (
-                            <Button
-                                className={buttonClass}
-                                onClick={handleFinalize}
-                                disabled={submitting || selectedServices.length === 0}
-                            >
-                                {submitting ? <Loader2 className="animate-spin mr-2" /> : hasFinalStage ? <CheckCircle2 className="mr-2 h-5 w-5" /> : <Send className="mr-2 h-5 w-5" />}
-                                {buttonLabel}
-                            </Button>
-                        );
-                    })()}
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full h-10 border-dashed text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-all"
+                        onClick={handleSaveDraft}
+                        disabled={submitting}
+                    >
+                        <Save className="w-4 h-4 mr-2" />
+                        Quick Save Progress
+                    </Button>
                 </div>
             </div>
 
@@ -2056,12 +2231,27 @@ export default function Consultation() {
                                         {v.service_stages && v.service_stages.length > 0 && (
                                             <div className="space-y-2">
                                                 <Label className="text-[10px] uppercase font-bold text-muted-foreground">Procedures Performed</Label>
-                                                <div className="flex flex-wrap gap-2">
-                                                    {v.service_stages.map((stage: any) => (
-                                                        <Badge key={stage.id} variant="secondary" className="bg-blue-50 text-blue-700 border-blue-100">
-                                                            {stage.tooth_number ? `Tooth #${stage.tooth_number}` : 'General'}: {stage.current_stage}
-                                                        </Badge>
-                                                    ))}
+                                                <div className="flex flex-col gap-2">
+                                                    {v.service_stages.map((stage: any) => {
+                                                        const stageNames = stage.services?.stage_names || [];
+                                                        const name = stageNames[stage.current_stage - 1];
+                                                        return (
+                                                            <div key={stage.id} className="flex flex-col p-3 bg-blue-50/50 rounded-xl border border-blue-100/50 space-y-1">
+                                                                <div className="flex justify-between items-center">
+                                                                    <span className="font-bold text-xs text-blue-900">{stage.tooth_number ? `Tooth #${stage.tooth_number}` : 'General'}: {stage.services?.name}</span>
+                                                                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px]">
+                                                                        Stage {stage.current_stage} of {stage.total_stages}
+                                                                        {name ? ` — ${name}` : ''}
+                                                                    </Badge>
+                                                                </div>
+                                                                {stage.notes && (
+                                                                    <p className="text-[10px] italic text-slate-500 bg-white/50 p-1.5 rounded border border-dotted">
+                                                                        {stage.notes}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
                                         )}
@@ -2275,6 +2465,79 @@ export default function Consultation() {
                         <Button variant="ghost" onClick={() => setIsPinsPostsModalOpen(false)} className="flex-1 sm:flex-none">Cancel</Button>
                         <Button onClick={handleConfirmPinsPosts} className="flex-1 sm:flex-none bg-primary hover:bg-primary/90 text-white px-8 shadow-md">
                             Add to Bill
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Manual Stage Selection Modal */}
+            <Dialog open={manualStageDialogOpen} onOpenChange={setManualStageDialogOpen}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Activity className="h-5 w-5 text-blue-600" />
+                            Select Next Treatment Stage
+                        </DialogTitle>
+                        <DialogDescription>
+                            Manually choose the next stage for this treatment.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {pendingManualStageJump && (
+                        <div className="space-y-4 py-4">
+                            <div className="p-3 bg-blue-50 rounded-lg border border-blue-100 flex justify-between items-center">
+                                <span className="text-xs font-bold text-blue-900">{pendingManualStageJump.services?.name}</span>
+                                <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300">
+                                    Current: Stage {pendingManualStageJump.current_stage}
+                                </Badge>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label className="text-sm font-bold">Select Stage</Label>
+                                <Select
+                                    value={selectedManualStageNumber.toString()}
+                                    onValueChange={(val) => setSelectedManualStageNumber(parseInt(val))}
+                                >
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Select stage" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {Array.from({ length: pendingManualStageJump.total_stages }, (_, i) => i + 1)
+                                            .map((num) => {
+                                                const stageNames = Array.isArray(pendingManualStageJump.services?.stage_names) ? pendingManualStageJump.services.stage_names : [];
+                                                const name = stageNames[num - 1];
+                                                const isCurrent = num === pendingManualStageJump.current_stage;
+                                                const isPast = num < pendingManualStageJump.current_stage;
+                                                return (
+                                                    <SelectItem
+                                                        key={num}
+                                                        value={num.toString()}
+                                                        disabled={isCurrent || isPast}
+                                                        className={isCurrent ? "font-bold text-blue-600 bg-blue-50" : ""}
+                                                    >
+                                                        {num === pendingManualStageJump.current_stage ? "✔ " : ""}Stage {num} {name ? `— ${name}` : ''}
+                                                    </SelectItem>
+                                                );
+                                            })}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
+                                <div className="flex items-center gap-2 text-amber-800 font-bold text-xs uppercase tracking-wider">
+                                    <AlertTriangle className="w-4 h-4" />
+                                    Clinical Warning
+                                </div>
+                                <p className="text-xs text-amber-700 leading-relaxed font-medium">
+                                    “Selecting a later stage assumes the earlier stages are clinically not required. This action will be audited.”
+                                </p>
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setManualStageDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={confirmManualJump} className="bg-blue-600 hover:bg-blue-700 text-white">
+                            <CheckCircle2 className="w-4 h-4 mr-2" />
+                            Confirm Stage Selection
                         </Button>
                     </DialogFooter>
                 </DialogContent>

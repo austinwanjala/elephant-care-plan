@@ -185,7 +185,7 @@ serve(async (req) => {
             kopokopo_metadata: body // Save full raw body into the existing JSONB column for inspection
           })
           .eq("kopo_resource_id", resourceId)
-          .select("*")
+          .select("*, members(user_id, branch_id, full_name)")
           .single();
 
         if (pError) console.error("[kopokopo] DB Update Error:", pError.message);
@@ -193,10 +193,59 @@ serve(async (req) => {
         if (payment) {
           await supabase.from("members").update({ is_active: true }).eq("id", payment.member_id);
 
-          // Send SMS Confirmation to the user
-          const smsToken = await getAccessToken();
-          const smsMessage = `Confirmed! We have received your payment of KES ${payment.amount} (Ref: ${mpesaCode}). Your Elephant Care coverage is now active. Thank you!`;
-          await sendSmsConfirmation(payment.phone_used || eventData.sender_phone, smsMessage, smsToken);
+          // Get the most reliable info for notification
+          const currentMemberId = payment.member_id;
+          const { data: memberProfile } = await supabase
+            .from("members")
+            .select("phone, email")
+            .eq("id", currentMemberId)
+            .single();
+
+          const targetPhone = payment.phone_used || memberProfile?.phone || (eventData as any).sender_phone;
+          const memberData = (payment as any).members;
+
+          // --- SYSTEM NOTIFICATIONS ---
+
+          // 1. Notify Member (In-App)
+          if (memberData?.user_id) {
+            await supabase.from("notifications").insert({
+              recipient_id: memberData.user_id,
+              title: "Payment Received",
+              message: `Your payment of KES ${payment.amount} (Ref: ${mpesaCode}) has been processed successfully. Your individual coverage is now active.`,
+              type: "success"
+            });
+          }
+
+          // 2. Notify Member (SMS via KopoKopo directly)
+          if (targetPhone) {
+            try {
+              const smsToken = await getAccessToken();
+              const smsMessage = `Confirmed! We have received your payment of KES ${payment.amount} (Ref: ${mpesaCode}). Your Elephant Care coverage is now active. Thank you!`;
+              await sendSmsConfirmation(targetPhone, smsMessage, smsToken);
+              console.log("[kopokopo] Direct KopoKopo SMS sent to:", targetPhone);
+            } catch (err: any) {
+              console.error("[kopokopo] Direct SMS failed:", err.message);
+            }
+          }
+
+          // 3. Notify Branch Staff (Receptionists/Directors)
+          if (memberData?.branch_id) {
+            const { data: branchStaff } = await supabase
+              .from("staff")
+              .select("user_id")
+              .eq("branch_id", memberData.branch_id)
+              .eq("is_active", true);
+
+            if (branchStaff && branchStaff.length > 0) {
+              const staffNotifs = branchStaff.map((s: { user_id: string }) => ({
+                recipient_id: s.user_id,
+                title: "New Payment Received",
+                message: `Payment of KES ${payment.amount} received from ${memberData.full_name}. Ref: ${mpesaCode}.`,
+                type: "info"
+              }));
+              await supabase.from("notifications").insert(staffNotifs).catch((err: Error) => console.error("[kopokopo] Staff notif error:", err));
+            }
+          }
 
           await supabase.from("system_logs").insert({
             action: "KOPOKOPO_PAYMENT_SUCCESS",

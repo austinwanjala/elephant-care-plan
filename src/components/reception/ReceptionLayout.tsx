@@ -42,17 +42,11 @@ export function ReceptionLayout({ children }: ReceptionLayoutProps) {
             return;
         }
 
-        const { data: rolesData, error: roleError } = await supabase
+        const { data: roleData, error: roleError } = await supabase
             .from("user_roles")
             .select("role")
-            .eq("user_id", user.id);
-
-        const roles = rolesData?.map(v => v.role) || [];
-        const hasAccess = roles.includes("receptionist") || roles.includes("admin") || roles.includes("super_admin");
-
-        if (roles.includes("super_admin")) setRole("super_admin");
-        else if (roles.includes("admin")) setRole("admin");
-        else if (roles.length > 0) setRole(roles[0]);
+            .eq("user_id", user.id)
+            .maybeSingle();
 
         if (roleError) {
             toast({
@@ -65,7 +59,10 @@ export function ReceptionLayout({ children }: ReceptionLayoutProps) {
             return;
         }
 
-        if (!hasAccess) {
+        const userRole = roleData?.role as string;
+        setRole(userRole);
+
+        if (userRole !== "receptionist" && userRole !== "admin") {
             toast({
                 title: "Access Denied",
                 description: "You must be a receptionist to view this page.",

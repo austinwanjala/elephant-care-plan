@@ -48,20 +48,16 @@ export const AuditorLayout = () => {
             setUserEmail(user.email);
 
             // Verify Role
-            const { data: rolesData } = await supabase
+            const { data: roleData } = await supabase
                 .from("user_roles")
                 .select("role")
-                .eq("user_id", user.id);
+                .eq("user_id", user.id)
+                .single();
 
-            const roles = rolesData?.map(v => v.role) || [];
-            if (roles.includes("super_admin")) setRole("super_admin");
-            else if (roles.includes("admin")) setRole("admin");
-            else if (roles.includes("auditor")) setRole("auditor");
-            else if (roles.length > 0) setRole(roles[0]);
+            const userRole = roleData?.role as string;
+            setRole(userRole);
 
-            const hasAccess = roles.includes("auditor") || roles.includes("super_admin") || roles.includes("admin");
-
-            if (!hasAccess) {
+            if (userRole !== "auditor" && userRole !== "super_admin" && userRole !== "admin") {
                 toast({
                     title: "Access Denied",
                     description: "This portal is restricted to Auditors.",

@@ -36,9 +36,8 @@ export default function AdminSettings() {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const { data: rolesData } = await supabase.from("user_roles").select("role").eq("user_id", user.id);
-      const roles = rolesData?.map(r => r.role) || [];
-      setIsSuperAdmin(roles.includes('super_admin'));
+      const { data: roleData } = await supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
+      setIsSuperAdmin(roleData?.role === 'super_admin');
     }
 
     const { data: settingsData } = await supabase.from("system_settings").select("key, value");

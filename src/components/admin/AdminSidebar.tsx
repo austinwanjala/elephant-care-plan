@@ -50,10 +50,8 @@ export function AdminSidebar() {
     const checkRole = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { data: rolesData } = await supabase.from("user_roles").select("role").eq("user_id", user.id);
-        const roles = rolesData?.map(r => r.role) || [];
-
-        if (roles.includes('super_admin')) {
+        const { data } = await supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
+        if ((data?.role as string) === 'super_admin') {
           setBasePath("/super-admin");
           setRoleLabel("Super Admin");
         } else {
@@ -100,6 +98,7 @@ export function AdminSidebar() {
 
   if (roleLabel === "Super Admin") {
     settingsMenuItems.push({ title: "Permissions", url: `${basePath}/permissions`, icon: ShieldAlert });
+    settingsMenuItems.push({ title: "Content Management", url: `${basePath}/content`, icon: FileText });
   }
 
   useEffect(() => {

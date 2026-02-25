@@ -211,7 +211,24 @@ export default function RegisterVisit() {
         if (data.biometric_data) {
             setBiometricsVerified(false);
         } else {
+            setBiometricsVerified(false); // Force verification even if no data (will need capture)
+        }
+    };
+
+    const handleBiometricCaptureComplete = async (credentialData: string) => {
+        if (!member) return;
+        try {
+            const { error } = await supabase
+                .from("members")
+                .update({ biometric_data: credentialData })
+                .eq("id", member.id);
+            if (error) throw error;
+
+            setMember({ ...member, biometric_data: credentialData });
             setBiometricsVerified(true);
+            toast({ title: "Success", description: "Biometrics registered and verified." });
+        } catch (error: any) {
+            toast({ title: "Capture failed", description: error.message, variant: "destructive" });
         }
     };
 
@@ -252,14 +269,27 @@ export default function RegisterVisit() {
                 branch_id: receptionistBranchId,
                 receptionist_id: receptionistId,
                 status: 'registered',
-                doctor_id: selectedDoctorId || null, // Assign doctor if selected
-                biometrics_verified: biometricsVerified, // We verified the principal
+                doctor_id: selectedDoctorId || null,
+                biometrics_verified: true,
+                biometric_verified_at: new Date().toISOString(),
                 benefit_deducted: 0,
                 branch_compensation: 0,
                 profit_loss: 0
             }]);
 
             if (error) throw error;
+
+            // Log biometric verification
+            const { data: { user } } = await supabase.auth.getUser();
+            await supabase.from("system_logs").insert({
+                action: "VISIT_BIOMETRIC_VERIFIED",
+                user_id: user?.id,
+                details: {
+                    member_id: member.id,
+                    patient_id: selectedPatientId,
+                    timestamp: new Date().toISOString()
+                }
+            });
 
             toast({ title: "Visit Registered", description: `${isDependant ? 'Dependant' : 'Member'} is now in the queue for the doctor.` });
             navigate("/reception");
@@ -564,12 +594,20 @@ export default function RegisterVisit() {
                                         onVerificationComplete={handleBiometricVerificationComplete}
                                     />
                                 ) : (
-                                    <div className="p-4 border rounded-lg bg-yellow-50/20 text-yellow-700 flex items-center gap-3">
-                                        <Fingerprint className="h-6 w-6 shrink-0" />
-                                        <div>
-                                            <p className="font-medium">No Biometric Data Registered</p>
-                                            <p className="text-xs">Proceeding without biometric verification. Consider capturing biometrics for this member in Admin portal.</p>
+                                    <div className="space-y-4">
+                                        <div className="p-4 border rounded-lg bg-yellow-50/20 text-yellow-700 flex items-center gap-3 border-yellow-200">
+                                            <Fingerprint className="h-6 w-6 shrink-0" />
+                                            <div>
+                                                <p className="font-medium">No Biometric Data Found</p>
+                                                <p className="text-xs font-medium">To proceed, you MUST capture the principal member's biometric data now.</p>
+                                            </div>
                                         </div>
+                                        <BiometricCapture
+                                            mode="register"
+                                            userId={member.id}
+                                            userName={member.full_name}
+                                            onCaptureComplete={handleBiometricCaptureComplete}
+                                        />
                                     </div>
                                 )}
 

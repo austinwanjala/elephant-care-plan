@@ -155,21 +155,14 @@ const Login = () => {
       const delayMs = 500;
 
       while (attempts < maxAttempts && role === null) {
-        const { data: rolesData } = await supabase
+        const { data: roleData } = await supabase
           .from("user_roles")
           .select("role")
-          .eq("user_id", userId);
+          .eq("user_id", userId)
+          .maybeSingle();
 
-        if (rolesData && rolesData.length > 0) {
-          const roles = rolesData.map(r => r.role);
-          // Prioritize super_admin > admin > others
-          if (roles.includes("super_admin")) {
-            role = "super_admin";
-          } else if (roles.includes("admin")) {
-            role = "admin";
-          } else {
-            role = roles[0];
-          }
+        if (roleData?.role) {
+          role = roleData.role;
           break;
         }
 

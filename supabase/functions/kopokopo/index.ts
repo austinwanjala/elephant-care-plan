@@ -216,15 +216,29 @@ serve(async (req) => {
             });
           }
 
-          // 2. Notify Member (SMS via KopoKopo directly)
+          // 2. Notify Member (SMS via central service)
           if (targetPhone) {
             try {
+              // Call the centralized send-sms service used elsewhere in the app
+              await supabase.functions.invoke('send-sms', {
+                body: {
+                  type: 'payment_confirmation',
+                  phone: targetPhone,
+                  email: memberProfile?.email,
+                  data: {
+                    benefit_amount: payment.amount,
+                    ref: mpesaCode
+                  }
+                }
+              });
+              console.log("[kopokopo] Triggered central SMS for:", targetPhone);
+            } catch (err) {
+              console.error("[kopokopo] Central SMS invocation failed:", err);
+
+              // Fallback to internal KopoKopo SMS helper if central fails
               const smsToken = await getAccessToken();
               const smsMessage = `Confirmed! We have received your payment of KES ${payment.amount} (Ref: ${mpesaCode}). Your Elephant Care coverage is now active. Thank you!`;
               await sendSmsConfirmation(targetPhone, smsMessage, smsToken);
-              console.log("[kopokopo] Direct KopoKopo SMS sent to:", targetPhone);
-            } catch (err: any) {
-              console.error("[kopokopo] Direct SMS failed:", err.message);
             }
           }
 

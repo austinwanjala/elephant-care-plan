@@ -164,8 +164,7 @@ export default function RegisterVisit() {
             .from("service_stages")
             .select("*")
             .eq("member_id", data.id)
-            .eq("status", "in_progress")
-            .eq("marked_complete_by_doctor", false);
+            .eq("status", "in_progress");
 
         if (rawStages && rawStages.length > 0) {
             const serviceIds = [...new Set(rawStages.map((s: any) => s.service_id))];
@@ -327,20 +326,7 @@ export default function RegisterVisit() {
                                 <CardDescription>Who is receiving treatment today? Select to see their status.</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <RadioGroup
-                                    value={selectedPatientId}
-                                    onValueChange={(val) => {
-                                        setSelectedPatientId(val);
-                                        // Filter ongoingStages for just this person
-                                        const isDep = val !== member.id;
-                                        const currentStages = ongoingStages.filter((s: any) =>
-                                            isDep ? s.dependant_id === val : !s.dependant_id
-                                        );
-                                        // If no stages found for this person, the UI handles it via filtering later,
-                                        // but we ensure the selection state is clean.
-                                    }}
-                                    className="space-y-3"
-                                >
+                                <RadioGroup value={selectedPatientId} onValueChange={setSelectedPatientId} className="space-y-3">
 
                                     {/* ── Principal Member ── */}
                                     {(() => {

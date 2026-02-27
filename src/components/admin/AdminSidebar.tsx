@@ -8,12 +8,25 @@ import {
   LayoutDashboard,
   LogOut,
   Settings,
+  ClipboardList,
   History,
   DollarSign,
-  ClipboardList,
+  Landmark,
+  BadgePercent,
+  Receipt,
+  Banknote,
   FileText,
-  ShieldAlert,
+  Activity,
+  BarChart3,
+  Bell,
   MessageSquare,
+  ShieldAlert,
+  Fingerprint,
+  CalendarDays,
+  CalendarCheck,
+  Bookmark,
+  Percent,
+  Send,
 } from "lucide-react";
 import {
   Sidebar,
@@ -68,33 +81,33 @@ export function AdminSidebar() {
     { title: "Members", url: `${basePath}/members`, icon: Users },
     { title: "Branches", url: `${basePath}/branches`, icon: Building2 },
     { title: "Staff", url: `${basePath}/staff`, icon: UserCog },
-    { title: "Visits", url: `${basePath}/visits`, icon: History },
-    { title: "Appointments", url: `${basePath}/appointments`, icon: History },
+    { title: "Visits", url: `${basePath}/visits`, icon: ClipboardList },
+    { title: "Appointments", url: `${basePath}/appointments`, icon: CalendarDays },
     { title: "Services", url: `${basePath}/services`, icon: Stethoscope },
-    { title: "Branch Payments", url: `${basePath}/branch-payments`, icon: DollarSign },
-    { title: "Marketer Commissions", url: `${basePath}/marketer-commissions`, icon: DollarSign },
-    { title: "Marketer Claims", url: `${basePath}/marketer-claims`, icon: ClipboardList },
-    { title: "Payments", url: `${basePath}/payments`, icon: DollarSign },
+    { title: "Branch Payments", url: `${basePath}/branch-payments`, icon: Landmark },
+    { title: "Marketer Commissions", url: `${basePath}/marketer-commissions`, icon: BadgePercent },
+    { title: "Marketer Claims", url: `${basePath}/marketer-claims`, icon: Receipt },
+    { title: "Payments", url: `${basePath}/payments`, icon: Banknote },
     { title: "Messages", url: `${basePath}/messages`, icon: MessageSquare },
   ];
 
   // Conditionally add System Logs
   if (hasPermission('system_logs', 'view')) {
-    menuItems.push({ title: "System Logs", url: `${basePath}/logs`, icon: FileText });
+    menuItems.push({ title: "System Logs", url: `${basePath}/logs`, icon: Activity });
   }
 
   // Add Reports for admins
-  menuItems.push({ title: "Reports", url: `${basePath}/reports`, icon: FileText });
+  menuItems.push({ title: "Reports", url: `${basePath}/reports`, icon: BarChart3 });
 
   // Add Notifications for admins
-  menuItems.push({ title: "Notifications", url: `${basePath}/notifications`, icon: ShieldAlert });
+  menuItems.push({ title: "Notifications", url: `${basePath}/notifications`, icon: Bell });
 
   const settingsMenuItems = [
     { title: "General Settings", url: `${basePath}/settings`, icon: Settings },
-    { title: "Appointment Settings", url: `${basePath}/appointment-settings`, icon: ClipboardList },
-    { title: "Membership Categories", url: `${basePath}/membership-categories`, icon: Users },
-    { title: "Commission Rates", url: `${basePath}/commission-settings`, icon: DollarSign },
-    { title: "WhatsApp Config", url: `${basePath}/whatsapp`, icon: MessageSquare },
+    { title: "Appointment Settings", url: `${basePath}/appointment-settings`, icon: CalendarCheck },
+    { title: "Membership Categories", url: `${basePath}/membership-categories`, icon: Bookmark },
+    { title: "Commission Rates", url: `${basePath}/commission-settings`, icon: Percent },
+    { title: "WhatsApp Config", url: `${basePath}/whatsapp`, icon: Send },
   ];
 
   if (roleLabel === "Super Admin") {

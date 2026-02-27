@@ -135,7 +135,6 @@ export function MemberLayout({ children }: MemberLayoutProps) {
         <SidebarInset className="flex-1">
           <header className="h-14 border-b border-border flex items-center px-4 sticky top-0 bg-background/95 backdrop-blur z-40">
             <SidebarTrigger className="mr-4" />
-            <SidebarTrigger className="mr-4 h-5 w-5 md:h-6 md:w-6" />
             <div className="ml-auto flex items-center gap-4 text-sm text-slate-600">
               <NotificationBell />
               <span>Welcome, <span className="font-bold text-slate-800">{loading ? "..." : authorized ? (memberInfo?.full_name || "Member") : ""}</span></span>

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Loader2, CreditCard, Phone, CheckCircle2, ShieldCheck, Wallet } from "lucide-react";
+import { Loader2, CreditCard, Phone, CheckCircle2, ShieldCheck, Wallet, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { kopokopoService } from "@/services/kopokopo";
@@ -67,9 +67,10 @@ export default function MemberPayments() {
       .from("payments")
       .select("*")
       .eq("member_id", memberData.id)
+      .eq("status", "completed")
       .order("created_at", { ascending: false });
 
-    setPayments(data || []);
+    setPayments((data as any) || []);
     setLoading(false);
   };
 
@@ -318,7 +319,7 @@ export default function MemberPayments() {
                 <p className="text-sm text-muted-foreground italic">
                   Complete your wallet to activate a scheme
                 </p>
-                <Button onClick={() => navigate('/scheme-selection')} className="bg-emerald-600 hover:bg-emerald-700 w-full sm:w-auto">
+                <Button onClick={() => navigate('/dashboard/scheme-selection')} className="bg-emerald-600 hover:bg-emerald-700 w-full sm:w-auto">
                   Choose Scheme & Activate
                 </Button>
               </div>

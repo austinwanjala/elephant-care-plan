@@ -4,14 +4,13 @@ import { supabase } from "@/integrations/supabase/client";
 import {
     LayoutDashboard,
     Users,
-    FileText,
-    CreditCard,
+    ClipboardCheck,
+    Banknote,
     LogOut,
     Menu,
     X,
     ShieldCheck,
-    Activity,
-    History,
+    Fingerprint,
     MessageSquare
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -91,9 +90,9 @@ export const AuditorLayout = () => {
     const navItems = [
         { icon: LayoutDashboard, label: "Dashboard", href: "/auditor" },
         { icon: Users, label: "Members", href: "/auditor/members" },
-        { icon: Activity, label: "Visits", href: "/auditor/visits" },
-        { icon: CreditCard, label: "Financials", href: "/auditor/financials" },
-        { icon: History, label: "System Logs", href: "/auditor/logs" },
+        { icon: ClipboardCheck, label: "Visits", href: "/auditor/visits" },
+        { icon: Banknote, label: "Financials", href: "/auditor/financials" },
+        { icon: Fingerprint, label: "System Logs", href: "/auditor/logs" },
         { icon: MessageSquare, label: "Messages", href: "/auditor/messages" },
     ];
 

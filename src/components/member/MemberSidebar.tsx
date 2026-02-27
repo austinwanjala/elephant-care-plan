@@ -1,11 +1,11 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
-  CreditCard,
+  Wallet,
   History,
-  User,
+  UserCog,
   LogOut,
-  Users, // Added for Dependants
+  UserPlus,
   CalendarClock,
 } from "lucide-react";
 import {
@@ -26,11 +26,11 @@ import { supabase } from "@/integrations/supabase/client";
 
 const menuItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Payments", url: "/dashboard/payments", icon: CreditCard },
-  { title: "Visits", url: "/dashboard/visits", icon: History },
-  { title: "Appointments", url: "/dashboard/appointments", icon: CalendarClock },
-  { title: "Dependants", url: "/dashboard/dependants", icon: Users }, // New item
-  { title: "Profile", url: "/dashboard/profile", icon: User },
+  { title: "My Wallet", url: "/dashboard/payments", icon: Wallet },
+  { title: "Visit History", url: "/dashboard/visits", icon: History },
+  { title: "Book Appointment", url: "/dashboard/appointments", icon: CalendarClock },
+  { title: "My Dependants", url: "/dashboard/dependants", icon: UserPlus },
+  { title: "Profile Settings", url: "/dashboard/profile", icon: UserCog },
 ];
 
 import { useSystemSettings } from "@/hooks/useSystemSettings";

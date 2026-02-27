@@ -74,34 +74,19 @@ export default function RegisterVisit() {
 
     const fetchDoctors = async () => {
         try {
-            // 1. Get all active staff in this branch
-            const { data: branchStaff, error: staffError } = await supabase
-                .from("staff")
-                .select("id, full_name, user_id")
-                .eq("branch_id", receptionistBranchId)
-                .eq("is_active", true);
-
-            if (staffError) throw staffError;
-
-            if (!branchStaff || branchStaff.length === 0) {
+            if (!receptionistBranchId) {
                 setDoctors([]);
                 return;
             }
 
-            // 2. Filter these staff to check who has the 'doctor' role
-            const staffUserIds = branchStaff.map(s => s.user_id);
-            const { data: doctorRoles, error: roleError } = await supabase
-                .from("user_roles")
-                .select("user_id")
-                .eq("role", "doctor")
-                .in("user_id", staffUserIds);
+            // IMPORTANT: user_roles has hardened RLS (self-read), so we must use the SECURITY DEFINER RPC.
+            const { data, error } = await (supabase as any).rpc("get_branch_doctors", {
+                branch_id_input: receptionistBranchId,
+            });
 
-            if (roleError) throw roleError;
+            if (error) throw error;
 
-            const doctorUserIdSet = new Set(doctorRoles?.map(r => r.user_id));
-            const doctorsList = branchStaff.filter(s => doctorUserIdSet.has(s.user_id));
-
-            setDoctors(doctorsList);
+            setDoctors(data || []);
         } catch (error: any) {
             console.error("Error fetching doctors:", error);
             toast({ title: "Error", description: "Failed to load doctors list.", variant: "destructive" });

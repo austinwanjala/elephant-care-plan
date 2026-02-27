@@ -1,14 +1,14 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { useSidebar, Sidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { DollarSign, History, LogOut, LayoutDashboard, Users, Building2, MessageSquare } from "lucide-react";
+import { Coins, Receipt, Landmark, LogOut, LayoutDashboard, MessageSquare } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 const menuItems = [
     { title: "Dashboard", url: "/finance", icon: LayoutDashboard },
-    { title: "Marketer Payments", url: "/finance/marketer-payments", icon: Users },
-    { title: "Branch Payments", url: "/finance/branch-payments", icon: Building2 },
-    { title: "Payment History", url: "/finance/history", icon: History },
+    { title: "Marketer Payments", url: "/finance/marketer-payments", icon: Coins },
+    { title: "Branch Payments", url: "/finance/branch-payments", icon: Landmark },
+    { title: "Payment History", url: "/finance/history", icon: Receipt },
     { title: "Messages", url: "/finance/messages", icon: MessageSquare },
 ];
 
@@ -29,7 +29,7 @@ export function FinanceSidebar() {
             <SidebarHeader className="p-4 border-b border-border">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-amber-600 flex items-center justify-center shrink-0">
-                        <DollarSign className="text-white h-6 w-6" />
+                        <Landmark className="text-white h-6 w-6" />
                     </div>
                     <div className="flex flex-col">
                         <span className="text-lg font-serif font-bold text-foreground">{settings.app_name || "Elephant Dental"}</span>

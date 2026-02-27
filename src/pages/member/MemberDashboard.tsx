@@ -202,6 +202,7 @@ const MemberDashboard = () => {
         .from("payments")
         .select("*")
         .eq("member_id", memberData.id)
+        .eq("status", "completed")
         .order("created_at", { ascending: false });
 
       if (error) {

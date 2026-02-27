@@ -2,15 +2,15 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useSidebar, Sidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Users, DollarSign, Link2, LogOut, LayoutDashboard, Megaphone, UserPlus, MessageSquare } from "lucide-react";
+import { Share2, Wallet, Users2, LogOut, LayoutDashboard, Megaphone, UserPlus, MessageSquare } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 const menuItems = [
     { title: "Dashboard", url: "/marketer", icon: LayoutDashboard },
     { title: "Add Member", url: "/marketer/add-member", icon: UserPlus },
-    { title: "My Referrals", url: "/marketer/referrals", icon: Users },
-    { title: "Earnings", url: "/marketer/earnings", icon: DollarSign },
-    { title: "Marketing Links", url: "/marketer/links", icon: Link2 },
+    { title: "My Referrals", url: "/marketer/referrals", icon: Users2 },
+    { title: "Earnings", url: "/marketer/earnings", icon: Wallet },
+    { title: "Marketing Links", url: "/marketer/links", icon: Share2 },
     { title: "Messages", url: "/marketer/messages", icon: MessageSquare },
 ];
 

@@ -2,15 +2,15 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useSidebar, Sidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { UserPlus, Fingerprint, Receipt, LogOut, LayoutDashboard, Search, Calendar as CalendarClock, MessageSquare } from "lucide-react";
+import { UserPlus, Landmark, Receipt, LogOut, LayoutDashboard, Search, CalendarClock, MessageSquare, ClipboardPlus, Contact2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 const menuItems = [
     { title: "Dashboard", url: "/reception", icon: LayoutDashboard },
-    { title: "Register Visit", url: "/reception/register-visit", icon: UserPlus },
-    { title: "Add Member", url: "/reception/add-member", icon: UserPlus }, // New Add Member item
-    { title: "Search Member", url: "/reception/search", icon: Search }, // New item
-    { title: "Appointments", url: "/reception/appointments", icon: CalendarClock }, // New item
+    { title: "Register Visit", url: "/reception/register-visit", icon: ClipboardPlus },
+    { title: "Add Member", url: "/reception/add-member", icon: UserPlus },
+    { title: "Search Member", url: "/reception/search", icon: Contact2 },
+    { title: "Appointments", url: "/reception/appointments", icon: CalendarClock },
     { title: "Billing & Claims", url: "/reception/billing", icon: Receipt },
     { title: "Messages", url: "/reception/messages", icon: MessageSquare },
 ];

@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, Link } from "react-router-dom";
 import { BiometricCapture } from "@/components/BiometricCapture";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { InsufficientBalanceHandler } from "@/components/reception/InsufficientBalanceHandler";
 
 import {
     Select,
@@ -37,6 +38,7 @@ export default function RegisterVisit() {
     const [ongoingStages, setOngoingStages] = useState<any[]>([]);
     const [searchResults, setSearchResults] = useState<any[]>([]);
     const [selectionDialogOpen, setSelectionDialogOpen] = useState(false);
+    const [showPaymentHandler, setShowPaymentHandler] = useState(false);
     const { toast } = useToast();
     const navigate = useNavigate();
 
@@ -354,11 +356,36 @@ export default function RegisterVisit() {
                                 </div>
                             </div>
 
-                            {!member.is_active && (
-                                <div className="bg-destructive/10 text-destructive p-3 rounded-md flex items-center gap-2">
-                                    <UserX className="h-5 w-5" />
-                                    <span className="font-medium">Member is inactive. Advise payment before service.</span>
+                            {!member.is_active && !showPaymentHandler && (
+                                <div className="bg-destructive/10 text-destructive p-4 rounded-md flex flex-col gap-3">
+                                    <div className="flex items-center gap-2">
+                                        <UserX className="h-5 w-5" />
+                                        <span className="font-bold uppercase">Inactive Member - Renewal Required</span>
+                                    </div>
+                                    <p className="text-sm">The member account is currently inactive. Please renew their scheme or top up to proceed with registration.</p>
+                                    <Button
+                                        variant="destructive"
+                                        className="w-full bg-red-600 hover:bg-red-700"
+                                        onClick={() => setShowPaymentHandler(true)}
+                                    >
+                                        <CreditCard className="mr-2 h-4 w-4" />
+                                        Renew or Top-up Account
+                                    </Button>
                                 </div>
+                            )}
+
+                            {showPaymentHandler && (
+                                <InsufficientBalanceHandler
+                                    member={member}
+                                    requiredAmount={0} // 0 because we just want them to be active
+                                    onPaymentSuccess={async () => {
+                                        setShowPaymentHandler(false);
+                                        // Re-fetch member to get active status
+                                        handleSelectMember(member);
+                                        toast({ title: "Account Activated", description: "The member is now active." });
+                                    }}
+                                    onCancel={() => setShowPaymentHandler(false)}
+                                />
                             )}
                         </CardContent>
                     </Card>

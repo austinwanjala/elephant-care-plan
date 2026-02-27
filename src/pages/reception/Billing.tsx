@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, CreditCard, Check, Search, Receipt, History, Printer, Fingerprint } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { verifyCredential } from "@/lib/webauthn";
+import { InsufficientBalanceHandler } from "@/components/reception/InsufficientBalanceHandler";
 
 export default function ReceptionBilling() {
     const [visits, setVisits] = useState<any[]>([]);
@@ -21,6 +22,7 @@ export default function ReceptionBilling() {
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [receptionistId, setReceptionistId] = useState<string | null>(null);
     const [biometricsVerified, setBiometricsVerified] = useState<string | null>(null); // visitId if verified
+    const [showPaymentHandler, setShowPaymentHandler] = useState<string | null>(null); // visitId
     const { toast } = useToast();
 
     useEffect(() => {
@@ -372,10 +374,33 @@ export default function ReceptionBilling() {
                                                                             <p className="italic">"{visit.diagnosis || visit.treatment_notes || 'No notes provided'}"</p>
                                                                         </div>
 
-                                                                        {visit.members?.coverage_balance < bill?.total_benefit_cost && (
+                                                                        {visit.members?.coverage_balance < bill?.total_benefit_cost && !showPaymentHandler && (
                                                                             <div className="p-3 bg-red-50 text-red-700 rounded-md text-sm border border-red-200">
-                                                                                Insufficient Balance! Collect deficit in cash.
+                                                                                <div className="flex justify-between items-center">
+                                                                                    <span>Insufficient Balance!</span>
+                                                                                    <Button
+                                                                                        size="sm"
+                                                                                        variant="destructive"
+                                                                                        className="h-7 text-xs"
+                                                                                        onClick={() => setShowPaymentHandler(visit.id)}
+                                                                                    >
+                                                                                        Renew / Top-up
+                                                                                    </Button>
+                                                                                </div>
                                                                             </div>
+                                                                        )}
+
+                                                                        {showPaymentHandler === visit.id && (
+                                                                            <InsufficientBalanceHandler
+                                                                                member={visit.members}
+                                                                                requiredAmount={bill?.total_benefit_cost}
+                                                                                onPaymentSuccess={async () => {
+                                                                                    setShowPaymentHandler(null);
+                                                                                    await fetchBilledVisits();
+                                                                                    toast({ title: "Success", description: "Coverage updated. You can now finalize the bill." });
+                                                                                }}
+                                                                                onCancel={() => setShowPaymentHandler(null)}
+                                                                            />
                                                                         )}
 
                                                                         <div className="py-2">

@@ -30,6 +30,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
 interface Visit {
@@ -46,7 +47,7 @@ interface Visit {
   branches: { name: string } | null;
   receptionist: { full_name: string } | null;
   doctor: { full_name: string } | null;
-  periodontal_status: string | null;
+  periodontal_status: string[] | null;
   xray_urls: string[] | null;
   bills: {
     total_benefit_cost: number;
@@ -138,285 +139,161 @@ export default function AdminVisits() {
         return <Badge className="bg-blue-500/10 text-blue-600">With Doctor</Badge>;
       case "billed":
         return <Badge className="bg-orange-500/10 text-orange-600">Billed</Badge>;
-      case "completed":
-        return <Badge className="bg-success">Completed</Badge>;
-      case "cancelled":
-        return <Badge variant="destructive">Cancelled</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
   };
 
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-
-  const handleDeleteVisit = async (visitId: string) => {
-    try {
-      const { error } = await supabase.from("visits").delete().eq("id", visitId);
-      if (error) throw error;
-
-      // Log the action
-      const { error: logError } = await supabase.from("system_logs").insert({
-        action: "DELETE_VISIT",
-        details: { visit_id: visitId, deleted_by: (await supabase.auth.getUser()).data.user?.id },
-        user_id: (await supabase.auth.getUser()).data.user?.id
-      });
-      if (logError) console.error("Error logging action:", logError);
-
-      toast({
-        title: "Visit deleted",
-        description: "The visit record has been permanently removed.",
-      });
+  const deleteVisit = async (visitId: string) => {
+    const { error } = await (supabase as any).from("visits").delete().eq("id", visitId);
+    if (error) {
+      toast({ title: "Error deleting visit", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Visit deleted" });
       loadVisits();
-    } catch (error: any) {
-      toast({
-        title: "Error deleting visit",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setDeleteId(null);
     }
   };
 
-  const handleExport = () => {
-    const dataToExport = visits.map(v => {
-      const bill = v.bills?.[0];
-      return {
-        "Date": format(new Date(v.created_at), "yyyy-MM-dd HH:mm"),
-        "Member Name": v.members?.full_name || "N/A",
-        "Member Number": v.members?.member_number || "N/A",
-        "Branch": v.branches?.name || "N/A",
-        "Doctor": v.doctor?.full_name || "N/A",
-        "Receptionist": v.receptionist?.full_name || "N/A",
-        "Services": bill?.bill_items?.map((item: any) => item.service_name).join(", ") || "N/A",
-        "Diagnosis": v.diagnosis || "N/A",
-        "Status": v.status,
-        "Benefit Deducted": bill?.total_benefit_cost || 0,
-        "Branch Compensation": bill?.total_branch_compensation || 0,
-        "Profit/Loss": bill?.total_profit_loss || 0
-      };
-    });
-    exportToCsv("visits_export.csv", dataToExport);
-  };
+  const exportVisits = () => {
+    const exportData = visits.map((visit) => ({
+      Date: format(new Date(visit.created_at), "yyyy-MM-dd"),
+      Time: format(new Date(visit.created_at), "HH:mm"),
+      Patient: visit.members?.full_name || "",
+      MemberNumber: visit.members?.member_number || "",
+      Branch: visit.branches?.name || "",
+      Status: visit.status,
+      Diagnosis: visit.diagnosis || "",
+      TreatmentNotes: visit.treatment_notes || "",
+      PeriodontalStatus: visit.periodontal_status?.join(", ") || "",
+      BenefitDeducted: visit.benefit_deducted,
+      BranchCompensation: visit.branch_compensation,
+      ProfitLoss: visit.profit_loss,
+    }));
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+    exportToCsv(`visits_${format(new Date(), "yyyyMMdd")}`, exportData);
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-serif font-bold text-foreground">All Visits</h1>
-          <p className="text-muted-foreground">Comprehensive record of all processed dental services</p>
+          <h2 className="text-2xl font-bold">Visits</h2>
+          <p className="text-muted-foreground">Manage and review all patient visits.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Popover>
             <PopoverTrigger asChild>
-              <Button
-                id="date"
-                variant={"outline"}
-                className={cn(
-                  "w-[300px] justify-start text-left font-normal",
-                  !date && "text-muted-foreground"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
+              <Button variant="outline" className="gap-2">
+                <CalendarIcon className="w-4 h-4" />
                 {date?.from ? (
                   date.to ? (
-                    <>
-                      {format(date.from, "LLL dd, y")} -{" "}
-                      {format(date.to, "LLL dd, y")}
-                    </>
+                    `${format(date.from, "MMM dd")} - ${format(date.to, "MMM dd")}`
                   ) : (
-                    format(date.from, "LLL dd, y")
+                    format(date.from, "MMM dd, yyyy")
                   )
                 ) : (
-                  <span>Pick a date range</span>
+                  "Filter by date"
                 )}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="end">
               <Calendar
-                initialFocus
                 mode="range"
-                defaultMonth={date?.from}
                 selected={date}
                 onSelect={setDate}
                 numberOfMonths={2}
               />
             </PopoverContent>
           </Popover>
-          <Button variant="outline" onClick={handleExport}>
-            <Download className="mr-2 h-4 w-4" /> Export CSV
+          <Button variant="outline" className="gap-2" onClick={exportVisits}>
+            <Download className="w-4 h-4" /> Export CSV
           </Button>
         </div>
       </div>
 
-      <Card className="card-elevated overflow-hidden">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <History className="h-5 w-5 text-primary" />
-            Processed Services
-          </CardTitle>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Visit Records</CardTitle>
+          {loading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
         </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
+        <CardContent>
+          <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
-                  <TableHead>Member</TableHead>
+                  <TableHead>Patient</TableHead>
                   <TableHead>Branch</TableHead>
-                  <TableHead>Doctor</TableHead>
-                  <TableHead>Receptionist</TableHead>
-                  <TableHead>Services</TableHead>
-                  <TableHead>Diagnosis</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Benefit Deducted</TableHead>
-                  <TableHead>Branch Comp.</TableHead>
-                  <TableHead>Profit/Loss</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
+                  <TableHead>Benefit Used</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {visits.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
-                      No visits recorded yet.
+                {visits.map((visit) => (
+                  <TableRow key={visit.id}>
+                    <TableCell>
+                      <div className="font-medium">{format(new Date(visit.created_at), "MMM d, yyyy")}</div>
+                      <div className="text-xs text-muted-foreground">{format(new Date(visit.created_at), "HH:mm")}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium">{visit.members?.full_name}</div>
+                      <div className="text-xs text-muted-foreground">{visit.members?.member_number}</div>
+                    </TableCell>
+                    <TableCell>{visit.branches?.name}</TableCell>
+                    <TableCell>{getStatusBadge(visit.status)}</TableCell>
+                    <TableCell className="font-medium">KES {visit.benefit_deducted.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mr-2"
+                        onClick={() => {
+                          setSelectedVisit(visit);
+                          setDetailsOpen(true);
+                        }}
+                      >
+                        View
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="destructive" size="sm">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Visit</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This action cannot be undone. This will permanently delete the visit.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => deleteVisit(visit.id)}>
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </TableCell>
                   </TableRow>
-                ) : (
-                  visits.map((visit) => {
-                    const bill = visit.bills?.[0];
-                    const servicesList = bill?.bill_items?.map(item => item.service_name).join(", ") || "N/A";
-                    const benefitDeducted = bill?.total_benefit_cost || 0;
-                    const branchCompensation = bill?.total_branch_compensation || 0;
-                    const profitLoss = bill?.total_profit_loss || 0;
-
-                    return (
-                      <TableRow key={visit.id}>
-                        <TableCell>
-                          {format(new Date(visit.created_at), "MMM d, yyyy HH:mm")}
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{visit.members?.full_name}</p>
-                            <p className="text-xs text-muted-foreground font-mono">
-                              {visit.members?.member_number}
-                            </p>
-                          </div>
-                        </TableCell>
-                        <TableCell>{visit.branches?.name || "N/A"}</TableCell>
-                        <TableCell>{visit.doctor?.full_name || "N/A"}</TableCell>
-                        <TableCell>{visit.receptionist?.full_name || "N/A"}</TableCell>
-                        <TableCell className="max-w-[150px] truncate">{servicesList}</TableCell>
-                        <TableCell className="max-w-[150px]">
-                          <div className="space-y-2">
-                            <div className="truncate text-sm" title={visit.diagnosis || ''}>
-                              {visit.diagnosis || '-'}
-                            </div>
-                            {visit.xray_urls && visit.xray_urls.length > 0 && (
-                              <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide">
-                                {visit.xray_urls.map((url, idx) => (
-                                  <Dialog key={idx}>
-                                    <DialogTrigger asChild>
-                                      <div className="relative cursor-pointer group rounded border overflow-hidden h-8 w-8 flex-shrink-0 bg-slate-100">
-                                        <img src={url} alt="X-ray thumbnail" className="h-full w-full object-cover transition-opacity group-hover:opacity-80" />
-                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-white">
-                                          <ImageIcon className="h-3 w-3" />
-                                        </div>
-                                      </div>
-                                    </DialogTrigger>
-                                    <DialogContent className="max-w-4xl p-1 bg-black/90 border-0">
-                                      <DialogHeader className="hidden"><DialogTitle>X-Ray View</DialogTitle></DialogHeader>
-                                      <div className="flex items-center justify-center min-h-[50vh]">
-                                        <img src={url} alt="X-ray clinical view" className="max-h-[85vh] w-auto object-contain" />
-                                      </div>
-                                    </DialogContent>
-                                  </Dialog>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>{getStatusBadge(visit.status || "unknown")}</TableCell>
-                        <TableCell className="text-destructive">
-                          -KES {benefitDeducted.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-success">
-                          +KES {branchCompensation.toLocaleString()}
-                        </TableCell>
-                        <TableCell className={profitLoss >= 0 ? "text-success" : "text-destructive"}>
-                          KES {profitLoss.toLocaleString()}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-primary hover:bg-primary/10"
-                              onClick={() => {
-                                setSelectedVisit(visit);
-                                setDetailsOpen(true);
-                              }}
-                            >
-                              <History className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                              onClick={() => setDeleteId(visit.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
+                ))}
               </TableBody>
             </Table>
           </div>
         </CardContent>
       </Card>
 
-      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-        {/* ... (existing content) */}
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the visit record and associated billing information.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => deleteId && handleDeleteVisit(deleteId)}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Visit Details Modal */}
+      {/* Details Modal */}
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-serif">Visit Details</DialogTitle>
+            <DialogTitle className="text-xl">Visit Details</DialogTitle>
           </DialogHeader>
 
           {selectedVisit && (
-            <div className="space-y-8 py-4">
+            <div className="space-y-8">
               {/* Header Info */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 p-6 rounded-xl bg-slate-50 border shadow-sm">
                 <div>
@@ -447,10 +324,14 @@ export default function AdminVisits() {
                       <History className="w-5 h-5 text-primary" /> Clinical Assessment
                     </h3>
 
-                    {selectedVisit.periodontal_status && (
+                    {selectedVisit.periodontal_status && selectedVisit.periodontal_status.length > 0 && (
                       <div className="bg-primary/5 rounded-lg p-3 border border-primary/20">
                         <Label className="text-[10px] uppercase font-bold text-primary">Periodontal Status</Label>
-                        <p className="font-bold text-primary">{selectedVisit.periodontal_status.toUpperCase()}</p>
+                        <p className="font-bold text-primary">
+                          {selectedVisit.periodontal_status
+                            .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+                            .join(", ")}
+                        </p>
                       </div>
                     )}
 
@@ -518,47 +399,43 @@ export default function AdminVisits() {
               {/* Services & Billing */}
               <div className="space-y-4">
                 <h3 className="font-bold text-lg border-b pb-2">Services & Billing Summary</h3>
-                <Table className="border rounded-xl">
-                  <TableHeader className="bg-slate-50">
-                    <TableRow>
-                      <TableHead>Service Name</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {selectedVisit.bills?.[0]?.bill_items?.map((item, i) => (
-                      <TableRow key={i}>
-                        <TableCell className="font-medium">{item.service_name}</TableCell>
-                        <TableCell>
-                          {item.total_stages ? (
-                            <Badge variant="secondary" className="bg-blue-50 text-blue-700">
-                              Stage {item.current_stage} of {item.total_stages}
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline">Service Item</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right font-mono italic text-xs text-muted-foreground">Included in Total</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
 
-                <div className="flex justify-end pt-4">
-                  <div className="w-full sm:w-80 space-y-3 bg-slate-50 p-6 rounded-xl border shadow-sm">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Admin Profit/Loss:</span>
-                      <span className={cn("font-bold", (selectedVisit.bills?.[0]?.total_profit_loss || 0) >= 0 ? "text-success" : "text-destructive")}>
-                        KES {(selectedVisit.bills?.[0]?.total_profit_loss || 0).toLocaleString()}
-                      </span>
+                {selectedVisit.bills && selectedVisit.bills.length > 0 ? (
+                  <div className="grid sm:grid-cols-3 gap-4">
+                    <div className="p-4 bg-slate-50 rounded-xl border">
+                      <Label className="text-xs font-bold text-muted-foreground">Total Benefit Used</Label>
+                      <p className="text-2xl font-bold text-primary">KES {selectedVisit.bills[0].total_benefit_cost.toLocaleString()}</p>
                     </div>
-                    <div className="border-t pt-2 flex justify-between font-bold text-lg">
-                      <span>Benefit Deducted:</span>
-                      <span className="text-destructive">KES {(selectedVisit.bills?.[0]?.total_benefit_cost || 0).toLocaleString()}</span>
+                    <div className="p-4 bg-slate-50 rounded-xl border">
+                      <Label className="text-xs font-bold text-muted-foreground">Branch Compensation</Label>
+                      <p className="text-2xl font-bold text-green-700">KES {selectedVisit.bills[0].total_branch_compensation.toLocaleString()}</p>
+                    </div>
+                    <div className="p-4 bg-slate-50 rounded-xl border">
+                      <Label className="text-xs font-bold text-muted-foreground">Profit / Loss</Label>
+                      <p className={cn(
+                        "text-2xl font-bold",
+                        selectedVisit.bills[0].total_profit_loss >= 0 ? "text-emerald-700" : "text-red-600"
+                      )}>
+                        KES {selectedVisit.bills[0].total_profit_loss.toLocaleString()}
+                      </p>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <p className="text-muted-foreground">No billing information found for this visit.</p>
+                )}
+
+                {selectedVisit.bills && selectedVisit.bills[0]?.bill_items && selectedVisit.bills[0].bill_items.length > 0 && (
+                  <div className="mt-4">
+                    <Label className="text-sm font-bold">Services Provided</Label>
+                    <ul className="mt-2 space-y-2">
+                      {selectedVisit.bills[0].bill_items.map((item, idx) => (
+                        <li key={idx} className="p-3 rounded-lg bg-slate-50 border text-sm">
+                          {item.service_name}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             </div>
           )}

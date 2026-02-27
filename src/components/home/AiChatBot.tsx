@@ -23,6 +23,61 @@ interface Message {
     content: string;
 }
 
+function escapeHtml(input: string) {
+    return input
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function toSafeChatHtml(content: string) {
+    // Escape first (prevents any HTML injection), then apply a tiny subset of markdown.
+    const escaped = escapeHtml(content || "");
+    return escaped.replace(/\*\*(.*?)\*\*/g, "<b>$1</b>").replace(/\n/g, "<br />");
+}
+
+function getOfflineResponse(message: string) {
+    let fallbackResponse = "I'm here to help! ";
+    const msg = (message || "").toLowerCase();
+
+    if (msg.includes("register") || msg.includes("join")) {
+        fallbackResponse += "To join, click **'Get Started'** at the top of our page. It takes just a few minutes!";
+    } else if (msg.includes("500") || msg.includes("1000") || msg.includes("coverage")) {
+        fallbackResponse += "Our **2x Coverage** means every KES 500 you contribute gives you KES 1,000 in dental benefits instantly!";
+    } else if (msg.includes("branch") || msg.includes("location") || msg.includes("where")) {
+        fallbackResponse += "Our Head Office is in **Meru**, and we have branches expanding across Kenya. Contact us for the one nearest to you.";
+    } else if (msg.includes("contact") || msg.includes("phone") || msg.includes("email")) {
+        fallbackResponse += "You can reach us on **+254 710 500 500** or email **info@elephantdental.org**.";
+    } else {
+        fallbackResponse += "Please tell me what you need help with (registration, coverage, branches, or payments).";
+    }
+
+    return fallbackResponse;
+}
+
+async function invokeAiChatbot(params: { message: string; history: Message[] }) {
+    // Keep the UI responsive: if the function call hangs or errors, we fall back to offline.
+    const timeoutMs = 12000;
+
+    const timeout = new Promise<{ response: string }>((_resolve, reject) => {
+        const id = setTimeout(() => {
+            clearTimeout(id);
+            reject(new Error("Chat request timed out"));
+        }, timeoutMs);
+    });
+
+    const request = supabase.functions.invoke("ai-chatbot", {
+        body: { message: params.message, history: params.history },
+    }).then(({ data, error }) => {
+        if (error) throw error;
+        return data as { response?: string };
+    });
+
+    return Promise.race([request, timeout]);
+}
+
 export const AiChatBot = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [isMinimized, setIsMinimized] = useState(false);
@@ -67,18 +122,18 @@ export const AiChatBot = () => {
         setShowNudge(false);
 
         try {
-            const { data, error } = await supabase.functions.invoke("ai-chatbot", {
-                body: { message: messageText, history },
-            });
+            const data = await invokeAiChatbot({ message: messageText, history });
 
-            if (error) throw error;
+            const responseText = typeof data?.response === "string" && data.response.trim().length > 0
+                ? data.response
+                : getOfflineResponse(messageText);
 
-            setHistory([...newHistory, { role: "assistant", content: data.response }]);
+            setHistory([...newHistory, { role: "assistant", content: responseText }]);
         } catch (error) {
             console.error("Chat error:", error);
             setHistory([...newHistory, {
                 role: "assistant",
-                content: "Oops! I encountered an error. Please try again soon or contact support at +254 710 500 500."
+                content: getOfflineResponse(messageText)
             }]);
         } finally {
             setIsLoading(false);
@@ -173,9 +228,9 @@ export const AiChatBot = () => {
                                         </div>
                                         <div className="bg-white border border-slate-100 p-3 rounded-2xl rounded-tl-none shadow-sm max-w-[85%]">
                                             <p className="text-sm text-slate-800 leading-relaxed">
-                                                Jambo! I'm **Effie**, your virtual assistant at Elephant Dental. 🐘
+                                                Jambo! I'm <b>Effie</b>, your virtual assistant at Elephant Dental.
                                                 <br /><br />
-                                                I'm here to help you understand our **2x coverage**, register members, and find our locations.
+                                                I'm here to help you understand our <b>2x coverage</b>, register members, and find our locations.
                                                 <br /><br />
                                                 What would you like to know today?
                                             </p>
@@ -202,10 +257,7 @@ export const AiChatBot = () => {
                                                     ? "bg-emerald-600 text-white rounded-tr-none shadow-emerald-200"
                                                     : "bg-white border border-slate-100 text-slate-800 rounded-tl-none"
                                             )}>
-                                                <div dangerouslySetInnerHTML={{
-                                                    // Simple markdown support for bolding
-                                                    __html: msg.content.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br />')
-                                                }} />
+                                                <div dangerouslySetInnerHTML={{ __html: toSafeChatHtml(msg.content) }} />
                                             </div>
                                         </div>
                                     ))}

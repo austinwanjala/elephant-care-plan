@@ -106,6 +106,44 @@ async function sendSmsConfirmation(phone: string, message: string, token: string
   }
 }
 
+function resolveMpesaTransactionCode(params: {
+  eventData: any
+  body: any
+  resourceId: string
+}) {
+  const { eventData, body, resourceId } = params
+
+  // KopoKopo payloads can differ by event version; try multiple known locations.
+  // Goal: capture the REAL M-Pesa transaction code (e.g. "QKxxxxxxx") if provided.
+  const candidates = [
+    eventData?.mpesa_reference,
+    eventData?.transaction_reference,
+    eventData?.receipt_number,
+    eventData?.payment_method_reference,
+
+    // Sometimes nested
+    eventData?.payment_method?.reference,
+    eventData?.payment_method?.transaction_reference,
+    eventData?.sender?.reference,
+    eventData?.sender?.transaction_reference,
+
+    // Some payloads place it in metadata
+    eventData?.metadata?.mpesa_reference,
+    eventData?.metadata?.transaction_reference,
+
+    // Fallbacks (NOT always the M-Pesa code)
+    eventData?.external_reference,
+    eventData?.reference,
+    body?.data?.attributes?.reference,
+
+    // Last resort: resource id
+    resourceId,
+  ]
+
+  const val = candidates.find((x) => typeof x === 'string' && x.trim().length > 0)
+  return val ? String(val).trim() : null
+}
+
 serve(async (req) => {
   const { method, url } = req;
   const path = new URL(url).pathname;
@@ -164,14 +202,11 @@ serve(async (req) => {
         // Log all available fields to find where the M-PESA code is hiding
         console.log("[kopokopo] All attributes keys:", Object.keys(eventData));
 
-        // Exhaustive search for the M-PESA transaction code
-        const mpesaCode =
-          eventData.reference ||
-          eventData.mpesa_reference ||
-          eventData.external_reference ||
-          eventData.receipt_number ||
-          eventData.transaction_reference ||
-          body.data?.id; // Fallback to raw resource ID if others fail
+        const mpesaCode = resolveMpesaTransactionCode({
+          eventData,
+          body,
+          resourceId,
+        })
 
         console.log(`[kopokopo] Resolved Transaction Reference: ${mpesaCode} for resource: ${resourceId}`);
 
@@ -322,7 +357,7 @@ serve(async (req) => {
         },
         metadata: {
           member_id: memberId,
-          reference: invoiceNumber || `REF-${Date.now()}`
+          reference: invoiceNumber || `REF-${Date.now()}` 
         },
         _links: {
           callback_url: callbackUrl
@@ -388,7 +423,9 @@ serve(async (req) => {
 
       // Auto-update if successful during manual check
       if (data.data?.attributes?.status === 'Success') {
-        const mpesaCode = data.data.attributes.reference;
+        const eventData = data.data?.attributes || data.data || {}
+        const mpesaCode = resolveMpesaTransactionCode({ eventData, body: data, resourceId })
+
         await supabase.from("payments").update({
           status: "completed",
           payment_date: new Date().toISOString(),

@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ArrowLeft, Check, Save, Eye, EyeOff, Send } from "lucide-react";
+import { Loader2, ArrowLeft, Check, Eye, EyeOff, Send } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 const ForgotPasswordForm = () => {
@@ -87,54 +87,50 @@ const Login = () => {
   const { toast } = useToast();
   const { settings } = useSystemSettings();
 
+  const resolveRoleFromProfiles = async (userId: string) => {
+    // Prefer staff/marketer/member based on existing profile rows.
+    const [staffRes, marketerRes, memberRes] = await Promise.all([
+      supabase.from("staff").select("role").eq("user_id", userId).maybeSingle(),
+      supabase.from("marketers").select("id").eq("user_id", userId).maybeSingle(),
+      supabase.from("members").select("id").eq("user_id", userId).maybeSingle(),
+    ]);
+
+    // Staff tables may not always have role populated for legacy users.
+    const staffRole = (staffRes.data as any)?.role as string | undefined;
+
+    if (staffRole && staffRole !== "staff") return staffRole;
+    if (marketerRes.data) return "marketer";
+    if (memberRes.data) return "member";
+    return "member";
+  };
+
   const checkUserRoleAndNavigate = async (userId: string) => {
     try {
       let role: string | null = null;
-      let attempts = 0;
-      const maxAttempts = 5;
-      const delayMs = 500;
 
-      while (attempts < maxAttempts && role === null) {
-        const { data: rolesData, error: rolesError } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", userId);
+      // 1) Try read roles
+      const { data: rolesData, error: rolesError } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId);
 
-        if (rolesError) {
-          console.error("Error fetching roles:", rolesError);
-        } else if (rolesData && rolesData.length > 0) {
-          const roles = rolesData.map((r) => r.role);
-          if (roles.includes("super_admin")) {
-            role = "super_admin";
-          } else if (roles.includes("admin")) {
-            role = "admin";
-          } else {
-            role = roles[0];
-          }
-          break;
-        }
-
-        attempts++;
-        if (attempts < maxAttempts) {
-          await new Promise((resolve) => setTimeout(resolve, delayMs));
-        }
+      if (!rolesError && rolesData && rolesData.length > 0) {
+        const roles = rolesData.map((r) => r.role);
+        if (roles.includes("super_admin")) role = "super_admin";
+        else if (roles.includes("admin")) role = "admin";
+        else role = roles[0];
       }
 
-      // Self-heal: if user exists but is missing a role row, create it based on their profile
+      // 2) If missing role row, self-heal based on existing profile tables
       if (!role) {
-        const { error: ensureError } = await supabase.rpc("ensure_portal_role");
-        if (!ensureError) {
-          const { data: rolesData2 } = await supabase
-            .from("user_roles")
-            .select("role")
-            .eq("user_id", userId);
+        const inferred = await resolveRoleFromProfiles(userId);
+        const { error: insertErr } = await supabase.from("user_roles").insert({
+          user_id: userId,
+          role: inferred as any,
+        } as any);
 
-          if (rolesData2 && rolesData2.length > 0) {
-            const roles = rolesData2.map((r) => r.role);
-            if (roles.includes("super_admin")) role = "super_admin";
-            else if (roles.includes("admin")) role = "admin";
-            else role = roles[0];
-          }
+        if (!insertErr) {
+          role = inferred;
         }
       }
 
@@ -170,7 +166,7 @@ const Login = () => {
         navigate("/auditor");
       } else if (role === "marketer") {
         navigate("/marketer");
-      } else if (role === "member") {
+      } else {
         const { data: memberProfile } = await supabase
           .from("members")
           .select("is_active, membership_category_id")
@@ -182,8 +178,6 @@ const Login = () => {
         } else {
           navigate("/dashboard/scheme-selection");
         }
-      } else {
-        navigate("/");
       }
     } catch (error: any) {
       toast({

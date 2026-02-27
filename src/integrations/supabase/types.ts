@@ -1595,6 +1595,7 @@ export type Database = {
     }
     Functions: {
       apply_yearly_rollover: { Args: never; Returns: undefined }
+      ensure_portal_role: { Args: never; Returns: Database["public"]["Enums"]["app_role"] }
       finalize_bill: {
         Args: { _bill_id: string; _receptionist_id: string }
         Returns: undefined

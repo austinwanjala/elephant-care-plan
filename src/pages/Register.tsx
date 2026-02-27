@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ArrowLeft, UserPlus, Search, Plus, Trash, Users, CreditCard } from "lucide-react";
+import { Loader2, ArrowLeft, UserPlus, Plus, Trash, Users } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -80,7 +80,6 @@ const Register = () => {
   });
   const [loading, setLoading] = useState(false);
 
-  // Load persisted data on mount
   useEffect(() => {
     const savedData = localStorage.getItem("registration_form_data");
     const savedReferral = localStorage.getItem("registration_referral_source");
@@ -93,7 +92,6 @@ const Register = () => {
     if (savedDependants) setDependants(JSON.parse(savedDependants));
   }, []);
 
-  // Persist data on change
   useEffect(() => {
     localStorage.setItem("registration_form_data", JSON.stringify(formData));
   }, [formData]);
@@ -193,105 +191,73 @@ const Register = () => {
     setLoading(true);
 
     try {
-      // 1. Sign up the user using the Admin Edge Function to bypass email confirmation
-      const { data: authData, error: authError } = await supabase.functions.invoke("admin-create-user", {
-        body: {
-          email: formData.email,
-          password: formData.password,
-          metadata: {
-            role: 'member',
+      const signUpRes = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            role: "member",
             full_name: formData.fullName,
             phone: formData.phone,
             id_number: formData.idNumber,
-            dob: formData.dob, // Include DOB
+            dob: formData.dob,
             marketer_id: selectedMarketer?.id || null,
             marketer_code: selectedMarketer?.code || null,
-            dependants: dependants // Also store as JSON for backward compatibility/reference
-          }
-        }
+            dependants,
+          },
+        },
       });
 
-      if (authError) {
-        const errorData = await authError.context?.json().catch(() => ({}));
-        throw new Error(errorData?.error || authError.message);
-      }
+      if (signUpRes.error) throw signUpRes.error;
 
-      if (!authData.user) throw new Error("Registration failed. Please try again.");
+      // If email confirmations are disabled, Supabase returns a session.
+      // If not, we attempt a login to keep the flow smooth.
+      let signedInUserId = signUpRes.data.session?.user.id || null;
 
-      // 2. Insert dependants properly into table
-      if (dependants.length > 0) {
-        // We need to wait a small bit for the trigger to finish insert
-        // The trigger on_auth_user_created handles creating the member record
-
-        let memberId: string | null = null;
-        let retries = 5;
-
-        while (retries > 0 && !memberId) {
-          const { data: memberData } = await supabase
-            .from("members")
-            .select("id")
-            .eq("user_id", authData.user.id)
-            .maybeSingle();
-
-          if (memberData) {
-            memberId = memberData.id;
-          } else {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            retries--;
-          }
-        }
-
-        if (!memberId) {
-          console.error("Could not find member record after registration (retries exhausted)");
-        } else {
-          const depsToInsert = dependants.map(d => ({
-            member_id: memberId,
-            full_name: d.fullName,
-            relationship: d.relationship,
-            dob: d.dob,
-            id_number: d.idNumber,
-            gender: d.gender,
-            is_active: true
-          }));
-
-          const { error: depError } = await supabase.from("dependants").insert(depsToInsert);
-
-          if (depError) {
-            console.error("Error adding dependants:", depError);
-          } else {
-            // Log audit
-            await supabase.from("system_logs").insert({
-              action: "dependant_added_via_registration",
-              details: {
-                member_id: memberId,
-                count: dependants.length,
-                dependants: dependants.map(d => d.fullName)
-              }
-            });
-          }
-        }
-      }
-
-      // 3. Send Welcome SMS
-      try {
-        await supabase.functions.invoke('send-sms', {
-          body: {
-            type: 'welcome',
-            phone: formData.phone,
-            data: { name: formData.fullName }
-          }
+      if (!signedInUserId) {
+        const signInRes = await supabase.auth.signInWithPassword({
+          email: formData.email,
+          password: formData.password,
         });
-      } catch (smsErr) {
-        console.error("Failed to send Welcome SMS:", smsErr);
+
+        if (!signInRes.error && signInRes.data.user) {
+          signedInUserId = signInRes.data.user.id;
+        }
       }
 
-      toast({
-        title: "Registration Successful",
-        description: "Your account has been created. You can now log in.",
-      });
+      if (signedInUserId) {
+        await supabase.rpc("ensure_portal_role");
 
-      clearPersistedData();
-      navigate("/login");
+        // Send Welcome SMS (best-effort)
+        try {
+          await supabase.functions.invoke("send-sms", {
+            body: {
+              type: "welcome",
+              phone: formData.phone,
+              data: { name: formData.fullName },
+            },
+          });
+        } catch (smsErr) {
+          console.error("Failed to send Welcome SMS:", smsErr);
+        }
+
+        toast({
+          title: "Registration Successful",
+          description: "Welcome! Redirecting you to your dashboard...",
+        });
+
+        clearPersistedData();
+        navigate("/dashboard/scheme-selection");
+      } else {
+        // Email confirmation likely enabled
+        toast({
+          title: "Registration Successful",
+          description: "Your account has been created. Please check your email to confirm, then log in.",
+        });
+
+        clearPersistedData();
+        navigate("/login");
+      }
     } catch (error: any) {
       toast({
         title: "Registration failed",
@@ -303,9 +269,8 @@ const Register = () => {
     }
   };
 
-  const filteredMarketers = marketers.filter(m =>
-    m.full_name.toLowerCase().includes(marketerSearch.toLowerCase()) ||
-    m.code.toLowerCase().includes(marketerSearch.toLowerCase())
+  const filteredMarketers = marketers.filter(
+    (m) => m.full_name.toLowerCase().includes(marketerSearch.toLowerCase()) || m.code.toLowerCase().includes(marketerSearch.toLowerCase())
   );
 
   return (
@@ -324,7 +289,6 @@ const Register = () => {
             <span className="text-xl font-serif font-bold text-foreground">{settings.app_name || "Elephant Dental"}</span>
           </div>
 
-
           <h1 className="text-3xl font-serif font-bold text-foreground mb-2">Member Registration</h1>
           <p className="text-muted-foreground mb-8">Join the Elephant Care Plan today.</p>
 
@@ -336,14 +300,14 @@ const Register = () => {
               onClick={async () => {
                 try {
                   const { error } = await supabase.auth.signInWithOAuth({
-                    provider: 'google',
+                    provider: "google",
                     options: {
                       redirectTo: `${window.location.origin}/login`,
                       queryParams: {
-                        access_type: 'offline',
-                        prompt: 'consent',
-                      }
-                    }
+                        access_type: "offline",
+                        prompt: "consent",
+                      },
+                    },
                   });
 
                   if (error) throw error;
@@ -351,14 +315,26 @@ const Register = () => {
                   toast({
                     title: "Google Registration Failed",
                     description: error.message,
-                    variant: "destructive"
+                    variant: "destructive",
                   });
                 }
               }}
             >
               <div className="flex items-center justify-center gap-2 text-base">
-                <svg className="h-5 w-5" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512">
-                  <path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path>
+                <svg
+                  className="h-5 w-5"
+                  aria-hidden="true"
+                  focusable="false"
+                  data-prefix="fab"
+                  data-icon="google"
+                  role="img"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 488 512"
+                >
+                  <path
+                    fill="currentColor"
+                    d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"
+                  ></path>
                 </svg>
                 Sign up with Google
               </div>
@@ -375,7 +351,6 @@ const Register = () => {
           </div>
 
           <form onSubmit={handleRegister} className="space-y-8">
-            {/* Personal Details */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold border-b pb-2">Personal Details</h3>
               <div className="grid md:grid-cols-2 gap-6">
@@ -395,19 +370,10 @@ const Register = () => {
                   <div className="flex justify-between items-center">
                     <Label htmlFor="dob">Date of Birth</Label>
                     {formData.dob && (
-                      <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                        Age: {calculateAge(formData.dob)} yrs
-                      </span>
+                      <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">Age: {calculateAge(formData.dob)} yrs</span>
                     )}
                   </div>
-                  <Input
-                    id="dob"
-                    type="date"
-                    value={formData.dob}
-                    onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
-                    required
-                    max={new Date().toISOString().split('T')[0]}
-                  />
+                  <Input id="dob" type="date" value={formData.dob} onChange={(e) => setFormData({ ...formData, dob: e.target.value })} required max={new Date().toISOString().split("T")[0]} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="email">Email Address</Label>
@@ -420,7 +386,6 @@ const Register = () => {
               </div>
             </div>
 
-            {/* Referral Section */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold border-b pb-2">Referral Information</h3>
               <div className="space-y-2">
@@ -444,17 +409,10 @@ const Register = () => {
               </div>
             </div>
 
-            {/* Dependants Section */}
             <div className="space-y-4">
               <div className="flex items-center justify-between border-b pb-2">
                 <h3 className="text-lg font-semibold">Add Dependants (Optional)</h3>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsDependantModalOpen(true)}
-                  disabled={dependants.length >= 5}
-                >
+                <Button type="button" variant="outline" size="sm" onClick={() => setIsDependantModalOpen(true)} disabled={dependants.length >= 5}>
                   <Plus className="h-4 w-4 mr-1" /> Add Dependant
                 </Button>
               </div>
@@ -469,7 +427,7 @@ const Register = () => {
                         <div>
                           <p className="text-sm font-medium">{dep.fullName}</p>
                           <p className="text-xs text-muted-foreground">
-                            {dep.relationship} • {calculateAge(dep.dob)} yrs • {dep.gender} • ID: {dep.idNumber || 'N/A'}
+                            {dep.relationship} • {calculateAge(dep.dob)} yrs • {dep.gender} • ID: {dep.idNumber || "N/A"}
                           </p>
                         </div>
                       </div>
@@ -482,7 +440,6 @@ const Register = () => {
               )}
             </div>
 
-            {/* Consents */}
             <div className="space-y-4 pt-6 border-t border-border">
               <div className="flex items-start space-x-3">
                 <Checkbox id="processing" checked={consents.processing} onCheckedChange={(checked) => setConsents({ ...consents, processing: !!checked })} />
@@ -511,122 +468,101 @@ const Register = () => {
         </div>
       </div>
 
-      {/* Marketer Selection Modal */}
       <Dialog open={isMarketerModalOpen} onOpenChange={setIsMarketerModalOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Select Marketer</DialogTitle>
             <DialogDescription>Choose the agent who referred you to Elephant Dental.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by name or code..."
-                className="pl-9"
-                value={marketerSearch}
-                onChange={(e) => setMarketerSearch(e.target.value)}
-              />
-            </div>
-            <div className="max-h-[300px] overflow-y-auto border rounded-md divide-y">
+
+          <div className="space-y-3">
+            <Input placeholder="Search by name or code" value={marketerSearch} onChange={(e) => setMarketerSearch(e.target.value)} />
+
+            <div className="max-h-72 overflow-y-auto border rounded-md">
               {loadingMarketers ? (
-                <div className="p-8 text-center">
-                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
-                  <p className="text-sm text-muted-foreground mt-2">Loading marketers...</p>
-                </div>
+                <div className="p-4 text-sm text-muted-foreground">Loading...</div>
               ) : filteredMarketers.length === 0 ? (
-                <p className="p-4 text-center text-muted-foreground">No active marketers found.</p>
+                <div className="p-4 text-sm text-muted-foreground">No marketers found.</div>
               ) : (
                 filteredMarketers.map((m) => (
-                  <div
+                  <button
                     key={m.id}
-                    className="p-3 hover:bg-muted cursor-pointer flex justify-between items-center"
+                    type="button"
+                    className="w-full text-left p-3 hover:bg-muted border-b last:border-b-0"
                     onClick={() => {
                       setSelectedMarketer(m);
                       setIsMarketerModalOpen(false);
                     }}
                   >
-                    <div>
-                      <p className="font-medium">{m.full_name}</p>
-                      <p className="text-xs text-muted-foreground">{m.code}</p>
-                    </div>
-                    <Button size="sm" variant="ghost">Select</Button>
-                  </div>
+                    <div className="font-medium">{m.full_name}</div>
+                    <div className="text-xs text-muted-foreground">Code: {m.code}</div>
+                  </button>
                 ))
               )}
             </div>
           </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setReferralSource("");
+                setSelectedMarketer(null);
+                setIsMarketerModalOpen(false);
+              }}
+            >
+              Cancel
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Dependant Modal */}
       <Dialog open={isDependantModalOpen} onOpenChange={setIsDependantModalOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Add Dependant</DialogTitle>
-            <DialogDescription>Enter the details of your family member.</DialogDescription>
+            <DialogDescription>Enter dependant details.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+
+          <div className="grid gap-4 py-2">
             <div className="space-y-2">
               <Label>Full Name</Label>
-              <Input
-                placeholder="Dependant's Name"
-                value={newDep.fullName}
-                onChange={(e) => setNewDep({ ...newDep, fullName: e.target.value })}
-              />
+              <Input value={newDep.fullName} onChange={(e) => setNewDep({ ...newDep, fullName: e.target.value })} />
             </div>
             <div className="space-y-2">
               <Label>Relationship</Label>
-              <Input
-                placeholder="e.g. Child, Spouse"
-                value={newDep.relationship}
-                onChange={(e) => setNewDep({ ...newDep, relationship: e.target.value })}
-              />
+              <Input value={newDep.relationship} onChange={(e) => setNewDep({ ...newDep, relationship: e.target.value })} placeholder="e.g. Spouse, Child" />
             </div>
             <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <Label>Date of Birth</Label>
-                {newDep.dob && (
-                  <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                    Age: {calculateAge(newDep.dob)} yrs
-                  </span>
-                )}
-              </div>
-              <Input
-                type="date"
-                value={newDep.dob}
-                onChange={(e) => setNewDep({ ...newDep, dob: e.target.value })}
-              />
+              <Label>Date of Birth</Label>
+              <Input type="date" value={newDep.dob} onChange={(e) => setNewDep({ ...newDep, dob: e.target.value })} max={new Date().toISOString().split("T")[0]} />
             </div>
             <div className="space-y-2">
-              <Label>Birth Cert / Student ID Number</Label>
-              <div className="relative">
-                <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="ID or Certificate Number"
-                  className="pl-9"
-                  value={newDep.idNumber}
-                  onChange={(e) => setNewDep({ ...newDep, idNumber: e.target.value })}
-                />
-              </div>
+              <Label>ID Number (Optional)</Label>
+              <Input value={newDep.idNumber} onChange={(e) => setNewDep({ ...newDep, idNumber: e.target.value })} />
             </div>
             <div className="space-y-2">
               <Label>Gender</Label>
               <Select value={newDep.gender} onValueChange={(v) => setNewDep({ ...newDep, gender: v })}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select gender" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="male">Male</SelectItem>
                   <SelectItem value="female">Female</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDependantModalOpen(false)}>Cancel</Button>
-            <Button onClick={addDependant}>Add Dependant</Button>
+            <Button type="button" variant="outline" onClick={() => setIsDependantModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={addDependant} className="btn-primary">
+              Add Dependant
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

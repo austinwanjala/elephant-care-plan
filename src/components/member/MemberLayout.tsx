@@ -25,7 +25,6 @@ export function MemberLayout({ children }: MemberLayoutProps) {
   useEffect(() => {
     checkAuthAndMaintenance();
 
-    // Subscribe to maintenance mode changes
     const channel = supabase
       .channel('maintenance_updates')
       .on(
@@ -48,7 +47,6 @@ export function MemberLayout({ children }: MemberLayoutProps) {
   const checkAuthAndMaintenance = async () => {
     setLoading(true);
 
-    // 1. Check Maintenance Mode
     const { data: maintenanceData } = await supabase
       .from("system_settings")
       .select("value")
@@ -64,51 +62,54 @@ export function MemberLayout({ children }: MemberLayoutProps) {
       return;
     }
 
-    // 2. Check Role
-    const { data: roleData, error: roleError } = await supabase
+    // Role (self-heal if missing)
+    let role = (await supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", user.id)
-      .maybeSingle();
+      .maybeSingle()).data?.role as string | undefined;
 
-    if (roleError) {
-      toast({ title: "Error fetching role", description: roleError.message, variant: "destructive" });
-      navigate("/");
-      setLoading(false);
-      return;
+    if (!role) {
+      await supabase.rpc("ensure_portal_role");
+      role = (await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .maybeSingle()).data?.role as string | undefined;
     }
 
-    // If maintenance is ON and user is NOT admin/super_admin, redirect to maintenance page
-    // @ts-ignore
-    if (isMaintenance && roleData?.role !== "admin" && roleData?.role !== "super_admin") {
+    // Maintenance redirect for non-admins
+    if (isMaintenance && role !== "admin" && role !== "super_admin") {
       navigate("/maintenance");
       setLoading(false);
       return;
     }
 
     // Role-based redirects for non-members
-    if (roleData?.role === "receptionist") { navigate("/reception"); setLoading(false); return; }
-    if (roleData?.role === "doctor") { navigate("/doctor"); setLoading(false); return; }
-    if (roleData?.role === "branch_director") { navigate("/director"); setLoading(false); return; }
-    if (roleData?.role === "marketer") { navigate("/marketer"); setLoading(false); return; }
-    // @ts-ignore
-    if (roleData?.role === "finance") { navigate("/finance"); setLoading(false); return; }
+    if (role === "receptionist") { navigate("/reception"); setLoading(false); return; }
+    if (role === "doctor") { navigate("/doctor"); setLoading(false); return; }
+    if (role === "branch_director") { navigate("/director"); setLoading(false); return; }
+    if (role === "marketer") { navigate("/marketer"); setLoading(false); return; }
+    if (role === "finance") { navigate("/finance"); setLoading(false); return; }
+    if (role === "auditor") { navigate("/auditor"); setLoading(false); return; }
 
-    // 3. Load Member Details
-    const { data: memberDetails, error: memberError } = await supabase
+    // Ensure member profile exists (fixes "You don't have member privileges")
+    let memberDetails = (await supabase
       .from("members")
       .select("full_name")
       .eq("user_id", user.id)
-      .maybeSingle();
+      .maybeSingle()).data as MemberInfo | null;
 
-    if (memberError) {
-      toast({ title: "Error loading member details", description: memberError.message, variant: "destructive" });
-      setLoading(false);
-      return;
+    if (!memberDetails) {
+      await supabase.rpc("ensure_member_profile");
+      memberDetails = (await supabase
+        .from("members")
+        .select("full_name")
+        .eq("user_id", user.id)
+        .maybeSingle()).data as MemberInfo | null;
     }
 
-    // @ts-ignore
-    if (!memberDetails && roleData?.role !== "admin" && roleData?.role !== "super_admin") {
+    if (!memberDetails) {
       toast({ title: "Access denied", description: "You don't have member privileges", variant: "destructive" });
       navigate("/");
       setLoading(false);

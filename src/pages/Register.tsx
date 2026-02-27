@@ -210,54 +210,21 @@ const Register = () => {
 
       if (signUpRes.error) throw signUpRes.error;
 
-      // If email confirmations are disabled, Supabase returns a session.
-      // If not, we attempt a login to keep the flow smooth.
-      let signedInUserId = signUpRes.data.session?.user.id || null;
-
-      if (!signedInUserId) {
-        const signInRes = await supabase.auth.signInWithPassword({
-          email: formData.email,
-          password: formData.password,
-        });
-
-        if (!signInRes.error && signInRes.data.user) {
-          signedInUserId = signInRes.data.user.id;
-        }
+      // Always route to login after registration (per requirement)
+      // and clear any session that might have been created.
+      try {
+        await supabase.auth.signOut();
+      } catch {
+        // ignore
       }
 
-      if (signedInUserId) {
-        await supabase.rpc("ensure_portal_role");
+      toast({
+        title: "Registration Successful",
+        description: "Your account has been created. Please log in with your email and password.",
+      });
 
-        // Send Welcome SMS (best-effort)
-        try {
-          await supabase.functions.invoke("send-sms", {
-            body: {
-              type: "welcome",
-              phone: formData.phone,
-              data: { name: formData.fullName },
-            },
-          });
-        } catch (smsErr) {
-          console.error("Failed to send Welcome SMS:", smsErr);
-        }
-
-        toast({
-          title: "Registration Successful",
-          description: "Welcome! Redirecting you to your dashboard...",
-        });
-
-        clearPersistedData();
-        navigate("/dashboard/scheme-selection");
-      } else {
-        // Email confirmation likely enabled
-        toast({
-          title: "Registration Successful",
-          description: "Your account has been created. Please check your email to confirm, then log in.",
-        });
-
-        clearPersistedData();
-        navigate("/login");
-      }
+      clearPersistedData();
+      navigate("/login");
     } catch (error: any) {
       toast({
         title: "Registration failed",

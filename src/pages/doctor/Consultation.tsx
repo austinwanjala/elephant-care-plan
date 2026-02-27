@@ -226,7 +226,7 @@ export default function Consultation() {
 
             if (visitsData) setPastVisits(visitsData);
 
-            let recordsQuery = supabase
+            let recordsQuery = (supabase as any)
                 .from("dental_records")
                 .select("tooth_number, status, condition, color, visit_id")
                 .eq("member_id", data.member_id);
@@ -406,7 +406,7 @@ export default function Consultation() {
         if (consultationMode === 'diagnosis') {
             // Check if tooth already has a diagnosis
             if (existingConditions[toothId]) {
-                toast({ title: "Locked", description: "This tooth has already been diagnosed and its condition cannot be changed.", variant: "secondary" });
+                toast({ title: "Locked", description: "This tooth has already been diagnosed and its condition cannot be changed.", variant: "default" });
                 return;
             }
 
@@ -1012,7 +1012,7 @@ export default function Consultation() {
             checkQuery = checkQuery.is("dependant_id", null);
         }
 
-        const { data: existingVisits, error: checkError } = await checkQuery;
+        const { data: existingVisits, error: checkError } = await (checkQuery as any);
 
         if (checkError) {
             toast({ title: "Error checking limits", description: checkError.message, variant: "destructive" });

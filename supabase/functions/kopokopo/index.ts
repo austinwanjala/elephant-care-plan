@@ -106,6 +106,13 @@ async function sendSmsConfirmation(phone: string, message: string, token: string
   }
 }
 
+function extractMpesaReceiptFromText(text: string) {
+  // Typical M-Pesa receipt / transaction code is 10 chars (often starts with 2 letters).
+  // Example commonly looks like: QK12ABCDEF
+  const match = text.toUpperCase().match(/\b([A-Z]{2}[0-9A-Z]{8})\b/);
+  return match?.[1] ?? null;
+}
+
 function resolveMpesaTransactionCode(params: {
   eventData: any
   body: any
@@ -113,9 +120,7 @@ function resolveMpesaTransactionCode(params: {
 }) {
   const { eventData, body, resourceId } = params
 
-  // KopoKopo payloads can differ by event version; try multiple known locations.
-  // Goal: capture the REAL M-Pesa transaction code (e.g. "QKxxxxxxx") if provided.
-  const candidates = [
+  const likelyReceiptFields = [
     eventData?.mpesa_reference,
     eventData?.transaction_reference,
     eventData?.receipt_number,
@@ -130,18 +135,39 @@ function resolveMpesaTransactionCode(params: {
     // Some payloads place it in metadata
     eventData?.metadata?.mpesa_reference,
     eventData?.metadata?.transaction_reference,
-
-    // Fallbacks (NOT always the M-Pesa code)
-    eventData?.external_reference,
-    eventData?.reference,
-    body?.data?.attributes?.reference,
-
-    // Last resort: resource id
-    resourceId,
   ]
 
-  const val = candidates.find((x) => typeof x === 'string' && x.trim().length > 0)
-  return val ? String(val).trim() : null
+  for (const val of likelyReceiptFields) {
+    if (typeof val !== 'string') continue
+    const receipt = extractMpesaReceiptFromText(val.trim())
+    if (receipt) return receipt
+  }
+
+  // If KopoKopo includes the raw M-Pesa message/description, extract the receipt from there.
+  const likelyMessageFields = [
+    eventData?.message,
+    eventData?.description,
+    eventData?.status_message,
+    eventData?.status_reason,
+    eventData?.metadata?.message,
+    eventData?.metadata?.mpesa_message,
+    eventData?.metadata?.mpesaMessage,
+    body?.data?.attributes?.message,
+    body?.data?.attributes?.description,
+  ]
+
+  for (const val of likelyMessageFields) {
+    if (typeof val !== 'string') continue
+    const receipt = extractMpesaReceiptFromText(val)
+    if (receipt) return receipt
+  }
+
+  // We only want the M-Pesa receipt code; don't fall back to KopoKopo resource ids.
+  console.warn("[kopokopo] Could not resolve M-Pesa receipt code from payload", {
+    resourceId,
+    event: body?.event,
+  })
+  return null
 }
 
 serve(async (req) => {
@@ -208,7 +234,7 @@ serve(async (req) => {
           resourceId,
         })
 
-        console.log(`[kopokopo] Resolved Transaction Reference: ${mpesaCode} for resource: ${resourceId}`);
+        console.log(`[kopokopo] Resolved M-Pesa receipt: ${mpesaCode} for resource: ${resourceId}`);
 
         const { data: payment, error: pError } = await supabase
           .from("payments")
@@ -249,7 +275,7 @@ serve(async (req) => {
             await supabase.from("notifications").insert({
               recipient_id: memberData.user_id,
               title: "Payment Received",
-              message: `Your payment of KES ${payment.amount} (Ref: ${mpesaCode}) has been processed successfully.`,
+              message: `Your payment of KES ${payment.amount} (Ref: ${mpesaCode || 'N/A'}) has been processed successfully.`,
               type: "success"
             });
           }
@@ -275,7 +301,7 @@ serve(async (req) => {
 
               // Fallback to internal KopoKopo SMS helper if central fails
               const smsToken = await getAccessToken();
-              const smsMessage = `Confirmed! We have received your payment of KES ${payment.amount} (Ref: ${mpesaCode}). Thank you!`;
+              const smsMessage = `Confirmed! We have received your payment of KES ${payment.amount} (Ref: ${mpesaCode || 'N/A'}). Thank you!`;
               await sendSmsConfirmation(targetPhone, smsMessage, smsToken);
             }
           }
@@ -292,7 +318,7 @@ serve(async (req) => {
               const staffNotifs = branchStaff.map((s: { user_id: string }) => ({
                 recipient_id: s.user_id,
                 title: "New Payment Received",
-                message: `Payment of KES ${payment.amount} received from ${memberData.full_name}. Ref: ${mpesaCode}.`,
+                message: `Payment of KES ${payment.amount} received from ${memberData.full_name}. Ref: ${mpesaCode || 'N/A'}.`,
                 type: "info"
               }));
               await supabase.from("notifications").insert(staffNotifs).catch((err: Error) => console.error("[kopokopo] Staff notif error:", err));

@@ -1603,6 +1603,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      ensure_member_dependants_from_metadata: { Args: never; Returns: number }
       ensure_member_profile: { Args: never; Returns: string }
       ensure_portal_role: { Args: never; Returns: Database["public"]["Enums"]["app_role"] }
       finalize_bill: {

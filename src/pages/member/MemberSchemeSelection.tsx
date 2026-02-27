@@ -103,6 +103,17 @@ const MemberSchemeSelection = () => {
     setSubmitting(true);
 
     try {
+      // Save scheme selection before initiating payment
+      const { error: schemeErr } = await supabase
+        .from("members")
+        .update({
+          membership_category_id: selectedCategory.id,
+          scheme_selected: true,
+        })
+        .eq("id", member.id);
+
+      if (schemeErr) throw schemeErr;
+
       const totalPaymentAmount = selectedCategory.payment_amount + selectedCategory.registration_fee + selectedCategory.management_fee;
 
       const response = await kopokopoService.initiateStkPush({
@@ -163,7 +174,7 @@ const MemberSchemeSelection = () => {
           return;
         }
 
-        const { data: payment } = await supabase
+        const { data: payment } = await (supabase as any)
           .from("payments")
           .select("status")
           .eq("kopo_resource_id", resourceId)

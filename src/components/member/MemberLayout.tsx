@@ -109,6 +109,9 @@ export function MemberLayout({ children }: MemberLayoutProps) {
         .maybeSingle()).data as MemberInfo | null;
     }
 
+    // Ensure dependants created during signup are persisted
+    await supabase.rpc("ensure_member_dependants_from_metadata");
+
     if (!memberDetails) {
       toast({ title: "Access denied", description: "You don't have member privileges", variant: "destructive" });
       navigate("/");

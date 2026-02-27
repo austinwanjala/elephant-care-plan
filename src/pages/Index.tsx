@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Shield, CreditCard, QrCode, Building2, Users, ArrowRight, CheckCircle, Phone, Mail } from "lucide-react";
 import { useSystemSettings } from "@/hooks/useSystemSettings";
+import { AiChatBot } from "@/components/home/AiChatBot";
 
 
 const Index = () => {
@@ -274,6 +275,7 @@ const Index = () => {
           </div>
         </div>
       </footer>
+      <AiChatBot />
     </div>
   );
 };

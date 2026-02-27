@@ -124,13 +124,15 @@ export const AiChatBot = () => {
         try {
             const data = await invokeAiChatbot({ message: messageText, history });
 
-            const responseText = typeof data?.response === "string" && data.response.trim().length > 0
-                ? data.response
+            // If we get a response, use it. If it's empty, use offline logic.
+            const responseText = (data?.response && typeof data.response === "string")
+                ? data.response.trim()
                 : getOfflineResponse(messageText);
 
             setHistory([...newHistory, { role: "assistant", content: responseText }]);
         } catch (error) {
             console.error("Chat error:", error);
+            // Fallback to offline logic immediately on error
             setHistory([...newHistory, {
                 role: "assistant",
                 content: getOfflineResponse(messageText)
@@ -228,11 +230,11 @@ export const AiChatBot = () => {
                                         </div>
                                         <div className="bg-white border border-slate-100 p-3 rounded-2xl rounded-tl-none shadow-sm max-w-[85%]">
                                             <p className="text-sm text-slate-800 leading-relaxed">
-                                                Jambo! I'm <b>Effie</b>, your virtual assistant at Elephant Dental.
+                                                Karibu! I'm <b>Effie</b>, your premium Elephant Dental assistant. 🐘
                                                 <br /><br />
-                                                I'm here to help you understand our <b>2x coverage</b>, register members, and find our locations.
+                                                My goal is to help you double your coverage and find the best dental care in Kenya.
                                                 <br /><br />
-                                                What would you like to know today?
+                                                How can I assist you today?
                                             </p>
                                         </div>
                                     </div>

@@ -10,7 +10,7 @@ const TermsOfService = () => {
   useEffect(() => {
     const fetchContent = async () => {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from("site_content")
           .select("content")
           .eq("slug", "terms_and_conditions")

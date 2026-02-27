@@ -293,9 +293,10 @@ export default function Consultation() {
             if (data.status === 'registered' && doctorId) {
                 await supabase
                     .from("visits")
-                    .update({ status: 'with_doctor', doctor_id: doctorId })
+                    .update({ status: 'with_doctor', doctor_id: doctorId, assigned_doctor_id: doctorId })
                     .eq("id", visitId);
             }
+
         }
         setLoading(false);
     };
@@ -430,7 +431,7 @@ export default function Consultation() {
                 toast({
                     title: `Active Treatment: Tooth #${toothId}`,
                     description: `"${stage?.services?.name}" is in progress (Stage ${stage?.current_stage}/${stage?.total_stages}). Use the "Complete Stage" button in the Active Treatment panel above.`,
-                    variant: "secondary"
+                    variant: "default"
                 });
                 return;
             }
@@ -466,11 +467,12 @@ export default function Consultation() {
             }));
 
             if (recordsToUpsert.length > 0) {
-                const { error: dentalError } = await supabase.rpc('upsert_dental_records', { records: recordsToUpsert });
+                const { error: dentalError } = await (supabase as any).rpc('upsert_dental_records', { records: recordsToUpsert });
                 if (dentalError) throw dentalError;
             }
 
             // Update visit diagnosis text and "lock" it (mark as passed diagnosis)
+
             const combinedDiagnosis = diagnosis + (newDiagnosis ? (diagnosis ? "\n" : "") + newDiagnosis : "");
             const combinedNotes = treatmentNotes + (newTreatmentNotes ? (treatmentNotes ? "\n" : "") + newTreatmentNotes : "");
 
@@ -2609,5 +2611,7 @@ export default function Consultation() {
                 </DialogContent>
             </Dialog>
         </div>
+    );
+}
     );
 }

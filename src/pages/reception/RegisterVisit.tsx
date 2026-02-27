@@ -257,6 +257,7 @@ export default function RegisterVisit() {
                 receptionist_id: receptionistId,
                 status: 'registered',
                 doctor_id: selectedDoctorId || null,
+                assigned_doctor_id: selectedDoctorId || null,
                 biometrics_verified: true,
                 biometric_verified_at: new Date().toISOString(),
                 benefit_deducted: 0,

@@ -45,6 +45,7 @@ interface Member {
   id_number: string;
   marketers?: { full_name: string; code: string } | null;
   whatsapp_opt_in: boolean;
+  insurance_card_token: string | null;
 }
 
 interface Visit {
@@ -355,10 +356,11 @@ const MemberDashboard = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-1 space-y-8">
             {member && <InsuranceCard member={{
+              id: member.id,
               full_name: member.full_name,
               member_number: member.member_number,
               membership_categories: member.membership_categories,
-              qr_code_data: member.qr_code_data || null,
+              insurance_card_token: member.insurance_card_token,
               is_active: member.is_active,
               coverage_balance: member.coverage_balance || 0,
               benefit_limit: member.benefit_limit || 0,

@@ -7,11 +7,15 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, ArrowRight, ClipboardList } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import CardScanner from "@/components/medical-card/CardScanner";
+import { QrCode } from "lucide-react";
 
 export default function DoctorQueue() {
     const [visits, setVisits] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [doctorId, setDoctorId] = useState<string | null>(null);
+    const [scanDialogOpen, setScanDialogOpen] = useState(false);
     const { toast } = useToast();
     const navigate = useNavigate();
 
@@ -168,10 +172,15 @@ export default function DoctorQueue() {
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Button size="sm" onClick={() => handleStartConsultation(visit.id, visit.status)}>
-                                                        {visit.status === 'with_doctor' ? 'Continue' : 'Start Consultation'}
-                                                        <ArrowRight className="ml-2 h-4 w-4" />
-                                                    </Button>
+                                                    <div className="flex gap-2">
+                                                        <Button size="sm" onClick={() => handleStartConsultation(visit.id, visit.status)}>
+                                                            {visit.status === 'with_doctor' ? 'Continue' : 'Start'}
+                                                            <ArrowRight className="ml-2 h-4 w-4" />
+                                                        </Button>
+                                                        <Button size="sm" variant="outline" onClick={() => setScanDialogOpen(true)}>
+                                                            <QrCode className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
                                                 </TableCell>
                                             </TableRow>
                                         );
@@ -182,6 +191,15 @@ export default function DoctorQueue() {
                     </div>
                 </CardContent>
             </Card>
+
+            <Dialog open={scanDialogOpen} onOpenChange={setScanDialogOpen}>
+                <DialogContent className="max-w-3xl">
+                    <DialogHeader>
+                        <DialogTitle>Instant Card Verification</DialogTitle>
+                    </DialogHeader>
+                    <CardScanner />
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

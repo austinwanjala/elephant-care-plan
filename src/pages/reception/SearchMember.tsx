@@ -9,13 +9,16 @@ import { Search, User, Phone, Mail, CreditCard, CalendarDays, ArrowLeft, Loader2
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 import { BiometricCapture } from "@/components/BiometricCapture";
+import CardScanner from "@/components/medical-card/CardScanner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { QrCode } from "lucide-react";
 
 export default function ReceptionSearchMember() {
     const [searchTerm, setSearchTerm] = useState("");
     const [searching, setSearching] = useState(false);
     const [member, setMember] = useState<any>(null);
     const [biometricDialogOpen, setBiometricDialogOpen] = useState(false);
+    const [scanDialogOpen, setScanDialogOpen] = useState(false);
     const { toast } = useToast();
 
     const handleSearch = async (e: React.FormEvent) => {
@@ -108,9 +111,27 @@ export default function ReceptionSearchMember() {
                             {searching ? <Loader2 className="animate-spin" /> : <Search className="h-4 w-4" />}
                             <span className="ml-2">Search</span>
                         </Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className="gap-2 border-primary/30 text-primary"
+                            onClick={() => setScanDialogOpen(true)}
+                        >
+                            <QrCode className="h-4 w-4" />
+                            Scan Card
+                        </Button>
                     </form>
                 </CardContent>
             </Card>
+
+            <Dialog open={scanDialogOpen} onOpenChange={setScanDialogOpen}>
+                <DialogContent className="max-w-3xl">
+                    <DialogHeader>
+                        <DialogTitle>Scan Insurance Card</DialogTitle>
+                    </DialogHeader>
+                    <CardScanner />
+                </DialogContent>
+            </Dialog>
 
             {member && (
                 <Card className="border-primary/50">

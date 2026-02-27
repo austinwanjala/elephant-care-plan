@@ -35,9 +35,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Search, Plus, MoreHorizontal, Edit, Trash2, Fingerprint, Download, Loader2, ShieldCheck, History, Users, Image as ImageIcon } from "lucide-react";
+import { Search, Plus, MoreHorizontal, Edit, Trash2, Fingerprint, Download, Loader2, ShieldCheck, History, Users, Image as ImageIcon, CreditCard as CreditCardIcon, QrCode } from "lucide-react";
 import { BiometricCapture } from "@/components/BiometricCapture";
 import { exportToCsv } from "@/utils/csvExport";
+import { InsuranceCard } from "@/components/member/InsuranceCard";
+import { generateCardPDF } from "@/utils/generateCardPDF";
 
 interface Member {
   id: string;
@@ -58,6 +60,7 @@ interface Member {
   branches: { name: string } | null;
   membership_categories: { id: string; name: string; payment_amount: number; benefit_amount: number } | null;
   created_at: string;
+  insurance_card_token: string | null;
 }
 
 interface Category {
@@ -77,10 +80,12 @@ export default function AdminMembers() {
   const [biometricDialogOpen, setBiometricDialogOpen] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [dependantsDialogOpen, setDependantsDialogOpen] = useState(false);
+  const [cardDialogOpen, setCardDialogOpen] = useState(false);
   const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
   const [resettingUser, setResettingUser] = useState<any>(null);
   const [newPassword, setNewPassword] = useState("");
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+  const [isExportingCard, setIsExportingCard] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     fullName: "",
@@ -288,6 +293,19 @@ export default function AdminMembers() {
     loadData();
   };
 
+  const handleDownloadCard = async () => {
+    if (!selectedMember) return;
+    setIsExportingCard(true);
+    try {
+      await generateCardPDF("member-insurance-card", selectedMember.full_name);
+      toast({ title: "Success", description: "Insurance card PDF generated successfully." });
+    } catch (error: any) {
+      toast({ title: "Export Failed", description: error.message, variant: "destructive" });
+    } finally {
+      setIsExportingCard(false);
+    }
+  };
+
   const filteredMembers = members.filter(m =>
     m.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     m.member_number.toLowerCase().includes(searchTerm.toLowerCase())
@@ -382,6 +400,7 @@ export default function AdminMembers() {
                         <DropdownMenuItem onClick={() => { setResettingUser(m); setResetPasswordOpen(true); }}><ShieldCheck className="mr-2 h-4 w-4" /> Reset Password</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => { setSelectedMember(m); setDependantsDialogOpen(true); }}><Users className="mr-2 h-4 w-4" /> View Dependants</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => { setSelectedMember(m); setHistoryDialogOpen(true); }}><History className="mr-2 h-4 w-4" /> View History</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => { setSelectedMember(m); setCardDialogOpen(true); }}><CreditCardIcon className="mr-2 h-4 w-4" /> Digital Card</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => { setSelectedMember(m); setBiometricDialogOpen(true); }}><Fingerprint className="mr-2 h-4 w-4" /> Biometric</DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteMember(m.id)}><Trash2 className="mr-2 h-4 w-4" /> Deactivate</DropdownMenuItem>
                       </DropdownMenuContent>
@@ -464,6 +483,30 @@ export default function AdminMembers() {
           member={selectedMember}
         />
       )}
+
+      <Dialog open={cardDialogOpen} onOpenChange={setCardDialogOpen}>
+        <DialogContent className="max-w-md p-0 overflow-hidden bg-transparent border-none shadow-none">
+          <DialogTitle className="hidden">Insurance Card</DialogTitle>
+          {selectedMember && (
+            <div className="space-y-4">
+              <div id="member-insurance-card">
+                <InsuranceCard member={selectedMember as any} />
+              </div>
+              <div className="px-4 pb-4">
+                <Button
+                  onClick={handleDownloadCard}
+                  className="w-full btn-primary bg-primary hover:bg-primary/90 text-white shadow-lg"
+                  disabled={isExportingCard}
+                >
+                  {isExportingCard ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Download className="mr-2 h-4 w-4" />}
+                  Download Printable PDF
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={resetPasswordOpen} onOpenChange={setResetPasswordOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>

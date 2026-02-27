@@ -8,15 +8,16 @@ import jsPDF from 'jspdf';
 import { useToast } from "@/hooks/use-toast";
 
 interface MemberDetails {
+  id: string;
   full_name: string;
   member_number: string;
   membership_categories: { name: string } | null;
-  qr_code_data?: string | null;
+  insurance_card_token?: string | null;
   is_active: boolean;
   coverage_balance: number;
   benefit_limit: number;
   id_number: string;
-  expiry_date?: string; // Optional if available
+  expiry_date?: string;
 }
 
 interface InsuranceCardProps {
@@ -28,7 +29,11 @@ export function InsuranceCard({ member }: InsuranceCardProps) {
   const [downloading, setDownloading] = useState(false);
   const { toast } = useToast();
 
-  const qrCodeData = member.qr_code_data || (member.is_active ? `MEMBER-${member.member_number}` : null);
+  const qrCodeData = JSON.stringify({
+    mid: member.id,
+    ts: Date.now(),
+    sig: member.insurance_card_token || member.id
+  });
 
   // Format currency
   const formatCurrency = (amount: number) => {

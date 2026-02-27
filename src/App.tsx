@@ -75,6 +75,7 @@ import AdminAppointments from "./pages/admin/AdminAppointments";
 import AdminServices from "./pages/admin/AdminServices";
 import AdminBranchPayments from "./pages/admin/AdminBranchPayments";
 import AdminMarketerClaims from "./pages/admin/AdminMarketerClaims";
+import AdminMarketerCommissions from "./pages/admin/AdminMarketerCommissions";
 import AdminCommissionSettings from "./pages/admin/AdminCommissionSettings";
 import AppointmentSettings from "./pages/admin/AppointmentSettings";
 import AdminSettings from "./pages/admin/AdminSettings";
@@ -183,6 +184,7 @@ const App = () => (
             <Route path="services" element={<AdminServices />} />
             <Route path="branch-payments" element={<AdminBranchPayments />} />
             <Route path="marketer-claims" element={<AdminMarketerClaims />} />
+            <Route path="marketer-commissions" element={<AdminMarketerCommissions />} />
             <Route path="commission-settings" element={<AdminCommissionSettings />} />
             <Route path="appointment-settings" element={<AppointmentSettings />} />
             <Route path="settings" element={<AdminSettings />} />
@@ -206,6 +208,7 @@ const App = () => (
             <Route path="services" element={<AdminServices />} />
             <Route path="branch-payments" element={<AdminBranchPayments />} />
             <Route path="marketer-claims" element={<AdminMarketerClaims />} />
+            <Route path="marketer-commissions" element={<AdminMarketerCommissions />} />
             <Route path="commission-settings" element={<AdminCommissionSettings />} />
             <Route path="appointment-settings" element={<AppointmentSettings />} />
             <Route path="settings" element={<AdminSettings />} />

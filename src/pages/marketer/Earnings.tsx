@@ -92,25 +92,20 @@ export default function MarketerEarnings() {
     };
 
     const handleSubmitClaim = async () => {
-        if (!marketer || claimableAmount <= 0) {
-            toast({ title: "No Claimable Amount", description: "You don't have any commission to claim.", variant: "destructive" });
+        if (!marketer) {
+            toast({ title: "Account Error", description: "Marketer profile not found.", variant: "destructive" });
             return;
         }
 
         setClaiming(true);
         try {
-            const { error } = await (supabase as any)
-                .from("marketer_claims")
-                .insert({
-                    marketer_id: marketer.id,
-                    amount: claimableAmount,
-                    referral_count: activeReferrals,
-                    status: 'pending'
-                });
-
+            const { data, error } = await (supabase as any).rpc("marketer_submit_claim");
             if (error) throw error;
 
-            toast({ title: "Claim Submitted", description: `Your claim for KES ${claimableAmount.toLocaleString()} has been submitted for approval.` });
+            toast({
+                title: "Claim Submitted",
+                description: `Your claim for KES ${Number(data?.[0]?.amount || 0).toLocaleString()} has been submitted for approval.`
+            });
             fetchMarketerData();
         } catch (error: any) {
             toast({ title: "Claim Failed", description: error.message, variant: "destructive" });

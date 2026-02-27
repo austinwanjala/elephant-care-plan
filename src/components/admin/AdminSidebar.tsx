@@ -72,6 +72,7 @@ export function AdminSidebar() {
     { title: "Appointments", url: `${basePath}/appointments`, icon: History },
     { title: "Services", url: `${basePath}/services`, icon: Stethoscope },
     { title: "Branch Payments", url: `${basePath}/branch-payments`, icon: DollarSign },
+    { title: "Marketer Commissions", url: `${basePath}/marketer-commissions`, icon: DollarSign },
     { title: "Marketer Claims", url: `${basePath}/marketer-claims`, icon: ClipboardList },
     { title: "Payments", url: `${basePath}/payments`, icon: DollarSign },
     { title: "Messages", url: `${basePath}/messages`, icon: MessageSquare },
@@ -237,4 +238,3 @@ export function AdminSidebar() {
     </Sidebar>
   );
 }
-

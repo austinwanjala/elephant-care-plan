@@ -531,8 +531,10 @@ export type Database = {
           document_number: string | null
           document_type: string | null
           full_name: string
+          gender: string | null
           id: string
           id_number: string | null
+          image_url: string | null
           is_active: boolean | null
           member_id: string
           relationship: string | null
@@ -544,8 +546,10 @@ export type Database = {
           document_number?: string | null
           document_type?: string | null
           full_name: string
+          gender?: string | null
           id?: string
           id_number?: string | null
+          image_url?: string | null
           is_active?: boolean | null
           member_id: string
           relationship?: string | null
@@ -557,8 +561,10 @@ export type Database = {
           document_number?: string | null
           document_type?: string | null
           full_name?: string
+          gender?: string | null
           id?: string
           id_number?: string | null
+          image_url?: string | null
           is_active?: boolean | null
           member_id?: string
           relationship?: string | null
@@ -1629,6 +1635,14 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      marketer_submit_claim: {
+        Args: never
+        Returns: {
+          amount: number
+          claim_id: string
+          referral_count: number
+        }[]
       }
       update_staff_role: {
         Args: { target_user_id: string; new_role: string }

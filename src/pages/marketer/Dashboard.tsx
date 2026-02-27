@@ -71,25 +71,25 @@ export default function MarketerDashboard() {
 
             setReferrals(members || []);
 
-            const activeCount = members?.filter((m: any) => m.is_active).length || 0;
-            const lifeEarnings = activeCount * rate;
-
-            const { data: claims } = await (supabase as any)
-                .from("marketer_claims")
+            const { data: commissions, error: commissionsError } = await (supabase as any)
+                .from("marketer_commissions")
                 .select("amount, status")
                 .eq("marketer_id", mData.id);
 
-            const totalPaid = claims?.filter((c: any) => c.status === 'paid').reduce((sum: number, c: any) => sum + c.amount, 0) || 0;
-            const pendingClaims = claims?.filter((c: any) => c.status === 'pending').reduce((sum: number, c: any) => sum + c.amount, 0) || 0;
+            if (commissionsError) throw commissionsError;
 
-            const claimable = Math.max(0, lifeEarnings - totalPaid - pendingClaims);
+            const pendingActivation = commissions?.filter((c: any) => c.status === 'pending_activation').length || 0;
+            const claimableTotal = commissions?.filter((c: any) => c.status === 'claimable').reduce((sum: number, c: any) => sum + Number(c.amount || 0), 0) || 0;
+            const earnedTotal = commissions?.filter((c: any) => ['claimable', 'claimed', 'paid'].includes(c.status)).reduce((sum: number, c: any) => sum + Number(c.amount || 0), 0) || 0;
+            const paidTotal = commissions?.filter((c: any) => c.status === 'paid').reduce((sum: number, c: any) => sum + Number(c.amount || 0), 0) || 0;
+            const claimedTotal = commissions?.filter((c: any) => c.status === 'claimed').reduce((sum: number, c: any) => sum + Number(c.amount || 0), 0) || 0;
 
             setStats({
-                activeCount,
-                totalLifeEarnings: lifeEarnings,
-                totalPaid,
-                claimable,
-                pendingClaims,
+                activeCount: members?.filter((m: any) => m.is_active).length || 0,
+                totalLifeEarnings: earnedTotal,
+                totalPaid: paidTotal,
+                claimable: claimableTotal,
+                pendingClaims: claimedTotal,
                 commissionRate: rate
             });
 

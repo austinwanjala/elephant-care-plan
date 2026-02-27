@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ArrowLeft, Plus, Trash, Users, Camera, User, ImagePlus, AlertCircle } from "lucide-react";
+import { Loader2, ArrowLeft, Plus, Trash, Users, Camera, User, ImagePlus, AlertCircle, Pencil } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -50,9 +50,43 @@ const MemberDependants = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  const [editOpen, setEditOpen] = useState(false);
+  const [editing, setEditing] = useState<Dependant | null>(null);
+  const [editForm, setEditForm] = useState({
+    fullName: "",
+    dob: "",
+    idNumber: "",
+    relationship: "",
+    gender: "male",
+  });
+  const [editImageFile, setEditImageFile] = useState<File | null>(null);
+
   useEffect(() => {
     fetchDependants();
   }, []);
+
+  const validateImage = (file: File) => {
+    const isAllowed = ["image/jpeg", "image/png"].includes(file.type);
+    if (!isAllowed) throw new Error("Only JPG/PNG images are allowed.");
+    if (file.size > 5 * 1024 * 1024) throw new Error("Image must be 5MB or smaller.");
+  };
+
+  const uploadDependantImage = async (depId: string, file: File) => {
+    if (!memberId) throw new Error("Member profile not loaded.");
+    validateImage(file);
+
+    const ext = file.type === "image/png" ? "png" : "jpg";
+    const path = `${memberId}/${depId}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("dependants")
+      .upload(path, file, { upsert: true, contentType: file.type });
+
+    if (uploadError) throw uploadError;
+
+    const { data: { publicUrl } } = supabase.storage.from("dependants").getPublicUrl(path);
+    return publicUrl;
+  };
 
   const fetchDependants = async () => {
     setLoading(true);
@@ -93,7 +127,6 @@ const MemberDependants = () => {
       }
     } catch (err: any) {
       console.error("Error fetching dependants:", err);
-      // Ensure error message is not blank
       const msg = err.message || "An unexpected error occurred.";
       setFetchError(msg);
       toast({
@@ -116,41 +149,27 @@ const MemberDependants = () => {
 
     setSubmitting(true);
     try {
-      let imageUrl = null;
-
-      if (imageFile) {
-        const fileExt = imageFile.name.split('.').pop();
-        const fileName = `${memberId}-${Math.random()}.${fileExt}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('dependant-images')
-          .upload(fileName, imageFile);
-
-        if (uploadError) {
-          if (uploadError.message.includes("bucket not found")) {
-            // Log but don't block dependant creation if image fails (optional)
-            console.error("Storage bucket issue:", uploadError);
-            toast({ title: "Image Upload Failed", description: "Could not upload photo. Proceeding without it.", variant: "secondary" });
-          } else {
-            throw uploadError;
-          }
-        } else {
-          const { data: { publicUrl } } = supabase.storage.from('dependant-images').getPublicUrl(fileName);
-          imageUrl = publicUrl;
-        }
-      }
-
-      const { error } = await supabase.from("dependants").insert({
-        member_id: memberId,
-        full_name: newDependant.fullName,
-        dob: newDependant.dob,
-        id_number: newDependant.idNumber,
-        relationship: newDependant.relationship,
-        gender: newDependant.gender,
-        image_url: imageUrl
-      });
+      const { data: inserted, error } = await supabase
+        .from("dependants")
+        .insert({
+          member_id: memberId,
+          full_name: newDependant.fullName,
+          dob: newDependant.dob,
+          id_number: newDependant.idNumber,
+          relationship: newDependant.relationship,
+          gender: newDependant.gender,
+          image_url: null
+        })
+        .select("*")
+        .single();
 
       if (error) throw error;
+
+      if (imageFile && inserted?.id) {
+        const url = await uploadDependantImage(inserted.id, imageFile);
+        const { error: uErr } = await supabase.from("dependants").update({ image_url: url }).eq("id", inserted.id);
+        if (uErr) throw uErr;
+      }
 
       toast({ title: "Dependant Added", description: `${newDependant.fullName} has been added.` });
       setDialogOpen(false);
@@ -159,6 +178,55 @@ const MemberDependants = () => {
       fetchDependants();
     } catch (error: any) {
       toast({ title: "Error adding dependant", description: error.message, variant: "destructive" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const openEdit = (dep: Dependant) => {
+    setEditing(dep);
+    setEditForm({
+      fullName: dep.full_name,
+      dob: dep.dob,
+      idNumber: dep.id_number || "",
+      relationship: dep.relationship || "",
+      gender: (dep.gender as any) || "male",
+    });
+    setEditImageFile(null);
+    setEditOpen(true);
+  };
+
+  const handleUpdateDependant = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editing) return;
+    setSubmitting(true);
+    try {
+      let imageUrl = editing.image_url;
+      if (editImageFile) {
+        imageUrl = await uploadDependantImage(editing.id, editImageFile);
+      }
+
+      const { error } = await supabase
+        .from("dependants")
+        .update({
+          full_name: editForm.fullName,
+          dob: editForm.dob,
+          id_number: editForm.idNumber,
+          relationship: editForm.relationship,
+          gender: editForm.gender,
+          image_url: imageUrl,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", editing.id);
+
+      if (error) throw error;
+
+      toast({ title: "Dependant Updated", description: "Changes saved successfully." });
+      setEditOpen(false);
+      setEditing(null);
+      fetchDependants();
+    } catch (error: any) {
+      toast({ title: "Update failed", description: error.message, variant: "destructive" });
     } finally {
       setSubmitting(false);
     }
@@ -244,8 +312,8 @@ const MemberDependants = () => {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Birth Cert / ID Number *</Label>
-                    <Input value={newDependant.idNumber} onChange={(e) => setNewDependant({ ...newDependant, idNumber: e.target.value })} required placeholder="Enter ID" />
+                    <Label>Birth Cert / Student ID *</Label>
+                    <Input value={newDependant.idNumber} onChange={(e) => setNewDependant({ ...newDependant, idNumber: e.target.value })} required placeholder="Enter number" />
                   </div>
                   <div className="space-y-2">
                     <Label>Gender *</Label>
@@ -291,11 +359,11 @@ const MemberDependants = () => {
                         <ImagePlus className="h-4 w-4" />
                         {imageFile ? "Change Photo" : "Choose Image"}
                       </Label>
-                      <p className="text-[10px] text-muted-foreground mt-1">JPG, PNG or WebP. Max 2MB.</p>
+                      <p className="text-[10px] text-muted-foreground mt-1">JPG/PNG only. Max 5MB.</p>
                       <Input
                         id="image-upload"
                         type="file"
-                        accept="image/*"
+                        accept="image/png,image/jpeg"
                         className="hidden"
                         onChange={(e) => setImageFile(e.target.files?.[0] || null)}
                       />
@@ -336,15 +404,105 @@ const MemberDependants = () => {
                       </p>
                     </div>
                   </div>
-                  <Button variant="ghost" size="icon" onClick={() => handleDelete(dep.id, dep.full_name)}>
-                    <Trash className="h-4 w-4 text-destructive" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" onClick={() => openEdit(dep)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => handleDelete(dep.id, dep.full_name)}>
+                      <Trash className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
                 </Card>
               ))
             )}
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Dependant</DialogTitle>
+            <DialogDescription>Update dependant details and photo. (Max 5 dependants)</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleUpdateDependant} className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Full Name *</Label>
+              <Input value={editForm.fullName} onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })} required />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Date of Birth *</Label>
+                <Input type="date" max={new Date().toISOString().split("T")[0]} value={editForm.dob} onChange={e => setEditForm({ ...editForm, dob: e.target.value })} required />
+              </div>
+              <div className="space-y-2">
+                <Label>Relationship *</Label>
+                <Input value={editForm.relationship} onChange={(e) => setEditForm({ ...editForm, relationship: e.target.value })} required />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Birth Cert / Student ID *</Label>
+                <Input value={editForm.idNumber} onChange={(e) => setEditForm({ ...editForm, idNumber: e.target.value })} required />
+              </div>
+              <div className="space-y-2">
+                <Label>Gender *</Label>
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  value={editForm.gender}
+                  onChange={(e) => setEditForm({ ...editForm, gender: e.target.value })}
+                  required
+                >
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Update Photo (Optional)</Label>
+              <div className="flex items-center gap-4 p-3 border rounded-lg bg-muted/30">
+                {editImageFile ? (
+                  <Avatar className="h-16 w-16 border">
+                    <AvatarImage src={URL.createObjectURL(editImageFile)} />
+                    <AvatarFallback><User /></AvatarFallback>
+                  </Avatar>
+                ) : (
+                  <Avatar className="h-16 w-16 border">
+                    <AvatarImage src={editing?.image_url || ""} />
+                    <AvatarFallback>{editing?.full_name?.charAt(0) || "?"}</AvatarFallback>
+                  </Avatar>
+                )}
+                <div className="flex-1">
+                  <Label htmlFor="edit-image-upload" className="cursor-pointer inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">
+                    <ImagePlus className="h-4 w-4" />
+                    Choose Image
+                  </Label>
+                  <p className="text-[10px] text-muted-foreground mt-1">JPG/PNG only. Max 5MB.</p>
+                  <Input
+                    id="edit-image-upload"
+                    type="file"
+                    accept="image/png,image/jpeg"
+                    className="hidden"
+                    onChange={(e) => setEditImageFile(e.target.files?.[0] || null)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={submitting}>
+                {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

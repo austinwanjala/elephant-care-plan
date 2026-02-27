@@ -48,31 +48,15 @@ export function MarketerSidebar() {
 
             if (!marketer) return;
 
-            const { data: config } = await (supabase as any)
-                .from("marketer_commission_config")
-                .select("commission_per_referral")
-                .order("updated_at", { ascending: false })
-                .limit(1)
-                .maybeSingle();
-
-            const rate = config?.commission_per_referral || 0;
-
-            const { count: activeCount } = await supabase
-                .from("members")
-                .select("*", { count: 'exact', head: true })
-                .eq("marketer_id", marketer.id)
-                .eq("is_active", true);
-
-            const { data: claims } = await (supabase as any)
-                .from("marketer_claims")
+            const { data: commissions } = await (supabase as any)
+                .from("marketer_commissions")
                 .select("amount, status")
                 .eq("marketer_id", marketer.id);
 
-            const totalPaid = claims?.filter((c: any) => c.status === 'paid').reduce((sum: number, c: any) => sum + c.amount, 0) || 0;
-            const pending = claims?.filter((c: any) => c.status === 'pending').reduce((sum: number, c: any) => sum + c.amount, 0) || 0;
+            const claimable = commissions
+                ?.filter((c: any) => c.status === 'claimable')
+                .reduce((sum: number, c: any) => sum + Number(c.amount || 0), 0) || 0;
 
-            const earnings = (activeCount || 0) * rate;
-            const claimable = Math.max(0, earnings - totalPaid - pending);
             setClaimableAmount(claimable);
         };
 

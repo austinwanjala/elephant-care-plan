@@ -210,15 +210,19 @@ export default function AdminStaff() {
     }
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       const { error } = await supabase.functions.invoke("admin-reset-password", {
         body: {
-          email: resettingUser.email,
+          userId: resettingUser.user_id,
+          email: resettingUser.email || null,
           password: newPassword,
-          admin_id: user?.id
         }
       });
-      if (error) throw error;
+
+      if (error) {
+        const errorData = await error.context?.json().catch(() => ({}));
+        throw new Error(errorData?.error || error.message);
+      }
+
       toast({ title: "Success", description: `Password for ${resettingUser.full_name} has been reset and notification sent.` });
       setResetPasswordOpen(false);
       setResettingUser(null);

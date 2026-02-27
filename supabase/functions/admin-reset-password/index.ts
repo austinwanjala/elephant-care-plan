@@ -71,25 +71,45 @@ serve(async (req: Request) => {
       });
     }
 
-    const { email, password } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const userId = (body.userId as string | undefined) ?? undefined;
+    const email = (body.email as string | undefined) ?? undefined;
+    const password = (body.password as string | undefined) ?? undefined;
 
-    if (!email || !password) {
-      return new Response(JSON.stringify({ error: "Email and new password are required" }), {
+    if (!password) {
+      return new Response(JSON.stringify({ error: "New password is required" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 400,
       });
     }
 
-    // 1. Find user in our public tables
-    const [{ data: member }, { data: staff }] = await Promise.all([
-      supabaseAdmin.from("members").select("user_id, full_name, phone, email").eq("email", email).maybeSingle(),
-      supabaseAdmin.from("staff").select("user_id, full_name, phone, email").eq("email", email).maybeSingle(),
-    ]);
+    if (!userId && !email) {
+      return new Response(JSON.stringify({ error: "userId or email is required" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
+    }
 
-    const user = member || staff;
+    // 1) Find user in our public tables (prefer user_id for reliability)
+    let user = null;
+
+    if (userId) {
+      const [{ data: member }, { data: staff }] = await Promise.all([
+        supabaseAdmin.from("members").select("user_id, full_name, phone, email").eq("user_id", userId).maybeSingle(),
+        supabaseAdmin.from("staff").select("user_id, full_name, phone, email").eq("user_id", userId).maybeSingle(),
+      ]);
+      user = member || staff;
+    } else {
+      const [{ data: member }, { data: staff }] = await Promise.all([
+        supabaseAdmin.from("members").select("user_id, full_name, phone, email").eq("email", email).maybeSingle(),
+        supabaseAdmin.from("staff").select("user_id, full_name, phone, email").eq("email", email).maybeSingle(),
+      ]);
+      user = member || staff;
+    }
 
     if (!user) {
-      return new Response(JSON.stringify({ error: "This email is not registered in our system." }), {
+      console.error("[admin-reset-password] Target user not found", { userId, email });
+      return new Response(JSON.stringify({ error: "Target user not found" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 400,
       });
@@ -138,7 +158,7 @@ serve(async (req: Request) => {
       user_id: callerId,
       details: {
         target_user_id: user.user_id,
-        target_email: email,
+        target_email: user.email ?? email ?? null,
         performed_by: callerId,
         caller_role: callerRole,
       },
@@ -169,7 +189,7 @@ serve(async (req: Request) => {
     });
   } catch (error: any) {
     console.error("[admin-reset-password] Fatal error", { message: error?.message });
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: error?.message ?? "Unknown error" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 400,
     });

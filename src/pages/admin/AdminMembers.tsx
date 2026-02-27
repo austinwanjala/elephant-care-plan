@@ -143,8 +143,6 @@ export default function AdminMembers() {
 
       if (error) throw error;
 
-      if (error) throw error;
-
       // Send Welcome SMS
       try {
         await supabase.functions.invoke('send-sms', {
@@ -255,15 +253,17 @@ export default function AdminMembers() {
     }
     setLoading(true);
     try {
-      const { data: { user: adminUser } } = await supabase.auth.getUser();
       const { error } = await supabase.functions.invoke("admin-reset-password", {
         body: {
-          email: resettingUser.email,
+          userId: resettingUser.user_id,
+          email: resettingUser.email || null,
           password: newPassword,
-          admin_id: adminUser?.id
         }
       });
-      if (error) throw error;
+      if (error) {
+        const errorData = await error.context?.json().catch(() => ({}));
+        throw new Error(errorData?.error || error.message);
+      }
       toast({ title: "Success", description: `Password for ${resettingUser.full_name} has been reset and notification sent.` });
       setResetPasswordOpen(false);
       setResettingUser(null);
@@ -500,6 +500,7 @@ export default function AdminMembers() {
 function MemberHistoryDialog({ open, onOpenChange, member }: { open: boolean, onOpenChange: (open: boolean) => void, member: Member }) {
   const [visits, setVisits] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (open && member) {
@@ -542,7 +543,7 @@ function MemberHistoryDialog({ open, onOpenChange, member }: { open: boolean, on
       .eq("member_id", member.id);
 
     // Fetch service stages to show progress
-    const { data: stagesData } = await supabase
+    const { data: stagesData } = await (supabase as any)
       .from("service_stages")
       .select("*")
       .eq("member_id", member.id);

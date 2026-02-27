@@ -22,21 +22,20 @@ export default function AdminContent() {
     const fetchContent = async () => {
         setLoading(true);
         try {
-            const { data, error } = await supabase
+            const { data, error } = await (supabase as any)
                 .from("site_content")
                 .select("slug, content");
 
             if (error) throw error;
 
             const contentMap: Record<string, string> = {};
-            data?.forEach(item => {
+            data?.forEach((item: any) => {
                 contentMap[item.slug] = item.content;
             });
             setContent(prev => ({ ...prev, ...contentMap }));
         } catch (error: any) {
             toast({ title: "Error loading content", description: error.message, variant: "destructive" });
         } finally {
-            setLoading(true); // Wait, should be false
             setLoading(false);
         }
     };
@@ -46,25 +45,31 @@ export default function AdminContent() {
         try {
             const { data: { user } } = await supabase.auth.getUser();
 
-            // 1. Get current content for history
-            const { data: current } = await supabase
+            // 1. Get current content for history (if it exists)
+            const { data: current, error: currentErr } = await (supabase as any)
                 .from("site_content")
                 .select("id, content")
                 .eq("slug", slug)
-                .single();
+                .maybeSingle();
+
+            if (currentErr) throw currentErr;
 
             if (current) {
                 // 2. Save to history
-                await supabase.from("site_content_history").insert({
-                    content_id: current.id,
-                    slug: slug,
-                    content: current.content,
-                    version_by: user?.id
-                });
+                const { error: historyErr } = await (supabase as any)
+                    .from("site_content_history")
+                    .insert({
+                        content_id: current.id,
+                        slug: slug,
+                        content: current.content,
+                        version_by: user?.id
+                    });
+
+                if (historyErr) throw historyErr;
             }
 
             // 3. Update main content
-            const { error } = await supabase
+            const { error } = await (supabase as any)
                 .from("site_content")
                 .upsert({
                     slug,

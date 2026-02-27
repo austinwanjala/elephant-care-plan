@@ -32,7 +32,7 @@ export const LegalLayout = ({ children, title, subtitle }: LegalLayoutProps) => 
                             <div className="bg-lime-500 text-white px-3 py-1 font-bold rounded mb-1 text-[10px]">HEAD OFFICE</div>
                             <div className="flex items-center gap-1"><MapPin className="w-3 h-3 text-orange-500" /> P. O. Box 643 - 60200, Meru</div>
                             <div className="flex items-center gap-1"><Phone className="w-3 h-3 text-orange-500" /> +254 710 500 500</div>
-                            <div className="flex items-center gap-1"><Mail className="w-3 h-3 text-orange-500" /> info@elephantdental.org</div>
+                            <div className="flex items-center gap-1"><Mail className="w-3 h-3 text-orange-500" /> elephantkenya@gmail.com</div>
                             <div className="flex items-center gap-1"><Globe className="w-3 h-3 text-orange-500" /> www.elephantdental.org</div>
                         </div>
                     </div>
@@ -69,7 +69,7 @@ export const LegalLayout = ({ children, title, subtitle }: LegalLayoutProps) => 
                         <div className="bg-slate-50 p-8 border-t border-slate-100 flex flex-col items-center gap-4">
                             <p className="text-xs text-slate-400 text-center max-w-sm">
                                 By using our services, you acknowledge that you have read and understood these terms.
-                                Last Updated: February 2024.
+                                Last Updated: February 2026.
                             </p>
                             <Button asChild className="bg-orange-500 hover:bg-orange-600 text-white px-10 py-6 rounded-2xl font-bold text-lg shadow-lg shadow-orange-200">
                                 <Link to="/register">Join the Scheme Now</Link>

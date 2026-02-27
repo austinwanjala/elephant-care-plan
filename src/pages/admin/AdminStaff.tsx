@@ -64,11 +64,10 @@ export default function AdminStaff() {
       const [staffRes, marketersRes, rolesRes, branchesRes] = await Promise.all([
         supabase.from("staff").select("*, branches(name)").order("created_at", { ascending: false }),
         supabase.from("marketers").select("*").order("created_at", { ascending: false }),
-        supabase.from("user_roles").select("user_id, role"),
+        supabase.rpc("admin_list_staff_roles"),
         supabase.from("branches").select("id, name").eq("is_active", true),
       ]);
 
-      console.log("Roles fetched:", rolesRes.data?.length, rolesRes.data);
       if (rolesRes.error) console.error("Error fetching roles:", rolesRes.error);
 
       const roleMap: Record<string, string> = {};

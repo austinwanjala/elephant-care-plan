@@ -1595,6 +1595,14 @@ export type Database = {
     }
     Functions: {
       apply_yearly_rollover: { Args: never; Returns: undefined }
+      admin_list_staff_roles: {
+        Args: never
+        Returns: {
+          branch_id: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }[]
+      }
       ensure_member_profile: { Args: never; Returns: string }
       ensure_portal_role: { Args: never; Returns: Database["public"]["Enums"]["app_role"] }
       finalize_bill: {

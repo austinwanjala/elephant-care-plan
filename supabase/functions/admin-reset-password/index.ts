@@ -90,37 +90,49 @@ serve(async (req: Request) => {
       });
     }
 
-    // 1) Find user in our public tables (prefer user_id for reliability)
-    let user = null;
+    // Identify the target auth user ID.
+    // If userId is provided, use it directly (don't depend on public profile tables).
+    let targetAuthUserId = userId;
 
-    if (userId) {
-      const [{ data: member }, { data: staff }] = await Promise.all([
-        supabaseAdmin.from("members").select("user_id, full_name, phone, email").eq("user_id", userId).maybeSingle(),
-        supabaseAdmin.from("staff").select("user_id, full_name, phone, email").eq("user_id", userId).maybeSingle(),
-      ]);
-      user = member || staff;
-    } else {
-      const [{ data: member }, { data: staff }] = await Promise.all([
-        supabaseAdmin.from("members").select("user_id, full_name, phone, email").eq("email", email).maybeSingle(),
-        supabaseAdmin.from("staff").select("user_id, full_name, phone, email").eq("email", email).maybeSingle(),
-      ]);
-      user = member || staff;
+    if (!targetAuthUserId && email) {
+      const { data: authByEmail, error: authByEmailError } = await supabaseAdmin.auth.admin.listUsers({
+        perPage: 1,
+        page: 1,
+        email,
+      });
+
+      if (authByEmailError) {
+        console.error("[admin-reset-password] Failed to lookup auth user by email", authByEmailError);
+        return new Response(JSON.stringify({ error: "Unable to lookup user" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        });
+      }
+
+      const found = authByEmail?.users?.[0];
+      if (!found) {
+        return new Response(JSON.stringify({ error: "Target user not found" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        });
+      }
+
+      targetAuthUserId = found.id;
     }
 
-    if (!user) {
-      console.error("[admin-reset-password] Target user not found", { userId, email });
+    if (!targetAuthUserId) {
       return new Response(JSON.stringify({ error: "Target user not found" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 400,
       });
     }
 
-    // 2. Admins cannot reset passwords for admin/super_admin accounts
+    // Admins cannot reset passwords for admin/super_admin accounts
     if (!isSuperAdmin) {
       const { data: targetRoles, error: targetRolesError } = await supabaseAdmin
         .from("user_roles")
         .select("role")
-        .eq("user_id", user.user_id);
+        .eq("user_id", targetAuthUserId);
 
       if (targetRolesError) {
         console.error("[admin-reset-password] Failed to fetch target roles", targetRolesError);
@@ -139,8 +151,8 @@ serve(async (req: Request) => {
       }
     }
 
-    // 3. Update password in Auth
-    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user.user_id, {
+    // Update password in Auth
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(targetAuthUserId, {
       password,
     });
 
@@ -152,27 +164,37 @@ serve(async (req: Request) => {
       });
     }
 
-    // 4. Audit log
+    // Try to find contact info for notifications/audit (optional)
+    const [{ data: member }, { data: staff }, { data: marketer }, { data: director }] = await Promise.all([
+      supabaseAdmin.from("members").select("user_id, full_name, phone, email").eq("user_id", targetAuthUserId).maybeSingle(),
+      supabaseAdmin.from("staff").select("user_id, full_name, phone, email").eq("user_id", targetAuthUserId).maybeSingle(),
+      supabaseAdmin.from("marketers").select("user_id, full_name, phone, email").eq("user_id", targetAuthUserId).maybeSingle(),
+      supabaseAdmin.from("branch_directors").select("user_id, full_name, phone, email").eq("user_id", targetAuthUserId).maybeSingle(),
+    ]);
+
+    const profile = member || staff || marketer || director || null;
+
+    // Audit log
     await supabaseAdmin.from("system_logs").insert({
       action: "ADMIN_PASSWORD_RESET",
       user_id: callerId,
       details: {
-        target_user_id: user.user_id,
-        target_email: user.email ?? email ?? null,
+        target_user_id: targetAuthUserId,
+        target_email: profile?.email ?? email ?? null,
         performed_by: callerId,
         caller_role: callerRole,
       },
     });
 
-    // 5. Optional SMS notification
-    if (user.phone) {
+    // Optional SMS notification
+    if (profile?.phone) {
       const { error: smsError } = await supabaseAdmin.functions.invoke("send-sms", {
         body: {
           type: "password_reset",
-          phone: user.phone,
-          email: user.email,
+          phone: profile.phone,
+          email: profile.email,
           data: {
-            name: user.full_name,
+            name: profile.full_name,
             password,
           },
         },

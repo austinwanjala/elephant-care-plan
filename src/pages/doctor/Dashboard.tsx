@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Users, ClipboardList, History, ArrowRight } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2, Users, ClipboardList, History, LayoutDashboard, ArrowRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 
 export default function DoctorDashboard() {
     const [stats, setStats] = useState({ waiting: 0, inProgress: 0 });
@@ -29,12 +30,10 @@ export default function DoctorDashboard() {
 
         const today = new Date().toISOString().split('T')[0];
 
-        // Restriction: doctors only see visits assigned to them.
-        const { data: visits } = await (supabase as any)
+        const { data: visits } = await supabase
             .from("visits")
             .select("status")
             .eq('branch_id', staffData.branch_id)
-            .eq('assigned_doctor_id', staffData.id)
             .or(`and(status.eq.registered,created_at.gte.${today}),and(status.eq.with_doctor,doctor_id.eq.${staffData.id})`);
 
         if (visits) {

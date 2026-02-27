@@ -39,12 +39,13 @@ export default function DoctorQueue() {
 
         const today = new Date().toISOString().split('T')[0];
 
-        // Restriction: doctors only see visits assigned to them.
-        const { data, error } = await (supabase as any)
+        // Fetch visits: 
+        // 1. Registered (Waiting) - Created Today
+        // 2. With Doctor (In Progress) - Assigned to this doctor (ANY date to persist)
+        const { data, error } = await supabase
             .from("visits")
             .select("*, members(full_name, member_number, age, dob), dependants(*)")
             .eq('branch_id', staffData.branch_id)
-            .eq('assigned_doctor_id', staffData.id)
             .or(`and(status.eq.registered,created_at.gte.${today}),and(status.eq.with_doctor,doctor_id.eq.${staffData.id})`)
             .order('created_at', { ascending: true });
 
@@ -60,7 +61,7 @@ export default function DoctorQueue() {
         if (currentStatus === 'registered') {
             const { error } = await supabase
                 .from("visits")
-                .update({ status: 'with_doctor', doctor_id: doctorId, assigned_doctor_id: doctorId })
+                .update({ status: 'with_doctor', doctor_id: doctorId })
                 .eq("id", visitId);
 
             if (error) {
@@ -126,35 +127,60 @@ export default function DoctorQueue() {
                                                 }
                                                 return age;
                                             }
-                                            return visit.members?.age || "N/A";
+                                            if (visit.members?.age) return visit.members.age;
+                                            if (visit.members?.dob) {
+                                                const birthDate = new Date(visit.members.dob);
+                                                const today = new Date();
+                                                let age = today.getFullYear() - birthDate.getFullYear();
+                                                const m = today.getMonth() - birthDate.getMonth();
+                                                if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                                                    age--;
+                                                }
+                                                return age;
+                                            }
+                                            return 0;
                                         };
+
+                                        const patientAge = getAge();
+                                        const isDependant = !!visit.dependants;
 
                                         return (
                                             <TableRow key={visit.id}>
-                                                <TableCell>{new Date(visit.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</TableCell>
-                                                <TableCell>
-                                                    <div className="font-medium">{patientName}</div>
-                                                    <div className="text-xs text-muted-foreground">Age: {getAge()}</div>
+                                                <TableCell className="font-mono text-xs">
+                                                    {new Date(visit.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    <div className="text-[10px] text-muted-foreground">{new Date(visit.created_at).toLocaleDateString()}</div>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <div className="text-sm">{visit.members?.member_number}</div>
-                                                    {visit.dependants && (
-                                                        <div className="text-xs text-muted-foreground">Dependant</div>
-                                                    )}
+                                                    <div>
+                                                        <p className="font-medium flex items-center gap-2">
+                                                            {patientName}
+                                                            {isDependant && <Badge variant="outline" className="text-[10px] h-4 px-1">Dependant</Badge>}
+                                                            {patientAge <= 14 && <Badge variant="secondary" className="text-[10px] h-4 px-1 bg-amber-100 text-amber-800 hover:bg-amber-100">Pediatric</Badge>}
+                                                        </p>
+                                                        <p className="text-xs text-muted-foreground">{patientAge} yrs</p>
+                                                    </div>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Badge variant={visit.status === 'registered' ? 'secondary' : 'default'}>
-                                                        {visit.status.replace('_', ' ').toUpperCase()}
+                                                    <div className="flex flex-col">
+                                                        <span>{visit.dependants?.document_number ? `ID: ${visit.dependants.document_number}` : (visit.members?.member_number || '-')}</span>
+                                                        {isDependant && <span className="text-[10px] text-muted-foreground">Principal: {visit.members?.full_name}</span>}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge variant={visit.status === 'with_doctor' ? 'default' : 'secondary'}>
+                                                        {visit.status === 'with_doctor' ? 'In Progress' : 'Waiting'}
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Button
-                                                        onClick={() => handleStartConsultation(visit.id, visit.status)}
-                                                        size="sm"
-                                                        className="gap-2"
-                                                    >
-                                                        {visit.status === 'registered' ? 'Start' : 'Continue'} <ArrowRight className="h-4 w-4" />
-                                                    </Button>
+                                                    <div className="flex gap-2">
+                                                        <Button size="sm" onClick={() => handleStartConsultation(visit.id, visit.status)}>
+                                                            {visit.status === 'with_doctor' ? 'Continue' : 'Start'}
+                                                            <ArrowRight className="ml-2 h-4 w-4" />
+                                                        </Button>
+                                                        <Button size="sm" variant="outline" onClick={() => setScanDialogOpen(true)}>
+                                                            <QrCode className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
                                                 </TableCell>
                                             </TableRow>
                                         );
@@ -165,6 +191,15 @@ export default function DoctorQueue() {
                     </div>
                 </CardContent>
             </Card>
+
+            <Dialog open={scanDialogOpen} onOpenChange={setScanDialogOpen}>
+                <DialogContent className="max-w-3xl">
+                    <DialogHeader>
+                        <DialogTitle>Instant Card Verification</DialogTitle>
+                    </DialogHeader>
+                    <CardScanner />
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -6,10 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Loader2, CreditCard, Phone, CheckCircle2, AlertCircle, ShieldCheck } from "lucide-react";
+import { Loader2, CreditCard, Phone, CheckCircle2, ShieldCheck, Wallet } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { kopokopoService } from "@/services/kopokopo";
+import { Progress } from "@/components/ui/progress";
 
 interface Payment {
   id: string;
@@ -24,6 +26,13 @@ interface Payment {
   created_at: string;
 }
 
+type MemberWalletInfo = {
+  id: string;
+  phone: string;
+  membership_category_id: string | null;
+  scheme_selected: boolean | null;
+};
+
 export default function MemberPayments() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,30 +41,31 @@ export default function MemberPayments() {
   const [amount, setAmount] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const { toast } = useToast();
-  const [memberId, setMemberId] = useState<string | null>(null);
+  const [member, setMember] = useState<MemberWalletInfo | null>(null);
+  const navigate = useNavigate();
 
   const fetchPayments = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data: member } = await supabase
+    const { data: memberData } = await supabase
       .from("members")
-      .select("id, phone")
+      .select("id, phone, membership_category_id, scheme_selected")
       .eq("user_id", user.id)
       .maybeSingle();
 
-    if (!member) {
+    if (!memberData) {
       setLoading(false);
       return;
     }
 
-    setMemberId(member.id);
-    if (!phoneNumber) setPhoneNumber(member.phone);
+    setMember(memberData);
+    if (!phoneNumber) setPhoneNumber(memberData.phone);
 
     const { data } = await supabase
       .from("payments")
       .select("*")
-      .eq("member_id", member.id)
+      .eq("member_id", memberData.id)
       .order("created_at", { ascending: false });
 
     setPayments(data || []);
@@ -66,33 +76,40 @@ export default function MemberPayments() {
     fetchPayments();
   }, []);
 
-  const handleKopoKopoPayment = async () => {
-    if (!amount || !phoneNumber || !memberId) {
+  const walletTotal = useMemo(() => {
+    return payments
+      .filter((p) => p.status === 'completed' && (p.reference || '').startsWith('WALLET-TOPUP-'))
+      .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  }, [payments]);
+
+  const handleWalletTopup = async () => {
+    if (!amount || !phoneNumber || !member?.id) {
       toast({ title: "Error", description: "Please enter amount and phone number", variant: "destructive" });
       return;
     }
 
     setProcessing(true);
     try {
+      const topupAmount = parseFloat(amount);
+
       const response = await kopokopoService.initiateStkPush({
-        amount: parseFloat(amount),
+        amount: topupAmount,
         phone: phoneNumber,
-        memberId: memberId,
-        coverageAmount: parseFloat(amount),
-        paymentType: "Manual Top-up",
-        invoiceNumber: `TOPUP-${Date.now()}`
+        memberId: member.id,
+        coverageAmount: 0,
+        paymentType: "Wallet Top-up",
+        invoiceNumber: `WALLET-TOPUP-${Date.now()}`
       });
 
       const resourceId = response.resource_id;
 
       toast({
-        title: "Payment Initiated",
+        title: "Top-up Initiated",
         description: "Please check your phone for the M-Pesa STK push prompt.",
       });
 
-      // Listen for payment status updates via Realtime
       const channel = supabase
-        .channel('topup-status')
+        .channel('wallet-topup-status')
         .on(
           'postgres_changes',
           {
@@ -104,8 +121,8 @@ export default function MemberPayments() {
           (payload) => {
             if (payload.new.status === 'completed') {
               toast({
-                title: "Payment Successful",
-                description: `KES ${parseFloat(amount).toLocaleString()} has been added to your coverage.`,
+                title: "Top-up Successful",
+                description: `KES ${topupAmount.toLocaleString()} added to your wallet.`,
               });
               channel.unsubscribe();
               setProcessing(false);
@@ -114,7 +131,7 @@ export default function MemberPayments() {
               fetchPayments();
             } else if (payload.new.status === 'failed') {
               toast({
-                title: "Payment Failed",
+                title: "Top-up Failed",
                 description: "The payment request was cancelled or failed.",
                 variant: "destructive"
               });
@@ -125,7 +142,6 @@ export default function MemberPayments() {
         )
         .subscribe();
 
-      // Fallback polling + Remote Verification
       let attempts = 0;
       const interval = setInterval(async () => {
         attempts++;
@@ -134,7 +150,6 @@ export default function MemberPayments() {
           return;
         }
 
-        // Periodically trigger a remote status check to force a DB update if the webhook was missed
         if (attempts % 3 === 0) {
           await kopokopoService.checkStatus(resourceId).catch(console.error);
         }
@@ -180,6 +195,8 @@ export default function MemberPayments() {
     );
   }
 
+  const schemeNotChosen = !member?.membership_category_id && !member?.scheme_selected;
+
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       <div className="flex justify-between items-center">
@@ -200,7 +217,7 @@ export default function MemberPayments() {
               </div>
               <DialogTitle className="text-2xl font-bold text-[#49B249]">M-Pesa Payment</DialogTitle>
               <DialogDescription className="text-center">
-                Fast, secure payment via Lipa Na M-Pesa STK Push.
+                Wallet top-up (pay gradually). When your wallet reaches the scheme amount, you can activate coverage.
               </DialogDescription>
             </DialogHeader>
 
@@ -235,7 +252,7 @@ export default function MemberPayments() {
 
             <DialogFooter className="sm:justify-center pt-2">
               <Button
-                onClick={handleKopoKopoPayment}
+                onClick={handleWalletTopup}
                 disabled={processing}
                 className="w-full bg-[#49B249] hover:bg-[#3d943d] text-white text-lg h-12 rounded-xl font-bold shadow-md transition-all active:scale-95"
               >
@@ -249,6 +266,32 @@ export default function MemberPayments() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {schemeNotChosen && (
+        <Card className="border-emerald-200 bg-emerald-50/40">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Wallet className="h-5 w-5" /> Wallet (Pay Gradually)</CardTitle>
+            <CardDescription>
+              Your wallet is the total of completed "Wallet Top-up" payments. Once it matches the scheme amount, you can activate coverage.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-end justify-between">
+              <div>
+                <div className="text-xs text-muted-foreground">Wallet Balance</div>
+                <div className="text-2xl font-bold text-emerald-700">KES {walletTotal.toLocaleString()}</div>
+              </div>
+              <Button onClick={() => navigate('/scheme-selection')} className="bg-emerald-600 hover:bg-emerald-700">
+                Choose Scheme & Activate
+              </Button>
+            </div>
+            <Progress value={walletTotal > 0 ? 100 : 0} />
+            <p className="text-xs text-muted-foreground">
+              You can keep topping up your wallet from this page. Scheme activation is done on the scheme page.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {payments.length === 0 ? (
         <Card className="border-dashed">

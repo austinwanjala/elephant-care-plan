@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Loader2, CreditCard, Phone, CheckCircle2, ShieldCheck, Wallet, AlertCircle } from "lucide-react";
+import { Loader2, CreditCard, Phone, CheckCircle2, ShieldCheck, Wallet, AlertCircle, Printer } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { kopokopoService } from "@/services/kopokopo";
@@ -179,6 +179,111 @@ export default function MemberPayments() {
       toast({ title: "Request Failed", description: error.message, variant: "destructive" });
       setProcessing(false);
     }
+  };
+
+  const handlePrintReceipt = (payment: Payment) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const html = `
+      <html>
+        <head>
+          <title>Receipt - ${payment.mpesa_code || payment.id}</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+            body { font-family: 'Inter', sans-serif; padding: 40px; color: #1e293b; line-height: 1.5; }
+            .header { border-bottom: 2px solid #10b981; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; padding-bottom: 15px; }
+            .logo-text { font-size: 32px; font-weight: 800; line-height: 1; letter-spacing: 1px; }
+            .slogan { font-size: 11px; color: #064e3b; font-style: italic; margin-top: 5px; font-weight: 600; }
+            .contact-info { text-align: right; color: #064e3b; font-size: 11px; line-height: 1.4; }
+            .receipt-title { font-size: 24px; font-weight: 700; margin-bottom: 20px; color: #064e3b; text-align: center; text-transform: uppercase; letter-spacing: 2px; }
+            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 40px; }
+            .info-box { background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; }
+            .label { font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 700; margin-bottom: 4px; }
+            .value { font-size: 14px; font-weight: 600; color: #1e293b; }
+            .amount-box { text-align: center; padding: 30px; background: #f0fdf4; border: 2px dashed #10b981; border-radius: 12px; margin-bottom: 40px; }
+            .amount-val { font-size: 48px; font-weight: 800; color: #065f46; }
+            .footer { text-align: center; font-size: 12px; color: #64748b; margin-top: 60px; border-top: 1px solid #e2e8f0; padding-top: 20px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div style="display: flex; align-items: center; gap: 15px;">
+              <img src="/img/elephant-logo.png" style="width: 60px; height: 60px; object-fit: contain;" />
+              <div>
+                <div class="logo-text" style="color: #064e3b;">ELEPHANT</div>
+                <div class="logo-text" style="color: #10b981;">DENTAL</div>
+                <div class="slogan">...the epitome of dental solutions</div>
+              </div>
+            </div>
+            <div class="contact-info">
+              <div style="font-weight: 800; text-decoration: underline; margin-bottom: 5px; border: 1px solid #10b981; padding: 2px 8px; display: inline-block;">HEAD OFFICE</div>
+              <div>P. O. Box 643 - 60200, Meru</div>
+              <div>Mobile: +254 710 500 500</div>
+              <div>Email: elephantkenya@gmail.com</div>
+              <div>Website: www.elephantdental.org</div>
+            </div>
+          </div>
+
+          <div class="receipt-title">Official Payment Receipt</div>
+
+          <div class="amount-box">
+            <div class="label">Amount Paid</div>
+            <div class="amount-val">KES ${Number(payment.amount).toLocaleString()}</div>
+            <div style="color: #059669; font-weight: 600; margin-top: 5px;">Payment Successful</div>
+          </div>
+
+          <div class="info-grid">
+            <div class="info-box">
+              <div class="label">Transaction Details</div>
+              <div style="margin-bottom: 10px;">
+                <div class="label" style="font-size: 9px;">M-Pesa Reference</div>
+                <div class="value">${payment.mpesa_code || payment.mpesa_reference || 'N/A'}</div>
+              </div>
+              <div>
+                <div class="label" style="font-size: 9px;">System ID</div>
+                <div class="value" style="font-size: 10px; font-family: monospace;">${payment.id}</div>
+              </div>
+            </div>
+            <div class="info-box">
+              <div class="label">Date & Time</div>
+              <div style="margin-bottom: 10px;">
+                <div class="label" style="font-size: 9px;">Payment Date</div>
+                <div class="value">${format(new Date(payment.payment_date || payment.created_at), "MMMM d, yyyy")}</div>
+              </div>
+              <div>
+                <div class="label" style="font-size: 9px;">Time</div>
+                <div class="value">${format(new Date(payment.payment_date || payment.created_at), "HH:mm:ss")}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="info-box" style="margin-bottom: 40px; text-align: center;">
+            <div class="label">Coverage Implication</div>
+            <div class="value" style="color: #10b981; font-size: 18px;">+ KES ${Number(payment.coverage_added).toLocaleString()} Added to Limit</div>
+          </div>
+
+          <div class="footer">
+            Thank you for choosing Elephant Dental Care.<br>
+            Providing accessible oral healthcare for everyone across Kenya.
+            <br><br>
+            <div style="font-size: 10px; opacity: 0.7;">This is a computer-generated receipt and does not require a signature.</div>
+          </div>
+
+          <script>
+            window.onload = function() {
+              setTimeout(() => {
+                window.print();
+                window.close();
+              }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
   };
 
   const getStatusColor = (status: string | null) => {
@@ -377,6 +482,18 @@ export default function MemberPayments() {
                     {(payment.mpesa_code || payment.reference || payment.mpesa_reference || payment.kopo_resource_id) && (
                       <div className="text-[10px] text-muted-foreground mt-1 font-mono bg-slate-50 px-2 py-0.5 rounded inline-block">
                         Ref: {payment.mpesa_code || payment.reference || payment.mpesa_reference || payment.kopo_resource_id}
+                      </div>
+                    )}
+                    {payment.status === 'completed' && (
+                      <div className="mt-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-[10px] gap-1 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                          onClick={() => handlePrintReceipt(payment)}
+                        >
+                          <Printer className="h-3 w-3" /> Print Receipt
+                        </Button>
                       </div>
                     )}
                   </div>

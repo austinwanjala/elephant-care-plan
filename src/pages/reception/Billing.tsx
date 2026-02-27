@@ -160,9 +160,26 @@ export default function ReceptionBilling() {
                 </style>
             </head>
             <body>
-                <div class="header">
-                    <div class="logo font-serif italic">ELEPHANT DENTAL CARE</div>
-                    <div class="invoice-label">Visit Invoice</div>
+                <div class="header" style="border-bottom: 2px solid #10b981; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; padding-bottom: 15px;">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <img src="/img/elephant-logo.png" style="width: 70px; height: 70px; object-fit: contain;" />
+                        <div>
+                            <div style="font-size: 32px; font-weight: 800; color: #064e3b; line-height: 1; letter-spacing: 1px;">ELEPHANT</div>
+                            <div style="font-size: 32px; font-weight: 800; color: #10b981; line-height: 1; letter-spacing: 1px;">DENTAL</div>
+                            <div style="font-size: 11px; color: #064e3b; font-style: italic; margin-top: 5px; font-weight: 600;">...the epitome of dental solutions</div>
+                        </div>
+                    </div>
+                    <div style="text-align: right; color: #064e3b; font-size: 11px; line-height: 1.4;">
+                        <div style="font-weight: 800; text-decoration: underline; margin-bottom: 5px; border: 1px solid #10b981; padding: 2px 8px; display: inline-block;">HEAD OFFICE</div>
+                        <div>P. O. Box 643 - 60200, Meru</div>
+                        <div>Mobile: +254 710 500 500</div>
+                        <div>Email: elephantkenya@gmail.com</div>
+                        <div>Website: www.elephantdental.org</div>
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 30px;">
+                    <h2 style="margin: 0; color: #1e293b; font-size: 24px;">VISIT INVOICE</h2>
+                    <div style="background: #10b981; color: white; padding: 4px 12px; border-radius: 4px; font-weight: bold; font-size: 12px;">PAID / COVERED</div>
                 </div>
                 <div class="info-grid">
                     <div>
@@ -175,7 +192,7 @@ export default function ReceptionBilling() {
                         <div class="section-title">Invoice Details</div>
                         Invoice ID: INV-${visit.id.slice(0, 8).toUpperCase()}<br>
                         Visit Date: ${new Date(visit.created_at).toLocaleDateString()}<br>
-                        Status: <span style="color: #059669; font-weight: bold;">PAID / COVERED</span>
+                        Generated: ${new Date().toLocaleString()}
                     </div>
                 </div>
                 <table>
@@ -200,11 +217,11 @@ export default function ReceptionBilling() {
                             <span>Total Visit Cost:</span>
                             <span>KES ${Number(bill?.total_benefit_cost).toLocaleString()}</span>
                         </div>
-                        <div class="total-row" style="color: #059669">
+                        <div class="total-row" style="color: #10b981">
                             <span>Member Coverage Applied:</span>
                             <span>- KES ${Number(bill?.total_benefit_cost).toLocaleString()}</span>
                         </div>
-                        <div class="total-row grand-total">
+                        <div class="total-row grand-total" style="background: #10b981">
                             <span>Balance Due:</span>
                             <span>KES 0.00</span>
                         </div>
@@ -212,7 +229,7 @@ export default function ReceptionBilling() {
                 </div>
                 <div class="footer">
                     Thank you for trusting Elephant Dental with your care.<br>
-                    Elephant Care Plan - Providing accessible oral healthcare for everyone.
+                    Providing accessible oral healthcare for everyone across Kenya.
                 </div>
                 <script>window.onload = function() { window.print(); window.close(); }</script>
             </body>

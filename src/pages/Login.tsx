@@ -251,8 +251,8 @@ const Login = () => {
           </Link>
 
           <div className="flex items-center gap-2 mb-12">
-            <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
-              <span className="text-xl">🐘</span>
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
+              <img src="/img/elephant-logo.png" alt="Elephant Logo" className="w-8 h-8 object-contain" />
             </div>
             <span className="text-xl font-serif font-bold text-foreground">{settings.app_name || "Elephant Dental"}</span>
           </div>

@@ -1,4 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
+import { cn } from "@/lib/utils";
 import { useSidebar, Sidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { BarChart3, TrendingUp, Users, LogOut, LayoutDashboard, Building2, ShieldCheck, Stethoscope, MessageSquare } from "lucide-react";
@@ -37,8 +38,8 @@ export function DirectorSidebar() {
         <Sidebar collapsible="icon" className="border-r border-border">
             <SidebarHeader className="p-4 border-b border-border">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-emerald-600 flex items-center justify-center shrink-0">
-                        <Building2 className="text-white h-6 w-6" />
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden">
+                        <img src="/img/elephant-logo.png" alt="Elephant Logo" className="w-8 h-8 object-contain" />
                     </div>
                     {!collapsed && (
                         <div>
@@ -56,14 +57,29 @@ export function DirectorSidebar() {
                     <SidebarMenu>
                         {menuItems.map((item) => (
                             <SidebarMenuItem key={item.title}>
-                                <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={item.title}>
+                                <SidebarMenuButton
+                                    asChild
+                                    isActive={isActive(item.url)}
+                                    tooltip={item.title}
+                                    className="h-11 transition-all duration-300"
+                                >
                                     <a
                                         href={item.url}
                                         onClick={(e) => { e.preventDefault(); navigate(item.url); }}
                                         className="flex items-center gap-3"
                                     >
-                                        <item.icon className="h-5 w-5" />
-                                        <span>{item.title}</span>
+                                        <div className={cn(
+                                            "flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300",
+                                            isActive(item.url)
+                                                ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-110"
+                                                : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
+                                        )}>
+                                            <item.icon className="h-4 w-4" />
+                                        </div>
+                                        <span className={cn(
+                                            "font-medium transition-colors duration-300",
+                                            isActive(item.url) ? "text-primary font-bold" : "text-slate-600"
+                                        )}>{item.title}</span>
                                     </a>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>

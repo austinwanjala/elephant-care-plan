@@ -33,18 +33,20 @@ serve(async (req) => {
         });
 
         if (ResultCode === 0) {
-            let mpesaReceipt = null;
+            let mpesaReceipt: string | null = null;
             if (CallbackMetadata?.Item) {
-                mpesaReceipt = CallbackMetadata.Item.find((i: any) => i.Name === "MpesaReceiptNumber")?.Value;
+                mpesaReceipt = CallbackMetadata.Item.find((i: any) => i.Name === "MpesaReceiptNumber")?.Value || null;
             }
 
             // Update the payment record
+            // Save MpesaReceiptNumber BOTH as mpesa_code and mpesa_reference (legacy compatibility)
             const { data, error } = await supabase
                 .from("payments")
                 .update({
                     status: "completed",
                     mpesa_result_code: ResultCode,
                     mpesa_result_desc: ResultDesc,
+                    mpesa_code: mpesaReceipt,
                     mpesa_reference: mpesaReceipt,
                     payment_date: new Date().toISOString()
                 })
@@ -68,7 +70,9 @@ serve(async (req) => {
                 .update({
                     status: "failed",
                     mpesa_result_code: ResultCode,
-                    mpesa_result_desc: ResultDesc
+                    mpesa_result_desc: ResultDesc,
+                    mpesa_code: null,
+                    mpesa_reference: null
                 })
                 .eq("mpesa_checkout_request_id", CheckoutRequestID);
         }

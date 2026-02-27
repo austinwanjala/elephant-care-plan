@@ -1,106 +1,177 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-// @ts-ignore
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 serve(async (req: Request) => {
-    if (req.method === "OPTIONS") {
-        return new Response("ok", { headers: corsHeaders });
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    );
+
+    // Manual authentication handling
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
     }
 
-    try {
-        const supabaseAdmin = createClient(
-            // @ts-ignore
-            Deno.env.get("SUPABASE_URL") ?? "",
-            // @ts-ignore
-            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-            {
-                auth: {
-                    autoRefreshToken: false,
-                    persistSession: false,
-                },
-            }
-        );
-
-        const { email, password, admin_id } = await req.json();
-
-        if (!email || !password) {
-            throw new Error("Email and new password are required");
-        }
-
-        // 1. Find the user in the public tables first (to verify they are our user)
-        const [{ data: member }, { data: staff }] = await Promise.all([
-            supabaseAdmin.from("members").select("user_id, full_name, phone, email").eq("email", email).maybeSingle(),
-            supabaseAdmin.from("staff").select("user_id, full_name, phone, email").eq("email", email).maybeSingle()
-        ]);
-
-        const user = member || staff;
-
-        if (!user) {
-            throw new Error("This email is not registered in our system.");
-        }
-
-        // 2. Update the password in Auth using the ID
-        const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-            user.user_id,
-            { password: password }
-        );
-
-        if (updateError) throw updateError;
-
-        // 3. Store audit log
-        await supabaseAdmin.from("system_logs").insert({
-            action: "ADMIN_PASSWORD_RESET",
-            user_id: admin_id || null,
-            details: {
-                target_user_id: user.user_id,
-                target_email: email,
-                performed_by: admin_id,
-                message: "Password reset performed by admin"
-            }
-        });
-
-        // 4. Send notification
-        if (user.phone) {
-            try {
-                // We call the send-sms function internally or just use the same logic
-                // For simplicity here, let's assume we trigger it via another fetch or common utility if possible.
-                // Since Deno functions are isolated, we fetch the other function's URL.
-                const functionUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/send-sms`;
-                await fetch(functionUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        type: 'password_reset',
-                        phone: user.phone,
-                        email: user.email,
-                        data: {
-                            name: user.full_name,
-                            password: password
-                        }
-                    })
-                });
-            } catch (notifyError) {
-                console.error("Failed to send notification:", notifyError);
-            }
-        }
-
-        return new Response(JSON.stringify({ message: "Password updated successfully and notification sent" }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-            status: 200,
-        });
-    } catch (error: any) {
-        return new Response(JSON.stringify({ error: error.message }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-            status: 400,
-        });
+    const token = authHeader.replace("Bearer ", "").trim();
+    const { data: authUser, error: authUserError } = await supabaseAdmin.auth.getUser(token);
+    if (authUserError || !authUser?.user) {
+      console.error("[admin-reset-password] Unauthorized token", authUserError);
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
     }
+
+    const callerId = authUser.user.id;
+
+    const { data: callerRoleRow, error: callerRoleError } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", callerId)
+      .limit(1)
+      .maybeSingle();
+
+    if (callerRoleError) {
+      console.error("[admin-reset-password] Failed to fetch caller role", callerRoleError);
+      return new Response(JSON.stringify({ error: "Unable to verify permissions" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 403,
+      });
+    }
+
+    const callerRole = (callerRoleRow?.role as string | null) ?? null;
+    const isSuperAdmin = callerRole === "super_admin";
+    const isAdmin = callerRole === "admin";
+
+    if (!isSuperAdmin && !isAdmin) {
+      return new Response(JSON.stringify({ error: "Permission denied" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 403,
+      });
+    }
+
+    const { email, password } = await req.json();
+
+    if (!email || !password) {
+      return new Response(JSON.stringify({ error: "Email and new password are required" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
+    }
+
+    // 1. Find user in our public tables
+    const [{ data: member }, { data: staff }] = await Promise.all([
+      supabaseAdmin.from("members").select("user_id, full_name, phone, email").eq("email", email).maybeSingle(),
+      supabaseAdmin.from("staff").select("user_id, full_name, phone, email").eq("email", email).maybeSingle(),
+    ]);
+
+    const user = member || staff;
+
+    if (!user) {
+      return new Response(JSON.stringify({ error: "This email is not registered in our system." }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
+    }
+
+    // 2. Admins cannot reset passwords for admin/super_admin accounts
+    if (!isSuperAdmin) {
+      const { data: targetRoles, error: targetRolesError } = await supabaseAdmin
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.user_id);
+
+      if (targetRolesError) {
+        console.error("[admin-reset-password] Failed to fetch target roles", targetRolesError);
+        return new Response(JSON.stringify({ error: "Unable to verify target user" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 403,
+        });
+      }
+
+      const roles = (targetRoles ?? []).map((r: any) => r.role);
+      if (roles.includes("admin") || roles.includes("super_admin")) {
+        return new Response(JSON.stringify({ error: "Permission denied" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 403,
+        });
+      }
+    }
+
+    // 3. Update password in Auth
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user.user_id, {
+      password,
+    });
+
+    if (updateError) {
+      console.error("[admin-reset-password] Password update failed", updateError);
+      return new Response(JSON.stringify({ error: updateError.message }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
+    }
+
+    // 4. Audit log
+    await supabaseAdmin.from("system_logs").insert({
+      action: "ADMIN_PASSWORD_RESET",
+      user_id: callerId,
+      details: {
+        target_user_id: user.user_id,
+        target_email: email,
+        performed_by: callerId,
+        caller_role: callerRole,
+      },
+    });
+
+    // 5. Optional SMS notification
+    if (user.phone) {
+      const { error: smsError } = await supabaseAdmin.functions.invoke("send-sms", {
+        body: {
+          type: "password_reset",
+          phone: user.phone,
+          email: user.email,
+          data: {
+            name: user.full_name,
+            password,
+          },
+        },
+      });
+
+      if (smsError) {
+        console.error("[admin-reset-password] Failed to send SMS notification", smsError);
+      }
+    }
+
+    return new Response(JSON.stringify({ message: "Password updated successfully" }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200,
+    });
+  } catch (error: any) {
+    console.error("[admin-reset-password] Fatal error", { message: error?.message });
+    return new Response(JSON.stringify({ error: error.message }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 400,
+    });
+  }
 });

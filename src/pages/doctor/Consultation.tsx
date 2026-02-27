@@ -226,7 +226,7 @@ export default function Consultation() {
 
             if (visitsData) setPastVisits(visitsData);
 
-            let recordsQuery = supabase
+            let recordsQuery = (supabase as any)
                 .from("dental_records")
                 .select("tooth_number, status, condition, color, visit_id")
                 .eq("member_id", data.member_id);
@@ -293,9 +293,10 @@ export default function Consultation() {
             if (data.status === 'registered' && doctorId) {
                 await supabase
                     .from("visits")
-                    .update({ status: 'with_doctor', doctor_id: doctorId })
+                    .update({ status: 'with_doctor', doctor_id: doctorId, assigned_doctor_id: doctorId })
                     .eq("id", visitId);
             }
+
         }
         setLoading(false);
     };
@@ -405,7 +406,7 @@ export default function Consultation() {
         if (consultationMode === 'diagnosis') {
             // Check if tooth already has a diagnosis
             if (existingConditions[toothId]) {
-                toast({ title: "Locked", description: "This tooth has already been diagnosed and its condition cannot be changed.", variant: "secondary" });
+                toast({ title: "Locked", description: "This tooth has already been diagnosed and its condition cannot be changed.", variant: "default" });
                 return;
             }
 
@@ -430,7 +431,7 @@ export default function Consultation() {
                 toast({
                     title: `Active Treatment: Tooth #${toothId}`,
                     description: `"${stage?.services?.name}" is in progress (Stage ${stage?.current_stage}/${stage?.total_stages}). Use the "Complete Stage" button in the Active Treatment panel above.`,
-                    variant: "secondary"
+                    variant: "default"
                 });
                 return;
             }
@@ -466,15 +467,16 @@ export default function Consultation() {
             }));
 
             if (recordsToUpsert.length > 0) {
-                const { error: dentalError } = await supabase.rpc('upsert_dental_records', { records: recordsToUpsert });
+                const { error: dentalError } = await (supabase as any).rpc('upsert_dental_records', { records: recordsToUpsert });
                 if (dentalError) throw dentalError;
             }
 
             // Update visit diagnosis text and "lock" it (mark as passed diagnosis)
+
             const combinedDiagnosis = diagnosis + (newDiagnosis ? (diagnosis ? "\n" : "") + newDiagnosis : "");
             const combinedNotes = treatmentNotes + (newTreatmentNotes ? (treatmentNotes ? "\n" : "") + newTreatmentNotes : "");
 
-            const { error: visitError } = await supabase.from("visits").update({
+            const { error: visitError } = await (supabase as any).from("visits").update({
                 diagnosis: combinedDiagnosis,
                 treatment_notes: combinedNotes,
                 treatment_done: treatmentDone,
@@ -692,7 +694,6 @@ export default function Consultation() {
         // So it IS safe to fall through to performAddService!
         // So it IS safe to fall through to performAddService!
 
-        // If it's a multi-stage service, prompt for stage selection for NEW starts
         if (service.is_multi_stage) {
             // Check if we already have an active stage for General (if no teeth selected)
             if (selectedTeeth.length === 0) {
@@ -703,7 +704,7 @@ export default function Consultation() {
                 if (existingStage) {
                     const nextStage = existingStage.current_stage + 1;
                     if (nextStage > service.total_stages) {
-                        toast({ title: "Completed", description: "This treatment is already completed.", variant: "secondary" });
+                        toast({ title: "Completed", description: "This treatment is already completed.", variant: "default" });
                         return;
                     }
                     toast({ title: "Continuing Treatment", description: `Added ${service.name} Stage ${nextStage}.` });
@@ -724,6 +725,14 @@ export default function Consultation() {
 
             // Set default stage to next available
             const maxStage = getMaxStageForSelection(service.id, selectedTeeth);
+
+            // MANDATORY ENFORCEMENT: A doctor cannot start a multistage service at Stage 2 or above.
+            // If no previous stages done (maxStage == 0), always start at 1.
+            if (maxStage === 0) {
+                performAddService(service, 1);
+                return;
+            }
+
             const nextSuggested = maxStage + 1;
 
             if (nextSuggested > service.total_stages) {
@@ -743,6 +752,7 @@ export default function Consultation() {
 
         performAddService(service, 1);
     };
+
 
     const handleConfirmPinsPosts = () => {
         if (pendingPinsPostsData) {
@@ -766,7 +776,7 @@ export default function Consultation() {
 
     const handleContinueStage = (stage: any) => {
         if (selectedServices.find(s => s.service.stageId === stage.id)) {
-            toast({ title: "Already Added", description: "This stage progression is already in the list.", variant: "secondary" });
+            toast({ title: "Already Added", description: "This stage progression is already in the list.", variant: "default" });
             return;
         }
         setPendingContinueStage(stage);
@@ -958,7 +968,7 @@ export default function Consultation() {
                 // But `upsert_dental_records` handles both.
                 // Let's use RPC for robustness.
 
-                const { error: dentalError } = await supabase.rpc('upsert_dental_records', { records: recordsToUpsert });
+                const { error: dentalError } = await (supabase as any).rpc('upsert_dental_records', { records: recordsToUpsert });
                 if (dentalError) throw dentalError;
             }
 
@@ -1002,7 +1012,7 @@ export default function Consultation() {
             checkQuery = checkQuery.is("dependant_id", null);
         }
 
-        const { data: existingVisits, error: checkError } = await checkQuery;
+        const { data: existingVisits, error: checkError } = await (checkQuery as any);
 
         if (checkError) {
             toast({ title: "Error checking limits", description: checkError.message, variant: "destructive" });
@@ -1031,11 +1041,12 @@ export default function Consultation() {
             }));
 
             if (recordsToUpsert.length > 0) {
-                const { error: dentalError } = await supabase.rpc('upsert_dental_records', { records: recordsToUpsert });
+                const { error: dentalError } = await (supabase as any).rpc('upsert_dental_records', { records: recordsToUpsert });
                 if (dentalError) throw dentalError;
             }
 
             // Split services into "New Multi-Stage" (Locked) and "Standard/Updates" (Unlocked/No-Cost)
+
             const newMultiStageServices = selectedServices.filter(s => s.service.is_multi_stage && !s.service.is_multi_stage_update);
             const standardAndUpdates = selectedServices.filter(s => !s.service.is_multi_stage || s.service.is_multi_stage_update);
 
@@ -1113,7 +1124,7 @@ export default function Consultation() {
                 const itemsToInsert = newMultiStageServices.map(s => ({
                     bill_id: lockedBill.id,
                     service_id: s.service.id,
-                    service_name: s.service.name + " (Stage 1 - Full Payment)",
+                    service_name: `${s.service.name} (Stage ${s.service.startAtStage || 1} - Full Payment)`,
                     quantity: 1,
                     unit_cost: s.service.benefit_cost || 0,
                     total_cost: s.service.benefit_cost || 0,
@@ -1148,7 +1159,7 @@ export default function Consultation() {
                         dependant_id: visit.dependant_id || null,
                         visit_id: visitId,
                         tooth_number: item.tooth_number || null,
-                        current_stage: 1,
+                        current_stage: item.service.startAtStage || 1,
                         total_stages: item.service.total_stages,
                         status: 'in_progress',
                         related_bill_id: lockedBill.id,
@@ -2537,7 +2548,8 @@ export default function Consultation() {
                                             const combined = [...xrayUrls, ...newUrls];
                                             setXrayUrls(combined);
                                             // Persist to visits table immediately
-                                            await supabase.from('visits').update({ xray_urls: combined }).eq('id', visitId!);
+                                            await (supabase as any).from('visits').update({ xray_urls: combined }).eq('id', visitId!);
+
                                             toast({ title: `${newUrls.length} image${newUrls.length > 1 ? 's' : ''} uploaded`, description: 'X-rays saved to this visit record.' });
                                         } catch (error: any) {
                                             console.error('Upload error:', error);

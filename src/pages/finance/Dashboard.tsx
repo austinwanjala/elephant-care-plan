@@ -40,57 +40,68 @@ export default function FinanceDashboard() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    loadFinanceStats();
-  }, []);
-
   const loadFinanceStats = async () => {
     setLoading(true);
     try {
-      const [paymentsRes, branchClaimsRes, marketerClaimsRes] = await Promise.all([
-        supabase.from("payments").select("amount, status"),
-        supabase.from("revenue_claims").select("amount, status"),
-        supabase.from("marketer_claims").select("amount, status")
-      ]);
+      const { data, error } = await supabase.rpc("get_finance_dashboard_stats" as any);
 
-      const totalContributions = paymentsRes.data
-        ?.filter(p => p.status === 'completed')
-        .reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+      if (error) throw error;
 
-      const totalBranchPayouts = branchClaimsRes.data
-        ?.filter(c => c.status === 'paid')
-        .reduce((sum, c) => sum + Number(c.amount), 0) || 0;
+      if (data) {
+        const statsData = data as any;
+        setStats({
+          totalContributions: Number(statsData.total_contributions),
+          totalBranchPayouts: Number(statsData.total_branch_payouts),
+          totalMarketerPayouts: Number(statsData.total_marketer_payouts),
+          pendingBranchClaims: statsData.pending_branch_claims,
+          pendingMarketerClaims: statsData.pending_marketer_claims,
+          netPosition: Number(statsData.net_position)
+        });
 
-      const totalMarketerPayouts = marketerClaimsRes.data
-        ?.filter(c => c.status === 'paid')
-        .reduce((sum, c) => sum + Number(c.amount), 0) || 0;
-
-      const pendingBranchClaims = branchClaimsRes.data?.filter(c => c.status === 'pending').length || 0;
-      const pendingMarketerClaims = marketerClaimsRes.data?.filter(c => c.status === 'pending').length || 0;
-
-      setStats({
-        totalContributions,
-        totalBranchPayouts,
-        totalMarketerPayouts,
-        pendingBranchClaims,
-        pendingMarketerClaims,
-        netPosition: totalContributions - (totalBranchPayouts + totalMarketerPayouts)
-      });
-
-      // Mock chart data for now based on totals
-      setChartData([
-        { name: 'Jan', contributions: totalContributions * 0.1, payouts: (totalBranchPayouts + totalMarketerPayouts) * 0.08 },
-        { name: 'Feb', contributions: totalContributions * 0.15, payouts: (totalBranchPayouts + totalMarketerPayouts) * 0.12 },
-        { name: 'Mar', contributions: totalContributions * 0.25, payouts: (totalBranchPayouts + totalMarketerPayouts) * 0.2 },
-        { name: 'Apr', contributions: totalContributions * 0.5, payouts: (totalBranchPayouts + totalMarketerPayouts) * 0.6 },
-      ]);
-
+        const totalPayouts = Number(statsData.total_branch_payouts) + Number(statsData.total_marketer_payouts);
+        setChartData([
+          { name: 'Jan', contributions: Number(statsData.total_contributions) * 0.1, payouts: totalPayouts * 0.08 },
+          { name: 'Feb', contributions: Number(statsData.total_contributions) * 0.15, payouts: totalPayouts * 0.12 },
+          { name: 'Mar', contributions: Number(statsData.total_contributions) * 0.25, payouts: totalPayouts * 0.2 },
+          { name: 'Apr', contributions: Number(statsData.total_contributions) * 0.5, payouts: totalPayouts * 0.6 },
+        ]);
+      }
     } catch (error) {
       console.error("Error loading finance stats:", error);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadFinanceStats();
+
+    // Set up real-time subscription for instant updates
+    const channel = supabase
+      .channel('finance-updates')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'payments' },
+        () => loadFinanceStats()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'revenue_claims' },
+        () => loadFinanceStats()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'marketer_claims' },
+        () => loadFinanceStats()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+
 
   return (
     <div className="space-y-8">
@@ -152,7 +163,7 @@ export default function FinanceDashboard() {
                 <LineChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `${v/1000}k`} />
+                  <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `${v / 1000}k`} />
                   <Tooltip />
                   <Legend />
                   <Line type="monotone" dataKey="contributions" stroke="#10b981" strokeWidth={2} name="Collections" />

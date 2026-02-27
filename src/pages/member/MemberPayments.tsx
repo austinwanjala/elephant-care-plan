@@ -31,6 +31,7 @@ type MemberWalletInfo = {
   phone: string;
   membership_category_id: string | null;
   scheme_selected: boolean | null;
+  total_contributions: number | null;
 };
 
 export default function MemberPayments() {
@@ -50,7 +51,7 @@ export default function MemberPayments() {
 
     const { data: memberData } = await supabase
       .from("members")
-      .select("id, phone, membership_category_id, scheme_selected")
+      .select("id, phone, membership_category_id, scheme_selected, total_contributions")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -78,9 +79,10 @@ export default function MemberPayments() {
 
   const walletTotal = useMemo(() => {
     return payments
-      .filter((p) => p.status === 'completed' && (p.reference || '').startsWith('WALLET-TOPUP-'))
+      .filter((p) => p.status === 'completed')
       .reduce((sum, p) => sum + Number(p.amount || 0), 0);
   }, [payments]);
+
 
   const handleWalletTopup = async () => {
     if (!amount || !phoneNumber || !member?.id) {
@@ -267,31 +269,75 @@ export default function MemberPayments() {
         </Dialog>
       </div>
 
-      {schemeNotChosen && (
-        <Card className="border-emerald-200 bg-emerald-50/40">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Wallet className="h-5 w-5" /> Wallet (Pay Gradually)</CardTitle>
-            <CardDescription>
-              Your wallet is the total of completed "Wallet Top-up" payments. Once it matches the scheme amount, you can activate coverage.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-end justify-between">
-              <div>
-                <div className="text-xs text-muted-foreground">Wallet Balance</div>
-                <div className="text-2xl font-bold text-emerald-700">KES {walletTotal.toLocaleString()}</div>
-              </div>
-              <Button onClick={() => navigate('/scheme-selection')} className="bg-emerald-600 hover:bg-emerald-700">
-                Choose Scheme & Activate
-              </Button>
+      <Card className="border-emerald-200 bg-emerald-50/40">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Wallet className="h-5 w-5" />
+            {schemeNotChosen ? "Wallet (Pay Gradually)" : "Payment Summary"}
+          </CardTitle>
+          <CardDescription>
+            {schemeNotChosen
+              ? "Your wallet balance represents the total of all successful payments made."
+              : "Summary of your total contributions."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-6 bg-white/50 rounded-xl border border-emerald-100 shadow-sm flex flex-col items-center text-center">
+              <div className="text-sm font-medium text-muted-foreground mb-2 uppercase tracking-wider">Wallet Balance</div>
+              <div className="text-4xl font-black text-emerald-700 mb-1">KES {walletTotal.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground italic">
+                Total of all successful payments
+              </p>
             </div>
-            <Progress value={walletTotal > 0 ? 100 : 0} />
-            <p className="text-xs text-muted-foreground">
-              You can keep topping up your wallet from this page. Scheme activation is done on the scheme page.
-            </p>
-          </CardContent>
-        </Card>
-      )}
+
+            <div className="flex flex-col justify-center space-y-3">
+              <div className="flex items-center gap-3 p-3 bg-white/40 rounded-lg border border-emerald-50">
+                <div className="bg-emerald-100 p-2 rounded-full">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-emerald-900">Payment Verified</p>
+                  <p className="text-[10px] text-emerald-700">All transactions are processed securely</p>
+                </div>
+              </div>
+
+              {schemeNotChosen && (
+                <div className="p-3 bg-amber-50 rounded-lg border border-amber-100 flex gap-2">
+                  <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                  <p className="text-[10px] text-amber-700">
+                    Keep topping up until your balance covers your selected scheme to activate coverage.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+          {schemeNotChosen ? (
+            <>
+              <div className="pt-2 flex flex-col sm:flex-row gap-4 items-center justify-between">
+                <p className="text-sm text-muted-foreground italic">
+                  Complete your wallet to activate a scheme
+                </p>
+                <Button onClick={() => navigate('/scheme-selection')} className="bg-emerald-600 hover:bg-emerald-700 w-full sm:w-auto">
+                  Choose Scheme & Activate
+                </Button>
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between text-[10px] font-medium text-emerald-600 mb-1">
+                  <span>Wallet Active</span>
+                  <span>{walletTotal > 0 ? '100%' : '0%'}</span>
+                </div>
+                <Progress value={walletTotal > 0 ? 100 : 0} className="h-1.5" />
+              </div>
+            </>
+          ) : (
+            <div className="p-3 bg-emerald-100/50 rounded-lg flex items-center gap-3 text-emerald-800 text-sm italic">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              <span>Your membership scheme is active. You can continue topping up or view your history below.</span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {payments.length === 0 ? (
         <Card className="border-dashed">

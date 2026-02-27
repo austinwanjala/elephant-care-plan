@@ -191,7 +191,10 @@ serve(async (req) => {
         if (pError) console.error("[kopokopo] DB Update Error:", pError.message);
 
         if (payment) {
-          await supabase.from("members").update({ is_active: true }).eq("id", payment.member_id);
+          // IMPORTANT: Only activate member if it's a scheme selection payment
+          if ((payment.reference || "").startsWith("SCHEME-")) {
+            await supabase.from("members").update({ is_active: true }).eq("id", payment.member_id);
+          }
 
           // Get the most reliable info for notification
           const currentMemberId = payment.member_id;
@@ -211,7 +214,7 @@ serve(async (req) => {
             await supabase.from("notifications").insert({
               recipient_id: memberData.user_id,
               title: "Payment Received",
-              message: `Your payment of KES ${payment.amount} (Ref: ${mpesaCode}) has been processed successfully. Your individual coverage is now active.`,
+              message: `Your payment of KES ${payment.amount} (Ref: ${mpesaCode}) has been processed successfully.`,
               type: "success"
             });
           }
@@ -237,7 +240,7 @@ serve(async (req) => {
 
               // Fallback to internal KopoKopo SMS helper if central fails
               const smsToken = await getAccessToken();
-              const smsMessage = `Confirmed! We have received your payment of KES ${payment.amount} (Ref: ${mpesaCode}). Your Elephant Care coverage is now active. Thank you!`;
+              const smsMessage = `Confirmed! We have received your payment of KES ${payment.amount} (Ref: ${mpesaCode}). Thank you!`;
               await sendSmsConfirmation(targetPhone, smsMessage, smsToken);
             }
           }

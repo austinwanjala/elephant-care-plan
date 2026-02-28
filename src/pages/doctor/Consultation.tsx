@@ -13,6 +13,7 @@ import {
     ClipboardList, CheckCircle2, Activity, ShieldCheck, User, CreditCard, ChevronRight, CheckSquare
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { DentalChart, DentalChartMode } from "@/components/doctor/DentalChart";
@@ -56,6 +57,9 @@ export default function Consultation() {
     const [isXrayModalOpen, setIsXrayModalOpen] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [chartMode, setChartMode] = useState<DentalChartMode>('adult');
+
+    const [chargeConsultation, setChargeConsultation] = useState(false);
+    const [consultationService, setConsultationService] = useState<any>(null);
 
     // New State for Diagnosis/Treatment Separation
     const [consultationMode, setConsultationMode] = useState<'diagnosis' | 'treatment'>('diagnosis');
@@ -393,7 +397,15 @@ export default function Consultation() {
             return service.service_preapprovals.some((preapproval: any) => preapproval.branch_id === branchId);
         }) || [];
 
-        setAvailableServices(filteredServices);
+        const normalServices = filteredServices.filter(s => {
+            if (s.name.toLowerCase().includes('consultation')) {
+                setConsultationService(s);
+                return false;
+            }
+            return true;
+        });
+
+        setAvailableServices(normalServices);
     };
 
     const getStageName = (service: any, stageNum: number) => {
@@ -539,6 +551,19 @@ export default function Consultation() {
             selectedTeeth.forEach(tooth => {
                 if (newSelections.find(s => s.service.id === service.id && s.tooth_number === tooth)) {
                     return;
+                }
+
+                if (toothConditions[tooth] === 'missing') {
+                    const sName = service.name.toLowerCase();
+                    const isAllowed = sName.includes('denture') || sName.includes('implant') || sName.includes('bridge');
+                    if (!isAllowed) {
+                        toast({
+                            title: "Action Restricted",
+                            description: `Tooth #${tooth} is marked as Missing. Only Denture, Implant, or Bridge services can be performed on it.`,
+                            variant: "destructive"
+                        });
+                        return;
+                    }
                 }
 
                 // 0. Block: tooth is under an active multi-stage treatment for ANY service
@@ -986,8 +1011,14 @@ export default function Consultation() {
 
     const handleFinalize = async () => {
         if (!visitId || !doctorId) return;
-        if (selectedServices.length === 0) {
-            toast({ title: "Select Services", description: "Please add at least one service.", variant: "destructive" });
+
+        const finalSelectedServices = [...selectedServices];
+        if (chargeConsultation && consultationService) {
+            finalSelectedServices.push({ service: consultationService, tooth_number: null });
+        }
+
+        if (finalSelectedServices.length === 0) {
+            toast({ title: "Select Services", description: "Please add at least one service or charge consultation.", variant: "destructive" });
             return;
         }
 
@@ -1047,8 +1078,8 @@ export default function Consultation() {
 
             // Split services into "New Multi-Stage" (Locked) and "Standard/Updates" (Unlocked/No-Cost)
 
-            const newMultiStageServices = selectedServices.filter(s => s.service.is_multi_stage && !s.service.is_multi_stage_update);
-            const standardAndUpdates = selectedServices.filter(s => !s.service.is_multi_stage || s.service.is_multi_stage_update);
+            const newMultiStageServices = finalSelectedServices.filter(s => s.service.is_multi_stage && !s.service.is_multi_stage_update);
+            const standardAndUpdates = finalSelectedServices.filter(s => !s.service.is_multi_stage || s.service.is_multi_stage_update);
 
             let primaryBillId = null;
 
@@ -1177,7 +1208,7 @@ export default function Consultation() {
             }
 
             // 3. Handle Stage Updates (Create 0-cost bill for reception approval)
-            const updates = selectedServices.filter(s => s.service.is_multi_stage_update);
+            const updates = finalSelectedServices.filter(s => s.service.is_multi_stage_update);
 
             if (updates.length > 0) {
                 // Create a bill for these updates so Receptionist can "Finalize" them
@@ -1274,7 +1305,7 @@ export default function Consultation() {
             }
 
             // Only insert chart records if we have a bill ID or we can insert without it (check active stages for related bill)
-            const chartRecordsToInsert = selectedServices
+            const chartRecordsToInsert = finalSelectedServices
                 .map(s => {
                     let billIdToUse = primaryBillId;
                     if (s.service.is_multi_stage_update && s.service.related_bill_id) {
@@ -1324,8 +1355,8 @@ export default function Consultation() {
             if (visitUpdateError) throw visitUpdateError;
 
             // Determine the right success message
-            const hasOnlyFollowUps = selectedServices.every(s => s.service.is_multi_stage_update);
-            const hasFinalStage = selectedServices.some(s => s.service.is_multi_stage_update && s.service.isFinal);
+            const hasOnlyFollowUps = finalSelectedServices.every(s => s.service.is_multi_stage_update);
+            const hasFinalStage = finalSelectedServices.some(s => s.service.is_multi_stage_update && s.service.isFinal);
 
             if (hasFinalStage) {
                 toast({
@@ -1343,7 +1374,7 @@ export default function Consultation() {
 
             await (supabase as any).from("system_logs").insert({
                 action: "Consultation Submitted",
-                details: { visit_id: visitId, doctor_id: doctorId, services_count: selectedServices.length, bill_id: primaryBillId, has_follow_up_stages: hasOnlyFollowUps },
+                details: { visit_id: visitId, doctor_id: doctorId, services_count: finalSelectedServices.length, bill_id: primaryBillId, has_follow_up_stages: hasOnlyFollowUps },
                 user_id: (await supabase.auth.getUser()).data.user?.id
             });
 
@@ -1651,6 +1682,7 @@ export default function Consultation() {
                                                 { id: 'filled', label: 'Filled', color: 'bg-green-500', border: 'border-green-200' },
                                                 { id: 'crowned', label: 'Crowned', color: 'bg-blue-500', border: 'border-blue-200' },
                                                 { id: 'partial_denture', label: 'Pt. Denture', color: 'bg-pink-500', border: 'border-pink-200' },
+                                                ...(isChild ? [{ id: 'mobile', label: 'Mobile Tooth', color: 'bg-purple-500', border: 'border-purple-200' }] : []),
                                             ].map(tool => (
                                                 <button
                                                     key={tool.id}
@@ -1999,16 +2031,29 @@ export default function Consultation() {
                                     </div>
 
                                     <div className="p-4 bg-white rounded-xl border shadow-sm space-y-3">
-                                        <div className="flex justify-between text-sm">
+                                        {consultationService && (
+                                            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+                                                <Checkbox
+                                                    id="charge-consultation"
+                                                    checked={chargeConsultation}
+                                                    onCheckedChange={(c) => setChargeConsultation(!!c)}
+                                                    className="w-5 h-5 border-slate-300 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                                                />
+                                                <Label htmlFor="charge-consultation" className="text-sm font-bold text-slate-700 cursor-pointer">
+                                                    Include Consultation Fee (KES {consultationService.benefit_cost.toLocaleString()})
+                                                </Label>
+                                            </div>
+                                        )}
+                                        <div className="flex justify-between text-sm pt-1">
                                             <span className="text-slate-500 font-medium">Session Total</span>
-                                            <span className="font-bold text-slate-900">KES {selectedServices.filter(s => !s.service.is_multi_stage_update).reduce((acc, s) => acc + Number(s.service.benefit_cost), 0).toLocaleString()}</span>
+                                            <span className="font-bold text-slate-900">KES {(selectedServices.filter(s => !s.service.is_multi_stage_update).reduce((acc, s) => acc + Number(s.service.benefit_cost), 0) + (chargeConsultation && consultationService ? Number(consultationService.benefit_cost) : 0)).toLocaleString()}</span>
                                         </div>
                                         <div className="h-px bg-slate-100 w-full" />
                                         <div className="flex justify-between items-center">
                                             <div className="flex flex-col">
                                                 <span className="text-[10px] font-black text-slate-400 uppercase">Estimated Deduction</span>
                                                 <span className="text-xl font-black text-primary">
-                                                    KES {Math.min(selectedServices.filter(s => !s.service.is_multi_stage_update).reduce((acc, s) => acc + Number(s.service.benefit_cost), 0), visit.members.coverage_balance || 0).toLocaleString()}
+                                                    KES {Math.min(selectedServices.filter(s => !s.service.is_multi_stage_update).reduce((acc, s) => acc + Number(s.service.benefit_cost), 0) + (chargeConsultation && consultationService ? Number(consultationService.benefit_cost) : 0), visit.members.coverage_balance || 0).toLocaleString()}
                                                 </span>
                                             </div>
                                         </div>
@@ -2031,11 +2076,11 @@ export default function Consultation() {
                                             className={cn(
                                                 "w-full h-14 text-base font-black rounded-xl shadow-xl transition-all hover:scale-[1.02] active:scale-95 text-white",
                                                 hasFinalStage ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100" :
-                                                    hasOnlyFollowUps ? "bg-blue-700 hover:bg-blue-800 shadow-blue-100" :
+                                                    hasOnlyFollowUps && !chargeConsultation ? "bg-blue-700 hover:bg-blue-800 shadow-blue-100" :
                                                         "bg-slate-900 hover:bg-slate-800 shadow-slate-200"
                                             )}
                                             onClick={handleFinalize}
-                                            disabled={submitting || selectedServices.length === 0}
+                                            disabled={submitting || (selectedServices.length === 0 && !chargeConsultation)}
                                         >
                                             {submitting ? (
                                                 <Loader2 className="animate-spin mr-2" />
@@ -2104,7 +2149,7 @@ export default function Consultation() {
             </Dialog>
 
             <Dialog open={continueStageDialogOpen} onOpenChange={setContinueStageDialogOpen}>
-                <DialogContent className="max-w-lg">
+                <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <Activity className="h-5 w-5 text-blue-600" />
@@ -2240,7 +2285,7 @@ export default function Consultation() {
                 </DialogContent>
             </Dialog>
             <Dialog open={isManualStageModalOpen} onOpenChange={setIsManualStageModalOpen}>
-                <DialogContent className="max-w-lg">
+                <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <Activity className="h-5 w-5 text-amber-600" />

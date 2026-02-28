@@ -327,6 +327,7 @@ function Tooth({ id, isSelected, status, stage, onClick, isLower, imageSrc, smal
     if (status === 'filled') colorClass = "fill-green-500 stroke-green-700";
     if (status === 'crowned') colorClass = "fill-blue-500 stroke-blue-700";
     if (status === 'partial_denture') colorClass = "fill-pink-500 stroke-pink-700";
+    if (status === 'mobile') colorClass = "fill-purple-500 stroke-purple-700 animate-pulse";
 
     // Legacy support or Treatment statuses
     if (status === 'planned') colorClass = "fill-cyan-400 stroke-cyan-600";
@@ -394,6 +395,7 @@ function Tooth({ id, isSelected, status, stage, onClick, isLower, imageSrc, smal
                             status === 'missing' && "opacity-20 grayscale", // Stronger missing state
                             status === 'partial_denture' && "drop-shadow-[0_0_2px_rgba(236,72,153,0.8)]",
                             status === 'in_progress' && "drop-shadow-[0_0_2px_rgba(245,158,11,0.8)]",
+                            status === 'mobile' && "drop-shadow-[0_0_2px_rgba(168,85,247,0.8)]",
                             isSelected && "drop-shadow-[0_0_6px_rgba(249,115,22,1)]"
                         )}
                     />
@@ -408,6 +410,7 @@ function Tooth({ id, isSelected, status, stage, onClick, isLower, imageSrc, smal
                             status === 'partial_denture' && "bg-pink-600",
                             status === 'in_progress' && "bg-amber-500",
                             status === 'multi_stage_completed' && "bg-orange-500",
+                            status === 'mobile' && "bg-purple-500"
                         )} />
                     )}
                     {/* Stage Indicator Overlay */}

@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, CreditCard, Check, Search, Receipt, History, Printer, Fingerprint } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { verifyCredential } from "@/lib/webauthn";
+import { verifyCredential, registerCredential } from "@/lib/webauthn";
 import { InsufficientBalanceHandler } from "@/components/reception/InsufficientBalanceHandler";
 
 export default function ReceptionBilling() {
@@ -353,7 +353,7 @@ export default function ReceptionBilling() {
                                                                                                     <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50">
                                                                                                         #{item.tooth_number}
                                                                                                     </Badge>
-                                                                                                ) : "—" }
+                                                                                                ) : "—"}
                                                                                             </TableCell>
                                                                                             <TableCell className="text-right">KES {Number(item.benefit_cost).toLocaleString()}</TableCell>
                                                                                         </TableRow>
@@ -410,13 +410,26 @@ export default function ReceptionBilling() {
                                                                                 onClick={async () => {
                                                                                     if (biometricsVerified === visit.id) return; // Already verified
 
-                                                                                    // 1. Check if member has biometrics enrolled
+                                                                                    // 1. Check if member has biometrics enrolled, if not capture it inline
                                                                                     if (!visit.members.biometric_data) {
-                                                                                        toast({
-                                                                                            title: "Biometrics Not Enrolled",
-                                                                                            description: "This member has not set up biometrics yet. Please update their profile.",
-                                                                                            variant: "destructive"
-                                                                                        });
+                                                                                        try {
+                                                                                            const credentialData = await registerCredential(visit.members.id, visit.members.full_name);
+
+                                                                                            // Save to DB
+                                                                                            const { error } = await supabase
+                                                                                                .from("members")
+                                                                                                .update({ biometric_data: credentialData })
+                                                                                                .eq("id", visit.members.id);
+                                                                                            if (error) throw error;
+
+                                                                                            toast({ title: "Biometrics Captured", description: "Identity captured and mapped to this member." });
+
+                                                                                            // Map it locally so successive tries or states work
+                                                                                            visit.members.biometric_data = credentialData;
+                                                                                            setBiometricsVerified(visit.id);
+                                                                                        } catch (err: any) {
+                                                                                            toast({ title: "Capture Failed", description: err.message || "Failed to capture biometrics.", variant: "destructive" });
+                                                                                        }
                                                                                         return;
                                                                                     }
 
@@ -437,6 +450,8 @@ export default function ReceptionBilling() {
                                                                             >
                                                                                 {biometricsVerified === visit.id ? (
                                                                                     <><Check className="mr-2 h-6 w-6" /> Biometrics Confirmed</>
+                                                                                ) : !visit.members?.biometric_data ? (
+                                                                                    <><Fingerprint className="mr-2 h-6 w-6" /> Capture Member Biometrics</>
                                                                                 ) : (
                                                                                     <><Fingerprint className="mr-2 h-6 w-6" /> Verify Member Biometrics</>
                                                                                 )}

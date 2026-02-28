@@ -16,6 +16,7 @@ import { QrCode } from "lucide-react";
 export default function ReceptionSearchMember() {
     const [searchTerm, setSearchTerm] = useState("");
     const [searching, setSearching] = useState(false);
+    const [searchResults, setSearchResults] = useState<any[]>([]);
     const [member, setMember] = useState<any>(null);
     const [biometricDialogOpen, setBiometricDialogOpen] = useState(false);
     const [scanDialogOpen, setScanDialogOpen] = useState(false);
@@ -33,6 +34,7 @@ export default function ReceptionSearchMember() {
 
         setSearching(true);
         setMember(null);
+        setSearchResults([]);
 
         try {
             // 1. Search Principals
@@ -73,13 +75,12 @@ export default function ReceptionSearchMember() {
             }
 
             if (allResults.length > 0) {
-                // If multiple results, just take the first one or throw error similar to previous behavior
-                // The RegisterVisit page handles multiple results better with a dialog, 
-                // but here we follow the original logic of maybeSingle/Single
                 if (allResults.length > 1) {
-                    toast({ title: "Note", description: "Multiple members found. Showing the closest match." });
+                    toast({ title: "Multiple Member Matches", description: "Please select the correct member from the list." });
+                    setSearchResults(allResults);
+                } else {
+                    setMember(allResults[0]);
                 }
-                setMember(allResults[0]);
             } else {
                 toast({ title: "Member not found", description: "No member found matching that criteria.", variant: "destructive" });
             }
@@ -139,6 +140,35 @@ export default function ReceptionSearchMember() {
                     <CardScanner />
                 </DialogContent>
             </Dialog>
+
+            {searchResults.length > 0 && !member && (
+                <Card className="border-primary/50">
+                    <CardHeader className="bg-primary/5">
+                        <CardTitle className="text-xl">Select Member</CardTitle>
+                        <CardDescription>Multiple members found for your search. Please choose the correct one.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="pt-6 space-y-4">
+                        {searchResults.map((res: any) => (
+                            <div key={res.id} className="flex justify-between items-center p-4 border rounded-lg hover:bg-slate-50 transition-colors">
+                                <div>
+                                    <h4 className="font-bold text-lg">{res.full_name}</h4>
+                                    <div className="text-sm text-muted-foreground flex gap-3">
+                                        <span>Phone: {res.phone}</span>
+                                        <span>ID: {res.id_number}</span>
+                                        <span>Member #: {res.member_number}</span>
+                                    </div>
+                                </div>
+                                <Button onClick={() => {
+                                    setMember(res);
+                                    setSearchResults([]);
+                                }}>
+                                    Select
+                                </Button>
+                            </div>
+                        ))}
+                    </CardContent>
+                </Card>
+            )}
 
             {member && (
                 <Card className="border-primary/50">

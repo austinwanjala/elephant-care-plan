@@ -46,6 +46,8 @@ interface Member {
   marketers?: { full_name: string; code: string } | null;
   whatsapp_opt_in: boolean;
   insurance_card_token: string | null;
+  scheme_start_at?: string | null;
+  scheme_end_at?: string | null;
 }
 
 interface Visit {
@@ -126,7 +128,25 @@ const MemberDashboard = () => {
       });
       setMember(null);
     } else if (data) {
-      setMember(data);
+      // UI-side fallback: if scheme has expired, trigger reset immediately.
+      // The scheduled job also handles this daily.
+      const schemeEnd = (data as any).scheme_end_at ? new Date((data as any).scheme_end_at) : null;
+      if (schemeEnd && schemeEnd.getTime() < Date.now()) {
+        try {
+          await (supabase as any).rpc("expire_member_scheme_if_needed", { p_member_id: (data as any).id });
+          const { data: refreshed } = await supabase
+            .from("members")
+            .select("*, membership_categories(name, benefit_amount), marketers(full_name, code)")
+            .eq("user_id", userId)
+            .single();
+          if (refreshed) setMember(refreshed as unknown as Member);
+          return;
+        } catch {
+          // If this fails, we still show the member as uncovered by checks below.
+        }
+      }
+
+      setMember(data as unknown as Member);
     }
   };
 
@@ -172,7 +192,7 @@ const MemberDashboard = () => {
     if (memberData) {
       const { data, error } = await supabase
         .from("visits")
-        .select(`
+        .select(`*
           *, 
           branches(name), 
           bills(
@@ -229,6 +249,12 @@ const MemberDashboard = () => {
   const coveragePercentage = member?.benefit_limit
     ? (member.coverage_balance / member.benefit_limit) * 100
     : 0;
+
+  const schemeStartLabel = member?.scheme_start_at ? new Date(member.scheme_start_at).toLocaleDateString() : null;
+  const schemeEndLabel = member?.scheme_end_at ? new Date(member.scheme_end_at).toLocaleDateString() : null;
+  const schemeDaysLeft = member?.scheme_end_at
+    ? Math.max(0, Math.ceil((new Date(member.scheme_end_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : null;
 
   if (loading) {
     return (
@@ -330,6 +356,21 @@ const MemberDashboard = () => {
                 <p className="text-xs text-muted-foreground">
                   Total Contributions: KES {member?.total_contributions?.toLocaleString() || 0}
                 </p>
+                {schemeStartLabel && schemeEndLabel && (
+                  <div className="mt-2 rounded-md border bg-muted/30 px-3 py-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold text-slate-700">Scheme Period</p>
+                      {typeof schemeDaysLeft === "number" && (
+                        <Badge variant={schemeDaysLeft <= 30 ? "destructive" : "secondary"}>
+                          {schemeDaysLeft} days left
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {schemeStartLabel} – {schemeEndLabel}
+                    </p>
+                  </div>
+                )}
                 {member?.marketers && (
                   <p className="text-xs font-medium text-primary">
                     Referred by: {member.marketers.full_name} ({member.marketers.code})
@@ -424,32 +465,28 @@ const MemberDashboard = () => {
               </Card>
             )}
 
+            {/* Dependants */}
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-primary" />
-                  Dependants
-                </CardTitle>
-                <Link to="/dashboard/dependants">
-                  <Button variant="outline" size="sm">Manage</Button>
-                </Link>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5" />Dependants</CardTitle>
+                <CardDescription>Registered family members covered under your scheme</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {dependants.length === 0 ? (
-                    <p className="text-muted-foreground text-sm">No dependants registered.</p>
-                  ) : (
-                    dependants.map((dep, idx) => (
-                      <div key={idx} className="flex justify-between items-center border-b pb-2 last:border-0 last:pb-0">
-                        <div>
-                          <p className="font-medium">{dep.full_name}</p>
-                          <p className="text-xs text-muted-foreground">{dep.relationship}</p>
+                {dependants.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No dependants registered.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {dependants.map((dep) => (
+                      <div key={dep.id} className="p-3 rounded-lg border bg-muted/30">
+                        <div className="flex justify-between items-center">
+                          <p className="font-semibold">{dep.full_name}</p>
+                          <Badge variant="outline" className="capitalize">{dep.relationship}</Badge>
                         </div>
-                        <Badge variant="outline">{dep.id_number}</Badge>
+                        <p className="text-xs text-muted-foreground">ID: {dep.id_number}</p>
                       </div>
-                    ))
-                  )}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -531,7 +568,7 @@ const MemberDashboard = () => {
                   <Switch
                     checked={member.whatsapp_opt_in}
                     onCheckedChange={async (checked) => {
-                      const { error } = await supabase
+                      const { error } = await (supabase as any)
                         .from("members")
                         .update({ whatsapp_opt_in: checked })
                         .eq("id", member.id);

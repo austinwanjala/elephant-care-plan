@@ -168,8 +168,29 @@ const Login = () => {
         navigate("/marketer");
       } else {
         // Member: ensure the member profile exists before routing (prevents "You don't have member privileges")
-        await supabase.rpc("ensure_member_profile");
-        await supabase.rpc("ensure_member_dependants_from_metadata");
+        const { error: ensureMemberError } = await supabase.rpc("ensure_member_profile");
+        if (ensureMemberError) {
+          toast({
+            title: "Account setup failed",
+            description: ensureMemberError.message,
+            variant: "destructive",
+          });
+          await supabase.auth.signOut();
+          setLoading(false);
+          return;
+        }
+
+        const { error: ensureDepsError } = await supabase.rpc("ensure_member_dependants_from_metadata");
+        if (ensureDepsError) {
+          toast({
+            title: "Account setup failed",
+            description: ensureDepsError.message,
+            variant: "destructive",
+          });
+          await supabase.auth.signOut();
+          setLoading(false);
+          return;
+        }
 
         const { data: memberProfile } = await supabase
           .from("members")

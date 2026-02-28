@@ -210,6 +210,26 @@ const Register = () => {
 
       if (signUpRes.error) throw signUpRes.error;
 
+      // Ensure the member profile exists.
+      // Some Supabase setups may not return a session from signUp even when email confirmation is off.
+      // In that case, we sign in briefly, run the setup RPCs, then sign out.
+      if (!signUpRes.data.session) {
+        const { error: signInErr } = await supabase.auth.signInWithPassword({
+          email: formData.email,
+          password: formData.password,
+        });
+        if (signInErr) throw signInErr;
+      }
+
+      const { error: ensureMemberError } = await supabase.rpc("ensure_member_profile");
+      if (ensureMemberError) throw ensureMemberError;
+
+      const { error: ensureDepsError } = await supabase.rpc("ensure_member_dependants_from_metadata");
+      if (ensureDepsError) throw ensureDepsError;
+
+      const { error: ensureRoleError } = await supabase.rpc("ensure_portal_role");
+      if (ensureRoleError) throw ensureRoleError;
+
       // Always route to login after registration (per requirement)
       // and clear any session that might have been created.
       try {

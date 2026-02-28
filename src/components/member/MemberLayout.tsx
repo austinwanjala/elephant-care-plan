@@ -101,7 +101,18 @@ export function MemberLayout({ children }: MemberLayoutProps) {
       .maybeSingle()).data as MemberInfo | null;
 
     if (!memberDetails) {
-      await supabase.rpc("ensure_member_profile");
+      const { error: ensureMemberError } = await supabase.rpc("ensure_member_profile");
+      if (ensureMemberError) {
+        toast({
+          title: "Account setup failed",
+          description: ensureMemberError.message,
+          variant: "destructive",
+        });
+        navigate("/login");
+        setLoading(false);
+        return;
+      }
+
       memberDetails = (await supabase
         .from("members")
         .select("full_name")
@@ -110,7 +121,17 @@ export function MemberLayout({ children }: MemberLayoutProps) {
     }
 
     // Ensure dependants created during signup are persisted
-    await supabase.rpc("ensure_member_dependants_from_metadata");
+    const { error: ensureDepsError } = await supabase.rpc("ensure_member_dependants_from_metadata");
+    if (ensureDepsError) {
+      toast({
+        title: "Account setup failed",
+        description: ensureDepsError.message,
+        variant: "destructive",
+      });
+      navigate("/login");
+      setLoading(false);
+      return;
+    }
 
     if (!memberDetails) {
       toast({ title: "Access denied", description: "You don't have member privileges", variant: "destructive" });

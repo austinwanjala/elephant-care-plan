@@ -1848,7 +1848,7 @@ export default function Consultation() {
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="treatmentNotes" className="flex items-center justify-between">
-                                        <span>Treatment Notes</span>
+                                        <span>Treatment Plan</span>
                                         {treatmentNotes && <Badge variant="outline" className="text-[10px] uppercase font-normal text-muted-foreground">Read Only (Saved)</Badge>}
                                     </Label>
                                     {treatmentNotes && (

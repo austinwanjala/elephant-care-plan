@@ -96,10 +96,15 @@ export default function RegisterVisit() {
         }
     };
 
+    const sanitizeSearchTerm = (raw: string) => raw.replace(/[(),]/g, " ").replace(/"/g, "").trim();
+
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
         const term = searchTerm.trim();
         if (!term) return;
+
+        const safeTerm = sanitizeSearchTerm(term);
+        if (!safeTerm) return;
 
         setSearching(true);
         setMember(null);
@@ -112,7 +117,9 @@ export default function RegisterVisit() {
             const { data: principalMatches, error: principalError } = await supabase
                 .from("members")
                 .select("*, membership_categories(name), branches(name)")
-                .or(`phone.ilike."%${term}%",id_number.ilike."%${term}%",member_number.ilike."%${term}%",full_name.ilike."%${term}%"`);
+                .or(
+                    `phone.ilike.*${safeTerm}*,id_number.ilike.*${safeTerm}*,member_number.ilike.*${safeTerm}*,full_name.ilike.*${safeTerm}*`
+                );
 
             if (principalError) throw principalError;
 
@@ -120,7 +127,7 @@ export default function RegisterVisit() {
             const { data: dependantMatches, error: dependantError } = await supabase
                 .from("dependants")
                 .select("member_id")
-                .or(`full_name.ilike."%${term}%",id_number.ilike."%${term}%"`);
+                .or(`full_name.ilike.*${safeTerm}*,id_number.ilike.*${safeTerm}*`);
 
             if (dependantError) throw dependantError;
 

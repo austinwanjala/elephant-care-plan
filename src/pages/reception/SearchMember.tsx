@@ -21,10 +21,15 @@ export default function ReceptionSearchMember() {
     const [scanDialogOpen, setScanDialogOpen] = useState(false);
     const { toast } = useToast();
 
+    const sanitizeSearchTerm = (raw: string) => raw.replace(/[(),]/g, " ").replace(/"/g, "").trim();
+
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
         const term = searchTerm.trim();
         if (!term) return;
+
+        const safeTerm = sanitizeSearchTerm(term);
+        if (!safeTerm) return;
 
         setSearching(true);
         setMember(null);
@@ -34,7 +39,9 @@ export default function ReceptionSearchMember() {
             const { data: principalMatches, error: principalError } = await supabase
                 .from("members")
                 .select("*, membership_categories(name), branches(name), dependants(*)")
-                .or(`phone.ilike."%${term}%",id_number.ilike."%${term}%",member_number.ilike."%${term}%",full_name.ilike."%${term}%"`);
+                .or(
+                    `phone.ilike.*${safeTerm}*,id_number.ilike.*${safeTerm}*,member_number.ilike.*${safeTerm}*,full_name.ilike.*${safeTerm}*`
+                );
 
             if (principalError) throw principalError;
 
@@ -42,7 +49,7 @@ export default function ReceptionSearchMember() {
             const { data: dependantMatches, error: dependantError } = await supabase
                 .from("dependants")
                 .select("member_id")
-                .or(`full_name.ilike."%${term}%",id_number.ilike."%${term}%"`);
+                .or(`full_name.ilike.*${safeTerm}*,id_number.ilike.*${safeTerm}*`);
 
             if (dependantError) throw dependantError;
 
@@ -138,23 +145,12 @@ export default function ReceptionSearchMember() {
                     <CardHeader className="bg-primary/5">
                         <div className="flex justify-between items-start">
                             <div>
-                                <CardTitle>{member.full_name}</CardTitle>
-                                <CardDescription>Member #{member.member_number}</CardDescription>
+                                <CardTitle className="text-2xl">{member.full_name}</CardTitle>
+                                <CardDescription>Member Number: {member.member_number}</CardDescription>
                             </div>
-                            <div className="flex gap-2">
-                                {!member.biometric_data ? (
-                                    <Button variant="outline" size="sm" onClick={() => setBiometricDialogOpen(true)}>
-                                        <Fingerprint className="mr-2 h-4 w-4" /> Capture Biometrics
-                                    </Button>
-                                ) : (
-                                    <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
-                                        <Fingerprint className="mr-1 h-3 w-3" /> Biometrics Registered
-                                    </Badge>
-                                )}
-                                <Badge variant={member.is_active ? "default" : "destructive"}>
-                                    {member.is_active ? "Active" : "Inactive"}
-                                </Badge>
-                            </div>
+                            <Badge variant={member.is_active ? "default" : "destructive"}>
+                                {member.is_active ? "Active" : "Inactive"}
+                            </Badge>
                         </div>
                     </CardHeader>
                     <CardContent className="pt-6 space-y-6">
@@ -250,6 +246,6 @@ export default function ReceptionSearchMember() {
                     )}
                 </DialogContent>
             </Dialog>
-        </div >
+        </div>
     );
 }

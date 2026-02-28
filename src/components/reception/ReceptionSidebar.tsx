@@ -40,9 +40,9 @@ export function ReceptionSidebar() {
     useEffect(() => {
         const fetchPendingBills = async () => {
             const { count } = await (supabase as any)
-                .from('bills')
+                .from('visits')
                 .select('*', { count: 'exact', head: true })
-                .eq('status', 'pending'); // Assuming 'pending' status for unpaid bills
+                .in('status', ['billed', 'billing_pending']);
             setPendingBillsCount(count || 0);
         };
 

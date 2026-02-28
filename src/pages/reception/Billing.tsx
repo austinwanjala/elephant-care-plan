@@ -52,7 +52,7 @@ export default function ReceptionBilling() {
         const { data, error } = await supabase
             .from("visits")
             .select("*, members(id, full_name, phone, member_number, coverage_balance, biometric_data), branches(name), bills(*, bill_items(*))")
-            .eq("status", "billed")
+            .in("status", ["billed", "billing_pending"])
             .order("updated_at", { ascending: false });
 
         if (error) {
@@ -353,7 +353,7 @@ export default function ReceptionBilling() {
                                                                                                     <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50">
                                                                                                         #{item.tooth_number}
                                                                                                     </Badge>
-                                                                                                ) : "—"}
+                                                                                                ) : "—" }
                                                                                             </TableCell>
                                                                                             <TableCell className="text-right">KES {Number(item.benefit_cost).toLocaleString()}</TableCell>
                                                                                         </TableRow>
@@ -522,6 +522,6 @@ export default function ReceptionBilling() {
                     </Card>
                 </TabsContent>
             </Tabs>
-        </div >
+        </div>
     );
 }

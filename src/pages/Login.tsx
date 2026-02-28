@@ -167,10 +167,16 @@ const Login = () => {
       } else if (role === "marketer") {
         navigate("/marketer");
       } else {
+        // Member: ensure the member profile exists before routing (prevents "You don't have member privileges")
+        await supabase.rpc("ensure_member_profile");
+        await supabase.rpc("ensure_member_dependants_from_metadata");
+
         const { data: memberProfile } = await supabase
           .from("members")
           .select("is_active, membership_category_id")
           .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(1)
           .maybeSingle();
 
         if (memberProfile && memberProfile.is_active && memberProfile.membership_category_id) {

@@ -80,6 +80,12 @@ export default function MemberPayments() {
 
   const walletTotal = useMemo(() => {
     return payments
+      .filter((p) => p.status === 'completed' && p.reference?.startsWith('WALLET-TOPUP-'))
+      .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  }, [payments]);
+
+  const grandTotal = useMemo(() => {
+    return payments
       .filter((p) => p.status === 'completed')
       .reduce((sum, p) => sum + Number(p.amount || 0), 0);
   }, [payments]);
@@ -389,12 +395,22 @@ export default function MemberPayments() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-6 bg-white/50 rounded-xl border border-emerald-100 shadow-sm flex flex-col items-center text-center">
-              <div className="text-sm font-medium text-muted-foreground mb-2 uppercase tracking-wider">Wallet Balance</div>
-              <div className="text-4xl font-black text-emerald-700 mb-1">KES {walletTotal.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground italic">
-                Total of all successful payments
-              </p>
+            <div className="flex flex-col gap-4">
+              <div className="p-6 bg-white/50 rounded-xl border border-emerald-100 shadow-sm flex flex-col items-center text-center">
+                <div className="text-sm font-medium text-muted-foreground mb-2 uppercase tracking-wider">Wallet Balance</div>
+                <div className="text-4xl font-black text-emerald-700 mb-1">KES {walletTotal.toLocaleString()}</div>
+                <p className="text-[10px] text-muted-foreground italic max-w-[200px]">
+                  Unused funds directly topped up to your wallet.
+                </p>
+              </div>
+
+              <div className="p-4 bg-emerald-700 text-white rounded-xl shadow-sm flex flex-col items-center text-center">
+                <div className="text-xs font-semibold uppercase tracking-wider text-emerald-100 mb-1">Total Lifetime Payments</div>
+                <div className="text-2xl font-black mb-1">KES {grandTotal.toLocaleString()}</div>
+                <p className="text-[10px] text-emerald-100/70 italic">
+                  Sum of all schemes and wallet top-ups.
+                </p>
+              </div>
             </div>
 
             <div className="flex flex-col justify-center space-y-3">
@@ -437,7 +453,7 @@ export default function MemberPayments() {
               </div>
             </>
           ) : (
-            <div className="p-3 bg-emerald-100/50 rounded-lg flex items-center gap-3 text-emerald-800 text-sm italic">
+            <div className="p-3 bg-emerald-100/50 rounded-lg flex items-center gap-3 text-emerald-800 text-sm italic mt-2">
               <CheckCircle2 className="h-4 w-4 shrink-0" />
               <span>Your membership scheme is active. You can continue topping up or view your history below.</span>
             </div>

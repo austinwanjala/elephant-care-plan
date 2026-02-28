@@ -38,6 +38,7 @@ export const InsufficientBalanceHandler: React.FC<InsufficientBalanceHandlerProp
     const [categories, setCategories] = useState<MembershipCategory[]>([]);
     const [selectedCategory, setSelectedCategory] = useState<string>("");
     const [customAmount, setCustomAmount] = useState<string>("");
+    const [paymentPhone, setPaymentPhone] = useState<string>(member.phone || "");
     const [loading, setLoading] = useState(false);
     const [paymentStatus, setPaymentStatus] = useState<'idle' | 'pending' | 'success' | 'failed'>('idle');
     const [resourceId, setResourceId] = useState<string | null>(null);
@@ -105,6 +106,9 @@ export const InsufficientBalanceHandler: React.FC<InsufficientBalanceHandlerProp
     const handleInitiatePayment = async () => {
         setLoading(true);
         try {
+            const phone = paymentPhone.trim();
+            if (!phone) throw new Error("Please enter a valid mobile number for payment.");
+
             let amountToPay = 0;
             let coverageToAdd = 0;
             let paymentType = "topup";
@@ -132,7 +136,7 @@ export const InsufficientBalanceHandler: React.FC<InsufficientBalanceHandlerProp
             // Trigger STK Push via KopoKopo (edge function will create the pending payment row)
             const response = await kopokopoService.initiateStkPush({
                 amount: amountToPay,
-                phone: member.phone,
+                phone: phone,
                 memberId: member.id,
                 paymentType,
                 coverageAmount: coverageToAdd,
@@ -179,6 +183,26 @@ export const InsufficientBalanceHandler: React.FC<InsufficientBalanceHandlerProp
                 </div>
 
                 <div className="space-y-4 pt-2">
+                    {/* ── Mobile Number for STK Push ── */}
+                    <div className="space-y-2">
+                        <Label className="text-sm font-semibold flex items-center gap-2">
+                            <Smartphone className="h-4 w-4 text-blue-600" />
+                            Mobile Number for STK Push
+                        </Label>
+                        <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">+</span>
+                            <Input
+                                type="tel"
+                                placeholder="e.g. 0712345678"
+                                className="pl-7 font-mono"
+                                value={paymentPhone}
+                                onChange={(e) => setPaymentPhone(e.target.value)}
+                                disabled={paymentStatus === 'pending' || paymentStatus === 'success'}
+                            />
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">Pre-filled from member profile. Change if the payer is using a different phone.</p>
+                    </div>
+
                     <div className="space-y-2">
                         <Label className="text-sm font-semibold">Option 1: Choose New Scheme / Renewal</Label>
                         <Select value={selectedCategory} onValueChange={(val) => {
@@ -233,7 +257,7 @@ export const InsufficientBalanceHandler: React.FC<InsufficientBalanceHandlerProp
                         <Smartphone className="h-10 w-10 text-amber-600" />
                         <div>
                             <p className="font-bold text-amber-900">Waiting for STK Confirmation...</p>
-                            <p className="text-xs text-amber-700">Confirm payment on patient's phone ({member.phone})</p>
+                            <p className="text-xs text-amber-700">Confirm payment on phone: <span className="font-mono font-bold">{paymentPhone}</span></p>
                         </div>
                         <Loader2 className="h-5 w-5 animate-spin text-amber-600" />
                     </div>

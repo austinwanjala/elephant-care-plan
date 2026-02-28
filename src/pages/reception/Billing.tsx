@@ -233,7 +233,7 @@ export default function ReceptionBilling() {
                     Thank you for trusting Elephant Dental with your care.<br>
                     Providing accessible oral healthcare for everyone across Kenya.
                 </div>
-                <script>setTimeout(function() { window.print(); window.close(); }, 500);</script>
+                <script>window.onload = function() { window.print(); window.close(); }</script>
             </body>
             </html>
         `;

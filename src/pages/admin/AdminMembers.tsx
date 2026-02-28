@@ -224,6 +224,7 @@ export default function AdminMembers() {
           coverage_added: selectedCategory.benefit_amount,
           status: "completed",
           mpesa_reference: "Admin Scheme Assignment",
+          reference: `SCHEME-ADMIN-${Date.now()}`,
           payment_date: new Date().toISOString()
         });
 

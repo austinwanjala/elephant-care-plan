@@ -169,7 +169,41 @@ serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify(data), {
+    const createdUserId = data.user?.id;
+
+    // Ensure profiles are created immediately (do not rely on auth.users triggers being fast/consistent)
+    try {
+      if (createdUserId) {
+        const { error: setupErr } = await supabaseAdmin.rpc("sync_user_setup", {
+          v_user_id: createdUserId,
+          v_email: data.user?.email,
+          v_meta: metadata ?? {},
+        });
+
+        if (setupErr) {
+          console.error("[admin-create-user] sync_user_setup failed", setupErr);
+        }
+      }
+    } catch (e: any) {
+      console.error("[admin-create-user] sync_user_setup exception", { message: e?.message });
+    }
+
+    let member_id: string | null = null;
+    if (createdUserId && requestedRole === "member") {
+      const { data: memberRow, error: memberErr } = await supabaseAdmin
+        .from("members")
+        .select("id")
+        .eq("user_id", createdUserId)
+        .maybeSingle();
+
+      if (memberErr) {
+        console.error("[admin-create-user] Failed to fetch created member id", memberErr);
+      } else {
+        member_id = memberRow?.id ?? null;
+      }
+    }
+
+    return new Response(JSON.stringify({ ...data, member_id }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });

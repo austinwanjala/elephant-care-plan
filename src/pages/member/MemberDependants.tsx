@@ -84,7 +84,9 @@ const MemberDependants = () => {
 
     if (uploadError) throw uploadError;
 
-    const { data: { publicUrl } } = supabase.storage.from("dependants").getPublicUrl(path);
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from("dependants").getPublicUrl(path);
     return publicUrl;
   };
 
@@ -92,7 +94,9 @@ const MemberDependants = () => {
     setLoading(true);
     setFetchError(null);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         navigate("/login");
         return;
@@ -149,29 +153,51 @@ const MemberDependants = () => {
 
     setSubmitting(true);
     try {
-      const { data: inserted, error } = await supabase
+      const payload = {
+        member_id: memberId,
+        full_name: newDependant.fullName.trim(),
+        dob: newDependant.dob,
+        id_number: newDependant.idNumber.trim(),
+        relationship: newDependant.relationship.trim(),
+        gender: newDependant.gender,
+        image_url: null,
+      };
+
+      // Avoid duplicate key errors (dependants_unique_identity: member_id + full_name + dob)
+      const { data: existing } = await supabase
         .from("dependants")
-        .insert({
-          member_id: memberId,
-          full_name: newDependant.fullName,
-          dob: newDependant.dob,
-          id_number: newDependant.idNumber,
-          relationship: newDependant.relationship,
-          gender: newDependant.gender,
-          image_url: null
-        })
         .select("*")
-        .single();
+        .eq("member_id", payload.member_id)
+        .eq("full_name", payload.full_name)
+        .eq("dob", payload.dob)
+        .maybeSingle();
 
-      if (error) throw error;
+      const insertedOrExisting = existing
+        ? existing
+        : await (async () => {
+            const { data: inserted, error } = await supabase
+              .from("dependants")
+              .insert(payload)
+              .select("*")
+              .single();
+            if (error) throw error;
+            return inserted as Dependant;
+          })();
 
-      if (imageFile && inserted?.id) {
-        const url = await uploadDependantImage(inserted.id, imageFile);
-        const { error: uErr } = await supabase.from("dependants").update({ image_url: url }).eq("id", inserted.id);
+      if (imageFile && insertedOrExisting?.id) {
+        const url = await uploadDependantImage(insertedOrExisting.id, imageFile);
+        const { error: uErr } = await supabase
+          .from("dependants")
+          .update({ image_url: url, updated_at: new Date().toISOString() })
+          .eq("id", insertedOrExisting.id);
         if (uErr) throw uErr;
       }
 
-      toast({ title: "Dependant Added", description: `${newDependant.fullName} has been added.` });
+      toast({
+        title: existing ? "Dependant Already Exists" : "Dependant Added",
+        description: `${payload.full_name} ${existing ? "is already on your list." : "has been added."}`,
+      });
+
       setDialogOpen(false);
       setNewDependant({ fullName: "", dob: "", idNumber: "", relationship: "", gender: "male" });
       setImageFile(null);
@@ -261,7 +287,9 @@ const MemberDependants = () => {
           <h3 className="font-semibold text-lg">Unable to load dependants</h3>
           <p className="text-muted-foreground">{fetchError}</p>
         </div>
-        <Button variant="outline" onClick={fetchDependants}>Retry</Button>
+        <Button variant="outline" onClick={fetchDependants}>
+          Retry
+        </Button>
       </div>
     );
   }
@@ -269,7 +297,11 @@ const MemberDependants = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4 mb-6">
-        <Link to="/dashboard"><Button variant="ghost" size="icon"><ArrowLeft className="h-5 w-5" /></Button></Link>
+        <Link to="/dashboard">
+          <Button variant="ghost" size="icon">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        </Link>
         <div>
           <h1 className="text-3xl font-bold text-foreground">My Dependants</h1>
           <p className="text-muted-foreground">Manage family members covered under your scheme</p>
@@ -278,9 +310,15 @@ const MemberDependants = () => {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5" /> Registered Dependants</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5" /> Registered Dependants
+          </CardTitle>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild><Button className="btn-primary" disabled={dependants.length >= 5}><Plus className="mr-2 h-4 w-4" /> Add Dependant</Button></DialogTrigger>
+            <DialogTrigger asChild>
+              <Button className="btn-primary" disabled={dependants.length >= 5}>
+                <Plus className="mr-2 h-4 w-4" /> Add Dependant
+              </Button>
+            </DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>Add New Dependant</DialogTitle>
@@ -289,7 +327,12 @@ const MemberDependants = () => {
               <form onSubmit={handleAddDependant} className="space-y-4 py-4">
                 <div className="space-y-2">
                   <Label>Full Name *</Label>
-                  <Input value={newDependant.fullName} onChange={(e) => setNewDependant({ ...newDependant, fullName: e.target.value })} required placeholder="e.g. Jane Doe" />
+                  <Input
+                    value={newDependant.fullName}
+                    onChange={(e) => setNewDependant({ ...newDependant, fullName: e.target.value })}
+                    required
+                    placeholder="e.g. Jane Doe"
+                  />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -302,18 +345,34 @@ const MemberDependants = () => {
                         </span>
                       )}
                     </div>
-                    <Input type="date" max={new Date().toISOString().split("T")[0]} value={newDependant.dob} onChange={e => setNewDependant({ ...newDependant, dob: e.target.value })} required />
+                    <Input
+                      type="date"
+                      max={new Date().toISOString().split("T")[0]}
+                      value={newDependant.dob}
+                      onChange={(e) => setNewDependant({ ...newDependant, dob: e.target.value })}
+                      required
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Relationship *</Label>
-                    <Input value={newDependant.relationship} onChange={(e) => setNewDependant({ ...newDependant, relationship: e.target.value })} placeholder="e.g. Child" required />
+                    <Input
+                      value={newDependant.relationship}
+                      onChange={(e) => setNewDependant({ ...newDependant, relationship: e.target.value })}
+                      placeholder="e.g. Child"
+                      required
+                    />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Birth Cert / Student ID *</Label>
-                    <Input value={newDependant.idNumber} onChange={(e) => setNewDependant({ ...newDependant, idNumber: e.target.value })} required placeholder="Enter number" />
+                    <Input
+                      value={newDependant.idNumber}
+                      onChange={(e) => setNewDependant({ ...newDependant, idNumber: e.target.value })}
+                      required
+                      placeholder="Enter number"
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Gender *</Label>
@@ -337,7 +396,9 @@ const MemberDependants = () => {
                       <div className="relative">
                         <Avatar className="h-16 w-16 border">
                           <AvatarImage src={URL.createObjectURL(imageFile)} />
-                          <AvatarFallback><User /></AvatarFallback>
+                          <AvatarFallback>
+                            <User />
+                          </AvatarFallback>
                         </Avatar>
                         <Button
                           type="button"
@@ -355,7 +416,10 @@ const MemberDependants = () => {
                       </div>
                     )}
                     <div className="flex-1">
-                      <Label htmlFor="image-upload" className="cursor-pointer inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">
+                      <Label
+                        htmlFor="image-upload"
+                        className="cursor-pointer inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                      >
                         <ImagePlus className="h-4 w-4" />
                         {imageFile ? "Change Photo" : "Choose Image"}
                       </Label>
@@ -372,7 +436,9 @@ const MemberDependants = () => {
                 </div>
 
                 <DialogFooter className="pt-4">
-                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                    Cancel
+                  </Button>
                   <Button type="submit" disabled={submitting}>
                     {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
                     Add Dependant
@@ -434,7 +500,13 @@ const MemberDependants = () => {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Date of Birth *</Label>
-                <Input type="date" max={new Date().toISOString().split("T")[0]} value={editForm.dob} onChange={e => setEditForm({ ...editForm, dob: e.target.value })} required />
+                <Input
+                  type="date"
+                  max={new Date().toISOString().split("T")[0]}
+                  value={editForm.dob}
+                  onChange={(e) => setEditForm({ ...editForm, dob: e.target.value })}
+                  required
+                />
               </div>
               <div className="space-y-2">
                 <Label>Relationship *</Label>
@@ -468,7 +540,9 @@ const MemberDependants = () => {
                 {editImageFile ? (
                   <Avatar className="h-16 w-16 border">
                     <AvatarImage src={URL.createObjectURL(editImageFile)} />
-                    <AvatarFallback><User /></AvatarFallback>
+                    <AvatarFallback>
+                      <User />
+                    </AvatarFallback>
                   </Avatar>
                 ) : (
                   <Avatar className="h-16 w-16 border">
@@ -477,7 +551,10 @@ const MemberDependants = () => {
                   </Avatar>
                 )}
                 <div className="flex-1">
-                  <Label htmlFor="edit-image-upload" className="cursor-pointer inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">
+                  <Label
+                    htmlFor="edit-image-upload"
+                    className="cursor-pointer inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                  >
                     <ImagePlus className="h-4 w-4" />
                     Choose Image
                   </Label>
@@ -494,7 +571,9 @@ const MemberDependants = () => {
             </div>
 
             <DialogFooter className="pt-2">
-              <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
+              <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>
+                Cancel
+              </Button>
               <Button type="submit" disabled={submitting}>
                 {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Save Changes

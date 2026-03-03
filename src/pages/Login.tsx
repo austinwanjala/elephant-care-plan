@@ -70,7 +70,13 @@ const ForgotPasswordForm = () => {
       </div>
 
       <Button type="submit" className="w-full btn-primary" disabled={loading}>
-        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <><Send className="mr-2 h-4 w-4" /> Send reset link</>}
+        {loading ? (
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        ) : (
+          <>
+            <Send className="mr-2 h-4 w-4" /> Send reset link
+          </>
+        )}
       </Button>
     </form>
   );
@@ -86,6 +92,13 @@ const Login = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { settings } = useSystemSettings();
+
+  const resetForm = () => {
+    setEmail("");
+    setPassword("");
+    setShowPassword(false);
+    setLoading(false);
+  };
 
   const resolveRoleFromProfiles = async (userId: string) => {
     // Prefer staff/marketer/member based on existing profile rows.
@@ -141,7 +154,7 @@ const Login = () => {
           variant: "destructive",
         });
         await supabase.auth.signOut();
-        setLoading(false);
+        resetForm();
         return;
       }
 
@@ -176,7 +189,7 @@ const Login = () => {
             variant: "destructive",
           });
           await supabase.auth.signOut();
-          setLoading(false);
+          resetForm();
           return;
         }
 
@@ -188,7 +201,7 @@ const Login = () => {
             variant: "destructive",
           });
           await supabase.auth.signOut();
-          setLoading(false);
+          resetForm();
           return;
         }
 
@@ -217,6 +230,9 @@ const Login = () => {
   };
 
   useEffect(() => {
+    // Reset any retained form state whenever the login page mounts.
+    resetForm();
+
     const checkSession = async () => {
       const {
         data: { session },
@@ -231,7 +247,12 @@ const Login = () => {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "SIGNED_OUT") {
+        resetForm();
+        return;
+      }
+
       if (session) {
         setLoading(true);
         if (window.location.pathname === "/login") {

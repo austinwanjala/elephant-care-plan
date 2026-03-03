@@ -4,7 +4,6 @@ import { Fingerprint, Check, AlertCircle, Loader2, ShieldCheck, ShieldX } from "
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { registerCredential, verifyCredential } from "@/lib/webauthn";
-import ExternalBiometricCapture from "@/components/biometrics/ExternalBiometricCapture";
 
 interface BiometricCaptureProps {
   mode: "register" | "verify";
@@ -216,7 +215,7 @@ export const BiometricCapture = ({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <p className="text-xs text-muted-foreground">
-              Prefer using an external biometric reader (USB/HID/Windows Hello)?
+              Use an external biometric reader (USB/NFC/Windows Hello compatible).
             </p>
             <Button type="button" variant="outline" size="xs" onClick={() => setShowExternal(!showExternal)}>
               {showExternal ? "Hide external options" : "Use external device"}
@@ -224,25 +223,79 @@ export const BiometricCapture = ({
           </div>
 
           {showExternal && (
-            <ExternalBiometricCapture
-              mode={mode}
-              memberId={memberId}
-              onRegistered={() => {
-                // Mark registered success visually, but keep WebAuthn state untouched
-                // Consumers can react via onCaptureComplete if needed
-              }}
-              onVerified={(success) => {
-                if (success) {
-                  setVerified(true);
-                  onVerificationComplete?.(true);
-                } else {
-                  setVerified(false);
-                  onVerificationComplete?.(false);
-                }
-              }}
-              className="mt-1"
-              maxDurationMs={5000}
-            />
+            <div className="p-3 border rounded-lg bg-muted/30 space-y-2">
+              {mode === "register" ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      if (!userId || !userName) {
+                        throw new Error("User details required for registration");
+                      }
+                      setIsLoading(true);
+                      // Register with cross‑platform attachment so USB/NFC/roaming authenticators are used
+                      const data = await registerCredential(userId, userName, { attachment: "cross-platform" });
+                      setCaptured(true);
+                      onCaptureComplete?.(data);
+                      toast({
+                        title: "Biometric Registered (External)",
+                        description: "Credential captured via external device.",
+                      });
+                    } catch (err: any) {
+                      setCaptured(false);
+                      setError(err.message || "External registration failed");
+                      toast({
+                        title: "External Registration Failed",
+                        description: err.message || "Could not register via external device.",
+                        variant: "destructive",
+                      });
+                    } finally {
+                      setIsLoading(false);
+                    }
+                  }}
+                >
+                  Register via external device
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      if (!credentialId) {
+                        throw new Error("No biometric credential found. Register first.");
+                      }
+                      setIsLoading(true);
+                      const ok = await verifyCredential(credentialId);
+                      setVerified(ok);
+                      onVerificationComplete?.(ok);
+                      toast({
+                        title: ok ? "Verification Successful" : "Verification Failed",
+                        description: ok ? "External device verification passed." : "Please try again.",
+                        variant: ok ? "default" : "destructive",
+                      });
+                    } catch (err: any) {
+                      setVerified(false);
+                      setError(err.message || "External verification failed");
+                      onVerificationComplete?.(false);
+                      toast({
+                        title: "External Verification Failed",
+                        description: err.message || "Could not verify via external device.",
+                        variant: "destructive",
+                      });
+                    } finally {
+                      setIsLoading(false);
+                    }
+                  }}
+                >
+                  Verify via external device
+                </Button>
+              )}
+              <p className="text-[11px] text-muted-foreground">
+                Works with FIDO2/Windows Hello compatible readers and roaming authenticators. No file templates are used.
+              </p>
+            </div>
           )}
         </div>
       )}

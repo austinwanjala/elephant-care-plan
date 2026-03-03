@@ -11,7 +11,7 @@ function bufferEncode(value: ArrayBuffer): string {
         .replace(/=/g, "");
 }
 
-export async function registerCredential(userId: string, userName: string): Promise<string> {
+export async function registerCredential(userId: string, userName: string, opts?: { attachment?: "platform" | "cross-platform" }): Promise<string> {
     const challenge = new Uint8Array(32);
     window.crypto.getRandomValues(challenge);
 
@@ -30,14 +30,13 @@ export async function registerCredential(userId: string, userName: string): Prom
             { alg: -7, type: "public-key" }, // ES256
             { alg: -257, type: "public-key" }, // RS256
         ],
-        // Allow both platform and cross‑platform authenticators
         authenticatorSelection: {
             userVerification: "required",
-            // Keep existing resident key preference off for broader compatibility
+            // Choose platform (built-in) or cross-platform (USB/NFC/roaming) when requested
+            ...(opts?.attachment ? { authenticatorAttachment: opts.attachment } : {}),
             requireResidentKey: false,
         },
         timeout: 60000,
-        // No attestation needed for this flow
         attestation: "none",
     };
 
@@ -82,7 +81,7 @@ export async function verifyCredential(storedCredentialData: string): Promise<bo
                 {
                     id: bufferDecode(storedData.credentialId),
                     type: "public-key",
-                    // Accept both built‑in and external transports
+                    // Accept both built-in and external transports
                     transports: ["internal", "usb", "ble", "nfc", "hybrid"],
                 },
             ],

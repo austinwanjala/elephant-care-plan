@@ -27,7 +27,30 @@ serve(async (req) => {
     global: { headers: { Authorization: `Bearer ${token}` } },
   });
 
-  const { action, member_id, template, format } = await req.json().catch(() => ({}));
+  const body = await req.json().catch(() => ({} as any));
+
+  const action = body.action as string | undefined;
+  const entityType = (body.entity_type as "member" | "dependant" | "staff" | undefined) || "member";
+  const entityId = body.entity_id as string | undefined;
+  const template = body.template as string | undefined;
+  const format = (body.format as string | undefined) || "iso19794-2";
+  const deviceId = (body.device_id as string | undefined) || "unknown-device";
+  const captureTs = (body.capture_timestamp as string | undefined) || new Date().toISOString();
+
+  async function getCurrentUserId() {
+    const { data: { user } } = await supabase.auth.getUser();
+    return user?.id || null;
+  }
+
+  async function getMemberIdForCurrentUser(): Promise<string | null> {
+    const { data } = await supabase
+      .from("members")
+      .select("id")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return (data as any)?.id || null;
+  }
 
   if (!action) {
     return new Response(JSON.stringify({ error: "Missing action" }), {
@@ -36,54 +59,67 @@ serve(async (req) => {
     });
   }
 
-  // Resolve member id if not provided (current authenticated member)
-  async function getMemberId(): Promise<string | null> {
-    if (member_id) return member_id as string;
-    const { data, error } = await supabase
-      .from("members")
-      .select("id")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (error || !data) return null;
-    return (data as any).id as string;
-  }
-
-  if (action === "register") {
+  if (action === "enroll") {
     if (!template) {
       return new Response(JSON.stringify({ error: "Missing template" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const mid = await getMemberId();
-    if (!mid) {
-      return new Response(JSON.stringify({ error: "Member not found for current user" }), {
+
+    const currentUserId = await getCurrentUserId();
+    let targetId = entityId;
+
+    if (!targetId) {
+      if (entityType === "member") {
+        targetId = await getMemberIdForCurrentUser();
+      }
+      // For dependant/staff, entity_id is required if not bound to user
+    }
+
+    if (!targetId) {
+      return new Response(JSON.stringify({ error: "Target entity not found" }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Store as JSON string in members.biometric_data
-    const payload = JSON.stringify({
-      format: format || "unknown",
-      template, // base64 string (ANSI/ISO/WSQ)
-      updated_at: new Date().toISOString(),
-    });
+    // Persist payload
+    const payload = {
+      biometric_template: template,
+      biometric_format: format,
+      device_id: deviceId,
+      capture_timestamp: captureTs,
+      saved_by: currentUserId,
+    };
 
-    const { error: upErr } = await supabase
-      .from("members")
-      .update({ biometric_data: payload, updated_at: new Date().toISOString() })
-      .eq("id", mid);
+    if (entityType === "member") {
+      const json = JSON.stringify(payload);
+      const { error: upErr } = await supabase
+        .from("members")
+        .update({ biometric_data: json, updated_at: new Date().toISOString() })
+        .eq("id", targetId);
 
-    if (upErr) {
-      return new Response(JSON.stringify({ error: upErr.message }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      if (upErr) {
+        return new Response(JSON.stringify({ error: upErr.message }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    } else {
+      // Dependants and staff tables do not have biometric columns in the current schema.
+      // Store a secure audit trail so we don't break RLS or schema.
+      await supabase.from("system_logs").insert({
+        action: "biometric_enrolled",
+        details: {
+          entity_type: entityType,
+          entity_id: targetId,
+          ...payload,
+        } as any,
       });
     }
 
-    return new Response(JSON.stringify({ success: true, member_id: mid }), {
+    return new Response(JSON.stringify({ success: true, entity_type: entityType, entity_id: targetId }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -96,41 +132,64 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const mid = await getMemberId();
-    if (!mid) {
-      return new Response(JSON.stringify({ error: "Member not found for current user" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+
+    let targetId = entityId;
+    if (!targetId && entityType === "member") {
+      targetId = await getMemberIdForCurrentUser();
     }
-
-    const { data, error: selErr } = await supabase
-      .from("members")
-      .select("biometric_data")
-      .eq("id", mid)
-      .maybeSingle();
-
-    if (selErr || !data) {
-      return new Response(JSON.stringify({ error: selErr?.message || "Member not found" }), {
+    if (!targetId) {
+      return new Response(JSON.stringify({ error: "Target entity not found" }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     let storedTemplate: string | null = null;
-    try {
-      if (data.biometric_data) {
-        const parsed = JSON.parse(data.biometric_data);
-        storedTemplate = parsed?.template || null;
+
+    if (entityType === "member") {
+      const { data, error } = await supabase
+        .from("members")
+        .select("biometric_data")
+        .eq("id", targetId)
+        .maybeSingle();
+      if (error) {
+        return new Response(JSON.stringify({ error: error.message }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
-    } catch {
-      storedTemplate = null;
+      try {
+        if (data?.biometric_data) {
+          const parsed = JSON.parse(data.biometric_data as string);
+          storedTemplate = parsed?.biometric_template || parsed?.template || null;
+        }
+      } catch {
+        storedTemplate = null;
+      }
+    } else {
+      // Look up last enrolled template from system logs for dependants/staff
+      const { data } = await supabase
+        .from("system_logs")
+        .select("details")
+        .eq("action", "biometric_enrolled")
+        .order("created_at", { ascending: false });
+
+      if (Array.isArray(data)) {
+        for (const row of data) {
+          const details = row.details as any;
+          if (details?.entity_type === entityType && details?.entity_id === targetId) {
+            storedTemplate = details?.biometric_template || null;
+            break;
+          }
+        }
+      }
     }
 
-    // Simple comparison for now (exact match) — supports deterministic templates
-    const success = !!storedTemplate && storedTemplate === template;
+    // Simple deterministic comparison; production should use vendor/SDK matcher producing a score.
+    const match = !!storedTemplate && storedTemplate === template;
+    const score = match ? 100 : 0;
 
-    return new Response(JSON.stringify({ success }), {
+    return new Response(JSON.stringify({ match, score }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

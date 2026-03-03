@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Shield, CreditCard, QrCode, Building2, Users, ArrowRight, CheckCircle, Phone, Mail } from "lucide-react";
 import { useSystemSettings } from "@/hooks/useSystemSettings";
@@ -8,6 +7,9 @@ import { AiChatBot } from "@/components/home/AiChatBot";
 
 const Index = () => {
   const { settings } = useSystemSettings();
+  const [searchParams] = useSearchParams();
+  const refCode = searchParams.get("ref");
+  const registerUrl = refCode ? `/register?ref=${refCode}` : "/register";
 
   const app_name = settings.app_name || "Elephant Dental";
   const hero_title = settings.hero_title || "Dental Insurance That Doubles Your Investment";
@@ -70,7 +72,7 @@ const Index = () => {
             <Link to="/login">
               <Button variant="ghost">Login</Button>
             </Link>
-            <Link to="/register">
+            <Link to={registerUrl}>
               <Button className="btn-primary">Get Started</Button>
             </Link>
           </div>
@@ -88,7 +90,7 @@ const Index = () => {
               {hero_subtitle}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link to="/register">
+              <Link to={registerUrl}>
                 <Button size="lg" className="btn-accent text-lg px-8 py-6">
                   Join Now <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
@@ -221,7 +223,7 @@ const Index = () => {
           <p className="text-primary-foreground/80 text-lg mb-8 max-w-2xl mx-auto">
             Join {app_name} today and give your family the dental care they deserve.
           </p>
-          <Link to="/register">
+          <Link to={registerUrl}>
             <Button size="lg" className="btn-accent text-lg px-8 py-6">
               Register Now <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
@@ -257,7 +259,7 @@ const Index = () => {
               <h4 className="font-bold text-foreground">Quick Links</h4>
               <div className="flex flex-col gap-2 text-sm text-muted-foreground">
                 <Link to="/login" className="hover:text-primary">Member Login</Link>
-                <Link to="/register" className="hover:text-primary">Join Scheme</Link>
+                <Link to={registerUrl} className="hover:text-primary">Join Scheme</Link>
                 <Link to="/terms-of-service" className="hover:text-primary">Terms of Service</Link>
                 <Link to="/privacy-policy" className="hover:text-primary">Privacy Policy</Link>
               </div>

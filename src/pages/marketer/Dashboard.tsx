@@ -101,7 +101,7 @@ export default function MarketerDashboard() {
     };
 
     const copyReferralLink = () => {
-        const link = `${window.location.origin}/register?ref=${marketer?.code}`;
+        const link = `${window.location.origin}/?ref=${marketer?.code}`;
         navigator.clipboard.writeText(link);
         toast({ title: "Link Copied!", description: "Share this link with potential members." });
     };
@@ -133,7 +133,7 @@ export default function MarketerDashboard() {
                         <div className="space-y-2">
                             <h2 className="text-lg font-medium opacity-90">Your Referral Link</h2>
                             <p className="text-2xl font-bold truncate max-w-md bg-white/10 p-3 rounded-lg border border-white/20 font-mono text-sm uppercase">
-                                {window.location.origin}/register?ref={marketer.code}
+                                {window.location.origin}/?ref={marketer.code}
                             </p>
                         </div>
                         <Button onClick={copyReferralLink} variant="secondary" className="bg-white text-blue-700 hover:bg-blue-50 font-bold shrink-0">

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -80,6 +80,8 @@ const Register = () => {
   });
   const [loading, setLoading] = useState(false);
 
+  const [searchParams] = useSearchParams();
+
   useEffect(() => {
     const savedData = localStorage.getItem("registration_form_data");
     const savedReferral = localStorage.getItem("registration_referral_source");
@@ -90,7 +92,35 @@ const Register = () => {
     if (savedReferral) setReferralSource(savedReferral);
     if (savedMarketer) setSelectedMarketer(JSON.parse(savedMarketer));
     if (savedDependants) setDependants(JSON.parse(savedDependants));
+
+    // Check for referral code in URL
+    const refCode = searchParams.get("ref");
+    if (refCode) {
+      handleRefCode(refCode);
+    }
   }, []);
+
+  const handleRefCode = async (code: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("marketers")
+        .select("id, full_name, code")
+        .eq("code", code)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (data) {
+        setReferralSource("marketer");
+        setSelectedMarketer(data);
+        toast({
+          title: "Referral Applied",
+          description: `You are being referred by ${data.full_name}`,
+        });
+      }
+    } catch (err) {
+      console.error("Error applying referral code:", err);
+    }
+  };
 
   useEffect(() => {
     localStorage.setItem("registration_form_data", JSON.stringify(formData));

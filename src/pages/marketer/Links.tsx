@@ -46,7 +46,7 @@ export default function MarketerLinks() {
     };
 
     const copyReferralLink = () => {
-        const link = `${window.location.origin}/register?ref=${marketer?.code}`;
+        const link = `${window.location.origin}/?ref=${marketer?.code}`;
         navigator.clipboard.writeText(link);
         toast({ title: "Link Copied!", description: "Share this link with potential members." });
     };
@@ -63,7 +63,7 @@ export default function MarketerLinks() {
         return <div className="p-8 text-center text-muted-foreground">No marketer account found.</div>;
     }
 
-    const referralLink = `${window.location.origin}/register?ref=${marketer.code}`;
+    const referralLink = `${window.location.origin}/?ref=${marketer.code}`;
 
     return (
         <div className="space-y-6">

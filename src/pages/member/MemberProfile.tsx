@@ -16,6 +16,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import FingerprintCaptureModal from "@/components/biometrics/FingerprintCaptureModal";
 
 interface MemberProfile {
   id: string;
@@ -41,6 +42,7 @@ export default function MemberProfile() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+  const [biometricOpen, setBiometricOpen] = useState(false);
 
   const [editForm, setEditForm] = useState({
     full_name: "",
@@ -141,9 +143,15 @@ export default function MemberProfile() {
           <h1 className="text-2xl font-bold">My Profile</h1>
           <p className="text-muted-foreground">Your membership details</p>
         </div>
-        <Button onClick={() => setIsEditOpen(true)} variant="outline" className="gap-2">
-          <Pencil className="h-4 w-4" /> Edit Profile
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => setBiometricOpen(true)} className="gap-2">
+            <span className="inline-block h-4 w-4 rounded-full bg-primary/20" />
+            Register New Biometric
+          </Button>
+          <Button onClick={() => setIsEditOpen(true)} variant="outline" className="gap-2">
+            <Pencil className="h-4 w-4" /> Edit Profile
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
@@ -290,6 +298,17 @@ export default function MemberProfile() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Fingerprint enrollment modal */}
+      {profile && (
+        <FingerprintCaptureModal
+          open={biometricOpen}
+          onOpenChange={setBiometricOpen}
+          mode="enroll"
+          entityType="member"
+          entityId={profile.id}
+        />
+      )}
     </div>
   );
 }

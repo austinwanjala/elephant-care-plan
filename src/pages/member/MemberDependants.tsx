@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2, ArrowLeft, Plus, Trash, Users, Camera, User, ImagePlus, AlertCircle, Pencil } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import FingerprintCaptureModal from "@/components/biometrics/FingerprintCaptureModal";
 
 const calculateAge = (dob: string) => {
   if (!dob) return 0;
@@ -60,6 +61,8 @@ const MemberDependants = () => {
     gender: "male",
   });
   const [editImageFile, setEditImageFile] = useState<File | null>(null);
+  const [bioOpen, setBioOpen] = useState(false);
+  const [bioDependantId, setBioDependantId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchDependants();
@@ -492,6 +495,17 @@ const MemberDependants = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setBioDependantId(dep.id);
+                        setBioOpen(true);
+                      }}
+                    >
+                      <span className="inline-block h-2 w-2 rounded-full bg-primary mr-2" />
+                      Register Biometric
+                    </Button>
                     <Button variant="ghost" size="icon" onClick={() => openEdit(dep)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
@@ -603,6 +617,16 @@ const MemberDependants = () => {
           </form>
         </DialogContent>
       </Dialog>
+
+      {bioOpen && bioDependantId && (
+        <FingerprintCaptureModal
+          open={bioOpen}
+          onOpenChange={setBioOpen}
+          mode="enroll"
+          entityType="dependant"
+          entityId={bioDependantId}
+        />
+      )}
     </div>
   );
 };

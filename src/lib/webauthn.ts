@@ -1,6 +1,17 @@
-// Helper to convert Base64URL to ArrayBuffer
+// Helper to convert Base64URL or Base64 to ArrayBuffer (adds padding if needed)
 function bufferDecode(value: string): ArrayBuffer {
-    return Uint8Array.from(atob(value.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0)).buffer;
+    let v = value.trim();
+
+    // If it's base64url, convert to base64
+    v = v.replace(/-/g, "+").replace(/_/g, "/");
+
+    // Add padding if missing
+    const pad = v.length % 4;
+    if (pad === 2) v += "==";
+    else if (pad === 3) v += "=";
+    else if (pad !== 0) v += "=".repeat(4 - pad);
+
+    return Uint8Array.from(atob(v), c => c.charCodeAt(0)).buffer;
 }
 
 // Helper to convert ArrayBuffer to Base64URL
@@ -63,29 +74,31 @@ export async function registerCredential(userId: string, userName: string): Prom
 
 export async function verifyCredential(storedCredentialData: string): Promise<boolean> {
     try {
-        // Normalize incoming data: support JSON with `credentialId`, JSON with `id`, or raw string id
+        // Accept JSON with `credentialId` (current), JSON with `id` (legacy),
+        // or a raw string credential id.
         let credentialId: string | null = null;
 
-        if (typeof storedCredentialData === "string") {
-            const trimmed = storedCredentialData.trim();
+        const raw = (storedCredentialData ?? "").toString().trim();
+        if (!raw) {
+            throw new Error("Invalid credential data structure");
+        }
 
-            // Try parse JSON first
-            try {
-                const parsed = JSON.parse(trimmed);
-                if (parsed && typeof parsed === "object") {
-                    if (typeof parsed.credentialId === "string" && parsed.credentialId.length > 0) {
-                        credentialId = parsed.credentialId;
-                    } else if (typeof parsed.id === "string" && parsed.id.length > 0) {
-                        // Legacy shape support
-                        credentialId = parsed.id;
-                    }
-                }
-            } catch {
-                // Not JSON: assume it's already the credential id string
-                if (trimmed.length > 0) {
-                    credentialId = trimmed;
+        // Try JSON parse first
+        try {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === "object") {
+                if (typeof parsed.credentialId === "string" && parsed.credentialId.trim().length > 0) {
+                    credentialId = parsed.credentialId.trim();
+                } else if (typeof parsed.id === "string" && parsed.id.trim().length > 0) {
+                    credentialId = parsed.id.trim();
+                } else if (typeof parsed.rawId === "string" && parsed.rawId.trim().length > 0) {
+                    // Very old shape
+                    credentialId = parsed.rawId.trim();
                 }
             }
+        } catch {
+            // Not JSON; assume it's already the id string
+            credentialId = raw;
         }
 
         if (!credentialId) {
@@ -102,7 +115,7 @@ export async function verifyCredential(storedCredentialData: string): Promise<bo
                 {
                     id: bufferDecode(credentialId),
                     type: "public-key",
-                    // Accept both built‑in and external transports
+                    // Accept built‑in and external authenticators
                     transports: ["internal", "usb", "ble", "nfc", "hybrid"],
                 },
             ],

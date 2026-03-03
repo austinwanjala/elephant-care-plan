@@ -4,6 +4,7 @@ import { Fingerprint, Check, AlertCircle, Loader2, ShieldCheck, ShieldX } from "
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { registerCredential, verifyCredential } from "@/lib/webauthn";
+import ExternalBiometricCapture from "@/components/biometrics/ExternalBiometricCapture";
 
 interface BiometricCaptureProps {
   mode: "register" | "verify";
@@ -13,6 +14,8 @@ interface BiometricCaptureProps {
   onCaptureComplete?: (credentialData: string) => void;
   onVerificationComplete?: (success: boolean) => void;
   className?: string;
+  memberId?: string;
+  allowExternal?: boolean;
 }
 
 export const BiometricCapture = ({
@@ -23,12 +26,15 @@ export const BiometricCapture = ({
   onCaptureComplete,
   onVerificationComplete,
   className,
+  memberId,
+  allowExternal = true,
 }: BiometricCaptureProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [captured, setCaptured] = useState(false);
   const [verified, setVerified] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSupported, setIsSupported] = useState(false);
+  const [showExternal, setShowExternal] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -204,6 +210,41 @@ export const BiometricCapture = ({
           <AlertCircle className="h-3 w-3 inline mr-1" />
           WebAuthn biometrics requires a compatible device (Fingerprint/FaceID) and HTTPS context.
         </p>
+      )}
+
+      {allowExternal && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              Prefer using an external biometric reader (USB/HID/Windows Hello)?
+            </p>
+            <Button type="button" variant="outline" size="xs" onClick={() => setShowExternal(!showExternal)}>
+              {showExternal ? "Hide external options" : "Use external device"}
+            </Button>
+          </div>
+
+          {showExternal && (
+            <ExternalBiometricCapture
+              mode={mode}
+              memberId={memberId}
+              onRegistered={() => {
+                // Mark registered success visually, but keep WebAuthn state untouched
+                // Consumers can react via onCaptureComplete if needed
+              }}
+              onVerified={(success) => {
+                if (success) {
+                  setVerified(true);
+                  onVerificationComplete?.(true);
+                } else {
+                  setVerified(false);
+                  onVerificationComplete?.(false);
+                }
+              }}
+              className="mt-1"
+              maxDurationMs={5000}
+            />
+          )}
+        </div>
       )}
     </div>
   );

@@ -30,12 +30,14 @@ export async function registerCredential(userId: string, userName: string): Prom
             { alg: -7, type: "public-key" }, // ES256
             { alg: -257, type: "public-key" }, // RS256
         ],
+        // Allow both platform and cross‑platform authenticators
         authenticatorSelection: {
-            authenticatorAttachment: "platform",
             userVerification: "required",
+            // Keep existing resident key preference off for broader compatibility
             requireResidentKey: false,
         },
         timeout: 60000,
+        // No attestation needed for this flow
         attestation: "none",
     };
 
@@ -80,6 +82,8 @@ export async function verifyCredential(storedCredentialData: string): Promise<bo
                 {
                     id: bufferDecode(storedData.credentialId),
                     type: "public-key",
+                    // Accept both built‑in and external transports
+                    transports: ["internal", "usb", "ble", "nfc", "hybrid"],
                 },
             ],
             userVerification: "required",

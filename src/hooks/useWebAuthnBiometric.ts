@@ -74,16 +74,24 @@ export const useWebAuthnBiometric = (): UseWebAuthnBiometricReturn => {
     setError(null);
 
     try {
-      // Check if platform authenticator is available (fingerprint, face ID, etc.)
-      const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+      // Check for platform authenticator, but don't block if missing (external keys may be available)
+      let platformAvailable = false;
+      try {
+        platformAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+      } catch {
+        platformAvailable = false;
+      }
       
-      if (!available) {
-        throw new Error("No platform authenticator available. Please ensure your device has fingerprint or biometric capability enabled.");
+      if (!platformAvailable) {
+        toast({
+          title: "No built-in biometrics detected",
+          description: "We will try any connected external security key or reader instead.",
+        });
       }
 
       const challenge = generateChallenge();
       
-      // Create credential options for registration
+      // Create credential options for registration (allow both platform and cross‑platform)
       const createOptions: PublicKeyCredentialCreationOptions = {
         challenge,
         rp: {
@@ -99,13 +107,13 @@ export const useWebAuthnBiometric = (): UseWebAuthnBiometricReturn => {
           { alg: -7, type: "public-key" },   // ES256
           { alg: -257, type: "public-key" }, // RS256
         ],
+        // Do not force authenticatorAttachment so external authenticators can be used
         authenticatorSelection: {
-          authenticatorAttachment: "platform", // Use built-in authenticator (fingerprint/face)
-          userVerification: "required",        // Require biometric verification
+          userVerification: "required",
           residentKey: "preferred",
         },
-        timeout: 60000, // 60 seconds timeout
-        attestation: "direct",
+        timeout: 60000,
+        attestation: "none",
       };
 
       toast({
@@ -203,7 +211,8 @@ export const useWebAuthnBiometric = (): UseWebAuthnBiometricReturn => {
           {
             id: base64ToArrayBuffer(credentialId),
             type: "public-key",
-            transports: ["internal"], // Platform authenticator
+            // Allow internal and external transports
+            transports: ["internal", "usb", "ble", "nfc", "hybrid"],
           },
         ],
       };

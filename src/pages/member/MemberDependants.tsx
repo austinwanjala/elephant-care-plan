@@ -163,13 +163,15 @@ const MemberDependants = () => {
         image_url: null,
       };
 
-      // Avoid duplicate key errors (dependants_unique_identity: member_id + full_name + dob)
+      // Avoid duplicate key errors by checking all identity fields
       const { data: existing } = await supabase
         .from("dependants")
         .select("*")
         .eq("member_id", payload.member_id)
         .eq("full_name", payload.full_name)
         .eq("dob", payload.dob)
+        .eq("relationship", payload.relationship)
+        .eq("id_number", payload.id_number)
         .maybeSingle();
 
       const insertedOrExisting = existing
@@ -180,7 +182,26 @@ const MemberDependants = () => {
               .insert(payload)
               .select("*")
               .single();
-            if (error) throw error;
+
+            // Gracefully handle unique constraint violations
+            if (error) {
+              const code = (error as any)?.code || "";
+              const message = (error as any)?.message || "";
+              if (code === "23505" || /duplicate key value/i.test(message)) {
+                const { data: already } = await supabase
+                  .from("dependants")
+                  .select("*")
+                  .eq("member_id", payload.member_id)
+                  .eq("full_name", payload.full_name)
+                  .eq("dob", payload.dob)
+                  .eq("relationship", payload.relationship)
+                  .eq("id_number", payload.id_number)
+                  .maybeSingle();
+                if (already) return already as Dependant;
+              }
+              throw error;
+            }
+
             return inserted as Dependant;
           })();
 

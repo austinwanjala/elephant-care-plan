@@ -22,6 +22,49 @@ function bufferEncode(value: ArrayBuffer): string {
         .replace(/=/g, "");
 }
 
+// Extract a credentialId from various stored formats (JSON, raw string, or double-encoded)
+function extractCredentialId(input: string): string | null {
+    if (!input) return null;
+    let s = input.trim();
+    if (!s) return null;
+
+    // Try up to 3 times to parse and unwrap nested JSON/string
+    for (let i = 0; i < 3; i++) {
+        try {
+            const parsed = JSON.parse(s);
+            if (parsed && typeof parsed === "object") {
+                if (typeof parsed.credentialId === "string" && parsed.credentialId.trim()) {
+                    return parsed.credentialId.trim();
+                }
+                if (typeof parsed.id === "string" && parsed.id.trim()) {
+                    return parsed.id.trim();
+                }
+                if (typeof parsed.rawId === "string" && parsed.rawId.trim()) {
+                    return parsed.rawId.trim();
+                }
+                // If it's an object without the expected keys, stop parsing
+                break;
+            }
+            if (typeof parsed === "string" && parsed.trim()) {
+                // Unwrap one layer and continue
+                s = parsed.trim();
+                continue;
+            }
+            break;
+        } catch {
+            // Not JSON; fall through to use raw string
+            break;
+        }
+    }
+
+    // Remove surrounding quotes if present (e.g., "\"...\"")
+    if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+        s = s.slice(1, -1).trim();
+    }
+
+    return s || null;
+}
+
 export async function registerCredential(userId: string, userName: string): Promise<string> {
     const challenge = new Uint8Array(32);
     window.crypto.getRandomValues(challenge);
@@ -74,33 +117,7 @@ export async function registerCredential(userId: string, userName: string): Prom
 
 export async function verifyCredential(storedCredentialData: string): Promise<boolean> {
     try {
-        // Accept JSON with `credentialId` (current), JSON with `id` (legacy),
-        // or a raw string credential id.
-        let credentialId: string | null = null;
-
-        const raw = (storedCredentialData ?? "").toString().trim();
-        if (!raw) {
-            throw new Error("Invalid credential data structure");
-        }
-
-        // Try JSON parse first
-        try {
-            const parsed = JSON.parse(raw);
-            if (parsed && typeof parsed === "object") {
-                if (typeof parsed.credentialId === "string" && parsed.credentialId.trim().length > 0) {
-                    credentialId = parsed.credentialId.trim();
-                } else if (typeof parsed.id === "string" && parsed.id.trim().length > 0) {
-                    credentialId = parsed.id.trim();
-                } else if (typeof parsed.rawId === "string" && parsed.rawId.trim().length > 0) {
-                    // Very old shape
-                    credentialId = parsed.rawId.trim();
-                }
-            }
-        } catch {
-            // Not JSON; assume it's already the id string
-            credentialId = raw;
-        }
-
+        const credentialId = extractCredentialId((storedCredentialData ?? "").toString());
         if (!credentialId) {
             throw new Error("Invalid credential data structure");
         }

@@ -63,14 +63,34 @@ export async function registerCredential(userId: string, userName: string): Prom
 
 export async function verifyCredential(storedCredentialData: string): Promise<boolean> {
     try {
-        let storedData;
-        try {
-            storedData = JSON.parse(storedCredentialData);
-        } catch (e) {
-            throw new Error("Invalid biometric data format. Please re-register member biometrics.");
+        // Normalize incoming data: support JSON with `credentialId`, JSON with `id`, or raw string id
+        let credentialId: string | null = null;
+
+        if (typeof storedCredentialData === "string") {
+            const trimmed = storedCredentialData.trim();
+
+            // Try parse JSON first
+            try {
+                const parsed = JSON.parse(trimmed);
+                if (parsed && typeof parsed === "object") {
+                    if (typeof parsed.credentialId === "string" && parsed.credentialId.length > 0) {
+                        credentialId = parsed.credentialId;
+                    } else if (typeof parsed.id === "string" && parsed.id.length > 0) {
+                        // Legacy shape support
+                        credentialId = parsed.id;
+                    }
+                }
+            } catch {
+                // Not JSON: assume it's already the credential id string
+                if (trimmed.length > 0) {
+                    credentialId = trimmed;
+                }
+            }
         }
 
-        if (!storedData.credentialId) throw new Error("Invalid credential data structure");
+        if (!credentialId) {
+            throw new Error("Invalid credential data structure");
+        }
 
         const challenge = new Uint8Array(32);
         window.crypto.getRandomValues(challenge);
@@ -80,7 +100,7 @@ export async function verifyCredential(storedCredentialData: string): Promise<bo
             rpId: window.location.hostname,
             allowCredentials: [
                 {
-                    id: bufferDecode(storedData.credentialId),
+                    id: bufferDecode(credentialId),
                     type: "public-key",
                     // Accept both built‑in and external transports
                     transports: ["internal", "usb", "ble", "nfc", "hybrid"],

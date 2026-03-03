@@ -36,7 +36,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Search, Plus, MoreHorizontal, Edit, Trash2, Fingerprint, Download, Loader2, ShieldCheck, History, Users, Image as ImageIcon, CreditCard as CreditCardIcon, QrCode } from "lucide-react";
-import { BiometricCapture } from "@/components/BiometricCapture";
+import FingerprintCaptureModal from "@/components/biometrics/FingerprintCaptureModal";
 import { exportToCsv } from "@/utils/csvExport";
 import { InsuranceCard } from "@/components/member/InsuranceCard";
 import { generateCardPDF } from "@/utils/generateCardPDF";
@@ -98,6 +98,7 @@ export default function AdminMembers() {
     membershipCategoryId: "",
   });
   const { toast } = useToast();
+  const [bridgeHint, setBridgeHint] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -287,11 +288,10 @@ export default function AdminMembers() {
     loadData();
   };
 
-  const handleBiometricCaptureComplete = async (data: string) => {
-    if (!selectedMember) return;
-    await supabase.from("members").update({ biometric_data: data }).eq("id", selectedMember.id);
+  const handleBiometricEnrollComplete = async () => {
     setBiometricDialogOpen(false);
-    loadData();
+    await loadData();
+    toast({ title: "Biometric Saved", description: "Member fingerprint has been enrolled." });
   };
 
   const handleDownloadCard = async () => {
@@ -463,9 +463,18 @@ export default function AdminMembers() {
       </Dialog>
 
       <Dialog open={biometricDialogOpen} onOpenChange={setBiometricDialogOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Capture Biometric</DialogTitle></DialogHeader>
-          {selectedMember && <BiometricCapture mode="register" userId={selectedMember.id} userName={selectedMember.full_name} onCaptureComplete={handleBiometricCaptureComplete} />}
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Fingerprint Capture</DialogTitle></DialogHeader>
+          {selectedMember && (
+            <FingerprintCaptureModal
+              open={biometricDialogOpen}
+              onOpenChange={setBiometricDialogOpen}
+              mode="enroll"
+              entityType="member"
+              entityId={selectedMember.id}
+              onEnrollComplete={handleBiometricEnrollComplete}
+            />
+          )}
         </DialogContent>
       </Dialog>
 

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Fingerprint, CheckCircle2, XCircle, ScanLine, Cpu, MonitorSmartphone } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { scanFingerprintViaBridge } from "@/services/biometricBridge";
+import { scanFingerprintViaBridge, isBridgeAvailable } from "@/services/biometricBridge";
 import { enrollBiometricTemplate, verifyBiometricTemplate } from "@/services/biometrics";
 
 type Mode = "enroll" | "verify";
@@ -17,6 +17,8 @@ interface FingerprintCaptureModalProps {
   mode: Mode;
   entityType: "member" | "dependant" | "staff";
   entityId?: string; // optional; if omitted for members, server resolves from auth
+  onEnrollComplete?: () => void;
+  onVerifyComplete?: (success: boolean) => void;
 }
 
 const FingerprintCaptureModal: React.FC<FingerprintCaptureModalProps> = ({
@@ -25,6 +27,8 @@ const FingerprintCaptureModal: React.FC<FingerprintCaptureModalProps> = ({
   mode,
   entityType,
   entityId,
+  onEnrollComplete,
+  onVerifyComplete,
 }) => {
   const { toast } = useToast();
   const [progress, setProgress] = useState(0);
@@ -58,13 +62,18 @@ const FingerprintCaptureModal: React.FC<FingerprintCaptureModalProps> = ({
       animateCapture("start");
 
       try {
-        // Step hints
+        // Preflight: ensure local bridge is reachable to avoid generic "failed to fetch"
+        const available = await isBridgeAvailable();
+        if (!available) {
+          throw new Error(
+            "Cannot reach the local biometric agent on this PC (http://localhost:8181/scan). Please start the local 'Elephant Biometric Bridge' app and retry."
+          );
+        }
+
         animateCapture("finger");
-        // Request local agent capture (returns ISO/WSQ template)
         const result = await scanFingerprintViaBridge({ source, timeoutMs: 8000 });
         animateCapture("hold");
 
-        // Enroll or verify
         if (mode === "enroll") {
           await enrollBiometricTemplate({
             entityType,
@@ -80,6 +89,7 @@ const FingerprintCaptureModal: React.FC<FingerprintCaptureModalProps> = ({
             title: "Biometric Enrolled",
             description: "Fingerprint template saved successfully.",
           });
+          onEnrollComplete?.();
         } else {
           const verify = await verifyBiometricTemplate({
             entityType,
@@ -88,6 +98,7 @@ const FingerprintCaptureModal: React.FC<FingerprintCaptureModalProps> = ({
           });
           animateCapture("done");
           setSuccess(verify.match);
+          onVerifyComplete?.(verify.match);
           toast({
             title: verify.match ? "Verification Successful" : "Verification Failed",
             description: verify.match ? `Match score: ${verify.score}` : "Fingerprint did not match. Please try again.",
@@ -106,7 +117,7 @@ const FingerprintCaptureModal: React.FC<FingerprintCaptureModalProps> = ({
         setBusy(false);
       }
     },
-    [mode, entityType, entityId, toast]
+    [mode, entityType, entityId, toast, onEnrollComplete, onVerifyComplete]
   );
 
   const resetStateAndClose = () => {

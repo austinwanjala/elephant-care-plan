@@ -11,6 +11,23 @@ export type BridgeScanResponse = {
 
 const BRIDGE_URL = "http://localhost:8181/scan";
 
+export async function isBridgeAvailable(timeoutMs: number = 1200): Promise<boolean> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${BRIDGE_URL}?ping=1`, {
+      method: "GET",
+      signal: controller.signal,
+      headers: { Accept: "application/json" },
+    });
+    return res.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function scanFingerprintViaBridge(params?: {
   source?: "windows" | "external";
   timeoutMs?: number;

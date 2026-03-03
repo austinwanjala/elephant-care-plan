@@ -9,7 +9,7 @@ import { Search, UserCheck, UserX, Fingerprint, ArrowRight, Loader2, CheckCircle
 
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, Link } from "react-router-dom";
-import FingerprintCaptureModal from "@/components/biometrics/FingerprintCaptureModal";
+import { BiometricCapture } from "@/components/BiometricCapture";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { InsufficientBalanceHandler } from "@/components/reception/InsufficientBalanceHandler";
 
@@ -40,8 +40,6 @@ export default function RegisterVisit() {
     const [searchResults, setSearchResults] = useState<any[]>([]);
     const [selectionDialogOpen, setSelectionDialogOpen] = useState(false);
     const [showPaymentHandler, setShowPaymentHandler] = useState(false);
-    const [openEnrollBio, setOpenEnrollBio] = useState(false);
-    const [openVerifyBio, setOpenVerifyBio] = useState(false);
     const { toast } = useToast();
     const navigate = useNavigate();
 
@@ -212,22 +210,27 @@ export default function RegisterVisit() {
         }
     };
 
-    const afterEnroll = async () => {
+    const handleBiometricCaptureComplete = async (credentialData: string) => {
         if (!member) return;
-        // Refresh member to pick up biometric_data
-        const { data } = await supabase.from("members").select("*").eq("id", member.id).maybeSingle();
-        if (data) setMember(data);
-        setBiometricsVerified(true);
-        setOpenEnrollBio(false);
-        toast({ title: "Biometric Enrolled", description: "Fingerprint saved for this member." });
+        try {
+            const { error } = await supabase
+                .from("members")
+                .update({ biometric_data: credentialData })
+                .eq("id", member.id);
+            if (error) throw error;
+
+            setMember({ ...member, biometric_data: credentialData });
+            setBiometricsVerified(true);
+            toast({ title: "Success", description: "Biometrics registered and verified." });
+        } catch (error: any) {
+            toast({ title: "Capture failed", description: error.message, variant: "destructive" });
+        }
     };
-    const afterVerify = (success: boolean) => {
+
+    const handleBiometricVerificationComplete = (success: boolean) => {
         setBiometricsVerified(success);
-        setOpenVerifyBio(false);
         if (!success) {
             toast({ title: "Biometric Verification Failed", description: "Please try again or proceed manually if allowed.", variant: "destructive" });
-        } else {
-            toast({ title: "Verification Successful", description: "Member identity confirmed." });
         }
     };
 
@@ -605,50 +608,28 @@ export default function RegisterVisit() {
                             </CardHeader>
                             <CardContent className="space-y-6">
                                 {member.biometric_data ? (
-                                  <div className="space-y-2">
-                                    <Button
-                                      type="button"
-                                      className="w-full"
-                                      onClick={() => setOpenVerifyBio(true)}
-                                    >
-                                      <Fingerprint className="mr-2 h-4 w-4" />
-                                      Verify Fingerprint
-                                    </Button>
-                                    <FingerprintCaptureModal
-                                      open={openVerifyBio}
-                                      onOpenChange={setOpenVerifyBio}
-                                      mode="verify"
-                                      entityType="member"
-                                      entityId={member.id}
-                                      onVerifyComplete={afterVerify}
+                                    <BiometricCapture
+                                        mode="verify"
+                                        userId={member.id}
+                                        credentialId={member.biometric_data}
+                                        onVerificationComplete={handleBiometricVerificationComplete}
                                     />
-                                  </div>
                                 ) : (
-                                  <div className="space-y-4">
-                                    <div className="p-4 border rounded-lg bg-yellow-50/20 text-yellow-700 flex items-center gap-3 border-yellow-200">
-                                      <Fingerprint className="h-6 w-6 shrink-0" />
-                                      <div>
-                                        <p className="font-medium">No Biometric Data Found</p>
-                                        <p className="text-xs font-medium">To proceed, you MUST capture the principal member's biometric data now.</p>
-                                      </div>
+                                    <div className="space-y-4">
+                                        <div className="p-4 border rounded-lg bg-yellow-50/20 text-yellow-700 flex items-center gap-3 border-yellow-200">
+                                            <Fingerprint className="h-6 w-6 shrink-0" />
+                                            <div>
+                                                <p className="font-medium">No Biometric Data Found</p>
+                                                <p className="text-xs font-medium">To proceed, you MUST capture the principal member's biometric data now.</p>
+                                            </div>
+                                        </div>
+                                        <BiometricCapture
+                                            mode="register"
+                                            userId={member.id}
+                                            userName={member.full_name}
+                                            onCaptureComplete={handleBiometricCaptureComplete}
+                                        />
                                     </div>
-                                    <Button
-                                      type="button"
-                                      className="w-full"
-                                      onClick={() => setOpenEnrollBio(true)}
-                                    >
-                                      <Fingerprint className="mr-2 h-4 w-4" />
-                                      Enroll Fingerprint
-                                    </Button>
-                                    <FingerprintCaptureModal
-                                      open={openEnrollBio}
-                                      onOpenChange={setOpenEnrollBio}
-                                      mode="enroll"
-                                      entityType="member"
-                                      entityId={member.id}
-                                      onEnrollComplete={afterEnroll}
-                                    />
-                                  </div>
                                 )}
 
                                 <div className="space-y-2">

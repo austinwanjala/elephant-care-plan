@@ -62,11 +62,10 @@ const FingerprintCaptureModal: React.FC<FingerprintCaptureModalProps> = ({
       animateCapture("start");
 
       try {
-        // Preflight: ensure local bridge is reachable to avoid generic "failed to fetch"
         const available = await isBridgeAvailable();
         if (!available) {
           throw new Error(
-            "Cannot reach the local biometric agent on this PC (http://localhost:8181/scan). Please start the local 'Elephant Biometric Bridge' app and retry."
+            "Cannot reach the local biometric agent on this PC. Make sure the 'Elephant Biometric Bridge' app is running. If your agent uses a custom port or HTTPS, set VITE_BIOMETRIC_BRIDGE_URL (e.g., http://127.0.0.1:9191/scan) and refresh the app."
           );
         }
 

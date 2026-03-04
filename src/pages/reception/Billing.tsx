@@ -21,14 +21,20 @@ export default function ReceptionBilling() {
     const [searchTerm, setSearchTerm] = useState("");
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [receptionistId, setReceptionistId] = useState<string | null>(null);
+    const [receptionistBranchId, setReceptionistBranchId] = useState<string | null>(null);
     const [biometricsVerified, setBiometricsVerified] = useState<string | null>(null); // visitId if verified
     const [showPaymentHandler, setShowPaymentHandler] = useState<string | null>(null); // visitId
     const { toast } = useToast();
 
     useEffect(() => {
         fetchReceptionistInfo();
-        fetchBilledVisits();
     }, []);
+
+    useEffect(() => {
+        if (receptionistBranchId) {
+            fetchBilledVisits();
+        }
+    }, [receptionistBranchId]);
 
     const fetchReceptionistInfo = async () => {
         const { data: { user } } = await supabase.auth.getUser();
@@ -36,7 +42,7 @@ export default function ReceptionBilling() {
 
         const { data: staffData, error: staffError } = await supabase
             .from("staff")
-            .select("id")
+            .select("id, branch_id")
             .eq("user_id", user.id)
             .maybeSingle();
 
@@ -45,14 +51,17 @@ export default function ReceptionBilling() {
             return;
         }
         setReceptionistId(staffData.id);
+        setReceptionistBranchId(staffData.branch_id);
     };
 
     const fetchBilledVisits = async () => {
+        if (!receptionistBranchId) return;
         setLoading(true);
         const { data, error } = await supabase
             .from("visits")
             .select("*, members(id, full_name, phone, member_number, coverage_balance, biometric_data), branches(name), bills(*, bill_items(*))")
             .in("status", ["billed", "billing_pending"])
+            .eq('branch_id', receptionistBranchId)
             .order("updated_at", { ascending: false });
 
         if (error) {
@@ -64,11 +73,13 @@ export default function ReceptionBilling() {
     };
 
     const fetchHistory = async () => {
+        if (!receptionistBranchId) return;
         setLoadingHistory(true);
         const { data, error } = await supabase
             .from("visits")
             .select("*, members(full_name, member_number), branches(name), bills(*, bill_items(*))")
             .eq("status", "completed")
+            .eq('branch_id', receptionistBranchId)
             .order("updated_at", { ascending: false })
             .limit(50);
 

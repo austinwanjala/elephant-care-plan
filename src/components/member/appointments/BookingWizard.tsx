@@ -191,6 +191,25 @@ const BookingWizard = ({ onSuccess }: BookingWizardProps) => {
         }));
     };
 
+    const handleBranchSelect = (id: string) => {
+        setBookingData(prev => ({
+            ...prev,
+            branchId: id,
+            doctorId: "", // Reset doctor when branch changes
+            time: ""      // Reset time when branch changes
+        }));
+        nextStep(); // Auto-advance to doctor selection
+    };
+
+    const handleDoctorSelect = (id: string) => {
+        setBookingData(prev => ({
+            ...prev,
+            doctorId: id,
+            time: "" // Reset time when doctor changes
+        }));
+        nextStep(); // Auto-advance to slot selection
+    };
+
     // --- Renders ---
 
     const renderStepContent = () => {
@@ -244,7 +263,7 @@ const BookingWizard = ({ onSuccess }: BookingWizardProps) => {
                                             "border rounded-lg p-4 cursor-pointer flex items-center gap-3 hover:bg-slate-50",
                                             bookingData.branchId === branch.id && "border-primary bg-primary/5 ring-1 ring-primary"
                                         )}
-                                        onClick={() => setBookingData(prev => ({ ...prev, branchId: branch.id }))}
+                                        onClick={() => handleBranchSelect(branch.id)}
                                     >
                                         <MapPin className="h-5 w-5 text-muted-foreground" />
                                         <span className="font-medium">{branch.name}</span>
@@ -267,7 +286,7 @@ const BookingWizard = ({ onSuccess }: BookingWizardProps) => {
                                             "border rounded-lg p-4 cursor-pointer flex items-center gap-3 hover:bg-slate-50",
                                             bookingData.doctorId === doc.id && "border-primary bg-primary/5 ring-1 ring-primary"
                                         )}
-                                        onClick={() => setBookingData(prev => ({ ...prev, doctorId: doc.id }))}
+                                        onClick={() => handleDoctorSelect(doc.id)}
                                     >
                                         <div className="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center">
                                             DR

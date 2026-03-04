@@ -83,26 +83,12 @@ const BookingWizard = ({ onSuccess }: BookingWizardProps) => {
     const { data: doctors, isLoading: isLoadingDoctors } = useQuery({
         queryKey: ["doctors", bookingData.branchId],
         queryFn: async () => {
-            // Fetch all active staff in branch
-            const { data: branchStaff, error: staffError } = await supabase
-                .from("staff")
-                .select("id, full_name, user_id") // staff table has full_name, not first_name/last_name. specialization might be missing in older schema?
-                .eq("branch_id", bookingData.branchId)
-                .eq("is_active", true);
+            const { data, error } = await (supabase as any).rpc("get_branch_doctors", {
+                branch_id_input: bookingData.branchId,
+            });
 
-            if (staffError) throw staffError;
-            if (!branchStaff || branchStaff.length === 0) return [];
-
-            // Filter for doctor role
-            const userIds = branchStaff.map(s => s.user_id);
-            const { data: roleData } = await supabase
-                .from("user_roles")
-                .select("user_id")
-                .eq("role", "doctor")
-                .in("user_id", userIds);
-
-            const doctorUserIds = new Set(roleData?.map(r => r.user_id));
-            return branchStaff.filter(s => doctorUserIds.has(s.user_id));
+            if (error) throw error;
+            return data || [];
         },
         enabled: step === 3 && !!bookingData.branchId
     });

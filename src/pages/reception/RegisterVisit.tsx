@@ -28,7 +28,7 @@ export default function RegisterVisit() {
     const [member, setMember] = useState<any>(null);
     const [dependants, setDependants] = useState<any[]>([]);
     const [selectedPatientId, setSelectedPatientId] = useState<string>("");
-    const [biometricsVerified, setBiometricsVerified] = useState(false);
+    const [biometricsVerified, setBiometricsVerified] = useState(true);
     const [loading, setLoading] = useState(false);
     const [receptionistId, setReceptionistId] = useState<string | null>(null);
     const [receptionistBranchId, setReceptionistBranchId] = useState<string | null>(null);
@@ -110,7 +110,7 @@ export default function RegisterVisit() {
         setMember(null);
         setDependants([]);
         setSelectedPatientId("");
-        setBiometricsVerified(false);
+        // setBiometricsVerified(false);
 
         try {
             // 1. Search Members (Principal)
@@ -203,11 +203,13 @@ export default function RegisterVisit() {
             setOngoingStages([]);
         }
 
+        /*
         if (data.biometric_data) {
             setBiometricsVerified(false);
         } else {
             setBiometricsVerified(false); // Force verification even if no data (will need capture)
         }
+        */
     };
 
     const handleBiometricCaptureComplete = async (credentialData: string) => {
@@ -236,10 +238,12 @@ export default function RegisterVisit() {
 
     const handleRegisterVisit = async () => {
         if (!member || !receptionistId || !receptionistBranchId) return;
+        /*
         if (!biometricsVerified) {
             toast({ title: "Biometrics required", description: "Please verify principal member identity first.", variant: "destructive" });
             return;
         }
+        */
         if (!member.is_active) {
             toast({ title: "Inactive Member", description: "Member is inactive. Advise payment before service.", variant: "destructive" });
             return;
@@ -607,6 +611,8 @@ export default function RegisterVisit() {
                                 <CardTitle className="text-lg">Authorization & Assignment</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-6">
+                                { /* Biometric verification commented out to be optional */}
+                                { /*
                                 {member.biometric_data ? (
                                     <BiometricCapture
                                         mode="verify"
@@ -631,6 +637,7 @@ export default function RegisterVisit() {
                                         />
                                     </div>
                                 )}
+                                */ }
 
                                 <div className="space-y-2">
                                     <Label>Assign Doctor (Optional)</Label>
@@ -650,7 +657,7 @@ export default function RegisterVisit() {
                                 <Button
                                     className="w-full btn-primary"
                                     size="lg"
-                                    disabled={!biometricsVerified || loading || !receptionistId || !receptionistBranchId}
+                                    disabled={loading || !receptionistId || !receptionistBranchId}
                                     onClick={handleRegisterVisit}
                                 >
                                     {loading ? <Loader2 className="animate-spin mr-2" /> : <UserCheck className="mr-2 h-5 w-5" />}

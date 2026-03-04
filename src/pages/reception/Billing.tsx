@@ -403,28 +403,20 @@ export default function ReceptionBilling() {
                                                                             />
                                                                         )}
 
-                                                                        <div className="py-2">
+                                                                        { /* Biometrics optional */}
+                                                                        <div className="py-2 opacity-50 grayscale hover:opacity-100 hover:grayscale-0 transition-all">
                                                                             <Button
                                                                                 variant={biometricsVerified === visit.id ? "default" : "outline"}
                                                                                 className={`w-full py-6 text-lg border-2 ${biometricsVerified === visit.id ? 'bg-green-600 hover:bg-green-700 border-green-600' : 'border-blue-200 hover:border-blue-400 text-blue-700'}`}
                                                                                 onClick={async () => {
                                                                                     if (biometricsVerified === visit.id) return; // Already verified
-
-                                                                                    // 1. Check if member has biometrics enrolled, if not capture it inline
+                                                                                    /* Biometric logic preserved but now optional */
                                                                                     if (!visit.members.biometric_data) {
                                                                                         try {
                                                                                             const credentialData = await registerCredential(visit.members.id, visit.members.full_name);
-
-                                                                                            // Save to DB
-                                                                                            const { error } = await supabase
-                                                                                                .from("members")
-                                                                                                .update({ biometric_data: credentialData })
-                                                                                                .eq("id", visit.members.id);
+                                                                                            const { error } = await supabase.from("members").update({ biometric_data: credentialData }).eq("id", visit.members.id);
                                                                                             if (error) throw error;
-
                                                                                             toast({ title: "Biometrics Captured", description: "Identity captured and mapped to this member." });
-
-                                                                                            // Map it locally so successive tries or states work
                                                                                             visit.members.biometric_data = credentialData;
                                                                                             setBiometricsVerified(visit.id);
                                                                                         } catch (err: any) {
@@ -432,18 +424,14 @@ export default function ReceptionBilling() {
                                                                                         }
                                                                                         return;
                                                                                     }
-
                                                                                     try {
-                                                                                        // 2. Perform WebAuthn Verification
                                                                                         const isVerified = await verifyCredential(visit.members.biometric_data);
-
                                                                                         if (isVerified) {
                                                                                             setBiometricsVerified(visit.id);
                                                                                             toast({ title: "Biometrics Verified", description: "Identity confirmed via biometric scan." });
                                                                                         }
                                                                                     } catch (err: any) {
                                                                                         console.error("Biometric error:", err);
-                                                                                        // Differentiate between technical error and mismatch (though client-side match fail usually throws too)
                                                                                         toast({ title: "Verification Error", description: err.message || "Biometric validation failed.", variant: "destructive" });
                                                                                     }
                                                                                 }}
@@ -451,19 +439,19 @@ export default function ReceptionBilling() {
                                                                                 {biometricsVerified === visit.id ? (
                                                                                     <><Check className="mr-2 h-6 w-6" /> Biometrics Confirmed</>
                                                                                 ) : !visit.members?.biometric_data ? (
-                                                                                    <><Fingerprint className="mr-2 h-6 w-6" /> Capture Member Biometrics</>
+                                                                                    <><Fingerprint className="mr-2 h-6 w-6" /> Capture Member Biometrics (Optional)</>
                                                                                 ) : (
-                                                                                    <><Fingerprint className="mr-2 h-6 w-6" /> Verify Member Biometrics</>
+                                                                                    <><Fingerprint className="mr-2 h-6 w-6" /> Verify Member Biometrics (Optional)</>
                                                                                 )}
                                                                             </Button>
-                                                                            <p className="text-[10px] text-center text-muted-foreground mt-1">Authorization required by member before coverage deduction.</p>
+                                                                            <p className="text-[10px] text-center text-muted-foreground mt-1">Authorization via biometrics is now optional.</p>
                                                                         </div>
                                                                     </div>
                                                                     <DialogFooter>
                                                                         <Button
                                                                             className="w-full bg-blue-600 hover:bg-blue-700 h-12 text-lg"
                                                                             onClick={() => handleFinalizeBill(visit, bill?.id)}
-                                                                            disabled={processingId === visit.id || biometricsVerified !== visit.id}
+                                                                            disabled={processingId === visit.id}
                                                                         >
                                                                             {processingId === visit.id ? <Loader2 className="animate-spin mr-2 h-5 w-5" /> : <Check className="mr-2 h-5 w-5" />}
                                                                             Finalize & Deduct Coverage

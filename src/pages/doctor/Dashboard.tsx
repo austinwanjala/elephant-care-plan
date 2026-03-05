@@ -58,27 +58,27 @@ export default function DoctorDashboard() {
                 </div>
 
                 <div className="grid gap-6 md:grid-cols-2">
-                    <Card className="hover:border-primary transition-all duration-300 cursor-pointer shadow-md hover:shadow-xl bg-white/80 backdrop-blur-sm rounded-3xl border-orange-100" onClick={() => navigate("/doctor/queue")}>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <Card className="card-premium-amber cursor-pointer group" onClick={() => navigate("/doctor/queue")}>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 header-gradient-amber border-b border-amber-100/30">
                             <CardTitle className="text-sm font-bold text-slate-600">Waiting Room</CardTitle>
-                            <div className="p-2 bg-orange-100 rounded-xl">
-                                <Users className="h-5 w-5 text-orange-600" />
+                            <div className="p-2 icon-glow-amber rounded-xl group-hover:scale-110 transition-transform duration-300">
+                                <Users className="h-5 w-5" />
                             </div>
                         </CardHeader>
-                        <CardContent>
-                            <div className="text-4xl font-black text-orange-600">{stats.waiting}</div>
+                        <CardContent className="pt-6">
+                            <div className="text-4xl font-black text-amber-600">{stats.waiting}</div>
                             <p className="text-xs text-slate-400 font-medium mt-1 uppercase tracking-wider">Patients waiting for consultation</p>
-                            <Button variant="link" className="px-0 mt-4 h-auto text-xs font-bold text-orange-700">View Queue <ArrowRight className="ml-1 h-3 w-3" /></Button>
+                            <Button variant="link" className="px-0 mt-4 h-auto text-xs font-bold text-amber-700">View Queue <ArrowRight className="ml-1 h-3 w-3" /></Button>
                         </CardContent>
                     </Card>
-                    <Card className="hover:border-primary transition-all duration-300 cursor-pointer shadow-md hover:shadow-xl bg-white/80 backdrop-blur-sm rounded-3xl border-blue-100" onClick={() => navigate("/doctor/queue")}>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <Card className="card-premium-blue cursor-pointer group" onClick={() => navigate("/doctor/queue")}>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 header-gradient-blue border-b border-blue-100/30">
                             <CardTitle className="text-sm font-bold text-slate-600">In Progress</CardTitle>
-                            <div className="p-2 bg-blue-100 rounded-xl">
-                                <ClipboardList className="h-5 w-5 text-blue-600" />
+                            <div className="p-2 icon-glow-blue rounded-xl group-hover:scale-110 transition-transform duration-300">
+                                <ClipboardList className="h-5 w-5" />
                             </div>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="pt-6">
                             <div className="text-4xl font-black text-blue-600">{stats.inProgress}</div>
                             <p className="text-xs text-slate-400 font-medium mt-1 uppercase tracking-wider">Active consultations</p>
                             <Button variant="link" className="px-0 mt-4 h-auto text-xs font-bold text-blue-700">Continue Sessions <ArrowRight className="ml-1 h-3 w-3" /></Button>
@@ -87,28 +87,40 @@ export default function DoctorDashboard() {
                 </div>
 
                 <div className="grid gap-6 lg:grid-cols-1 mt-4">
-                    <Card className="shadow-md bg-white/80 backdrop-blur-sm rounded-3xl border-slate-100 overflow-hidden">
+                    <Card className="card-premium">
                         <CardHeader className="bg-slate-50/50 border-b pb-4">
                             <CardTitle className="text-xl font-bold flex items-center gap-2 text-slate-800">
                                 <Activity className="h-5 w-5 text-primary" />
                                 Quick Actions
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="grid gap-4 md:grid-cols-3 p-6">
-                            <Button variant="outline" className="h-28 flex flex-col gap-2 rounded-2xl text-slate-700 border-slate-200 hover:border-primary hover:bg-primary/5 hover:text-primary transition-all shadow-sm group" onClick={() => navigate("/doctor/queue")}>
-                                <ClipboardList className="h-7 w-7 text-slate-400 group-hover:text-primary transition-colors" />
-                                <span className="font-bold">Open MY Queue</span>
-                                <span className="text-[10px] text-slate-400 font-medium">Manage today's visits</span>
+                        <CardContent className="grid gap-6 md:grid-cols-3 p-8">
+                            <Button variant="outline" className="h-32 flex flex-col gap-3 rounded-[2rem] text-slate-700 border-slate-100 hover:border-primary hover:bg-primary/5 hover:text-primary transition-all shadow-sm group" onClick={() => navigate("/doctor/queue")}>
+                                <div className="p-3 bg-slate-50 rounded-2xl group-hover:scale-110 group-hover:bg-primary/10 transition-all duration-300">
+                                    <ClipboardList className="h-7 w-7 text-slate-500 group-hover:text-primary" />
+                                </div>
+                                <div className="text-center">
+                                    <div className="font-bold">MY Queue</div>
+                                    <div className="text-[10px] text-slate-400 font-medium uppercase tracking-tighter mt-1">Today's Visits</div>
+                                </div>
                             </Button>
-                            <Button variant="outline" className="h-28 flex flex-col gap-2 rounded-2xl text-slate-700 border-slate-200 hover:border-primary hover:bg-primary/5 hover:text-primary transition-all shadow-sm group" onClick={() => navigate("/doctor/schedule")}>
-                                <History className="h-7 w-7 text-slate-400 group-hover:text-primary transition-colors" />
-                                <span className="font-bold">Approved Schedule</span>
-                                <span className="text-[10px] text-slate-400 font-medium">View future bookings</span>
+                            <Button variant="outline" className="h-32 flex flex-col gap-3 rounded-[2rem] text-slate-700 border-slate-100 hover:border-primary hover:bg-primary/5 hover:text-primary transition-all shadow-sm group" onClick={() => navigate("/doctor/schedule")}>
+                                <div className="p-3 bg-slate-50 rounded-2xl group-hover:scale-110 group-hover:bg-primary/10 transition-all duration-300">
+                                    <History className="h-7 w-7 text-slate-500 group-hover:text-primary" />
+                                </div>
+                                <div className="text-center">
+                                    <div className="font-bold">Schedule</div>
+                                    <div className="text-[10px] text-slate-400 font-medium uppercase tracking-tighter mt-1">Future Bookings</div>
+                                </div>
                             </Button>
-                            <Button variant="outline" className="h-28 flex flex-col gap-2 rounded-2xl text-slate-700 border-slate-200 hover:border-primary hover:bg-primary/5 hover:text-primary transition-all shadow-sm group" onClick={() => navigate("/doctor/history")}>
-                                <Users className="h-7 w-7 text-slate-400 group-hover:text-primary transition-colors" />
-                                <span className="font-bold">Patient Records</span>
-                                <span className="text-[10px] text-slate-400 font-medium">Historical clinical files</span>
+                            <Button variant="outline" className="h-32 flex flex-col gap-3 rounded-[2rem] text-slate-700 border-slate-100 hover:border-primary hover:bg-primary/5 hover:text-primary transition-all shadow-sm group" onClick={() => navigate("/doctor/history")}>
+                                <div className="p-3 bg-slate-50 rounded-2xl group-hover:scale-110 group-hover:bg-primary/10 transition-all duration-300">
+                                    <Users className="h-7 w-7 text-slate-500 group-hover:text-primary" />
+                                </div>
+                                <div className="text-center">
+                                    <div className="font-bold">Records</div>
+                                    <div className="text-[10px] text-slate-400 font-medium uppercase tracking-tighter mt-1">Clinical Files</div>
+                                </div>
                             </Button>
                         </CardContent>
                     </Card>

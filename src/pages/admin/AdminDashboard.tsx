@@ -259,17 +259,17 @@ export default function AdminDashboard() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card className="bg-white/70 backdrop-blur-xl border-blue-100 shadow-xl rounded-[2rem] overflow-hidden group hover:shadow-2xl transition-all h-full">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-blue-50/30 border-b border-blue-100/30">
+          <Card className="card-premium-blue group h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 header-gradient-blue border-b border-blue-100/30">
               <CardTitle className="text-[10px] font-black text-blue-800 uppercase tracking-widest leading-none">Total Membership</CardTitle>
-              <div className="p-2 bg-blue-100 rounded-xl group-hover:scale-110 transition-transform">
-                <Users className="h-4 w-4 text-blue-600" />
+              <div className="p-2 rounded-xl transition-all duration-300 icon-glow-blue group-hover:scale-110">
+                <Users className="h-4 w-4" />
               </div>
             </CardHeader>
             <CardContent className="pt-6">
               <div className="text-4xl font-black text-slate-900">{stats.totalMembers.toLocaleString()}</div>
               <div className="flex items-center gap-2 mt-2">
-                <Badge className="bg-emerald-500 border-0 font-bold px-2 py-0 h-4 text-[9px] uppercase tracking-tighter">
+                <Badge className="bg-emerald-500 border-0 font-bold px-2 py-0 h-4 text-[9px] uppercase tracking-tighter shadow-sm shadow-emerald-200">
                   <ArrowUpRight className="h-2 w-2 mr-0.5" />
                   +{stats.newMembersThisMonth} new arrivals
                 </Badge>
@@ -277,20 +277,20 @@ export default function AdminDashboard() {
               <div className="mt-5">
                 <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
                   <span>Active Rate</span>
-                  <span className="text-slate-900">{stats.totalMembers > 0 ? Math.round((stats.activeMembers / stats.totalMembers) * 100) : 0}%</span>
+                  <span className="text-blue-600">{stats.totalMembers > 0 ? Math.round((stats.activeMembers / stats.totalMembers) * 100) : 0}%</span>
                 </div>
-                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden shadow-inner">
-                  <div className="h-full bg-blue-600 rounded-full transition-all duration-1000" style={{ width: `${stats.totalMembers > 0 ? (stats.activeMembers / stats.totalMembers) * 100 : 0}%` }} />
+                <div className="h-1.5 bg-slate-100/50 rounded-full overflow-hidden shadow-inner backdrop-blur-sm">
+                  <div className="h-full bg-blue-600 rounded-full transition-all duration-1000 shadow-[0_0_8px_rgba(37,99,235,0.4)]" style={{ width: `${stats.totalMembers > 0 ? (stats.activeMembers / stats.totalMembers) * 100 : 0}%` }} />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-white/70 backdrop-blur-xl border-emerald-100 shadow-xl rounded-[2rem] overflow-hidden group hover:shadow-2xl transition-all h-full">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-emerald-50/30 border-b border-emerald-100/30">
+          <Card className="card-premium-emerald group h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 header-gradient-emerald border-b border-emerald-100/30">
               <CardTitle className="text-[10px] font-black text-emerald-800 uppercase tracking-widest leading-none">System Inflows</CardTitle>
-              <div className="p-2 bg-emerald-100 rounded-xl group-hover:scale-110 transition-transform">
-                <CreditCard className="h-4 w-4 text-emerald-600" />
+              <div className="p-2 rounded-xl transition-all duration-300 icon-glow-emerald group-hover:scale-110">
+                <CreditCard className="h-4 w-4" />
               </div>
             </CardHeader>
             <CardContent className="pt-6">
@@ -299,11 +299,11 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/70 backdrop-blur-xl border-violet-100 shadow-xl rounded-[2rem] overflow-hidden group hover:shadow-2xl transition-all h-full">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-violet-50/30 border-b border-violet-100/30">
+          <Card className="card-premium-violet group h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 header-gradient-violet border-b border-violet-100/30">
               <CardTitle className="text-[10px] font-black text-violet-800 uppercase tracking-widest leading-none">Network Efficiency</CardTitle>
-              <div className="p-2 bg-violet-100 rounded-xl group-hover:scale-110 transition-transform">
-                <Activity className="h-4 w-4 text-violet-600" />
+              <div className="p-2 rounded-xl transition-all duration-300 icon-glow-violet group-hover:scale-110">
+                <Activity className="h-4 w-4" />
               </div>
             </CardHeader>
             <CardContent className="pt-6">
@@ -313,22 +313,22 @@ export default function AdminDashboard() {
           </Card>
 
           <Card className={cn(
-            "bg-white/70 backdrop-blur-xl shadow-xl rounded-[2rem] overflow-hidden group hover:shadow-2xl transition-all border-0 h-full",
-            stats.totalProfitLoss >= 0 ? "border-emerald-100" : "border-rose-100"
+            "group h-full",
+            stats.totalProfitLoss >= 0 ? "card-premium-emerald" : "card-premium-rose"
           )}>
             <CardHeader className={cn(
               "flex flex-row items-center justify-between space-y-0 pb-2 border-b border-opacity-30",
-              stats.totalProfitLoss >= 0 ? "bg-emerald-50/30 border-emerald-100" : "bg-rose-50/30 border-rose-100"
+              stats.totalProfitLoss >= 0 ? "header-gradient-emerald border-emerald-100/30" : "header-gradient-rose border-rose-100/30"
             )}>
               <CardTitle className={cn(
                 "text-[10px] font-black uppercase tracking-widest leading-none",
                 stats.totalProfitLoss >= 0 ? "text-emerald-800" : "text-rose-800"
               )}>Financial Summary</CardTitle>
               <div className={cn(
-                "p-2 rounded-xl group-hover:scale-110 transition-transform",
-                stats.totalProfitLoss >= 0 ? "bg-emerald-100" : "bg-rose-100"
+                "p-2 rounded-xl transition-all duration-300 group-hover:scale-110",
+                stats.totalProfitLoss >= 0 ? "icon-glow-emerald" : "icon-glow-rose"
               )}>
-                {stats.totalProfitLoss >= 0 ? <TrendingUp className="h-4 w-4 text-emerald-600" /> : <TrendingDown className="h-4 w-4 text-rose-600" />}
+                {stats.totalProfitLoss >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
               </div>
             </CardHeader>
             <CardContent className="pt-6">
@@ -347,8 +347,8 @@ export default function AdminDashboard() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-          <Card className="lg:col-span-2 bg-white/70 backdrop-blur-xl border-slate-100 shadow-2xl rounded-[2.5rem] overflow-hidden h-full">
-            <CardHeader className="p-8 border-b border-slate-50">
+          <Card className="lg:col-span-2 card-premium group h-full">
+            <CardHeader className="p-8 border-b border-slate-100 bg-slate-50/30">
               <div>
                 <CardTitle className="text-2xl font-serif font-black text-slate-900">Network Growth Analytics</CardTitle>
                 <p className="text-slate-400 text-sm font-medium mt-1">Cross-sectional performance tracking across all nodes</p>
@@ -363,9 +363,9 @@ export default function AdminDashboard() {
                     <YAxis yAxisId="left" stroke="#94a3b8" fontSize={10} fontWeight="800" tickLine={false} axisLine={false} tickFormatter={(value) => `K${value / 1000}k`} />
                     <YAxis yAxisId="right" orientation="right" stroke="#94a3b8" fontSize={10} fontWeight="800" tickLine={false} axisLine={false} />
                     <Tooltip
-                      contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(8px)', padding: '12px' }}
-                      itemStyle={{ fontStyle: 'normal', fontWeight: '900', fontSize: '11px', textTransform: 'uppercase' }}
-                      labelStyle={{ fontWeight: '900', color: '#1e293b', marginBottom: '8px', fontSize: '12px' }}
+                      contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 30px 60px -12px rgba(0,0,0,0.15)', background: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(12px)', padding: '20px' }}
+                      itemStyle={{ fontStyle: 'normal', fontWeight: '900', fontSize: '11px', textTransform: 'uppercase', marginBottom: '4px' }}
+                      labelStyle={{ fontWeight: '900', color: '#1e293b', marginBottom: '12px', fontSize: '14px', letterSpacing: '-0.02em' }}
                     />
                     <Legend iconType="circle" />
                     <Line yAxisId="left" type="monotone" dataKey="revenue" stroke="#2563eb" strokeWidth={5} activeDot={{ r: 8, stroke: '#fff', strokeWidth: 4, fill: '#2563eb' }} dot={false} name="Network Revenue" />
@@ -376,14 +376,15 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900 text-white shadow-2xl border-0 rounded-[2.5rem] overflow-hidden relative group h-full">
-            <CardHeader className="p-8 border-b border-white/5 relative z-10">
+          <Card className="card-premium-dark text-white group h-full relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-orange-500/20 rounded-full blur-[80px] -mr-32 -mt-32 animate-pulse" />
+            <CardHeader className="p-8 border-b border-white/5 relative z-10 bg-white/5">
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-xl font-black">Branch Claims</CardTitle>
                   <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Pending Settlements</p>
                 </div>
-                <Badge className="bg-orange-500 text-white border-0 font-black px-3 h-6">{pendingClaims.length}</Badge>
+                <Badge className="bg-orange-500 text-white border-0 font-black px-3 h-6 shadow-[0_0_15px_rgba(249,115,22,0.4)]">{pendingClaims.length}</Badge>
               </div>
             </CardHeader>
             <CardContent className="p-8 relative z-10 space-y-4">
@@ -395,9 +396,9 @@ export default function AdminDashboard() {
               ) : (
                 <div className="space-y-3">
                   {pendingClaims.map((claim) => (
-                    <div key={claim.id} className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all group/item">
+                    <div key={claim.id} className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all group/item shadow-inner">
                       <div className="flex justify-between items-start mb-1">
-                        <p className="text-sm font-black text-white/90 group-hover/item:text-white">{claim.branches?.name || 'Unknown Unit'}</p>
+                        <p className="text-sm font-black text-white/90 group-hover/item:text-white transition-colors">{claim.branches?.name || 'Unknown Unit'}</p>
                         <p className="text-xs font-black text-emerald-400">KES {claim.amount?.toLocaleString()}</p>
                       </div>
                       <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">
@@ -410,14 +411,14 @@ export default function AdminDashboard() {
               <div className="flex flex-col gap-3 mt-6">
                 <Button
                   variant="ghost"
-                  className="w-full h-12 rounded-2xl border border-white/10 text-white font-black text-[10px] uppercase tracking-widest hover:bg-white hover:text-slate-900 transition-all"
+                  className="w-full h-12 rounded-2xl border border-white/10 text-white font-black text-[10px] uppercase tracking-widest hover:bg-white hover:text-slate-900 transition-all shadow-lg"
                   onClick={() => navigate('/admin/branch-payments')}
                 >
                   Authorize Settlements <ArrowUpRight className="ml-2 h-4 w-4" />
                 </Button>
                 <div className="grid grid-cols-2 gap-3">
-                  <Button variant="ghost" className="h-10 border border-white/5 bg-white/5 text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-white rounded-xl" onClick={() => navigate('/admin/branches')}>Nodes</Button>
-                  <Button variant="ghost" className="h-10 border border-white/5 bg-white/5 text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-white rounded-xl" onClick={() => navigate('/admin/marketers')}>Partners</Button>
+                  <Button variant="ghost" className="h-10 border border-white/5 bg-white/5 text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-white rounded-xl transition-all" onClick={() => navigate('/admin/branches')}>Nodes</Button>
+                  <Button variant="ghost" className="h-10 border border-white/5 bg-white/5 text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-white rounded-xl transition-all" onClick={() => navigate('/admin/marketers')}>Partners</Button>
                 </div>
               </div>
             </CardContent>
@@ -425,8 +426,8 @@ export default function AdminDashboard() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pb-12">
-          <Card className="bg-white/70 backdrop-blur-xl border-slate-100 shadow-2xl rounded-[2.5rem] overflow-hidden">
-            <CardHeader className="p-8 bg-slate-50/50 border-b">
+          <Card className="card-premium h-full">
+            <CardHeader className="p-8 header-gradient-blue border-b border-blue-100/30">
               <CardTitle className="text-xl font-serif font-black text-slate-900">Demographic Distribution</CardTitle>
               <p className="text-slate-400 text-sm font-medium mt-1">Network saturation by subscription category</p>
             </CardHeader>
@@ -439,11 +440,11 @@ export default function AdminDashboard() {
                     <div key={cat.name} className="space-y-3 group">
                       <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-600">
                         <span>{cat.name}</span>
-                        <span className="text-slate-900">{cat.count} members</span>
+                        <span className="text-slate-900 font-black">{cat.count} members</span>
                       </div>
-                      <div className="h-4 bg-slate-100 rounded-full overflow-hidden shadow-inner p-0.5">
+                      <div className="h-4 bg-slate-100/50 rounded-full overflow-hidden shadow-inner p-1 backdrop-blur-sm border border-slate-200/50">
                         <div
-                          className={cn("h-full rounded-full transition-all duration-1000", categoryColors[idx % categoryColors.length])}
+                          className={cn("h-full rounded-full transition-all duration-1000 shadow-sm", categoryColors[idx % categoryColors.length])}
                           style={{ width: `${(cat.count / (stats.totalMembers || 1)) * 100}%` }}
                         />
                       </div>
@@ -454,30 +455,30 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/70 backdrop-blur-xl border-slate-100 shadow-2xl rounded-[2.5rem] overflow-hidden">
-            <CardHeader className="p-8 bg-slate-50/50 border-b flex flex-row items-center justify-between">
+          <Card className="card-premium h-full">
+            <CardHeader className="p-8 header-gradient-emerald border-b border-emerald-100/30 flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-xl font-serif font-black text-slate-900">Executive Brief: Latest Arrivals</CardTitle>
                 <p className="text-slate-400 text-sm font-medium mt-1">Recently onboarded network participants</p>
               </div>
-              <Button variant="ghost" className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-primary transition-all" onClick={() => navigate('/admin/members')}>Complete Registry</Button>
+              <Button variant="ghost" className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-primary transition-all rounded-full hover:bg-primary/5 px-6" onClick={() => navigate('/admin/members')}>Registry</Button>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="divide-y divide-slate-50">
+              <div className="divide-y divide-slate-50/50">
                 {recentMembers.map((m) => (
-                  <div key={m.id} className="p-6 flex items-center justify-between hover:bg-slate-100/50 transition-colors group">
+                  <div key={m.id} className="p-6 flex items-center justify-between hover:bg-slate-50/50 transition-all group">
                     <div className="flex items-center gap-5">
-                      <div className="h-12 w-12 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center font-black text-slate-400 group-hover:bg-primary group-hover:text-white group-hover:border-primary transition-all text-sm">
+                      <div className="h-14 w-14 rounded-[1.25rem] bg-slate-50 border border-slate-200 flex items-center justify-center font-black text-slate-400 group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600 group-hover:shadow-[0_10px_20px_rgba(37,99,235,0.3)] group-hover:scale-105 transition-all duration-500 text-lg">
                         {m.full_name?.charAt(0)}
                       </div>
                       <div>
-                        <p className="text-sm font-black text-slate-800 lowercase capitalize group-hover:text-primary transition-colors">{m.full_name}</p>
-                        <Badge className="bg-blue-50 text-blue-700 border-blue-100 font-black text-[9px] uppercase tracking-tighter mt-1 h-5 px-2">{m.membership_categories?.name || 'Standard'}</Badge>
+                        <p className="text-sm font-black text-slate-800 lowercase capitalize group-hover:translate-x-1 transition-transform duration-500">{m.full_name}</p>
+                        <Badge className="bg-blue-50/50 text-blue-700 border-blue-100 font-black text-[9px] uppercase tracking-tighter mt-1 h-5 px-2 backdrop-blur-sm">{m.membership_categories?.name || 'Standard'}</Badge>
                       </div>
                     </div>
                     <div className="text-right">
-                      <Badge variant="outline" className="font-black text-[10px] uppercase tracking-widest bg-white border-slate-200 text-slate-400 mb-1">ID: {m.member_number}</Badge>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-1">{new Date(m.created_at).toLocaleDateString()}</p>
+                      <Badge variant="outline" className="font-black text-[10px] uppercase tracking-widest bg-white/50 border-slate-200 text-slate-400 mb-1 backdrop-blur-sm">ID: {m.member_number}</Badge>
+                      <p className="text-[10px] text-slate-400 font-black uppercase tracking-tighter mt-1 opacity-60">{new Date(m.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</p>
                     </div>
                   </div>
                 ))}

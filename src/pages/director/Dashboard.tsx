@@ -7,11 +7,15 @@ import {
     Stethoscope,
     Calendar,
     ArrowUpRight,
+    ArrowRight,
+    TrendingUp,
     Loader2,
     DollarSign,
     ClipboardList,
     Clock,
-    User
+    User,
+    Activity,
+    Building2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -33,7 +37,6 @@ import {
     TableHeader,
     TableRow
 } from "@/components/ui/table";
-import { Activity, Building2 } from "lucide-react";
 
 export default function DirectorDashboard() {
     const [loading, setLoading] = useState(true);
@@ -214,7 +217,7 @@ export default function DirectorDashboard() {
                         icon={DollarSign}
                         trend="+12% vs last month"
                         color="blue"
-                        className="bg-white/70 backdrop-blur-xl border-blue-100 shadow-lg shadow-blue-50/50 rounded-3xl"
+                        className="card-premium-blue h-full"
                     />
                     <Dialog open={isVisiListOpen} onOpenChange={setIsVisitListOpen}>
                         <DialogTrigger asChild>
@@ -226,7 +229,7 @@ export default function DirectorDashboard() {
                                     trend="Live facility tracking"
                                     color="emerald"
                                     onClick={() => setIsVisitListOpen(true)}
-                                    className="bg-white/70 backdrop-blur-xl border-emerald-100 shadow-lg shadow-emerald-50/50 rounded-3xl"
+                                    className="card-premium-emerald h-full"
                                 />
                             </div>
                         </DialogTrigger>
@@ -312,7 +315,7 @@ export default function DirectorDashboard() {
                         icon={Users}
                         trend="New for this month"
                         color="purple"
-                        className="bg-white/70 backdrop-blur-xl border-violet-100 shadow-lg shadow-violet-50/50 rounded-3xl"
+                        className="card-premium-violet h-full"
                     />
                     <DashboardCard
                         title="Patient Retention"
@@ -320,20 +323,20 @@ export default function DirectorDashboard() {
                         icon={TrendingUp}
                         trend="Turnout rate"
                         color="orange"
-                        className="bg-white/70 backdrop-blur-xl border-orange-100 shadow-lg shadow-orange-50/50 rounded-3xl"
+                        className="card-premium-amber h-full"
                     />
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-7 gap-8 items-start relative z-10">
-                    <Card className="lg:col-span-4 bg-white/70 backdrop-blur-xl border-slate-100 shadow-2xl rounded-[2.5rem] overflow-hidden">
-                        <CardHeader className="bg-slate-50/50 border-b border-slate-100/50 p-8 flex flex-row items-center justify-between">
+                    <Card className="lg:col-span-4 card-premium group overflow-hidden">
+                        <CardHeader className="header-gradient-emerald border-b border-emerald-100/30 p-8 flex flex-row items-center justify-between">
                             <div>
                                 <CardTitle className="text-2xl font-serif font-black text-slate-900">Revenue Analytics</CardTitle>
                                 <p className="text-slate-400 text-sm font-medium mt-1">Earnings breakdown from completed clinical steps</p>
                             </div>
-                            <Button variant="outline" size="icon" className="rounded-full h-10 w-10 border-slate-200">
-                                <TrendingUp className="h-5 w-5 text-emerald-500" />
-                            </Button>
+                            <div className="p-3 icon-glow-emerald rounded-full transition-all duration-300 group-hover:scale-110">
+                                <TrendingUp className="h-5 w-5" />
+                            </div>
                         </CardHeader>
                         <CardContent className="p-0">
                             <div className="overflow-x-auto">
@@ -384,21 +387,19 @@ export default function DirectorDashboard() {
                     </Card>
 
                     <div className="lg:col-span-3 space-y-8">
-                        <Card className="bg-indigo-900 text-white shadow-2xl border-0 rounded-[2.5rem] overflow-hidden relative group">
-                            <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
-                                <Activity className="h-32 w-32" />
-                            </div>
-                            <CardHeader className="p-8 relative z-10">
+                        <Card className="card-premium-dark text-white group relative overflow-hidden h-fit">
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/20 rounded-full blur-[80px] -mr-32 -mt-32 animate-pulse" />
+                            <CardHeader className="p-8 relative z-10 bg-white/5 border-b border-white/5">
                                 <CardTitle className="text-xl font-black text-white/90">Clinical Summary</CardTitle>
                                 <p className="text-indigo-200 text-xs font-bold uppercase tracking-widest mt-1">Efficiency Metrics</p>
                             </CardHeader>
-                            <CardContent className="p-8 pt-0 relative z-10 space-y-8">
+                            <CardContent className="p-8 relative z-10 space-y-8">
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div className="bg-white/10 backdrop-blur-md rounded-3xl p-6 border border-white/5">
+                                    <div className="bg-white/10 backdrop-blur-md rounded-3xl p-6 border border-white/5 transition-all group-hover:bg-white/15">
                                         <div className="text-3xl font-black">{stats.visitCount}</div>
                                         <div className="text-[10px] text-indigo-300 font-black uppercase tracking-widest mt-1">Sessions</div>
                                     </div>
-                                    <div className="bg-white/10 backdrop-blur-md rounded-3xl p-6 border border-white/5">
+                                    <div className="bg-white/10 backdrop-blur-md rounded-3xl p-6 border border-white/5 transition-all group-hover:bg-white/15">
                                         <div className="text-3xl font-black">{stats.totalAppts}</div>
                                         <div className="text-[10px] text-indigo-300 font-black uppercase tracking-widest mt-1">Bookings</div>
                                     </div>
@@ -408,8 +409,8 @@ export default function DirectorDashboard() {
                                         <span className="text-indigo-200">Appointment Completion</span>
                                         <span className="text-white">{Math.round((stats.completedAppts / (stats.totalAppts || 1)) * 100)}%</span>
                                     </div>
-                                    <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                                        <div className="h-full bg-emerald-400 rounded-full" style={{ width: `${(stats.completedAppts / (stats.totalAppts || 1)) * 100}%` }} />
+                                    <div className="h-2 bg-white/10 rounded-full overflow-hidden p-0.5">
+                                        <div className="h-full bg-emerald-400 rounded-full shadow-[0_0_10px_rgba(52,211,153,0.5)]" style={{ width: `${(stats.completedAppts / (stats.totalAppts || 1)) * 100}%` }} />
                                     </div>
                                 </div>
                             </CardContent>
@@ -422,8 +423,8 @@ export default function DirectorDashboard() {
                             recentVisits={recentVisits}
                         />
 
-                        <Card className="bg-white/70 backdrop-blur-xl border-slate-100 shadow-2xl rounded-[2.5rem] overflow-hidden">
-                            <CardHeader className="p-8 border-b border-slate-50">
+                        <Card className="card-premium h-full">
+                            <CardHeader className="p-8 header-gradient-blue border-b border-blue-100/30">
                                 <CardTitle className="text-xl font-serif font-black text-slate-900">Upcoming Records</CardTitle>
                             </CardHeader>
                             <CardContent className="p-8 space-y-6">
@@ -459,28 +460,44 @@ export default function DirectorDashboard() {
 }
 
 function DashboardCard({ title, value, icon: Icon, trend, color, onClick, className }: any) {
-    const colorClasses: any = {
-        blue: "text-blue-600 bg-blue-100",
-        emerald: "text-emerald-600 bg-emerald-100",
-        purple: "text-purple-600 bg-purple-100",
-        indigo: "text-indigo-600 bg-indigo-100",
+    const glowClasses: any = {
+        blue: "icon-glow-blue",
+        emerald: "icon-glow-emerald",
+        violet: "icon-glow-violet",
+        purple: "icon-glow-violet",
+        amber: "icon-glow-amber",
+        orange: "icon-glow-amber",
+        rose: "icon-glow-rose",
+    };
+
+    const headerGradients: any = {
+        blue: "header-gradient-blue",
+        emerald: "header-gradient-emerald",
+        violet: "header-gradient-violet",
+        purple: "header-gradient-violet",
+        amber: "header-gradient-amber",
+        orange: "header-gradient-amber",
+        rose: "header-gradient-rose",
     };
 
     return (
         <Card
-            className={`shadow-sm border-none card-elevated hover:shadow-md transition-shadow ${onClick ? 'cursor-pointer active:scale-[0.98]' : ''}`}
+            className={cn(
+                "group transition-all duration-500",
+                className
+            )}
             onClick={onClick}
         >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-                <div className={`p-2 rounded-full ${colorClasses[color]}`}>
+            <CardHeader className={cn("flex flex-row items-center justify-between space-y-0 pb-2 border-b border-opacity-10", headerGradients[color])}>
+                <CardTitle className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">{title}</CardTitle>
+                <div className={cn("p-2 rounded-xl transition-all duration-300 group-hover:scale-110", glowClasses[color] || "bg-slate-100 text-slate-600")}>
                     <Icon className="h-4 w-4" />
                 </div>
             </CardHeader>
-            <CardContent>
-                <div className="text-2xl font-bold">{value}</div>
-                <p className="text-xs text-muted-foreground flex items-center mt-2 font-medium">
-                    {trend.includes('+') ? <ArrowUpRight className="h-3 w-3 mr-1 text-emerald-500 font-bold" /> : null}
+            <CardContent className="pt-6">
+                <div className="text-3xl font-black text-slate-900 leading-none">{value}</div>
+                <p className="text-[10px] text-slate-400 flex items-center mt-3 font-black uppercase tracking-tighter">
+                    {trend && trend.includes('+') ? <ArrowUpRight className="h-3 w-3 mr-1 text-emerald-500" /> : null}
                     {trend}
                 </p>
             </CardContent>

@@ -96,72 +96,80 @@ export default function ReceptionDashboard() {
                 </div>
 
                 <div className="grid gap-6 md:grid-cols-3">
-                    <Card className="bg-white/70 backdrop-blur-xl border-orange-100 shadow-lg shadow-orange-100/50 rounded-3xl overflow-hidden group hover:shadow-xl transition-all">
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-orange-50/30 border-b border-orange-100/50">
-                            <CardTitle className="text-sm font-bold text-orange-800 uppercase tracking-wider">Today's Visits</CardTitle>
-                            <div className="p-2 bg-orange-100 rounded-xl group-hover:scale-110 transition-transform">
-                                <Users className="h-5 w-5 text-orange-600" />
+                    <Card className="card-premium-amber group h-full">
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 header-gradient-amber border-b border-amber-100/50">
+                            <CardTitle className="text-sm font-black text-amber-800 uppercase tracking-widest leading-none">Today's Visits</CardTitle>
+                            <div className="p-2 icon-glow-amber rounded-xl group-hover:scale-110 transition-transform duration-300">
+                                <Users className="h-5 w-5" />
                             </div>
                         </CardHeader>
                         <CardContent className="pt-6">
-                            <div className="text-4xl font-black text-orange-700">{stats.todayVisits}</div>
-                            <p className="text-xs text-slate-400 font-medium mt-1">Total walk-ins today</p>
+                            <div className="text-4xl font-black text-amber-700">{stats.todayVisits}</div>
+                            <p className="text-xs text-slate-400 font-medium mt-1 uppercase tracking-tighter">Total network participants today</p>
                         </CardContent>
                     </Card>
-                    <Card className="bg-white/70 backdrop-blur-xl border-blue-100 shadow-lg shadow-blue-100/50 rounded-3xl overflow-hidden group hover:shadow-xl transition-all">
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-blue-50/30 border-b border-blue-100/50">
-                            <CardTitle className="text-sm font-bold text-blue-800 uppercase tracking-wider">With Doctor</CardTitle>
-                            <div className="p-2 bg-blue-100 rounded-xl group-hover:scale-110 transition-transform">
-                                <Clock className="h-5 w-5 text-blue-600" />
+                    <Card className="card-premium-blue group h-full">
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 header-gradient-blue border-b border-blue-100/50">
+                            <CardTitle className="text-sm font-black text-blue-800 uppercase tracking-widest leading-none">With Doctor</CardTitle>
+                            <div className="p-2 icon-glow-blue rounded-xl group-hover:scale-110 transition-transform duration-300">
+                                <Clock className="h-5 w-5" />
                             </div>
                         </CardHeader>
                         <CardContent className="pt-6">
                             <div className="text-4xl font-black text-blue-700">{stats.withDoctorVisits}</div>
-                            <p className="text-xs text-slate-400 font-medium mt-1">Currently being attended</p>
+                            <p className="text-xs text-slate-400 font-medium mt-1 uppercase tracking-tighter">Currently in clinical session</p>
                         </CardContent>
                     </Card>
-                    <Card className="bg-white/70 backdrop-blur-xl border-emerald-100 shadow-lg shadow-emerald-100/50 rounded-3xl overflow-hidden group hover:shadow-xl transition-all">
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-emerald-50/30 border-b border-emerald-100/50">
-                            <CardTitle className="text-sm font-bold text-emerald-800 uppercase tracking-wider">Pending Billing</CardTitle>
-                            <div className="p-2 bg-emerald-100 rounded-xl group-hover:scale-110 transition-transform">
-                                <Receipt className="h-5 w-5 text-emerald-600" />
+                    <Card className="card-premium-emerald group h-full">
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 header-gradient-emerald border-b border-emerald-100/50">
+                            <CardTitle className="text-sm font-black text-emerald-800 uppercase tracking-widest leading-none">Pending Billing</CardTitle>
+                            <div className="p-2 icon-glow-emerald rounded-xl group-hover:scale-110 transition-transform duration-300">
+                                <Receipt className="h-5 w-5" />
                             </div>
                         </CardHeader>
                         <CardContent className="pt-6">
                             <div className="text-4xl font-black text-emerald-700">{stats.pendingBills}</div>
-                            <p className="text-xs text-slate-400 font-medium mt-1">Waiting for finalization</p>
+                            <p className="text-xs text-slate-400 font-medium mt-1 uppercase tracking-tighter">Awaiting financial clearance</p>
                         </CardContent>
                     </Card>
                 </div>
 
                 <div className="grid gap-6 md:grid-cols-7">
-                    <Card className="col-span-full xl:col-span-2 bg-white/70 backdrop-blur-xl border-slate-100 shadow-xl rounded-3xl overflow-hidden">
-                        <CardHeader className="bg-slate-50/50 border-b">
-                            <CardTitle className="text-lg font-bold text-slate-800">Quick Actions</CardTitle>
+                    <Card className="col-span-full xl:col-span-2 card-premium">
+                        <CardHeader className="bg-slate-50/50 border-b pb-4">
+                            <CardTitle className="text-lg font-black text-slate-900 font-serif">Front-Office Ops</CardTitle>
                         </CardHeader>
-                        <CardContent className="grid gap-4 p-6">
-                            <Button variant="outline" className="h-24 flex flex-col items-start gap-1 p-5 rounded-2xl border-slate-200 hover:border-primary hover:bg-primary/5 transition-all group" onClick={() => navigate("/reception/search")}>
-                                <div className="flex items-center gap-2 font-black text-slate-800 group-hover:text-primary transition-colors">
-                                    <Search className="h-5 w-5" /> Search Member
+                        <CardContent className="grid gap-5 p-8">
+                            <Button variant="outline" className="h-28 flex flex-col items-start gap-2 p-6 rounded-[2rem] border-slate-100 hover:border-emerald-500 hover:bg-emerald-50/50 transition-all group shadow-sm bg-white" onClick={() => navigate("/reception/search")}>
+                                <div className="flex items-center gap-3 font-black text-slate-800 group-hover:text-emerald-600 transition-colors">
+                                    <div className="p-2 rounded-xl bg-slate-50 group-hover:bg-emerald-100 transition-colors">
+                                        <Search className="h-5 w-5" />
+                                    </div>
+                                    <span className="text-sm">Search Member</span>
                                 </div>
-                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Check balance & register</span>
+                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest pl-11">Register Clinical Visit</span>
                             </Button>
-                            <Button variant="outline" className="h-24 flex flex-col items-start gap-1 p-5 rounded-2xl border-slate-200 hover:border-primary hover:bg-primary/5 transition-all group" onClick={() => navigate("/reception/billing")}>
-                                <div className="flex items-center gap-2 font-black text-slate-800 group-hover:text-primary transition-colors">
-                                    <Receipt className="h-5 w-5" /> Finalize Bills
+                            <Button variant="outline" className="h-28 flex flex-col items-start gap-2 p-6 rounded-[2rem] border-slate-100 hover:border-blue-500 hover:bg-blue-50/50 transition-all group shadow-sm bg-white" onClick={() => navigate("/reception/billing")}>
+                                <div className="flex items-center gap-3 font-black text-slate-800 group-hover:text-blue-600 transition-colors">
+                                    <div className="p-2 rounded-xl bg-slate-50 group-hover:bg-blue-100 transition-colors">
+                                        <Receipt className="h-5 w-5" />
+                                    </div>
+                                    <span className="text-sm">Billing Suite</span>
                                 </div>
-                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Process invoices & payments</span>
+                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest pl-11">Invoicing & Clearance</span>
                             </Button>
                         </CardContent>
                     </Card>
 
-                    <Card className="col-span-full xl:col-span-5 bg-white/70 backdrop-blur-xl border-slate-100 shadow-xl rounded-3xl overflow-hidden">
-                        <CardHeader className="bg-slate-50/50 border-b flex flex-row items-center justify-between">
-                            <CardTitle className="flex items-center gap-2 text-lg font-bold text-slate-800">
-                                <Clock className="h-5 w-5 text-primary" />
+                    <Card className="col-span-full xl:col-span-5 card-premium">
+                        <CardHeader className="bg-slate-50/50 border-b p-8 flex flex-row items-center justify-between">
+                            <CardTitle className="flex items-center gap-3 text-2xl font-black text-slate-900 font-serif">
+                                <div className="p-2.5 rounded-2xl bg-primary/10">
+                                    <Clock className="h-6 w-6 text-primary" />
+                                </div>
                                 Recent Activity
                             </CardTitle>
-                            <Badge variant="outline" className="bg-white font-bold text-[10px] uppercase">Live Updates</Badge>
+                            <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 font-black text-[10px] uppercase px-4 h-7 rounded-full animate-pulse shadow-sm">Live Feed</Badge>
                         </CardHeader>
                         <CardContent className="p-0">
                             <div className="overflow-x-auto">

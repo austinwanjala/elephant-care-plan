@@ -330,11 +330,11 @@ const MemberDashboard = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
-          <Card className="bg-white/70 backdrop-blur-xl border-slate-100 shadow-xl rounded-3xl overflow-hidden group hover:shadow-2xl transition-all">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-emerald-50/30 border-b border-emerald-100/50">
-              <CardTitle className="text-xs font-black text-emerald-800 uppercase tracking-widest">Coverage Balance</CardTitle>
-              <div className="p-2 bg-emerald-100 rounded-xl">
-                <Shield className="h-5 w-5 text-emerald-600" />
+          <Card className="card-premium-emerald group h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 header-gradient-emerald border-b border-emerald-100/50">
+              <CardTitle className="text-xs font-black text-emerald-800 uppercase tracking-widest leading-none">Coverage Balance</CardTitle>
+              <div className="p-2 icon-glow-emerald rounded-xl group-hover:scale-110 transition-transform duration-300">
+                <Shield className="h-5 w-5" />
               </div>
             </CardHeader>
             <CardContent className="pt-6">
@@ -342,21 +342,23 @@ const MemberDashboard = () => {
                 <div className="text-3xl font-black text-slate-900">
                   KES {member?.coverage_balance?.toLocaleString() || 0}
                 </div>
-                <Badge className="bg-emerald-500 text-white border-0 font-bold px-3">Active Cover</Badge>
+                <Badge className="bg-emerald-500 text-white border-0 font-bold px-3 shadow-sm shadow-emerald-200">Active Cover</Badge>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-tighter">
                   <span>Balance Utilization</span>
-                  <span>{coveragePercentage.toFixed(0)}% Left</span>
+                  <span className="text-emerald-600">{coveragePercentage.toFixed(0)}% Left</span>
                 </div>
-                <Progress value={coveragePercentage} className="h-2 bg-slate-100" />
+                <div className="h-2 bg-slate-100/50 rounded-full overflow-hidden shadow-inner backdrop-blur-sm">
+                  <div className="h-full bg-emerald-500 rounded-full transition-all duration-1000 shadow-[0_0_8px_rgba(16,185,129,0.4)]" style={{ width: `${coveragePercentage}%` }} />
+                </div>
                 <p className="text-[10px] font-bold text-slate-400 mt-2">
                   Of total KES {member?.benefit_limit?.toLocaleString() || 0} benefit limit
                 </p>
               </div>
               <div className="mt-6">
                 <Link to="/dashboard/scheme-selection">
-                  <Button size="sm" variant="outline" className="w-full rounded-xl border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 font-bold text-xs h-10">
+                  <Button size="sm" variant="outline" className="w-full rounded-xl border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 font-bold text-xs h-10 transition-all active:scale-95 shadow-sm">
                     <CreditCard className="mr-2 h-4 w-4" /> Top up / Upgrade
                   </Button>
                 </Link>
@@ -364,11 +366,11 @@ const MemberDashboard = () => {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/70 backdrop-blur-xl border-slate-100 shadow-xl rounded-3xl overflow-hidden group hover:shadow-2xl transition-all">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-blue-50/30 border-b border-blue-100/50">
-              <CardTitle className="text-xs font-black text-blue-800 uppercase tracking-widest">Membership Status</CardTitle>
-              <div className="p-2 bg-blue-100 rounded-xl">
-                <Users className="h-5 w-5 text-blue-600" />
+          <Card className="card-premium-blue group h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 header-gradient-blue border-b border-blue-100/50">
+              <CardTitle className="text-xs font-black text-blue-800 uppercase tracking-widest leading-none">Membership Status</CardTitle>
+              <div className="p-2 icon-glow-blue rounded-xl group-hover:scale-110 transition-transform duration-300">
+                <Users className="h-5 w-5" />
               </div>
             </CardHeader>
             <CardContent className="pt-6">
@@ -402,11 +404,11 @@ const MemberDashboard = () => {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/70 backdrop-blur-xl border-slate-100 shadow-xl rounded-3xl overflow-hidden group hover:shadow-2xl transition-all">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-violet-50/30 border-b border-violet-100/50">
-              <CardTitle className="text-xs font-black text-violet-800 uppercase tracking-widest">Usage History</CardTitle>
-              <div className="p-2 bg-violet-100 rounded-xl">
-                <Activity className="h-5 w-5 text-violet-600" />
+          <Card className="card-premium-violet group h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 header-gradient-violet border-b border-violet-100/50">
+              <CardTitle className="text-xs font-black text-violet-800 uppercase tracking-widest leading-none">Usage History</CardTitle>
+              <div className="p-2 icon-glow-violet rounded-xl group-hover:scale-110 transition-transform duration-300">
+                <Activity className="h-5 w-5" />
               </div>
             </CardHeader>
             <CardContent className="pt-6">
@@ -415,7 +417,7 @@ const MemberDashboard = () => {
                 Total medical sessions accessed
               </p>
               <div className="mt-8">
-                <Button variant="outline" className="w-full rounded-xl text-violet-700 bg-violet-50 border-violet-200 hover:bg-violet-100 font-bold text-xs h-10" onClick={() => document.getElementById('history-section')?.scrollIntoView({ behavior: 'smooth' })}>
+                <Button variant="outline" className="w-full rounded-xl text-violet-700 bg-violet-50 border-violet-200 hover:bg-violet-100 font-bold text-xs h-10 shadow-sm transition-all active:scale-95" onClick={() => document.getElementById('history-section')?.scrollIntoView({ behavior: 'smooth' })}>
                   <History className="mr-2 h-4 w-4" /> View Detailed Logs
                 </Button>
               </div>
@@ -441,8 +443,8 @@ const MemberDashboard = () => {
 
             {/* Ongoing Treatment Panel */}
             {ongoingTreatments.length > 0 && (
-              <Card className="border-blue-200 bg-white/70 backdrop-blur-xl shadow-xl rounded-3xl overflow-hidden">
-                <CardHeader className="bg-blue-600 text-white pb-4">
+              <Card className="card-premium border-blue-200">
+                <CardHeader className="bg-blue-600 text-white pb-4 rounded-t-[2.5rem]">
                   <CardTitle className="flex items-center gap-2 text-lg font-bold">
                     <Activity className="h-5 w-5 animate-pulse" />
                     Clinical Progress

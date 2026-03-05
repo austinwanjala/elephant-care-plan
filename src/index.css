@@ -61,6 +61,15 @@
     --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
     --shadow-primary: 0 10px 30px -10px hsla(120, 61%, 50%, 0.4);
     --shadow-accent: 0 10px 30px -10px hsla(35, 95%, 55%, 0.4);
+
+    /* Luxury Shadows for @apply persistence */
+    --luxury-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.08);
+    --luxury-shadow-hover: 0 30px 60px -12px rgba(0, 0, 0, 0.12);
+    --glow-blue: 0 0 20px rgba(59, 130, 246, 0.3);
+    --glow-emerald: 0 0 20px rgba(16, 185, 129, 0.3);
+    --glow-violet: 0 0 20px rgba(139, 92, 246, 0.3);
+    --glow-amber: 0 0 20px rgba(245, 158, 11, 0.3);
+    --glow-rose: 0 0 20px rgba(244, 63, 94, 0.3);
   }
 
   .dark {
@@ -189,6 +198,10 @@
     @apply bg-destructive/10 text-destructive border border-destructive/20;
   }
 
+  .badge-blue {
+    @apply bg-blue-100 text-blue-600 border border-blue-200;
+  }
+
   .glass-effect {
     @apply backdrop-blur-md bg-background/80 border border-border/50;
   }
@@ -266,11 +279,13 @@
   }
 
   .card-premium {
-    @apply bg-white/80 backdrop-blur-2xl border border-white/60 shadow-[0_20px_50px_-12px_rgba(0, 0, 0, 0.08)] rounded-[2.5rem] overflow-hidden transition-all duration-500;
+    @apply bg-white/80 backdrop-blur-2xl border border-white/60 rounded-[2.5rem] overflow-hidden transition-all duration-500;
+    box-shadow: var(--luxury-shadow);
   }
 
   .card-premium:hover {
-    @apply shadow-[0_30px_60px_-12px_rgba(0, 0, 0, 0.12)] -translate-y-1;
+    @apply -translate-y-1;
+    box-shadow: var(--luxury-shadow-hover);
   }
 
   .card-premium-blue {
@@ -318,23 +333,28 @@
   }
 
   .icon-glow-blue {
-    @apply bg-blue-100 text-blue-600 shadow-[0_0_20px_rgba(59, 130, 246, 0.3)];
+    @apply bg-blue-100 text-blue-600;
+    box-shadow: var(--glow-blue);
   }
 
   .icon-glow-emerald {
-    @apply bg-emerald-100 text-emerald-600 shadow-[0_0_20px_rgba(16, 185, 129, 0.3)];
+    @apply bg-emerald-100 text-emerald-600;
+    box-shadow: var(--glow-emerald);
   }
 
   .icon-glow-violet {
-    @apply bg-violet-100 text-violet-600 shadow-[0_0_20px_rgba(139, 92, 246, 0.3)];
+    @apply bg-violet-100 text-violet-600;
+    box-shadow: var(--glow-violet);
   }
 
   .icon-glow-amber {
-    @apply bg-amber-100 text-amber-600 shadow-[0_0_20px_rgba(245, 158, 11, 0.3)];
+    @apply bg-amber-100 text-amber-600;
+    box-shadow: var(--glow-amber);
   }
 
   .icon-glow-rose {
-    @apply bg-rose-100 text-rose-600 shadow-[0_0_20px_rgba(244, 63, 94, 0.3)];
+    @apply bg-rose-100 text-rose-600;
+    box-shadow: var(--glow-rose);
   }
 
   /* Custom utility to always show scrollbar */

@@ -254,6 +254,33 @@ export default function RegisterVisit() {
             const isDependant = selectedPatientId !== member.id;
             const dependantId = isDependant ? selectedPatientId : null;
 
+            // Block: Restrict same member/dependant registration twice a day
+            const todayStr = new Date().toISOString().split('T')[0];
+            let checkQuery = supabase
+                .from('visits')
+                .select('id')
+                .eq('member_id', member.id)
+                .gte('created_at', todayStr)
+                .neq('status', 'cancelled'); // Don't block if previous was cancelled? User didn't specify, but usually good.
+
+            if (dependantId) {
+                checkQuery = checkQuery.eq('dependant_id', dependantId);
+            } else {
+                checkQuery = checkQuery.is('dependant_id', null);
+            }
+
+            const { data: existingVisit } = await checkQuery.maybeSingle();
+
+            if (existingVisit) {
+                toast({
+                    title: "Registration Restricted",
+                    description: "This patient has already been registered for a visit today. Duplicate registrations are not allowed.",
+                    variant: "destructive"
+                });
+                setLoading(false);
+                return;
+            }
+
             // Verify if dependant is valid (double check)
             if (isDependant) {
                 const selectedDependant = dependants.find(d => d.id === selectedPatientId);

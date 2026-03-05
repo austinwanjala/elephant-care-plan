@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -15,7 +16,11 @@ import {
     Clock,
     User,
     Activity,
-    Building2
+    Building2,
+    FileText,
+    UserPlus,
+    Target,
+    BarChart
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -58,6 +63,7 @@ export default function DirectorDashboard() {
     const [activeVisitsList, setActiveVisitsList] = useState<any[]>([]);
     const [isVisiListOpen, setIsVisitListOpen] = useState(false);
     const [branchName, setBranchName] = useState("Loading...");
+    const [branchId, setBranchId] = useState<string | null>(null);
     const { toast } = useToast();
     const navigate = useNavigate();
 
@@ -87,6 +93,7 @@ export default function DirectorDashboard() {
             }
 
             setBranchName(staffData.branches.name);
+            setBranchId(staffData.branch_id);
             await fetchMetrics(staffData.branch_id);
 
         } catch (error: any) {
@@ -416,12 +423,14 @@ export default function DirectorDashboard() {
                             </CardContent>
                         </Card>
 
-                        <BranchReportModal
-                            branchId={branchId}
-                            branchName={branchName}
-                            stats={stats}
-                            recentVisits={recentVisits}
-                        />
+                        {branchId && (
+                            <BranchReportModal
+                                branchId={branchId}
+                                branchName={branchName}
+                                stats={stats}
+                                recentVisits={recentVisits}
+                            />
+                        )}
 
                         <Card className="card-premium h-full">
                             <CardHeader className="p-8 header-gradient-blue border-b border-blue-100/30">
@@ -502,5 +511,174 @@ function DashboardCard({ title, value, icon: Icon, trend, color, onClick, classN
                 </p>
             </CardContent>
         </Card>
+    );
+}
+
+function BranchReportModal({ branchId, branchName, stats, recentVisits }: any) {
+    const [isOpen, setIsOpen] = useState(false);
+
+    const metrics = [
+        { label: "Gross Revenue", value: `KES ${stats.totalRevenue.toLocaleString()}`, icon: DollarSign, color: "blue" },
+        { label: "Clinical Visits", value: stats.visitCount, icon: Stethoscope, color: "emerald" },
+        { label: "New Patients", value: stats.newMembers, icon: UserPlus, color: "violet" },
+        { label: "Net Margin", value: `KES ${stats.profitLoss.toLocaleString()}`, icon: TrendingUp, color: "amber" },
+    ];
+
+    return (
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+            <DialogTrigger asChild>
+                <Button className="w-full card-premium-blue h-24 rounded-3xl group relative overflow-hidden flex flex-col items-start p-6 border-none text-left">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-[40px] -mr-16 -mt-16 transition-all group-hover:bg-blue-500/20" />
+                    <div className="text-[10px] font-black uppercase tracking-widest text-blue-600/70 mb-1">Periodic Analytics</div>
+                    <div className="text-lg font-black text-slate-900 flex items-center gap-2">
+                        Generate Branch Report <FileText className="h-4 w-4 text-blue-500" />
+                    </div>
+                </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto bg-slate-50 border-none rounded-[3rem] p-0 shadow-2xl">
+                <div className="header-gradient-blue p-10 pb-20 border-b border-blue-100/20">
+                    <DialogHeader>
+                        <DialogTitle className="text-4xl font-serif font-black text-slate-900">Branch Intelligence Report</DialogTitle>
+                        <DialogDescription className="text-slate-500 text-lg font-medium italic">
+                            Detailed operational & financial audit for {branchName} - {format(new Date(), "MMMM yyyy")}
+                        </DialogDescription>
+                    </DialogHeader>
+                </div>
+
+                <div className="px-10 -mt-12 space-y-10 pb-12">
+                    {/* Key Core Metrics */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        {metrics.map((m, i) => (
+                            <Card key={i} className="card-premium border-none shadow-xl">
+                                <CardContent className="p-6">
+                                    <div className={cn("inline-flex p-3 rounded-2xl mb-4",
+                                        m.color === 'blue' ? "bg-blue-100 text-blue-600" :
+                                            m.color === 'emerald' ? "bg-emerald-100 text-emerald-600" :
+                                                m.color === 'violet' ? "bg-violet-100 text-violet-600" :
+                                                    "bg-amber-100 text-amber-600"
+                                    )}>
+                                        <m.icon className="h-5 w-5" />
+                                    </div>
+                                    <div className="text-2xl font-black text-slate-900 leading-none mb-1">{m.value}</div>
+                                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{m.label}</div>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        {/* Visit Distribution */}
+                        <Card className="card-premium h-full">
+                            <CardHeader className="p-8 border-b border-slate-100">
+                                <CardTitle className="text-xl font-black text-slate-800">Operational Breakdown</CardTitle>
+                            </CardHeader>
+                            <CardContent className="p-8 space-y-6">
+                                <div className="space-y-4">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm font-bold text-slate-500">Completed Visits</span>
+                                        <span className="text-sm font-black text-emerald-600">{stats.visitCount}</span>
+                                    </div>
+                                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                                        <div className="h-full bg-emerald-500" style={{ width: `${(stats.visitCount / (stats.totalAppts || 1)) * 100}%` }} />
+                                    </div>
+                                </div>
+                                <div className="space-y-4">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm font-bold text-slate-500">Confirmed Appointments</span>
+                                        <span className="text-sm font-black text-blue-600">{stats.confirmedAppts}</span>
+                                    </div>
+                                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                                        <div className="h-full bg-blue-500" style={{ width: `${(stats.confirmedAppts / (stats.totalAppts || 1)) * 100}%` }} />
+                                    </div>
+                                </div>
+                                <div className="space-y-4">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm font-bold text-slate-500">Cancellations & No-Shows</span>
+                                        <span className="text-sm font-black text-rose-600">{stats.cancelledAppts + stats.noShowAppts}</span>
+                                    </div>
+                                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                                        <div className="h-full bg-rose-500" style={{ width: `${((stats.cancelledAppts + stats.noShowAppts) / (stats.totalAppts || 1)) * 100}%` }} />
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Financial Efficiency */}
+                        <Card className="card-premium h-full">
+                            <CardHeader className="p-8 border-b border-slate-100">
+                                <CardTitle className="text-xl font-black text-slate-800">Financial Summary</CardTitle>
+                            </CardHeader>
+                            <CardContent className="p-8 space-y-8">
+                                <div className="flex items-center justify-between p-6 bg-blue-50/50 rounded-3xl border border-blue-100">
+                                    <div>
+                                        <div className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Average per Visit</div>
+                                        <div className="text-2xl font-black text-slate-900">KES {(stats.totalRevenue / (stats.visitCount || 1)).toLocaleString()}</div>
+                                    </div>
+                                    <div className="h-12 w-12 rounded-2xl bg-white border border-blue-100 flex items-center justify-center">
+                                        <Target className="h-6 w-6 text-blue-600" />
+                                    </div>
+                                </div>
+                                <div className="flex items-center justify-between p-6 bg-emerald-50/50 rounded-3xl border border-emerald-100">
+                                    <div>
+                                        <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Profitability Ratio</div>
+                                        <div className="text-2xl font-black text-slate-900">{((stats.profitLoss / (stats.totalRevenue || 1)) * 100).toFixed(1)}%</div>
+                                    </div>
+                                    <div className="h-12 w-12 rounded-2xl bg-white border border-emerald-100 flex items-center justify-center">
+                                        <BarChart className="h-6 w-6 text-emerald-600" />
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    {/* Detailed Activity Log */}
+                    <Card className="card-premium">
+                        <CardHeader className="p-8 border-b border-slate-100 flex flex-row items-center justify-between">
+                            <CardTitle className="text-xl font-black text-slate-800">Clinical Data Stream</CardTitle>
+                            <Badge variant="outline" className="bg-slate-50 text-slate-500 border-slate-200 font-bold px-3">Latest {recentVisits.length} Records</Badge>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            <Table>
+                                <TableHeader className="bg-slate-50/50">
+                                    <TableRow className="hover:bg-transparent">
+                                        <TableHead className="pl-8 font-black uppercase text-[10px] tracking-widest text-slate-400 py-4">Date</TableHead>
+                                        <TableHead className="font-black uppercase text-[10px] tracking-widest text-slate-400">Patient</TableHead>
+                                        <TableHead className="font-black uppercase text-[10px] tracking-widest text-slate-400">Status</TableHead>
+                                        <TableHead className="text-right pr-8 font-black uppercase text-[10px] tracking-widest text-slate-400">Compensation</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {recentVisits.slice(0, 15).map((visit: any) => (
+                                        <TableRow key={visit.id} className="hover:bg-slate-50/30 transition-colors border-b-slate-100/30">
+                                            <TableCell className="pl-8 py-4">
+                                                <div className="font-black text-slate-700 text-sm">{format(new Date(visit.created_at), "dd/MM/yyyy")}</div>
+                                                <div className="text-[9px] font-bold text-slate-400 uppercase">{format(new Date(visit.created_at), "HH:mm")}</div>
+                                            </TableCell>
+                                            <TableCell className="font-bold text-slate-600 text-xs">{visit.members?.full_name}</TableCell>
+                                            <TableCell>
+                                                <Badge className={cn("text-[9px] font-black uppercase tracking-tighter h-5",
+                                                    visit.status === 'completed' ? "bg-emerald-100 text-emerald-700" : "bg-blue-100 text-blue-700"
+                                                )}>
+                                                    {visit.status.replace('_', ' ')}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-right pr-8 font-black text-slate-900">
+                                                KES {Number((visit.bills as any)?.[0]?.total_branch_compensation || 0).toLocaleString()}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                <div className="p-8 bg-slate-900 text-center">
+                    <Button variant="outline" className="border-white/20 text-white hover:bg-white/10 rounded-xl px-10 h-12 font-black uppercase tracking-[0.2em] text-xs" onClick={() => setIsOpen(false)}>
+                        Dismiss Report View
+                    </Button>
+                </div>
+            </DialogContent>
+        </Dialog>
     );
 }

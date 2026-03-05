@@ -228,277 +228,263 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-            Admin Dashboard
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            {showAllTime ? "Viewing historical system performance." : "Viewing performance for the current month."}
-          </p>
+    <div className="dashboard-luxury-bg p-4 md:p-8 min-h-screen">
+      <div className="soft-glow-emerald top-[-5%] left-[-5%]" />
+      <div className="soft-glow-blue bottom-[-5%] right-[-5%]" />
+
+      <div className="flex flex-col gap-8 relative z-10 max-w-7xl mx-auto">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+          <div>
+            <h1 className="text-4xl font-serif font-bold tracking-tight text-slate-900 leading-tight">Admin Executive Suite</h1>
+            <p className="text-slate-500 mt-1 font-medium italic">High-level strategic overview of your dental network</p>
+          </div>
+          <div className="flex items-center gap-3 bg-white/70 backdrop-blur-md p-1.5 rounded-2xl border border-slate-200 shadow-xl shadow-slate-100/50">
+            <Button
+              variant={showAllTime ? "default" : "outline"}
+              size="sm"
+              onClick={() => setShowAllTime(!showAllTime)}
+              className={cn(
+                "rounded-xl font-black text-[10px] uppercase tracking-widest transition-all px-4 h-9",
+                showAllTime ? "bg-slate-900 text-white shadow-lg" : "border-slate-200 text-slate-600 hover:bg-slate-50"
+              )}
+            >
+              <History className="h-3 w-3 mr-2" />
+              {showAllTime ? "Show Monthly" : "Show All Time"}
+            </Button>
+            <div className="flex items-center gap-2 px-4 h-9 rounded-xl bg-slate-900/5 border border-slate-200/50 text-slate-800 font-black text-[10px] uppercase tracking-widest">
+              <Calendar className="h-3 w-3 text-primary" />
+              <span>{new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <Button
-            variant={showAllTime ? "default" : "outline"}
-            size="sm"
-            onClick={() => setShowAllTime(!showAllTime)}
-            className="gap-2"
-          >
-            {showAllTime ? <Calendar className="h-4 w-4" /> : <History className="h-4 w-4" />}
-            {showAllTime ? "Show Current Month" : "Show All Time"}
-          </Button>
-          <Badge variant="outline" className="px-3 py-1.5 text-sm bg-primary/5 border-primary/20">
-            <Calendar className="h-3.5 w-3.5 mr-1.5" />
-            {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-          </Badge>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <Card className="bg-white/70 backdrop-blur-xl border-blue-100 shadow-xl rounded-[2rem] overflow-hidden group hover:shadow-2xl transition-all h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-blue-50/30 border-b border-blue-100/30">
+              <CardTitle className="text-[10px] font-black text-blue-800 uppercase tracking-widest leading-none">Total Membership</CardTitle>
+              <div className="p-2 bg-blue-100 rounded-xl group-hover:scale-110 transition-transform">
+                <Users className="h-4 w-4 text-blue-600" />
+              </div>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <div className="text-4xl font-black text-slate-900">{stats.totalMembers.toLocaleString()}</div>
+              <div className="flex items-center gap-2 mt-2">
+                <Badge className="bg-emerald-500 border-0 font-bold px-2 py-0 h-4 text-[9px] uppercase tracking-tighter">
+                  <ArrowUpRight className="h-2 w-2 mr-0.5" />
+                  +{stats.newMembersThisMonth} new arrivals
+                </Badge>
+              </div>
+              <div className="mt-5">
+                <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
+                  <span>Active Rate</span>
+                  <span className="text-slate-900">{stats.totalMembers > 0 ? Math.round((stats.activeMembers / stats.totalMembers) * 100) : 0}%</span>
+                </div>
+                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+                  <div className="h-full bg-blue-600 rounded-full transition-all duration-1000" style={{ width: `${stats.totalMembers > 0 ? (stats.activeMembers / stats.totalMembers) * 100 : 0}%` }} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/70 backdrop-blur-xl border-emerald-100 shadow-xl rounded-[2rem] overflow-hidden group hover:shadow-2xl transition-all h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-emerald-50/30 border-b border-emerald-100/30">
+              <CardTitle className="text-[10px] font-black text-emerald-800 uppercase tracking-widest leading-none">System Inflows</CardTitle>
+              <div className="p-2 bg-emerald-100 rounded-xl group-hover:scale-110 transition-transform">
+                <CreditCard className="h-4 w-4 text-emerald-600" />
+              </div>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <div className="text-4xl font-black text-slate-900">{formatCurrency(stats.totalContributions)}</div>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-2">Aggregated system contributions</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/70 backdrop-blur-xl border-violet-100 shadow-xl rounded-[2rem] overflow-hidden group hover:shadow-2xl transition-all h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-violet-50/30 border-b border-violet-100/30">
+              <CardTitle className="text-[10px] font-black text-violet-800 uppercase tracking-widest leading-none">Network Efficiency</CardTitle>
+              <div className="p-2 bg-violet-100 rounded-xl group-hover:scale-110 transition-transform">
+                <Activity className="h-4 w-4 text-violet-600" />
+              </div>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <div className="text-4xl font-black text-slate-900">{stats.totalVisits.toLocaleString()}</div>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-2">Processed clinical encounters</p>
+            </CardContent>
+          </Card>
+
+          <Card className={cn(
+            "bg-white/70 backdrop-blur-xl shadow-xl rounded-[2rem] overflow-hidden group hover:shadow-2xl transition-all border-0 h-full",
+            stats.totalProfitLoss >= 0 ? "border-emerald-100" : "border-rose-100"
+          )}>
+            <CardHeader className={cn(
+              "flex flex-row items-center justify-between space-y-0 pb-2 border-b border-opacity-30",
+              stats.totalProfitLoss >= 0 ? "bg-emerald-50/30 border-emerald-100" : "bg-rose-50/30 border-rose-100"
+            )}>
+              <CardTitle className={cn(
+                "text-[10px] font-black uppercase tracking-widest leading-none",
+                stats.totalProfitLoss >= 0 ? "text-emerald-800" : "text-rose-800"
+              )}>Financial Summary</CardTitle>
+              <div className={cn(
+                "p-2 rounded-xl group-hover:scale-110 transition-transform",
+                stats.totalProfitLoss >= 0 ? "bg-emerald-100" : "bg-rose-100"
+              )}>
+                {stats.totalProfitLoss >= 0 ? <TrendingUp className="h-4 w-4 text-emerald-600" /> : <TrendingDown className="h-4 w-4 text-rose-600" />}
+              </div>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <div className={cn(
+                "text-4xl font-black",
+                stats.totalProfitLoss >= 0 ? "text-slate-900" : "text-rose-700"
+              )}>{formatCurrency(Math.abs(stats.totalProfitLoss))}</div>
+              <div className="flex items-center gap-1 mt-2">
+                <span className={cn(
+                  "text-[10px] font-black uppercase tracking-tighter",
+                  stats.totalProfitLoss >= 0 ? "text-emerald-600" : "text-rose-600"
+                )}>{stats.totalProfitLoss >= 0 ? 'Surplus recorded' : 'Deficit detected'}</span>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="relative overflow-hidden border-0 shadow-md bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950 dark:to-blue-900/50">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-blue-700 dark:text-blue-300">Total Members</CardTitle>
-            <div className="h-9 w-9 rounded-full bg-blue-500/10 flex items-center justify-center">
-              <Users className="h-4 w-4 text-blue-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-blue-900 dark:text-blue-100">{stats.totalMembers}</div>
-            <div className="flex items-center gap-2 mt-2">
-              <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 text-xs">
-                <ArrowUpRight className="h-3 w-3 mr-0.5" />
-                +{stats.newMembersThisMonth} this month
-              </Badge>
-            </div>
-            <div className="mt-3">
-              <div className="flex justify-between text-xs mb-1">
-                <span className="text-muted-foreground">Active rate</span>
-                <span className="font-medium">{stats.totalMembers > 0 ? Math.round((stats.activeMembers / stats.totalMembers) * 100) : 0}%</span>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+          <Card className="lg:col-span-2 bg-white/70 backdrop-blur-xl border-slate-100 shadow-2xl rounded-[2.5rem] overflow-hidden h-full">
+            <CardHeader className="p-8 border-b border-slate-50">
+              <div>
+                <CardTitle className="text-2xl font-serif font-black text-slate-900">Network Growth Analytics</CardTitle>
+                <p className="text-slate-400 text-sm font-medium mt-1">Cross-sectional performance tracking across all nodes</p>
               </div>
-              <Progress value={stats.totalMembers > 0 ? (stats.activeMembers / stats.totalMembers) * 100 : 0} className="h-1.5" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="relative overflow-hidden border-0 shadow-md bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950 dark:to-emerald-900/50">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
-              {showAllTime ? "Total Contributions" : "Monthly Contributions"}
-            </CardTitle>
-            <div className="h-9 w-9 rounded-full bg-emerald-500/10 flex items-center justify-center">
-              <CreditCard className="h-4 w-4 text-emerald-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-emerald-900 dark:text-blue-100">
-              {formatCurrency(stats.totalContributions)}
-            </div>
-            <p className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-2">
-              From {stats.totalMembers} members
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="relative overflow-hidden border-0 shadow-md bg-gradient-to-br from-violet-50 to-violet-100/50 dark:from-violet-950 dark:to-violet-900/50">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-violet-700 dark:text-violet-300">
-              {showAllTime ? "Total Visits" : "Monthly Visits"}
-            </CardTitle>
-            <div className="h-9 w-9 rounded-full bg-violet-500/10 flex items-center justify-center">
-              <Activity className="h-4 w-4 text-violet-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-violet-900 dark:text-blue-100">
-              {stats.totalVisits}
-            </div>
-            <p className="text-xs text-violet-600/80 dark:text-violet-400/80 mt-2">
-              Processed consultations
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className={`relative overflow-hidden border-0 shadow-md ${stats.totalProfitLoss >= 0
-          ? 'bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-950 dark:to-green-900/50'
-          : 'bg-gradient-to-br from-red-50 to-red-100/50 dark:from-red-950 dark:to-red-900/50'
-          }`}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className={`text-sm font-medium ${stats.totalProfitLoss >= 0 ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'
-              }`}>
-              {showAllTime ? "Net Profit/Loss" : "Monthly Profit/Loss"}
-            </CardTitle>
-            <div className={`h-9 w-9 rounded-full flex items-center justify-center ${stats.totalProfitLoss >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'
-              }`}>
-              {stats.totalProfitLoss >= 0
-                ? <TrendingUp className="h-4 w-4 text-green-600" />
-                : <TrendingDown className="h-4 w-4 text-red-600" />
-              }
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className={`text-3xl font-bold ${stats.totalProfitLoss >= 0 ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'
-              }`}>
-              {formatCurrency(Math.abs(stats.totalProfitLoss))}
-            </div>
-            <div className="flex items-center gap-1 mt-2">
-              {stats.totalProfitLoss >= 0
-                ? <ArrowUpRight className="h-3 w-3 text-green-600" />
-                : <ArrowDownRight className="h-3 w-3 text-red-600" />
-              }
-              <span className={`text-xs ${stats.totalProfitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {stats.totalProfitLoss >= 0 ? 'Profitable' : 'Loss'}
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Revenue Trend Chart */}
-        <Card className="lg:col-span-2 shadow-md">
-          <CardHeader>
-            <CardTitle>Trend Analytics</CardTitle>
-            <CardDescription>
-              {showAllTime ? "Revenue and Visit trends over last 12 months" : "Revenue and Visit trends over last 6 months"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                  <XAxis dataKey="month" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis yAxisId="left" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value / 1000}k`} />
-                  <YAxis yAxisId="right" orientation="right" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                  <Tooltip
-                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                    formatter={(value: any, name: any) => [name === 'revenue' ? `KES ${value.toLocaleString()}` : value, name === 'revenue' ? 'Revenue' : 'Visits']}
-                  />
-                  <Legend />
-                  <Line yAxisId="left" type="monotone" dataKey="revenue" stroke="#2563eb" strokeWidth={2} name="Total Revenue" activeDot={{ r: 8 }} />
-                  <Line yAxisId="right" type="monotone" dataKey="visits" stroke="#10b981" strokeWidth={2} name="Total Visits" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Pending Claims Card */}
-        <Card className="shadow-md">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Pending Claims</CardTitle>
-              <CardDescription>Branch claims requiring approval</CardDescription>
-            </div>
-            <Badge variant="secondary" className="bg-orange-100 text-orange-700">
-              {pendingClaims.length} Pending
-            </Badge>
-          </CardHeader>
-          <CardContent>
-            {pendingClaims.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
-                <CheckCircle className="h-12 w-12 mb-3 text-green-500/50" />
-                <p>All cleared!</p>
-                <p className="text-sm">No pending claims found.</p>
+            </CardHeader>
+            <CardContent className="p-8">
+              <div className="h-[350px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartData} margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="month" stroke="#94a3b8" fontSize={10} fontWeight="800" tickLine={false} axisLine={false} />
+                    <YAxis yAxisId="left" stroke="#94a3b8" fontSize={10} fontWeight="800" tickLine={false} axisLine={false} tickFormatter={(value) => `K${value / 1000}k`} />
+                    <YAxis yAxisId="right" orientation="right" stroke="#94a3b8" fontSize={10} fontWeight="800" tickLine={false} axisLine={false} />
+                    <Tooltip
+                      contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(8px)', padding: '12px' }}
+                      itemStyle={{ fontStyle: 'normal', fontWeight: '900', fontSize: '11px', textTransform: 'uppercase' }}
+                      labelStyle={{ fontWeight: '900', color: '#1e293b', marginBottom: '8px', fontSize: '12px' }}
+                    />
+                    <Legend iconType="circle" />
+                    <Line yAxisId="left" type="monotone" dataKey="revenue" stroke="#2563eb" strokeWidth={5} activeDot={{ r: 8, stroke: '#fff', strokeWidth: 4, fill: '#2563eb' }} dot={false} name="Network Revenue" />
+                    <Line yAxisId="right" type="monotone" dataKey="visits" stroke="#10b981" strokeWidth={5} activeDot={{ r: 8, stroke: '#fff', strokeWidth: 4, fill: '#10b981' }} dot={false} name="Clinical Visits" />
+                  </LineChart>
+                </ResponsiveContainer>
               </div>
-            ) : (
-              <div className="space-y-4">
-                {pendingClaims.map((claim) => (
-                  <div key={claim.id} className="flex items-center justify-between p-3 border rounded-lg bg-card hover:bg-muted/50 transition-colors">
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium">{claim.branches?.name || 'Unknown Branch'}</p>
-                      <p className="text-xs text-muted-foreground">
+            </CardContent>
+          </Card>
+
+          <Card className="bg-slate-900 text-white shadow-2xl border-0 rounded-[2.5rem] overflow-hidden relative group h-full">
+            <CardHeader className="p-8 border-b border-white/5 relative z-10">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-xl font-black">Branch Claims</CardTitle>
+                  <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Pending Settlements</p>
+                </div>
+                <Badge className="bg-orange-500 text-white border-0 font-black px-3 h-6">{pendingClaims.length}</Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="p-8 relative z-10 space-y-4">
+              {pendingClaims.length === 0 ? (
+                <div className="text-center py-20 opacity-30">
+                  <CheckCircle className="h-16 w-16 mx-auto mb-4" />
+                  <p className="text-[10px] font-black uppercase tracking-widest">Financials Up to Date</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {pendingClaims.map((claim) => (
+                    <div key={claim.id} className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all group/item">
+                      <div className="flex justify-between items-start mb-1">
+                        <p className="text-sm font-black text-white/90 group-hover/item:text-white">{claim.branches?.name || 'Unknown Unit'}</p>
+                        <p className="text-xs font-black text-emerald-400">KES {claim.amount?.toLocaleString()}</p>
+                      </div>
+                      <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">
                         By {claim.staff?.full_name?.split(' ')[0]} • {new Date(claim.created_at).toLocaleDateString()}
                       </p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-bold text-primary">
-                        KES {claim.amount?.toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              )}
+              <div className="flex flex-col gap-3 mt-6">
                 <Button
-                  variant="outline"
-                  className="w-full mt-2"
+                  variant="ghost"
+                  className="w-full h-12 rounded-2xl border border-white/10 text-white font-black text-[10px] uppercase tracking-widest hover:bg-white hover:text-slate-900 transition-all"
                   onClick={() => navigate('/admin/branch-payments')}
                 >
-                  View All Claims
+                  Authorize Settlements <ArrowUpRight className="ml-2 h-4 w-4" />
                 </Button>
+                <div className="grid grid-cols-2 gap-3">
+                  <Button variant="ghost" className="h-10 border border-white/5 bg-white/5 text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-white rounded-xl" onClick={() => navigate('/admin/branches')}>Nodes</Button>
+                  <Button variant="ghost" className="h-10 border border-white/5 bg-white/5 text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-white rounded-xl" onClick={() => navigate('/admin/marketers')}>Partners</Button>
+                </div>
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-lg">Membership Distribution</CardTitle>
-            <CardDescription>Members by category</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {categoryDistribution.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Activity className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                <p>No members registered yet</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {categoryDistribution.map((cat) => (
-                  <div key={cat.name} className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-2">
-                        <div className={`h-3 w-3 rounded-full ${cat.color}`} />
-                        <span className="text-sm font-medium">{cat.name}</span>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pb-12">
+          <Card className="bg-white/70 backdrop-blur-xl border-slate-100 shadow-2xl rounded-[2.5rem] overflow-hidden">
+            <CardHeader className="p-8 bg-slate-50/50 border-b">
+              <CardTitle className="text-xl font-serif font-black text-slate-900">Demographic Distribution</CardTitle>
+              <p className="text-slate-400 text-sm font-medium mt-1">Network saturation by subscription category</p>
+            </CardHeader>
+            <CardContent className="p-8 space-y-8">
+              {categoryDistribution.length === 0 ? (
+                <div className="text-center py-10 opacity-30 italic">Calculating metrics...</div>
+              ) : (
+                <div className="grid gap-6">
+                  {categoryDistribution.map((cat, idx) => (
+                    <div key={cat.name} className="space-y-3 group">
+                      <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-600">
+                        <span>{cat.name}</span>
+                        <span className="text-slate-900">{cat.count} members</span>
                       </div>
-                      <span className="text-sm text-muted-foreground">{cat.count} members</span>
+                      <div className="h-4 bg-slate-100 rounded-full overflow-hidden shadow-inner p-0.5">
+                        <div
+                          className={cn("h-full rounded-full transition-all duration-1000", categoryColors[idx % categoryColors.length])}
+                          style={{ width: `${(cat.count / (stats.totalMembers || 1)) * 100}%` }}
+                        />
+                      </div>
                     </div>
-                    <Progress
-                      value={stats.totalMembers > 0 ? (cat.count / stats.totalMembers) * 100 : 0}
-                      className="h-2"
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-lg">Recent Members</CardTitle>
-            <CardDescription>Latest member registrations</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {recentMembers.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Users className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                <p>No members yet</p>
+          <Card className="bg-white/70 backdrop-blur-xl border-slate-100 shadow-2xl rounded-[2.5rem] overflow-hidden">
+            <CardHeader className="p-8 bg-slate-50/50 border-b flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-xl font-serif font-black text-slate-900">Executive Brief: Latest Arrivals</CardTitle>
+                <p className="text-slate-400 text-sm font-medium mt-1">Recently onboarded network participants</p>
               </div>
-            ) : (
-              <div className="space-y-4">
-                {recentMembers.map((member) => (
-                  <div key={member.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors">
-                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                      <span className="text-sm font-bold text-primary">
-                        {member.full_name?.charAt(0)?.toUpperCase()}
-                      </span>
+              <Button variant="ghost" className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-primary transition-all" onClick={() => navigate('/admin/members')}>Complete Registry</Button>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y divide-slate-50">
+                {recentMembers.map((m) => (
+                  <div key={m.id} className="p-6 flex items-center justify-between hover:bg-slate-100/50 transition-colors group">
+                    <div className="flex items-center gap-5">
+                      <div className="h-12 w-12 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center font-black text-slate-400 group-hover:bg-primary group-hover:text-white group-hover:border-primary transition-all text-sm">
+                        {m.full_name?.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="text-sm font-black text-slate-800 lowercase capitalize group-hover:text-primary transition-colors">{m.full_name}</p>
+                        <Badge className="bg-blue-50 text-blue-700 border-blue-100 font-black text-[9px] uppercase tracking-tighter mt-1 h-5 px-2">{m.membership_categories?.name || 'Standard'}</Badge>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{member.full_name}</p>
-                      <p className="text-xs text-muted-foreground truncate">{member.email}</p>
+                    <div className="text-right">
+                      <Badge variant="outline" className="font-black text-[10px] uppercase tracking-widest bg-white border-slate-200 text-slate-400 mb-1">ID: {m.member_number}</Badge>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-1">{new Date(m.created_at).toLocaleDateString()}</p>
                     </div>
-                    <Badge variant="outline" className="text-xs shrink-0">
-                      {(member.membership_categories as any)?.name || 'Pending'}
-                    </Badge>
                   </div>
                 ))}
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

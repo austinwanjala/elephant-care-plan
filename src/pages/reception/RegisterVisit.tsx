@@ -640,7 +640,7 @@ export default function RegisterVisit() {
                                 */ }
 
                                 <div className="space-y-2">
-                                    <Label>Assign Doctor (Optional)</Label>
+                                    <Label>Assign Doctor <span className="text-destructive">*</span></Label>
                                     <Select value={selectedDoctorId} onValueChange={setSelectedDoctorId}>
                                         <SelectTrigger>
                                             <SelectValue placeholder="Select a doctor..." />
@@ -651,13 +651,13 @@ export default function RegisterVisit() {
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    <p className="text-xs text-muted-foreground">If not selected, the first available doctor will pick it up.</p>
+                                    <p className="text-xs text-muted-foreground italic">Doctors can only view patients specifically allocated to them by reception.</p>
                                 </div>
 
                                 <Button
                                     className="w-full btn-primary"
                                     size="lg"
-                                    disabled={loading || !receptionistId || !receptionistBranchId}
+                                    disabled={loading || !receptionistId || !receptionistBranchId || !selectedDoctorId}
                                     onClick={handleRegisterVisit}
                                 >
                                     {loading ? <Loader2 className="animate-spin mr-2" /> : <UserCheck className="mr-2 h-5 w-5" />}

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { AlertCircle, Cpu, Fingerprint, Upload, Usb, Wifi } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { registerExternalBiometric, verifyExternalBiometric, BiometricFormat } from "@/services/biometrics";
 
 type Mode = "register" | "verify";
@@ -127,8 +128,12 @@ export default function ExternalBiometricCapture({
       const base64 = (await finishWithTimeout(templateP)) as string;
       await processTemplate(base64, "unknown");
     } catch (err: any) {
-      toast({ title: "HID Capture Failed", description: err.message || "Failed to read from device.", variant: "destructive" });
-      setStatus("HID capture failed");
+      let msg = err.message || "Failed to read from device.";
+      if (err.name === "SecurityError" || msg.toLowerCase().includes("access denied")) {
+        msg = "Access Denied: The device is locked by another program or requires higher permissions. Try unplugging and replugging the device.";
+      }
+      toast({ title: "HID Capture Failed", description: msg, variant: "destructive" });
+      setStatus("HID capture failed: " + msg);
     } finally {
       setBusy(false);
     }
@@ -163,12 +168,16 @@ export default function ExternalBiometricCapture({
 
       await processTemplate(base64, "unknown");
     } catch (err: any) {
+      let msg = err.message || "Vendor-specific USB command not supported by this device.";
+      if (err.name === "SecurityError" || msg.toLowerCase().includes("access denied")) {
+        msg = "Access Denied: The device is in use or requires a WinUSB driver. On Windows, use Zadig to switch the driver to 'WinUSB' for this device.";
+      }
       toast({
         title: "USB Capture Failed",
-        description: err.message || "Vendor-specific USB command not supported by this device.",
+        description: msg,
         variant: "destructive",
       });
-      setStatus("USB capture failed");
+      setStatus("USB capture failed: " + msg);
     } finally {
       setBusy(false);
     }
@@ -228,9 +237,18 @@ export default function ExternalBiometricCapture({
         </div>
 
         {status && (
-          <div className="text-xs flex items-center gap-1">
-            <AlertCircle className="h-3 w-3" />
-            {status}
+          <div className={cn(
+            "text-xs flex items-start gap-1 p-2 rounded",
+            status.toLowerCase().includes("failed") ? "bg-destructive/10 text-destructive" : "text-muted-foreground"
+          )}>
+            <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
+            <span>{status}</span>
+          </div>
+        )}
+
+        {status?.toLowerCase().includes("access denied") && (
+          <div className="text-[10px] bg-amber-50 dark:bg-amber-950/20 p-2 rounded border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400">
+            <strong>Pro Tip:</strong> If you're on Windows and see 'Access Denied', your reader likely needs the <strong>WinUSB</strong> driver. Use a tool like <a href="https://zadig.akeo.ie/" target="_blank" rel="noopener noreferrer" className="underline font-bold">Zadig</a> to replace the current driver with WinUSB, then refresh this page.
           </div>
         )}
       </div>

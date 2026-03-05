@@ -178,7 +178,9 @@ export default function ExternalBiometricCapture({
       const device: USBDevice = await navAny.usb.requestDevice({ filters: [] });
       if (!device) throw new Error("No USB device selected");
 
-      setStatus("USB Device found. Opening connection...");
+      const isDP = device.vendorId === 0x05ba && device.productId === 0x000a;
+
+      setStatus(isDP ? "DigitalPersona 4500 detected. Initializing sensor..." : "USB Device found. Opening connection...");
       await device.open();
 
       // Log details to help developer identify the reader
@@ -186,7 +188,7 @@ export default function ExternalBiometricCapture({
         name: device.productName,
         vendorId: device.vendorId,
         productId: device.productId,
-        classes: device.configuration?.interfaces.map(i => i.alternates[0].interfaceClass)
+        isDigitalPersona: isDP
       });
 
       // Attempt to reset the device state (helps power on some readers)
@@ -204,15 +206,26 @@ export default function ExternalBiometricCapture({
         await device.claimInterface(1);
       }
 
-      // Start command (0x01) - some readers also need 0x12 for 'Power On'
-      try {
-        await device.controlTransferOut({
-          requestType: 'vendor', recipient: 'device', request: 0x01, value: 0x0000, index: interfaceNum
-        });
-        await device.controlTransferOut({
-          requestType: 'vendor', recipient: 'device', request: 0x12, value: 0x0000, index: interfaceNum
-        });
-      } catch (e) { }
+      if (isDP) {
+        // DigitalPersona 4500 specific 'Light On' sequence
+        try {
+          await device.controlTransferOut({ requestType: 'vendor', recipient: 'device', request: 0x01, value: 0x0000, index: interfaceNum });
+          await device.controlTransferOut({ requestType: 'vendor', recipient: 'device', request: 0x12, value: 0x0000, index: interfaceNum });
+          await device.controlTransferOut({ requestType: 'vendor', recipient: 'device', request: 0x04, value: 0x0001, index: interfaceNum });
+        } catch (e) {
+          console.warn("DigitalPersona specific init failed:", e);
+        }
+      } else {
+        // Start command (0x01) - some readers also need 0x12 for 'Power On'
+        try {
+          await device.controlTransferOut({
+            requestType: 'vendor', recipient: 'device', request: 0x01, value: 0x0000, index: interfaceNum
+          });
+          await device.controlTransferOut({
+            requestType: 'vendor', recipient: 'device', request: 0x12, value: 0x0000, index: interfaceNum
+          });
+        } catch (e) { }
+      }
 
       setStatus("Scanner activated. LED should be ON now. Please scan...");
 
@@ -358,16 +371,15 @@ export default function ExternalBiometricCapture({
 
             <div className="bg-amber-50 dark:bg-amber-950/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800 space-y-3 shadow-sm">
               <p className="text-[11px] font-bold uppercase text-amber-800 dark:text-amber-400 flex items-center gap-2">
-                <Usb className="h-3 w-3" /> Mandatory Driver Fix (Windows)
+                <Usb className="h-3 w-3" /> DigitalPersona 4500 Guide
               </p>
               <div className="text-[10px] text-amber-700 dark:text-amber-300 space-y-2">
-                <p>Browsers cannot "Power On" biometric scanners using default Windows drivers. You <strong>MUST</strong> switch to the WinUSB driver:</p>
-                <ol className="list-decimal pl-4 space-y-1">
-                  <li>Download and run <a href="https://zadig.akeo.ie/" target="_blank" rel="noopener noreferrer" className="underline font-black">Zadig.exe</a>.</li>
-                  <li>Go to <strong>Options &gt; List All Devices</strong>.</li>
-                  <li>Select your Biometric Scanner (or "MFS100/Morpho/SecuGen") from the list.</li>
-                  <li>Ensure the right side says <strong>WinUSB</strong> and click <strong>"Replace Driver"</strong>.</li>
-                  <li><strong>Restart your browser</strong> and the scanner light will now turn on.</li>
+                <p>For the <strong>DigitalPersona 4500 (Vendor: 05ba, Product: 000a)</strong> to light up in Chrome, you must replace the "DigitalPersona" driver with "WinUSB" using Zadig:</p>
+                <ol className="list-decimal pl-4 space-y-1 font-medium">
+                  <li>In Zadig, find <strong>"DigitalPersona U.are.U 4500 Fingerprint Reader"</strong>.</li>
+                  <li>Select <strong>WinUSB (v6.1.x.x)</strong> in the target box.</li>
+                  <li>Click <strong>Replace Driver</strong>.</li>
+                  <li>Click the <strong>WebUSB</strong> button in this portal (DigitalPersona does not use WebHID).</li>
                 </ol>
               </div>
             </div>

@@ -55,11 +55,11 @@ export default function ExternalBiometricCapture({
     };
   }, []);
 
-  const finishWithTimeout = (promise: Promise<any>) =>
+  const finishWithTimeout = (promise: Promise<any>, timeoutMs?: number) =>
     Promise.race([
       promise,
       new Promise((_resolve, reject) => {
-        timeoutRef.current = window.setTimeout(() => reject(new Error("Capture timed out")), maxDurationMs);
+        timeoutRef.current = window.setTimeout(() => reject(new Error("Capture timed out. Please try again and ensure your finger is on the scanner.")), timeoutMs || maxDurationMs);
       }),
     ]);
 
@@ -104,13 +104,40 @@ export default function ExternalBiometricCapture({
       const device = devices[0];
       await device.open();
 
+      setStatus("HID Device opened. Attempting to power on sensor...");
+      console.log("Device Info:", { vendorId: device.vendorId, productId: device.productId, productName: device.productName });
+
+      // Attempt multiple common HID activation sequences
+      const activationAttempts = async () => {
+        try {
+          // Attempt 1: Standard Output Report (0x01)
+          await device.sendReport(0x01, new Uint8Array([0x01, 0x01]));
+        } catch (e) {
+          try {
+            // Attempt 2: Alternative Report ID (0x02)
+            await device.sendReport(0x02, new Uint8Array([0x01]));
+          } catch (e2) {
+            try {
+              // Attempt 3: Feature Report (sometimes used for power-on)
+              await device.setFeatureReport(0x01, new Uint8Array([0x01]));
+            } catch (e3) {
+              console.warn("All activation commands failed. The device may require a specific vendor command.");
+            }
+          }
+        }
+      };
+
+      await activationAttempts();
+      setStatus("Scanner ready. If the light is NOT on, your device might require a local Windows driver or service (like RD Service).");
+
       const templateP = new Promise<string>((resolve, reject) => {
         const onReport = (e: HIDInputReportEvent) => {
           try {
             // Convert report data to base64; vendor-specific decoding is outside scope
             const dataView = e.data;
             const bytes = new Uint8Array(dataView.buffer.slice(0));
-            if (bytes.byteLength === 0) return; // wait for real data
+            if (bytes.byteLength < 10) return; // Ignore small/empty reports (status updates)
+            setStatus("Data received, processing...");
             const bin = Array.from(bytes)
               .map((b) => String.fromCharCode(b))
               .join("");
@@ -130,7 +157,7 @@ export default function ExternalBiometricCapture({
     } catch (err: any) {
       let msg = err.message || "Failed to read from device.";
       if (err.name === "SecurityError" || msg.toLowerCase().includes("access denied")) {
-        msg = "Access Denied: The device is locked by another program or requires higher permissions. Try unplugging and replugging the device.";
+        msg = "Access Denied: This HID device is protected by Windows. If this is a Windows Hello reader, please use the main 'Capture' button above instead of 'External'.";
       }
       toast({ title: "HID Capture Failed", description: msg, variant: "destructive" });
       setStatus("HID capture failed: " + msg);
@@ -150,19 +177,84 @@ export default function ExternalBiometricCapture({
       const navAny = navigator as any;
       const device: USBDevice = await navAny.usb.requestDevice({ filters: [] });
       if (!device) throw new Error("No USB device selected");
+
+      setStatus("USB Device found. Opening connection...");
       await device.open();
+
+      // Log details to help developer identify the reader
+      console.log("Device Connected:", {
+        name: device.productName,
+        vendorId: device.vendorId,
+        productId: device.productId,
+        classes: device.configuration?.interfaces.map(i => i.alternates[0].interfaceClass)
+      });
+
+      // Attempt to reset the device state (helps power on some readers)
+      try { await device.reset(); } catch (e) { console.warn("Reset failed, continuing..."); }
+
       if (device.configuration == null) await device.selectConfiguration(1);
-      // Attempt to claim first interface; vendor implementations vary
-      await device.claimInterface(0);
 
-      // Try a generic control transfer to read a small block (vendor-specific in reality)
-      const result = await finishWithTimeout(
-        device.controlTransferIn({ requestType: "vendor", recipient: "device", request: 1, value: 0x0000, index: 0x0000 }, 512) as any
-      ) as USBInTransferResult;
+      // Try to claim the first available interface, or iterate if 0 is blocked
+      let interfaceNum = 0;
+      try {
+        await device.claimInterface(0);
+      } catch (e) {
+        console.warn("Interface 0 busy, trying Interface 1...");
+        interfaceNum = 1;
+        await device.claimInterface(1);
+      }
 
-      if (!result || !result.data) throw new Error("No data received from USB device");
+      // Start command (0x01) - some readers also need 0x12 for 'Power On'
+      try {
+        await device.controlTransferOut({
+          requestType: 'vendor', recipient: 'device', request: 0x01, value: 0x0000, index: interfaceNum
+        });
+        await device.controlTransferOut({
+          requestType: 'vendor', recipient: 'device', request: 0x12, value: 0x0000, index: interfaceNum
+        });
+      } catch (e) { }
 
-      const bytes = new Uint8Array(result.data.buffer.slice(0));
+      setStatus("Scanner activated. LED should be ON now. Please scan...");
+
+      // Look for data endpoints
+      const alt = device.configuration?.interfaces[interfaceNum]?.alternates[0];
+      const endpointIn = alt?.endpoints.find(e => e.direction === 'in');
+
+      let bytes: Uint8Array = new Uint8Array(0);
+      const startTime = Date.now();
+      const timeoutLimit = maxDurationMs > 5000 ? maxDurationMs : 15000; // Give at least 15s for USB
+
+      // Loop to poll for data if it's not a blocking bulk transfer
+      // or if the first read returns status bytes instead of the template
+      while (bytes.length < 100 && (Date.now() - startTime < timeoutLimit)) {
+        let result: USBInTransferResult;
+
+        if (endpointIn) {
+          // Attempt to read from Bulk/Interrupt endpoint
+          result = await finishWithTimeout(device.transferIn(endpointIn.endpointNumber, 1024 * 16), timeoutLimit) as USBInTransferResult;
+        } else {
+          // Fallback to control transfer
+          result = await finishWithTimeout(
+            device.controlTransferIn({ requestType: "vendor", recipient: "device", request: 1, value: 0x0000, index: 0x0000 }, 2048),
+            timeoutLimit
+          ) as USBInTransferResult;
+        }
+
+        if (result && result.data && result.data.byteLength >= 100) {
+          bytes = new Uint8Array(result.data.buffer.slice(0));
+          break;
+        }
+
+        // Short pause before retry if we got too little data
+        await new Promise(r => setTimeout(r, 500));
+        setStatus(`Waiting for scan... (${Math.round((timeoutLimit - (Date.now() - startTime)) / 1000)}s)`);
+      }
+
+      if (bytes.length < 100) {
+        throw new Error("Capture timed out or data too small. Please ensure you hold your finger on the scanner until capture is complete.");
+      }
+
+      setStatus("Template captured successfully!");
       const bin = Array.from(bytes).map((b) => String.fromCharCode(b)).join("");
       const base64 = btoa(bin);
 
@@ -181,7 +273,7 @@ export default function ExternalBiometricCapture({
     } finally {
       setBusy(false);
     }
-  }, [supportsUSB, maxDurationMs, mode]);
+  }, [supportsUSB, maxDurationMs, processTemplate, toast]);
 
   const handleFile = async (file: File) => {
     setBusy(true);
@@ -211,11 +303,17 @@ export default function ExternalBiometricCapture({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          <Button type="button" variant="secondary" onClick={captureViaHID} disabled={!supportsHID || busy} className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="default"
+            onClick={captureViaHID}
+            disabled={!supportsHID || busy}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 shadow-md ring-2 ring-blue-400/20"
+          >
             <Cpu className="h-4 w-4" />
-            WebHID
+            WebHID (Primary)
           </Button>
-          <Button type="button" variant="secondary" onClick={captureViaUSB} disabled={!supportsUSB || busy} className="flex items-center gap-2">
+          <Button type="button" variant="secondary" onClick={captureViaUSB} disabled={!supportsUSB || busy} className="flex items-center gap-2 border border-slate-200">
             <Usb className="h-4 w-4" />
             WebUSB
           </Button>
@@ -249,6 +347,39 @@ export default function ExternalBiometricCapture({
         {status?.toLowerCase().includes("access denied") && (
           <div className="text-[10px] bg-amber-50 dark:bg-amber-950/20 p-2 rounded border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400">
             <strong>Pro Tip:</strong> If you're on Windows and see 'Access Denied', your reader likely needs the <strong>WinUSB</strong> driver. Use a tool like <a href="https://zadig.akeo.ie/" target="_blank" rel="noopener noreferrer" className="underline font-bold">Zadig</a> to replace the current driver with WinUSB, then refresh this page.
+          </div>
+        )}
+
+        {status?.toLowerCase().includes("waiting for scan") && (
+          <div className="space-y-3">
+            <div className="text-[10px] text-blue-600 dark:text-blue-400 italic font-medium">
+              <strong>Device Status:</strong> Visible in WebUSB but hidden in WebHID? This confirms your scanner is a <strong>Raw USB Device</strong>. The "Access Denied" error means Windows is blocking the browser from speaking to it.
+            </div>
+
+            <div className="bg-amber-50 dark:bg-amber-950/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800 space-y-3 shadow-sm">
+              <p className="text-[11px] font-bold uppercase text-amber-800 dark:text-amber-400 flex items-center gap-2">
+                <Usb className="h-3 w-3" /> Mandatory Driver Fix (Windows)
+              </p>
+              <div className="text-[10px] text-amber-700 dark:text-amber-300 space-y-2">
+                <p>Browsers cannot "Power On" biometric scanners using default Windows drivers. You <strong>MUST</strong> switch to the WinUSB driver:</p>
+                <ol className="list-decimal pl-4 space-y-1">
+                  <li>Download and run <a href="https://zadig.akeo.ie/" target="_blank" rel="noopener noreferrer" className="underline font-black">Zadig.exe</a>.</li>
+                  <li>Go to <strong>Options &gt; List All Devices</strong>.</li>
+                  <li>Select your Biometric Scanner (or "MFS100/Morpho/SecuGen") from the list.</li>
+                  <li>Ensure the right side says <strong>WinUSB</strong> and click <strong>"Replace Driver"</strong>.</li>
+                  <li><strong>Restart your browser</strong> and the scanner light will now turn on.</li>
+                </ol>
+              </div>
+            </div>
+
+            <div className="bg-slate-100 dark:bg-slate-900/50 p-3 rounded-md border border-slate-200 dark:border-slate-800 space-y-2">
+              <p className="text-[10px] font-bold uppercase text-slate-500">Still No Light?</p>
+              <ul className="text-[10px] text-slate-600 dark:text-slate-400 list-disc pl-4 space-y-1">
+                <li>Use the <strong>WebUSB</strong> button (not HID) since HID does not see your device.</li>
+                <li>Ensure no other biometric programs (like Windows Hello) are running.</li>
+                <li>Try a USB 2.0 port if you are on a Blue USB 3.0 port.</li>
+              </ul>
+            </div>
           </div>
         )}
       </div>

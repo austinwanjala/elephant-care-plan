@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 const menuItems = [
     { title: "Dashboard", url: "/doctor", icon: LayoutDashboard },
     { title: "My Schedule", url: "/doctor/schedule", icon: CalendarClock },
-    { title: "Today's Queue", url: "/doctor/queue", icon: Users },
+    { title: "MY Queue", url: "/doctor/queue", icon: Users },
     { title: "Patient History", url: "/doctor/history", icon: History },
     { title: "Messages", url: "/doctor/messages", icon: MessageSquare },
 ];

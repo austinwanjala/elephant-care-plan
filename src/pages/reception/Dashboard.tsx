@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { UserPlus, Clock, CheckCircle, Search, Receipt, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -79,129 +80,165 @@ export default function ReceptionDashboard() {
     };
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h1 className="text-3xl font-bold tracking-tight">Reception Dashboard</h1>
-                <Button onClick={() => navigate("/reception/register-visit")} className="gap-2">
-                    <UserPlus className="h-4 w-4" /> Register New Visit
-                </Button>
-            </div>
+        <div className="dashboard-luxury-bg p-4 md:p-8 min-h-screen">
+            <div className="soft-glow-emerald top-[-5%] left-[-5%]" />
+            <div className="soft-glow-blue bottom-[-5%] right-[-5%]" />
 
-            <div className="grid gap-4 md:grid-cols-3">
-                <Card className="bg-orange-50/50 border-orange-100">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Today's Visits</CardTitle>
-                        <Users className="h-4 w-4 text-orange-600" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-orange-700">{stats.todayVisits}</div>
-                        <p className="text-xs text-muted-foreground">Total walk-ins today</p>
-                    </CardContent>
-                </Card>
-                <Card className="bg-blue-50/50 border-blue-100">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">With Doctor</CardTitle>
-                        <Clock className="h-4 w-4 text-blue-600" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-blue-700">{stats.withDoctorVisits}</div>
-                        <p className="text-xs text-muted-foreground">Currently being attended</p>
-                    </CardContent>
-                </Card>
-                <Card className="bg-emerald-50/50 border-emerald-100">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Pending Billing</CardTitle>
-                        <Receipt className="h-4 w-4 text-emerald-600" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-emerald-700">{stats.pendingBills}</div>
-                        <p className="text-xs text-muted-foreground">Waiting for finalization</p>
-                    </CardContent>
-                </Card>
-            </div>
+            <div className="flex flex-col gap-8 relative z-10 max-w-7xl mx-auto">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <h1 className="text-4xl font-serif font-bold tracking-tight text-slate-900">Reception Dashboard</h1>
+                        <p className="text-slate-500 mt-1">Ready to assist our patients with care and efficiency.</p>
+                    </div>
+                    <Button onClick={() => navigate("/reception/register-visit")} className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xl shadow-emerald-200/50 rounded-2xl px-8 h-12 font-black transition-all hover:scale-105 active:scale-95">
+                        <UserPlus className="h-5 w-5" /> Register New Visit
+                    </Button>
+                </div>
 
-            <div className="grid gap-4 md:grid-cols-7">
-                <Card className="col-span-full xl:col-span-2">
-                    <CardHeader>
-                        <CardTitle>Quick Actions</CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid gap-4">
-                        <Button variant="outline" className="h-20 flex flex-col items-start gap-1 p-4" onClick={() => navigate("/reception/search")}>
-                            <div className="flex items-center gap-2 font-bold">
-                                <Search className="h-4 w-4 text-primary" /> Search Member
+                <div className="grid gap-6 md:grid-cols-3">
+                    <Card className="bg-white/70 backdrop-blur-xl border-orange-100 shadow-lg shadow-orange-100/50 rounded-3xl overflow-hidden group hover:shadow-xl transition-all">
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-orange-50/30 border-b border-orange-100/50">
+                            <CardTitle className="text-sm font-bold text-orange-800 uppercase tracking-wider">Today's Visits</CardTitle>
+                            <div className="p-2 bg-orange-100 rounded-xl group-hover:scale-110 transition-transform">
+                                <Users className="h-5 w-5 text-orange-600" />
                             </div>
-                            <span className="text-[10px] text-muted-foreground">Check balance & register visit</span>
-                        </Button>
-                        <Button variant="outline" className="h-20 flex flex-col items-start gap-1 p-4" onClick={() => navigate("/reception/billing")}>
-                            <div className="flex items-center gap-2 font-bold">
-                                <Receipt className="h-4 w-4 text-primary" /> Finalize Bills
+                        </CardHeader>
+                        <CardContent className="pt-6">
+                            <div className="text-4xl font-black text-orange-700">{stats.todayVisits}</div>
+                            <p className="text-xs text-slate-400 font-medium mt-1">Total walk-ins today</p>
+                        </CardContent>
+                    </Card>
+                    <Card className="bg-white/70 backdrop-blur-xl border-blue-100 shadow-lg shadow-blue-100/50 rounded-3xl overflow-hidden group hover:shadow-xl transition-all">
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-blue-50/30 border-b border-blue-100/50">
+                            <CardTitle className="text-sm font-bold text-blue-800 uppercase tracking-wider">With Doctor</CardTitle>
+                            <div className="p-2 bg-blue-100 rounded-xl group-hover:scale-110 transition-transform">
+                                <Clock className="h-5 w-5 text-blue-600" />
                             </div>
-                            <span className="text-[10px] text-muted-foreground">Process invoices & payments</span>
-                        </Button>
-                    </CardContent>
-                </Card>
+                        </CardHeader>
+                        <CardContent className="pt-6">
+                            <div className="text-4xl font-black text-blue-700">{stats.withDoctorVisits}</div>
+                            <p className="text-xs text-slate-400 font-medium mt-1">Currently being attended</p>
+                        </CardContent>
+                    </Card>
+                    <Card className="bg-white/70 backdrop-blur-xl border-emerald-100 shadow-lg shadow-emerald-100/50 rounded-3xl overflow-hidden group hover:shadow-xl transition-all">
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-emerald-50/30 border-b border-emerald-100/50">
+                            <CardTitle className="text-sm font-bold text-emerald-800 uppercase tracking-wider">Pending Billing</CardTitle>
+                            <div className="p-2 bg-emerald-100 rounded-xl group-hover:scale-110 transition-transform">
+                                <Receipt className="h-5 w-5 text-emerald-600" />
+                            </div>
+                        </CardHeader>
+                        <CardContent className="pt-6">
+                            <div className="text-4xl font-black text-emerald-700">{stats.pendingBills}</div>
+                            <p className="text-xs text-slate-400 font-medium mt-1">Waiting for finalization</p>
+                        </CardContent>
+                    </Card>
+                </div>
 
-                <Card className="col-span-full xl:col-span-5">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Clock className="h-5 w-5 text-primary" />
-                            Today's Registered Patients
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="rounded-md border">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Time</TableHead>
-                                        <TableHead>Patient</TableHead>
-                                        <TableHead>Assigned To</TableHead>
-                                        <TableHead>Status</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {loading ? (
-                                        <TableRow>
-                                            <TableCell colSpan={4} className="text-center py-4">
-                                                <div className="flex justify-center"><Clock className="animate-spin h-5 w-5" /></div>
-                                            </TableCell>
+                <div className="grid gap-6 md:grid-cols-7">
+                    <Card className="col-span-full xl:col-span-2 bg-white/70 backdrop-blur-xl border-slate-100 shadow-xl rounded-3xl overflow-hidden">
+                        <CardHeader className="bg-slate-50/50 border-b">
+                            <CardTitle className="text-lg font-bold text-slate-800">Quick Actions</CardTitle>
+                        </CardHeader>
+                        <CardContent className="grid gap-4 p-6">
+                            <Button variant="outline" className="h-24 flex flex-col items-start gap-1 p-5 rounded-2xl border-slate-200 hover:border-primary hover:bg-primary/5 transition-all group" onClick={() => navigate("/reception/search")}>
+                                <div className="flex items-center gap-2 font-black text-slate-800 group-hover:text-primary transition-colors">
+                                    <Search className="h-5 w-5" /> Search Member
+                                </div>
+                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Check balance & register</span>
+                            </Button>
+                            <Button variant="outline" className="h-24 flex flex-col items-start gap-1 p-5 rounded-2xl border-slate-200 hover:border-primary hover:bg-primary/5 transition-all group" onClick={() => navigate("/reception/billing")}>
+                                <div className="flex items-center gap-2 font-black text-slate-800 group-hover:text-primary transition-colors">
+                                    <Receipt className="h-5 w-5" /> Finalize Bills
+                                </div>
+                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Process invoices & payments</span>
+                            </Button>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="col-span-full xl:col-span-5 bg-white/70 backdrop-blur-xl border-slate-100 shadow-xl rounded-3xl overflow-hidden">
+                        <CardHeader className="bg-slate-50/50 border-b flex flex-row items-center justify-between">
+                            <CardTitle className="flex items-center gap-2 text-lg font-bold text-slate-800">
+                                <Clock className="h-5 w-5 text-primary" />
+                                Recent Activity
+                            </CardTitle>
+                            <Badge variant="outline" className="bg-white font-bold text-[10px] uppercase">Live Updates</Badge>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            <div className="overflow-x-auto">
+                                <Table>
+                                    <TableHeader className="bg-slate-50/30">
+                                        <TableRow className="hover:bg-transparent border-b-slate-100">
+                                            <TableHead className="font-bold text-slate-600 pl-6">Time</TableHead>
+                                            <TableHead className="font-bold text-slate-600">Patient Detail</TableHead>
+                                            <TableHead className="font-bold text-slate-600">Clinical Allocation</TableHead>
+                                            <TableHead className="font-bold text-slate-600 pr-6 text-right">Progress</TableHead>
                                         </TableRow>
-                                    ) : visits.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell colSpan={4} className="text-center py-8 text-muted-foreground italic">
-                                                No visits recorded for today yet.
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : (
-                                        visits.map((visit) => (
-                                            <TableRow key={visit.id}>
-                                                <TableCell className="text-xs font-medium">
-                                                    {new Date(visit.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="font-semibold text-sm">
-                                                        {visit.dependants?.full_name || visit.members?.full_name}
+                                    </TableHeader>
+                                    <TableBody>
+                                        {loading ? (
+                                            <TableRow>
+                                                <TableCell colSpan={4} className="text-center py-12">
+                                                    <div className="flex flex-col items-center gap-3">
+                                                        <Clock className="animate-spin h-8 w-8 text-primary opacity-20" />
+                                                        <span className="text-slate-400 font-bold text-xs uppercase animate-pulse">Synchronizing records...</span>
                                                     </div>
-                                                    <div className="text-[10px] text-muted-foreground">
-                                                        #{visit.members?.member_number}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="text-xs">
-                                                    {visit.doctor?.full_name ? `Dr. ${visit.doctor.full_name}` : "Unassigned"}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge variant="outline" className="capitalize text-[10px] h-5">
-                                                        {visit.status.replace('_', ' ')}
-                                                    </Badge>
                                                 </TableCell>
                                             </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </CardContent>
-                </Card>
+                                        ) : visits.length === 0 ? (
+                                            <TableRow>
+                                                <TableCell colSpan={4} className="text-center py-12 text-slate-400 italic">
+                                                    No clinical registrations recorded yet today.
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : (
+                                            visits.map((visit) => (
+                                                <TableRow key={visit.id} className="group hover:bg-slate-50/50 transition-colors border-b-slate-50">
+                                                    <TableCell className="font-black text-slate-400 text-xs pl-6">
+                                                        {new Date(visit.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-500 group-hover:bg-primary group-hover:text-white transition-all">
+                                                                {(visit.dependants?.full_name || visit.members?.full_name)?.charAt(0)}
+                                                            </div>
+                                                            <div>
+                                                                <div className="font-black text-slate-800 text-sm">
+                                                                    {visit.dependants?.full_name || visit.members?.full_name}
+                                                                </div>
+                                                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+                                                                    ID: {visit.members?.member_number}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex flex-col">
+                                                            <span className="text-xs font-bold text-slate-700">
+                                                                {visit.doctor?.full_name ? `Dr. ${visit.doctor.full_name}` : "Pending Allocation"}
+                                                            </span>
+                                                            <span className="text-[10px] text-slate-400 italic font-medium">Dental Unit</span>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell className="pr-6 text-right">
+                                                        <Badge variant="outline" className={cn(
+                                                            "capitalize text-[9px] font-black h-5 px-2 rounded-lg",
+                                                            visit.status === 'registered' ? "bg-blue-50 text-blue-600 border-blue-100" :
+                                                                visit.status === 'with_doctor' ? "bg-orange-50 text-orange-600 border-orange-100 animate-pulse" :
+                                                                    visit.status === 'billed' ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
+                                                                        "bg-slate-100 text-slate-500 border-slate-200"
+                                                        )}>
+                                                            {visit.status.replace('_', ' ')}
+                                                        </Badge>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
             </div>
         </div>
     );

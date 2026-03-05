@@ -164,14 +164,14 @@ export default function DoctorQueue() {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-3xl font-bold tracking-tight">Consultation Queue</h1>
+                <h1 className="text-3xl font-bold tracking-tight">MY Queue</h1>
                 <p className="text-muted-foreground">Manage your assigned patients and active consultations.</p>
             </div>
 
             <Tabs defaultValue="today" className="w-full">
                 <TabsList className="mb-4">
                     <TabsTrigger value="today" className="gap-2">
-                        <Clock className="w-4 h-4" /> Today's Queue ({todayVisits.length})
+                        <Clock className="w-4 h-4" /> MY Queue ({todayVisits.length})
                     </TabsTrigger>
                     <TabsTrigger value="history" className="gap-2">
                         <History className="w-4 h-4" /> Pending from Past ({pastVisits.length})

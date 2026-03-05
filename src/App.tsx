@@ -57,6 +57,7 @@ import DirectorDashboard from "./pages/director/Dashboard";
 import DirectorRevenue from "./pages/director/Revenue";
 import DirectorPerformance from "./pages/director/Performance";
 import DirectorReports from "./pages/director/Reports";
+import DirectorVisits from "./pages/director/Visits";
 
 // Marketer Pages
 import MarketerDashboard from "./pages/marketer/Dashboard";
@@ -159,6 +160,7 @@ const App = () => (
             <Route path="revenue" element={<DirectorRevenue />} />
             <Route path="performance" element={<DirectorPerformance />} />
             <Route path="reports" element={<DirectorReports />} />
+            <Route path="visits" element={<DirectorVisits />} />
             <Route path="staff" element={<AdminStaff />} />
             <Route path="messages" element={<StaffMessages />} />
           </Route>

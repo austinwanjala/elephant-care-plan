@@ -29,6 +29,10 @@ export default function DirectorRevenue() {
     const [claims, setClaims] = useState<any[]>([]);
     const [pendingMultiStageClaims, setPendingMultiStageClaims] = useState<any[]>([]);
     const [claiming, setClaiming] = useState(false);
+    const [doctorBreakdown, setDoctorBreakdown] = useState<any[]>([]);
+    const [serviceBreakdown, setServiceBreakdown] = useState<any[]>([]);
+    const [patientTypeBreakdown, setPatientTypeBreakdown] = useState<{ principal: number, dependant: number }>({ principal: 0, dependant: 0 });
+    const [detailedBills, setDetailedBills] = useState<any[]>([]);
     const { toast } = useToast();
     const navigate = useNavigate();
 
@@ -97,28 +101,88 @@ export default function DirectorRevenue() {
         const endOfMonthDate = format(new Date(year, month, 0), "yyyy-MM-dd") + "T23:59:59";
 
         try {
-            const { data, error } = await supabase
-                .from("visits")
-                .select("id, created_at, status, branch_compensation, profit_loss")
+            // Fetch all finalized bills for the period
+            const { data: allBills, error: billsErr } = await supabase
+                .from("bills")
+                .select(`
+                    id, 
+                    created_at, 
+                    total_branch_compensation, 
+                    total_profit_loss, 
+                    visits(
+                        id,
+                        assigned_doctor_id, 
+                        dependant_id, 
+                        members(full_name), 
+                        dependants(full_name), 
+                        staff:assigned_doctor_id(full_name)
+                    )
+                `)
                 .eq("branch_id", branchId)
                 .gte("created_at", startOfMonthDate)
                 .lte("created_at", endOfMonthDate)
-                .eq("status", "completed");
+                .eq("is_finalized", true);
 
-            if (error) throw error;
+            if (billsErr) throw billsErr;
+            setDetailedBills(allBills || []);
 
+            // 1. Daily Breakdown (Billed)
             const groupedData: Record<string, BranchRevenueEntry> = {};
-            (data || []).forEach(visit => {
-                const dateKey = format(new Date(visit.created_at), "yyyy-MM-dd");
+            (allBills || []).forEach(bill => {
+                const dateKey = format(new Date(bill.created_at), "yyyy-MM-dd");
                 if (!groupedData[dateKey]) {
                     groupedData[dateKey] = { date: dateKey, total_compensation: 0, total_profit_loss: 0, visit_count: 0 };
                 }
-                groupedData[dateKey].total_compensation += Number(visit.branch_compensation) || 0;
-                groupedData[dateKey].total_profit_loss += Number(visit.profit_loss) || 0;
+                groupedData[dateKey].total_compensation += Number(bill.total_branch_compensation) || 0;
+                groupedData[dateKey].total_profit_loss += Number(bill.total_profit_loss) || 0;
                 groupedData[dateKey].visit_count += 1;
             });
 
             setRevenueData(Object.values(groupedData).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+
+            // 2. Doctor Breakdown (Billed)
+            const docGroup: Record<string, any> = {};
+            (allBills || []).forEach((b: any) => {
+                const docId = b.visits?.assigned_doctor_id || 'unassigned';
+                const docName = b.visits?.staff?.full_name || 'Unassigned/Staff';
+                if (!docGroup[docId]) {
+                    docGroup[docId] = { id: docId, name: docName, total: 0, count: 0 };
+                }
+                docGroup[docId].total += Number(b.total_branch_compensation) || 0;
+                docGroup[docId].count += 1;
+            });
+            setDoctorBreakdown(Object.values(docGroup).sort((a, b) => b.total - a.total));
+
+            // 3. Service Breakdown (Billed Items)
+            if (allBills && allBills.length > 0) {
+                const billIds = allBills.map(b => b.id);
+                const { data: items } = await (supabase as any)
+                    .from("bill_items")
+                    .select("service_name, branch_compensation")
+                    .in("bill_id", billIds);
+
+                const svcGroup: Record<string, any> = {};
+                (items || []).forEach((item: any) => {
+                    const name = item.service_name;
+                    if (!svcGroup[name]) {
+                        svcGroup[name] = { name, total: 0, count: 0 };
+                    }
+                    svcGroup[name].total += Number(item.branch_compensation) || 0;
+                    svcGroup[name].count += 1;
+                });
+                setServiceBreakdown(Object.values(svcGroup).sort((a, b) => b.total - a.total));
+            } else {
+                setServiceBreakdown([]);
+            }
+
+            // 4. Patient Type Breakdown (Billed)
+            let principalRevenue = 0;
+            let dependantRevenue = 0;
+            (allBills || []).forEach((b: any) => {
+                if (b.visits?.dependant_id) dependantRevenue += Number(b.total_branch_compensation) || 0;
+                else principalRevenue += Number(b.total_branch_compensation) || 0;
+            });
+            setPatientTypeBreakdown({ principal: principalRevenue, dependant: dependantRevenue });
         } catch (error: any) {
             toast({ title: "Error fetching revenue data", description: error.message, variant: "destructive" });
         } finally {
@@ -359,13 +423,157 @@ export default function DirectorRevenue() {
                             <Badge variant="secondary" className="px-3 py-1 text-sm bg-blue-100 text-blue-700 border-blue-200">
                                 {revenueData.reduce((s, e) => s + e.visit_count, 0)} Total Visits
                             </Badge>
+
+                            <div className="mt-8 w-full max-w-sm space-y-4">
+                                <div className="flex justify-between text-sm font-bold text-slate-700">
+                                    <span>Principal Members</span>
+                                    <span>KES {patientTypeBreakdown.principal.toLocaleString()}</span>
+                                </div>
+                                <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                                    <div
+                                        className="bg-blue-600 h-full transition-all duration-1000"
+                                        style={{ width: `${(patientTypeBreakdown.principal / (patientTypeBreakdown.principal + patientTypeBreakdown.dependant || 1)) * 100}%` }}
+                                    />
+                                </div>
+
+                                <div className="flex justify-between text-sm font-bold text-slate-700">
+                                    <span>Dependants</span>
+                                    <span>KES {patientTypeBreakdown.dependant.toLocaleString()}</span>
+                                </div>
+                                <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                                    <div
+                                        className="bg-purple-600 h-full transition-all duration-1000"
+                                        style={{ width: `${(patientTypeBreakdown.dependant / (patientTypeBreakdown.principal + patientTypeBreakdown.dependant || 1)) * 100}%` }}
+                                    />
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </CardContent>
             </Card>
 
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card className="shadow-sm border-slate-100">
+                    <CardHeader className="border-b bg-slate-50/50">
+                        <CardTitle className="text-lg">Revenue by Doctor</CardTitle>
+                        <CardDescription>Top performing practitioners this month</CardDescription>
+                    </CardHeader>
+                    <CardContent className="pt-6">
+                        {doctorBreakdown.length === 0 ? (
+                            <p className="text-center text-muted-foreground py-8 font-medium">No doctor data available.</p>
+                        ) : (
+                            <Table>
+                                <TableHeader>
+                                    <TableRow className="hover:bg-transparent">
+                                        <TableHead>Doctor</TableHead>
+                                        <TableHead className="text-right">Revenue (KES)</TableHead>
+                                        <TableHead className="text-right">Visits</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {doctorBreakdown.map((doc) => (
+                                        <TableRow key={doc.id} className="hover:bg-slate-50/50">
+                                            <TableCell className="font-semibold text-slate-800">{doc.name}</TableCell>
+                                            <TableCell className="text-right font-bold text-emerald-600">KES {doc.total.toLocaleString()}</TableCell>
+                                            <TableCell className="text-right font-medium text-slate-500">{doc.count}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        )}
+                    </CardContent>
+                </Card>
+
+                <Card className="shadow-sm border-slate-100">
+                    <CardHeader className="border-b bg-slate-50/50">
+                        <CardTitle className="text-lg">Revenue by Service</CardTitle>
+                        <CardDescription>Breakdown of treatments generating revenue</CardDescription>
+                    </CardHeader>
+                    <CardContent className="pt-6">
+                        {serviceBreakdown.length === 0 ? (
+                            <p className="text-center text-muted-foreground py-8 font-medium">No service data available.</p>
+                        ) : (
+                            <div className="max-h-[400px] overflow-y-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow className="hover:bg-transparent">
+                                            <TableHead>Service</TableHead>
+                                            <TableHead className="text-right">Revenue (KES)</TableHead>
+                                            <TableHead className="text-right">Freq</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {serviceBreakdown.map((svc) => (
+                                            <TableRow key={svc.name} className="hover:bg-slate-50/50">
+                                                <TableCell className="text-sm font-medium text-slate-700">{svc.name}</TableCell>
+                                                <TableCell className="text-right font-bold text-blue-600">KES {svc.total.toLocaleString()}</TableCell>
+                                                <TableCell className="text-right font-medium text-slate-400">{svc.count}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+
             <Card className="shadow-sm border-slate-100">
-                <CardContent>
+                <CardHeader className="border-b bg-slate-50/50">
+                    <CardTitle className="text-lg">Detailed Visit Revenue</CardTitle>
+                    <CardDescription>Individual breakdown of revenue generated per visit</CardDescription>
+                </CardHeader>
+                <CardContent className="pt-6">
+                    {detailedBills.length === 0 ? (
+                        <p className="text-center text-muted-foreground py-8 font-medium">No visit records found.</p>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow className="hover:bg-transparent">
+                                        <TableHead>Date</TableHead>
+                                        <TableHead>Patient</TableHead>
+                                        <TableHead>Assigned Doctor</TableHead>
+                                        <TableHead className="text-right">Amount (KES)</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {detailedBills.map((bill) => {
+                                        const patientName = bill.visits?.dependants?.full_name
+                                            ? `${bill.visits.dependants.full_name} (Dep)`
+                                            : (bill.visits?.members?.full_name || "Unknown");
+                                        const doctorName = bill.visits?.staff?.full_name || "Unassigned";
+
+                                        return (
+                                            <TableRow key={bill.id} className="hover:bg-slate-50/50">
+                                                <TableCell className="text-sm">
+                                                    {format(new Date(bill.created_at), 'MMM d, h:mm a')}
+                                                </TableCell>
+                                                <TableCell className="font-medium text-slate-800">
+                                                    {patientName}
+                                                </TableCell>
+                                                <TableCell className="text-sm text-slate-500">
+                                                    {doctorName}
+                                                </TableCell>
+                                                <TableCell className="text-right font-bold text-emerald-600">
+                                                    KES {Number(bill.total_branch_compensation).toLocaleString()}
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            <Card className="shadow-sm border-slate-100">
+                <CardHeader className="border-b bg-slate-50/50">
+                    <CardTitle className="text-lg">Daily Revenue Log</CardTitle>
+                    <CardDescription>Day-by-day financial performance</CardDescription>
+                </CardHeader>
+                <CardContent className="pt-6">
                     {revenueData.length === 0 ? (
                         <p className="text-center text-muted-foreground py-8">No revenue data for this period.</p>
                     ) : (
@@ -382,8 +590,8 @@ export default function DirectorRevenue() {
                                     {revenueData.map(entry => (
                                         <tr key={entry.date} className="hover:bg-muted/50">
                                             <td className="py-3 pr-3 text-sm">{format(new Date(entry.date), 'MMM d, yyyy')}</td>
-                                            <td className="py-3 px-3 text-sm text-blue-700 text-right font-medium">KES {entry.total_compensation.toLocaleString()}</td>
-                                            <td className="py-3 pl-3 text-sm text-right">{entry.visit_count}</td>
+                                            <td className="py-3 px-3 text-sm text-blue-700 text-right font-medium font-bold">KES {entry.total_compensation.toLocaleString()}</td>
+                                            <td className="py-3 pl-3 text-sm text-right font-medium">{entry.visit_count}</td>
                                         </tr>
                                     ))}
                                 </tbody>

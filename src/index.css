@@ -248,6 +248,27 @@
     background-clip: text;
   }
 
+  .dashboard-luxury-bg {
+    @apply min-h-screen bg-slate-50/50 relative overflow-hidden;
+    background: radial-gradient(at 0% 0%, hsla(150, 100%, 40%, 0.03) 0, transparent 50%),
+      radial-gradient(at 100% 0%, hsla(33, 100%, 50%, 0.03) 0, transparent 50%),
+      radial-gradient(at 100% 100%, hsla(150, 100%, 40%, 0.03) 0, transparent 50%),
+      radial-gradient(at 0% 100%, hsla(33, 100%, 50%, 0.03) 0, transparent 50%),
+      #f8fafc;
+  }
+
+  .soft-glow-emerald {
+    @apply absolute w-[500px] h-[500px] bg-emerald-400/10 rounded-full blur-[120px] -z-10 pointer-events-none;
+  }
+
+  .soft-glow-blue {
+    @apply absolute w-[400px] h-[400px] bg-blue-400/10 rounded-full blur-[100px] -z-10 pointer-events-none;
+  }
+
+  .card-premium {
+    @apply bg-white/70 backdrop-blur-xl border border-white/40 shadow-xl shadow-slate-200/50 rounded-3xl overflow-hidden;
+  }
+
   /* Custom utility to always show scrollbar */
   .always-show-scrollbar [data-radix-scroll-area-scrollbar] {
     opacity: 1 !important;

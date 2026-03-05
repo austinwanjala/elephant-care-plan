@@ -312,152 +312,190 @@ const MemberDashboard = () => {
   }
 
   return (
-    <div className="bg-background">
-      <main className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Coverage Balance</CardTitle>
-              <Shield className="h-4 w-4 text-muted-foreground" />
+    <div className="dashboard-luxury-bg min-h-screen">
+      <div className="soft-glow-emerald top-[5%] left-[-10%]" />
+      <div className="soft-glow-blue bottom-[-5%] right-[-10%]" />
+
+      <main className="container mx-auto px-4 py-8 relative z-10">
+        <div className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h1 className="text-4xl font-serif font-bold text-slate-900 tracking-tight">Member Portal</h1>
+            <p className="text-slate-500 mt-1 font-medium">Welcome back, {member.full_name}. Here is your cover summary.</p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" className="rounded-xl border-slate-200 bg-white/50 backdrop-blur-sm font-bold text-xs px-5 shadow-sm hover:bg-white" onClick={loadMemberData}>
+              <RefreshCw className="mr-2 h-3.5 w-3.5" /> Sync Data
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
+          <Card className="bg-white/70 backdrop-blur-xl border-slate-100 shadow-xl rounded-3xl overflow-hidden group hover:shadow-2xl transition-all">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-emerald-50/30 border-b border-emerald-100/50">
+              <CardTitle className="text-xs font-black text-emerald-800 uppercase tracking-widest">Coverage Balance</CardTitle>
+              <div className="p-2 bg-emerald-100 rounded-xl">
+                <Shield className="h-5 w-5 text-emerald-600" />
+              </div>
             </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-2xl font-bold text-success">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-3xl font-black text-slate-900">
                   KES {member?.coverage_balance?.toLocaleString() || 0}
                 </div>
-                <div className="flex flex-col items-end gap-2">
-                  <Badge className="bg-success">Covered</Badge>
-                  <Link to="/dashboard/scheme-selection">
-                    <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1">
-                      <RefreshCw className="h-3 w-3" /> Renew / Upgrade
-                    </Button>
-                  </Link>
+                <Badge className="bg-emerald-500 text-white border-0 font-bold px-3">Active Cover</Badge>
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-tighter">
+                  <span>Balance Utilization</span>
+                  <span>{coveragePercentage.toFixed(0)}% Left</span>
                 </div>
-              </div>
-              <div className="mt-2">
-                <Progress value={coveragePercentage} className="h-2" />
-                <p className="text-xs text-muted-foreground mt-1">
-                  {coveragePercentage.toFixed(0)}% of KES {member?.benefit_limit?.toLocaleString() || 0} remaining
+                <Progress value={coveragePercentage} className="h-2 bg-slate-100" />
+                <p className="text-[10px] font-bold text-slate-400 mt-2">
+                  Of total KES {member?.benefit_limit?.toLocaleString() || 0} benefit limit
                 </p>
+              </div>
+              <div className="mt-6">
+                <Link to="/dashboard/scheme-selection">
+                  <Button size="sm" variant="outline" className="w-full rounded-xl border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 font-bold text-xs h-10">
+                    <CreditCard className="mr-2 h-4 w-4" /> Top up / Upgrade
+                  </Button>
+                </Link>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Membership</CardTitle>
-              <CreditCard className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {member?.membership_categories?.name || "N/A"}
+          <Card className="bg-white/70 backdrop-blur-xl border-slate-100 shadow-xl rounded-3xl overflow-hidden group hover:shadow-2xl transition-all">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-blue-50/30 border-b border-blue-100/50">
+              <CardTitle className="text-xs font-black text-blue-800 uppercase tracking-widest">Membership Status</CardTitle>
+              <div className="p-2 bg-blue-100 rounded-xl">
+                <Users className="h-5 w-5 text-blue-600" />
               </div>
-              <div className="flex flex-col gap-1 mt-1">
-                <p className="text-xs text-muted-foreground">
-                  Total Contributions: KES {member?.total_contributions?.toLocaleString() || 0}
-                </p>
-                {schemeStartLabel && schemeEndLabel && (
-                  <div className="mt-2 rounded-md border bg-muted/30 px-3 py-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-semibold text-slate-700">Scheme Period</p>
-                      {typeof schemeDaysLeft === "number" && (
-                        <Badge variant={schemeDaysLeft <= 30 ? "destructive" : "secondary"}>
-                          {schemeDaysLeft} days left
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {schemeStartLabel} – {schemeEndLabel}
-                    </p>
-                  </div>
-                )}
-                {member?.marketers && (
-                  <p className="text-xs font-medium text-primary">
-                    Referred by: {member.marketers.full_name} ({member.marketers.code})
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Services Used</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{visits.length}</div>
-              <p className="text-xs text-muted-foreground">
-                Total dental services received
+            <CardContent className="pt-6">
+              <div className="text-2xl font-black text-slate-900 capitalize mb-1">
+                {member?.membership_categories?.name || "Standard Member"}
+              </div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter mb-4">
+                ID: {member.member_number}
               </p>
+
+              {schemeStartLabel && schemeEndLabel && (
+                <div className="rounded-2xl border border-blue-100 bg-blue-50/50 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-black text-blue-800 uppercase tracking-widest">Validity Period</p>
+                    {typeof schemeDaysLeft === "number" && (
+                      <Badge className={cn(
+                        "font-bold text-[9px] uppercase px-2 py-0.5 rounded-lg border-0 shadow-sm",
+                        schemeDaysLeft <= 30 ? "bg-rose-500 text-white" : "bg-blue-600 text-white"
+                      )}>
+                        {schemeDaysLeft} DAYS REMAINING
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-xs font-bold text-slate-600">{schemeStartLabel}</div>
+                    <div className="h-px flex-1 bg-blue-200" />
+                    <div className="text-xs font-bold text-slate-600">{schemeEndLabel}</div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/70 backdrop-blur-xl border-slate-100 shadow-xl rounded-3xl overflow-hidden group hover:shadow-2xl transition-all">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-violet-50/30 border-b border-violet-100/50">
+              <CardTitle className="text-xs font-black text-violet-800 uppercase tracking-widest">Usage History</CardTitle>
+              <div className="p-2 bg-violet-100 rounded-xl">
+                <Activity className="h-5 w-5 text-violet-600" />
+              </div>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <div className="text-5xl font-black text-slate-900 mb-2">{visits.length}</div>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                Total medical sessions accessed
+              </p>
+              <div className="mt-8">
+                <Button variant="outline" className="w-full rounded-xl text-violet-700 bg-violet-50 border-violet-200 hover:bg-violet-100 font-bold text-xs h-10" onClick={() => document.getElementById('history-section')?.scrollIntoView({ behavior: 'smooth' })}>
+                  <History className="mr-2 h-4 w-4" /> View Detailed Logs
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
           <div className="lg:col-span-1 space-y-8">
-            {member && <InsuranceCard member={{
-              id: member.id,
-              full_name: member.full_name,
-              member_number: member.member_number,
-              membership_categories: member.membership_categories,
-              insurance_card_token: member.insurance_card_token,
-              is_active: member.is_active,
-              coverage_balance: member.coverage_balance || 0,
-              benefit_limit: member.benefit_limit || 0,
-              id_number: member.id_number,
-            }} />}
+            <div className="transform transition-transform hover:scale-[1.02] active:scale-[0.98] cursor-pointer">
+              {member && <InsuranceCard member={{
+                id: member.id,
+                full_name: member.full_name,
+                member_number: member.member_number,
+                membership_categories: member.membership_categories,
+                insurance_card_token: member.insurance_card_token,
+                is_active: member.is_active,
+                coverage_balance: member.coverage_balance || 0,
+                benefit_limit: member.benefit_limit || 0,
+                id_number: member.id_number,
+              }} />}
+            </div>
 
             {/* Ongoing Treatment Panel */}
             {ongoingTreatments.length > 0 && (
-              <Card className="border-blue-300 bg-gradient-to-br from-blue-50 to-white shadow-md">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-blue-900">
+              <Card className="border-blue-200 bg-white/70 backdrop-blur-xl shadow-xl rounded-3xl overflow-hidden">
+                <CardHeader className="bg-blue-600 text-white pb-4">
+                  <CardTitle className="flex items-center gap-2 text-lg font-bold">
                     <Activity className="h-5 w-5 animate-pulse" />
-                    Ongoing Treatment
+                    Clinical Progress
                   </CardTitle>
-                  <CardDescription className="text-blue-600 text-xs">Active multi-stage procedures</CardDescription>
+                  <CardDescription className="text-blue-100 text-[10px] font-bold uppercase tracking-widest">Active Multi-Stage Treatment</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-3">
+                <CardContent className="p-4 space-y-4">
                   {ongoingTreatments.map((t: any) => {
                     const progress = Math.round((t.current_stage / t.total_stages) * 100);
-                    const nextStage = t.current_stage + 1;
-                    const isNearComplete = nextStage === t.total_stages;
+                    const isNearComplete = t.current_stage + 1 === t.total_stages;
                     return (
-                      <div key={t.id} className="bg-white rounded-xl border border-blue-100 p-3 space-y-2 shadow-sm">
+                      <div key={t.id} className="bg-slate-50/80 rounded-2xl border border-slate-100 p-4 space-y-3 shadow-sm group hover:border-blue-300 transition-all">
                         <div className="flex justify-between items-start">
                           <div>
-                            <p className="font-bold text-sm text-slate-900">{t.serviceName}</p>
+                            <p className="font-black text-sm text-slate-900">{t.serviceName}</p>
                             {t.tooth_number && (
-                              <p className="text-xs text-blue-600">Tooth #{t.tooth_number}</p>
+                              <p className="text-[10px] font-black text-blue-600 uppercase mt-1">Tooth Spec: #{t.tooth_number}</p>
                             )}
                           </div>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isNearComplete ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-blue-100 text-blue-700 border border-blue-200'}`}>
-                            {isNearComplete ? 'Almost Done' : 'In Progress'}
-                          </span>
+                          <Badge className={cn(
+                            "text-[9px] font-black px-2 py-0.5 rounded-lg border-0",
+                            isNearComplete ? 'bg-emerald-500 text-white' : 'bg-blue-600 text-white'
+                          )}>
+                            {isNearComplete ? 'FINALIZING' : 'IN PROGRESS'}
+                          </Badge>
                         </div>
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-[10px] font-semibold text-blue-800">
-                            <span>Stage {t.current_stage} of {t.total_stages} completed</span>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-tighter">
+                            <span>Stage {t.current_stage} OF {t.total_stages} Complete</span>
                             <span>{progress}%</span>
                           </div>
-                          <div className="h-2 w-full bg-blue-100 rounded-full overflow-hidden">
+                          <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
                             <div
-                              className="h-full bg-blue-500 rounded-full transition-all"
+                              className="h-full bg-blue-600 rounded-full transition-all duration-1000"
                               style={{ width: `${progress}%` }}
                             />
                           </div>
-                          <div className="flex gap-1">
+                          <div className="flex gap-1.5 pt-1">
                             {Array.from({ length: t.total_stages }, (_, i) => (
                               <div
                                 key={i}
-                                className={`flex-1 h-1 rounded-full ${i < t.current_stage ? 'bg-blue-500' : 'bg-slate-200'
-                                  }`}
+                                className={cn(
+                                  "flex-1 h-1.5 rounded-full transition-colors",
+                                  i < t.current_stage ? 'bg-blue-600' : 'bg-slate-200'
+                                )}
                               />
                             ))}
                           </div>
                         </div>
-                        <p className="text-[10px] text-slate-500">Next visit: Stage {nextStage} of {t.total_stages}</p>
+                        <div className="flex items-center gap-2 pt-1">
+                          <Clock className="h-3 w-3 text-slate-400" />
+                          <p className="text-[10px] font-bold text-slate-400">NEXT: Stage {t.current_stage + 1} Assessment</p>
+                        </div>
                       </div>
                     );
                   })}
@@ -466,23 +504,29 @@ const MemberDashboard = () => {
             )}
 
             {/* Dependants */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5" />Dependants</CardTitle>
-                <CardDescription>Registered family members covered under your scheme</CardDescription>
+            <Card className="bg-white/70 backdrop-blur-xl border-slate-100 shadow-xl rounded-3xl overflow-hidden">
+              <CardHeader className="bg-slate-50/50 border-b">
+                <CardTitle className="flex items-center gap-2 text-lg font-bold text-slate-800">
+                  <Users className="h-5 w-5 text-primary" />
+                  Dependants
+                </CardTitle>
+                <CardDescription className="text-xs font-medium">Family members under your cover</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4">
                 {dependants.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No dependants registered.</p>
+                  <div className="py-8 text-center bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+                    <Users className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                    <p className="text-xs font-bold text-slate-400 italic">No family members registered.</p>
+                  </div>
                 ) : (
                   <div className="space-y-3">
                     {dependants.map((dep) => (
-                      <div key={dep.id} className="p-3 rounded-lg border bg-muted/30">
-                        <div className="flex justify-between items-center">
-                          <p className="font-semibold">{dep.full_name}</p>
-                          <Badge variant="outline" className="capitalize">{dep.relationship}</Badge>
+                      <div key={dep.id} className="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm hover:border-primary/30 transition-all group">
+                        <div className="flex justify-between items-center mb-1">
+                          <p className="font-black text-slate-800">{dep.full_name}</p>
+                          <Badge variant="outline" className="capitalize text-[9px] font-black bg-slate-50 border-slate-200 group-hover:bg-primary/10 group-hover:border-primary/20 transition-all">{dep.relationship}</Badge>
                         </div>
-                        <p className="text-xs text-muted-foreground">ID: {dep.id_number}</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">ID Number: {dep.id_number}</p>
                       </div>
                     ))}
                   </div>
@@ -491,30 +535,34 @@ const MemberDashboard = () => {
             </Card>
           </div>
 
-          <div className="lg:col-span-2 space-y-8">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <History className="h-5 w-5 text-primary" />
-                  Service History
+          <div className="lg:col-span-2 space-y-10">
+            <Card id="history-section" className="bg-white/70 backdrop-blur-xl border-slate-100 shadow-xl rounded-3xl overflow-hidden">
+              <CardHeader className="bg-slate-50/50 border-b">
+                <CardTitle className="flex items-center gap-2 text-lg font-bold text-slate-800">
+                  <Activity className="h-5 w-5 text-primary" />
+                  Clinical History
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-0">
                 <div className="overflow-x-auto">
                   <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Service</TableHead>
-                        <TableHead>Branch</TableHead>
-                        <TableHead>Amount</TableHead>
+                    <TableHeader className="bg-slate-50/30">
+                      <TableRow className="hover:bg-transparent border-b-slate-100">
+                        <TableHead className="font-bold text-slate-600 pl-6">Visit Date</TableHead>
+                        <TableHead className="font-bold text-slate-600">Procedures & Care</TableHead>
+                        <TableHead className="font-bold text-slate-600">Facility</TableHead>
+                        <TableHead className="font-bold text-slate-600 pr-6 text-right">Benefit Used</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {visits.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                            No services yet. Visit any branch for dental care!
+                          <TableCell colSpan={4} className="text-center py-16">
+                            <div className="flex flex-col items-center gap-2">
+                              <Activity className="h-10 w-10 text-primary opacity-10" />
+                              <p className="text-slate-400 font-bold text-sm">No clinical services accessed yet.</p>
+                              <p className="text-[10px] text-slate-400 uppercase font-medium">Your health journey begins at our clinics.</p>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ) : (
@@ -522,22 +570,26 @@ const MemberDashboard = () => {
                           const isPending = visit.status !== 'completed';
                           const bill = visit.bills?.[0];
                           const serviceNames = isPending
-                            ? "Processing..."
-                            : (bill?.bill_items?.map(i => i.service_name).join(", ") || "Consultation");
-
-                          const amountDisplay = isPending
-                            ? "Pending"
-                            : `-KES ${(bill?.total_benefit_cost || 0).toLocaleString()}`;
+                            ? "Processing Records..."
+                            : (bill?.bill_items?.map(i => i.service_name).join(", ") || "General Consultation");
 
                           return (
-                            <TableRow key={visit.id}>
-                              <TableCell>
-                                {new Date(visit.created_at).toLocaleDateString()}
+                            <TableRow key={visit.id} className="group hover:bg-slate-50/50 transition-colors border-b-slate-50">
+                              <TableCell className="pl-6">
+                                <div className="font-black text-slate-800 text-sm">{new Date(visit.created_at).toLocaleDateString()}</div>
+                                <div className="text-[10px] font-bold text-slate-400 uppercase">{new Date(visit.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                               </TableCell>
-                              <TableCell>{serviceNames}</TableCell>
-                              <TableCell>{visit.branches?.name || "N/A"}</TableCell>
-                              <TableCell className={`font-semibold ${isPending ? "text-muted-foreground" : "text-destructive"}`}>
-                                {amountDisplay}
+                              <TableCell>
+                                <span className="font-bold text-slate-700 text-xs leading-relaxed">{serviceNames}</span>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                  <span className="text-xs font-bold text-slate-600">{visit.branches?.name || "Care Unit"}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="pr-6 text-right font-black text-rose-600 text-sm">
+                                {isPending ? "-" : `KES ${(bill?.total_benefit_cost || 0).toLocaleString()}`}
                               </TableCell>
                             </TableRow>
                           );
@@ -549,97 +601,70 @@ const MemberDashboard = () => {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Shield className="h-5 w-5 text-primary" />
-                  Security & Notifications
-                </CardTitle>
-                <CardDescription>Manage your account preferences</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <div className="text-sm font-medium">WhatsApp Notifications</div>
-                    <div className="text-xs text-muted-foreground">
-                      Receive updates on your medical cover via WhatsApp
+            <div className="grid md:grid-cols-2 gap-8">
+              <Card className="bg-white/70 backdrop-blur-xl border-slate-100 shadow-xl rounded-3xl overflow-hidden">
+                <CardHeader className="bg-slate-50/50 border-b">
+                  <CardTitle className="flex items-center gap-2 text-lg font-bold text-slate-800">
+                    <Shield className="h-5 w-5 text-primary" />
+                    Preferences
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6 space-y-6">
+                  <div className="flex items-center justify-between p-4 rounded-2xl bg-emerald-50/30 border border-emerald-100/50">
+                    <div className="space-y-1">
+                      <div className="text-sm font-black text-emerald-900">WhatsApp Updates</div>
+                      <div className="text-[10px] text-emerald-700/70 font-bold uppercase">Clinical Notifications</div>
                     </div>
+                    <Switch
+                      checked={member.whatsapp_opt_in}
+                      onCheckedChange={async (checked) => {
+                        const { error } = await (supabase as any)
+                          .from("members")
+                          .update({ whatsapp_opt_in: checked })
+                          .eq("id", member.id);
+
+                        if (error) {
+                          toast({ title: "Update failed", description: error.message, variant: "destructive" });
+                        } else {
+                          setMember({ ...member, whatsapp_opt_in: checked });
+                          toast({ title: "Preferences updated", description: `WhatsApp notifications ${checked ? 'enabled' : 'disabled'}` });
+                        }
+                      }}
+                    />
                   </div>
-                  <Switch
-                    checked={member.whatsapp_opt_in}
-                    onCheckedChange={async (checked) => {
-                      const { error } = await (supabase as any)
-                        .from("members")
-                        .update({ whatsapp_opt_in: checked })
-                        .eq("id", member.id);
+                </CardContent>
+              </Card>
 
-                      if (error) {
-                        toast({
-                          title: "Update failed",
-                          description: error.message,
-                          variant: "destructive"
-                        });
-                      } else {
-                        setMember({ ...member, whatsapp_opt_in: checked });
-                        toast({
-                          title: "Settings updated",
-                          description: `WhatsApp notifications ${checked ? 'enabled' : 'disabled'}`
-                        });
-                      }
-                    }}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CreditCard className="h-5 w-5 text-primary" />
-                  Payment History
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead>Coverage Added</TableHead>
-                        <TableHead>Reference</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {payments.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                            No payment records
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        payments.map((payment) => (
-                          <TableRow key={payment.id}>
-                            <TableCell>
-                              {new Date(payment.payment_date).toLocaleDateString()}
-                            </TableCell>
-                            <TableCell>KES {payment.amount.toLocaleString()}</TableCell>
-                            <TableCell className="text-success">
-                              +KES {payment.coverage_added.toLocaleString()}
-                            </TableCell>
-                            <TableCell className="font-mono text-sm">
-                              {payment.mpesa_reference || "N/A"}
-                            </TableCell>
-                            <TableCell>{getStatusBadge(payment.status)}</TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
+              <Card className="bg-white/70 backdrop-blur-xl border-slate-100 shadow-xl rounded-3xl overflow-hidden">
+                <CardHeader className="bg-slate-50/50 border-b flex flex-row items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-lg font-bold text-slate-800">
+                    <CreditCard className="h-5 w-5 text-primary" />
+                    Payments
+                  </CardTitle>
+                  <Badge className="bg-slate-900 text-[9px] font-black uppercase">Recent</Badge>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="space-y-0">
+                    {payments.length === 0 ? (
+                      <div className="p-10 text-center italic text-slate-400 text-xs">No records found.</div>
+                    ) : (
+                      payments.slice(0, 3).map((p) => (
+                        <div key={p.id} className="p-4 border-b border-slate-100 hover:bg-slate-50/50 transition-all">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="font-black text-slate-800 text-sm">KES {p.amount.toLocaleString()}</span>
+                            <Badge className="bg-emerald-100 text-emerald-700 text-[9px] font-black border-0 uppercase">Success</Badge>
+                          </div>
+                          <div className="flex justify-between text-[10px] font-bold text-slate-400">
+                            <span className="uppercase">{new Date(p.payment_date).toLocaleDateString()}</span>
+                            <span className="font-mono">{p.mpesa_reference}</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
       </main>

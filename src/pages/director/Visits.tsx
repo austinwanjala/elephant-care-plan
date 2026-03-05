@@ -365,11 +365,7 @@ export default function DirectorVisits() {
                                 </h3>
 
                                 {selectedVisit.bills && selectedVisit.bills.length > 0 ? (
-                                    <div className="grid md:grid-cols-3 gap-4">
-                                        <div className="p-5 bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between">
-                                            <Label className="text-xs font-bold text-slate-400 uppercase">Total Billable</Label>
-                                            <p className="text-2xl font-black text-slate-900 mt-1">KES {selectedVisit.bills[0].total_benefit_cost.toLocaleString()}</p>
-                                        </div>
+                                    <div className="grid md:grid-cols-2 gap-4">
                                         <div className="p-5 bg-emerald-50/50 rounded-2xl border border-emerald-100 shadow-sm flex flex-col justify-between">
                                             <Label className="text-xs font-bold text-emerald-600/70 uppercase">Branch Revenue</Label>
                                             <p className="text-2xl font-black text-emerald-700 mt-1">KES {selectedVisit.bills[0].total_branch_compensation.toLocaleString()}</p>
@@ -435,7 +431,6 @@ function VisitTable({ visits, loading, onSelect, getStatusBadge }: any) {
                             <TableHead className="py-5 font-bold text-slate-600">Arrived</TableHead>
                             <TableHead className="py-5 font-bold text-slate-600">Practitioner</TableHead>
                             <TableHead className="py-5 font-bold text-slate-600">Current Status</TableHead>
-                            <TableHead className="py-5 font-bold text-slate-600">Total Bill</TableHead>
                             <TableHead className="py-5 font-bold text-right text-slate-600 pr-8">Context</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -462,10 +457,6 @@ function VisitTable({ visits, loading, onSelect, getStatusBadge }: any) {
                                     <div className="text-[10px] font-medium text-slate-400 italic">Medical Officer</div>
                                 </TableCell>
                                 <TableCell>{getStatusBadge(visit.status)}</TableCell>
-                                <TableCell>
-                                    <div className="font-black text-slate-900">KES {visit.benefit_deducted.toLocaleString()}</div>
-                                    <div className="text-[10px] font-bold text-emerald-600 uppercase">Verified Claim</div>
-                                </TableCell>
                                 <TableCell className="text-right pr-8">
                                     <Button
                                         variant="outline"

@@ -328,7 +328,7 @@ export default function DirectorReports() {
                                 </h4>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
-                                        <p className="text-xs text-slate-500 font-medium mb-1">Total Billables</p>
+                                        <p className="text-xs text-slate-500 font-medium mb-1">Gross Branch Revenue</p>
                                         <p className="text-xl font-bold text-slate-900">KES {stats.totalRevenue.toLocaleString()}</p>
                                     </div>
                                     <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
@@ -404,12 +404,12 @@ export default function DirectorReports() {
                                         <div key={idx} className="flex flex-col gap-1.5">
                                             <div className="flex justify-between text-xs font-bold text-slate-700">
                                                 <span>{svc.service_name}</span>
-                                                <span>KES {svc.total_benefit_cost.toLocaleString()}</span>
+                                                <span className="text-slate-400 font-medium">{svc.count} Visits</span>
                                             </div>
                                             <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden shadow-inner">
                                                 <div
                                                     className="bg-blue-600 h-full rounded-full transition-all duration-500"
-                                                    style={{ width: `${(svc.total_benefit_cost / (stats.totalRevenue || 1)) * 100}%` }}
+                                                    style={{ width: `${(svc.count / (stats.totalVisits || 1)) * 100}%` }}
                                                 />
                                             </div>
                                         </div>
@@ -447,9 +447,10 @@ export default function DirectorReports() {
                                             <span className="font-bold text-slate-800">{service.service_name}</span>
                                             <span className="text-xs text-slate-400 font-medium">{service.count} Successful Visits</span>
                                         </div>
-                                        <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-100 font-bold px-3 py-1">
-                                            KES {service.total_benefit_cost.toLocaleString()}
-                                        </Badge>
+                                        <div className="flex flex-col text-right">
+                                            <span className="font-bold text-slate-800">{((service.count / (stats.totalVisits || 1)) * 100).toFixed(0)}%</span>
+                                            <span className="text-[10px] text-slate-400 font-bold uppercase">Volume</span>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -481,7 +482,6 @@ export default function DirectorReports() {
                                         </div>
                                         <div className="text-right">
                                             <div className="font-black text-slate-900 leading-tight">{member.total_visits} Visits</div>
-                                            <div className="text-[10px] text-blue-600 font-black uppercase tracking-tighter">KES {member.total_deducted.toLocaleString()}</div>
                                         </div>
                                     </div>
                                 ))}

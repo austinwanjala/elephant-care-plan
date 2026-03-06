@@ -54,6 +54,7 @@ export default function ExternalBiometricCapture({
   const timeoutRef = useRef<number | null>(null);
   const streamingRef = useRef(false);
   const lastSuccessRef = useRef<string | null>(null);
+  const finalizeRef = useRef<((data: string, deviceId?: string) => Promise<void>) | null>(null);
 
   useEffect(() => {
     setSupportsHID(!!(navigator as any).hid);
@@ -105,6 +106,8 @@ export default function ExternalBiometricCapture({
         setBusy(false);
       }
     };
+
+    finalizeRef.current = finalizeCapture;
 
     const onSamplesAcquired = async (e: SamplesAcquired) => {
       console.log("DP Sample Acquired Event:", e);
@@ -360,11 +363,14 @@ export default function ExternalBiometricCapture({
       }
       
       if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
-      timeoutRef.current = window.setTimeout(() => {
+      timeoutRef.current = window.setTimeout(async () => {
         if (streamingRef.current && lastSuccessRef.current) {
            // Timeout hit but we have a preview image? Use the last one as a fallback!
            // This handles cases where people keep their finger on it but it never hits quality 0.
-           (dpReader as any).onQualityReported({ quality: 0, deviceId: deviceId });
+           if (finalizeRef.current) {
+             console.log("Timeout fallback: Finalizing with last successful sample.");
+             await finalizeRef.current(lastSuccessRef.current, deviceId);
+           }
         } else if (busy) {
            dpReader.stopAcquisition(deviceId).catch(console.error);
            streamingRef.current = false;

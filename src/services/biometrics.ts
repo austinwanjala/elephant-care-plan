@@ -9,6 +9,13 @@ export async function registerExternalBiometric(params: {
   templateBase64: string;
   format?: BiometricFormat;
 }) {
+  const { data: { session } } = await supabase.auth.getSession();
+  console.log("DEBUG: registerExternalBiometric triggered. Session check status:", !!session);
+  if (!session) {
+    console.warn("DEBUG: No session found!");
+    throw new Error("You must be logged in to perform biometric actions.");
+  }
+
   const { data, error } = await supabase.functions.invoke("biometric-verify", {
     body: {
       action: "register",
@@ -28,6 +35,12 @@ export async function verifyExternalBiometric(params: {
   memberId?: string;
   templateBase64: string;
 }) {
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (!session) {
+    throw new Error("You must be logged in to perform biometric actions.");
+  }
+
   const { data, error } = await supabase.functions.invoke("biometric-verify", {
     body: {
       action: "verify",

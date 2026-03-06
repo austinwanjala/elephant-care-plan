@@ -40,6 +40,7 @@ import { BiometricCapture } from "@/components/BiometricCapture";
 import { exportToCsv } from "@/utils/csvExport";
 import { InsuranceCard } from "@/components/member/InsuranceCard";
 import { generateCardPDF } from "@/utils/generateCardPDF";
+import { registerExternalBiometric } from "@/services/biometrics";
 
 interface Member {
   id: string;
@@ -289,9 +290,18 @@ export default function AdminMembers() {
 
   const handleBiometricCaptureComplete = async (data: string) => {
     if (!selectedMember) return;
-    await supabase.from("members").update({ biometric_data: data }).eq("id", selectedMember.id);
-    setBiometricDialogOpen(false);
-    loadData();
+    try {
+      await registerExternalBiometric({
+        memberId: selectedMember.id,
+        templateBase64: data,
+        format: "unknown"
+      });
+      setBiometricDialogOpen(false);
+      loadData();
+      toast({ title: "Success", description: "Member biometrics updated." });
+    } catch (err: any) {
+      toast({ title: "Capture Failed", description: err.message, variant: "destructive" });
+    }
   };
 
   const handleDownloadCard = async () => {

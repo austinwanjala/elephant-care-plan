@@ -14,7 +14,7 @@ serve(async (req) => {
 
   console.log(`Request Method: ${req.method}`);
 
-  const authHeader = req.headers.get("Authorization");
+  const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
   if (!authHeader) {
     console.warn("DEBUG/401: Authorization header missing!");
     return new Response(JSON.stringify({ error: "Unauthorized", details: "Authorization header is missing" }), {
@@ -22,7 +22,8 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-  const token = authHeader.replace("Bearer ", "");
+  const token = authHeader.replace("Bearer ", "").trim();
+  console.log(`DEBUG/Auth: token length: ${token.length}`);
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;

@@ -17,6 +17,10 @@ export async function registerExternalBiometric(params: {
   }
 
   const { data, error } = await supabase.functions.invoke("biometric-verify", {
+    headers: {
+      Authorization: `Bearer ${session?.access_token}`,
+      "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+    },
     body: {
       action: "register",
       member_id: params.memberId,
@@ -42,6 +46,10 @@ export async function verifyExternalBiometric(params: {
   }
 
   const { data, error } = await supabase.functions.invoke("biometric-verify", {
+    headers: {
+      Authorization: `Bearer ${session?.access_token}`,
+      "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+    },
     body: {
       action: "verify",
       member_id: params.memberId,

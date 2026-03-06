@@ -12,6 +12,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { BiometricCapture } from "@/components/BiometricCapture";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { InsufficientBalanceHandler } from "@/components/reception/InsufficientBalanceHandler";
+import { registerExternalBiometric } from "@/services/biometrics";
 
 import {
     Select,
@@ -213,12 +214,14 @@ export default function RegisterVisit() {
     const handleBiometricCaptureComplete = async (credentialData: string) => {
         if (!member) return;
         try {
-            const { error } = await supabase
-                .from("members")
-                .update({ biometric_data: credentialData })
-                .eq("id", member.id);
-            if (error) throw error;
+            await registerExternalBiometric({
+                memberId: member.id,
+                templateBase64: credentialData,
+                format: "unknown"
+            });
 
+            // The Edge Function saves it wrapped in JSON, but our local UI state 
+            // works best seeing the raw template for the component props logic.
             setMember((prev: any) => ({ ...prev, biometric_data: credentialData }));
             setBiometricsVerified(true);
             toast({ title: "Success", description: "Biometrics registered and saved to member profile." });

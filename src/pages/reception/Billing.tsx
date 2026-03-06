@@ -12,6 +12,7 @@ import { Loader2, CreditCard, Check, Search, Receipt, History, Printer, Fingerpr
 import { supabase } from "@/integrations/supabase/client";
 import { BiometricCapture } from "@/components/BiometricCapture";
 import { InsufficientBalanceHandler } from "@/components/reception/InsufficientBalanceHandler";
+import { registerExternalBiometric } from "@/services/biometrics";
 
 export default function ReceptionBilling() {
     const [visits, setVisits] = useState<any[]>([]);
@@ -420,16 +421,23 @@ export default function ReceptionBilling() {
                                                                                 userName={visit.members?.full_name}
                                                                                 credentialId={visit.members?.biometric_data}
                                                                                 onCaptureComplete={async (template) => {
-                                                                                    const { error } = await supabase.from("members").update({ biometric_data: template }).eq("id", visit.members.id);
-                                                                                    if (error) throw error;
-                                                                                    toast({ title: "Biometrics Captured", description: "Identity captured and mapped to this member." });
-                                                                                    
-                                                                                    // Update state immutably to reflect capture and allow immediate progression
-                                                                                    setVisits(prev => prev.map(v => v.id === visit.id ? { 
-                                                                                        ...v, 
-                                                                                        members: { ...v.members, biometric_data: template } 
-                                                                                    } : v));
-                                                                                    setBiometricsVerified(visit.id);
+                                                                                    try {
+                                                                                        await registerExternalBiometric({
+                                                                                            memberId: visit.members.id,
+                                                                                            templateBase64: template,
+                                                                                            format: "unknown"
+                                                                                        });
+                                                                                        toast({ title: "Biometrics Captured", description: "Identity captured and mapped to this member." });
+                                                                                        
+                                                                                        // Update state immutably to reflect capture and allow immediate progression
+                                                                                        setVisits(prev => prev.map(v => v.id === visit.id ? { 
+                                                                                            ...v, 
+                                                                                            members: { ...v.members, biometric_data: template } 
+                                                                                        } : v));
+                                                                                        setBiometricsVerified(visit.id);
+                                                                                    } catch (err: any) {
+                                                                                        toast({ title: "Capture Failed", description: err.message, variant: "destructive" });
+                                                                                    }
                                                                                 }}
                                                                                 onVerificationComplete={(success) => {
                                                                                     if (success) {

@@ -412,9 +412,7 @@ export default function ReceptionBilling() {
                                                                                 }}
                                                                                 onCancel={() => setShowPaymentHandler(null)}
                                                                             />
-                                                                        )}
-
-                                                                        { /* Biometrics optional */}
+                                                                        )}                                                                        { /* Biometric verification mandatory for finalization */ }
                                                                         <div className="py-2">
                                                                             <BiometricCapture
                                                                                 mode={visit.members?.biometric_data ? "verify" : "register"}
@@ -425,17 +423,24 @@ export default function ReceptionBilling() {
                                                                                     const { error } = await supabase.from("members").update({ biometric_data: template }).eq("id", visit.members.id);
                                                                                     if (error) throw error;
                                                                                     toast({ title: "Biometrics Captured", description: "Identity captured and mapped to this member." });
-                                                                                    visit.members.biometric_data = template;
+                                                                                    
+                                                                                    // Update state immutably to reflect capture and allow immediate progression
+                                                                                    setVisits(prev => prev.map(v => v.id === visit.id ? { 
+                                                                                        ...v, 
+                                                                                        members: { ...v.members, biometric_data: template } 
+                                                                                    } : v));
                                                                                     setBiometricsVerified(visit.id);
                                                                                 }}
                                                                                 onVerificationComplete={(success) => {
                                                                                     if (success) {
                                                                                         setBiometricsVerified(visit.id);
+                                                                                    } else {
+                                                                                        setBiometricsVerified(null);
                                                                                     }
                                                                                 }}
                                                                             />
-                                                                            <p className="text-[10px] text-center text-muted-foreground mt-1 px-4">
-                                                                                Authorization via scanned fingerprint template.
+                                                                            <p className="text-[10px] text-center text-blue-600 font-bold uppercase mt-1 px-4">
+                                                                                Biometric Authorization Required to Finalize Bill
                                                                             </p>
                                                                         </div>
                                                                     </div>
@@ -443,10 +448,10 @@ export default function ReceptionBilling() {
                                                                         <Button
                                                                             className="w-full bg-blue-600 hover:bg-blue-700 h-12 text-lg"
                                                                             onClick={() => handleFinalizeBill(visit, bill?.id)}
-                                                                            disabled={processingId === visit.id}
+                                                                            disabled={processingId === visit.id || biometricsVerified !== visit.id}
                                                                         >
                                                                             {processingId === visit.id ? <Loader2 className="animate-spin mr-2 h-5 w-5" /> : <Check className="mr-2 h-5 w-5" />}
-                                                                            Finalize & Deduct Coverage
+                                                                            {biometricsVerified === visit.id ? "Finalize & Deduct Coverage" : "Awaiting Biometric Verification..."}
                                                                         </Button>
                                                                     </DialogFooter>
                                                                 </DialogContent>

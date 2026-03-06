@@ -12,13 +12,14 @@ export default defineConfig(({ mode }) => ({
       overlay: false,
     },
   },
+  define: {
+    "WebSdk": "window.WebSdk",
+  },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      // The shim satisfies requirements of @digitalpersona packages if they are ever loaded,
-      // though we are now using globals via /src/lib/digitalpersona.ts
-      "WebSdk": path.resolve(__dirname, "./src/shims/WebSdk.js"),
+      "WebSdk": path.resolve(__dirname, "./src/mocks/WebSdk.js"),
     },
   },
 }));

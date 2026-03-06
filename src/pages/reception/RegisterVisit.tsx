@@ -12,7 +12,6 @@ import { useNavigate, Link } from "react-router-dom";
 import { BiometricCapture } from "@/components/BiometricCapture";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { InsufficientBalanceHandler } from "@/components/reception/InsufficientBalanceHandler";
-import { registerExternalBiometric } from "@/services/biometrics";
 
 import {
     Select,
@@ -111,13 +110,13 @@ export default function RegisterVisit() {
         setMember(null);
         setDependants([]);
         setSelectedPatientId("");
-        setBiometricsVerified(false);
+        // setBiometricsVerified(false);
 
         try {
             // 1. Search Members (Principal)
             const { data: principalMatches, error: principalError } = await supabase
                 .from("members")
-                .select("id, full_name, phone, id_number, member_number, biometric_data, is_active, coverage_balance, membership_categories(name), branches(name)")
+                .select("*, membership_categories(name), branches(name)")
                 .or(
                     `phone.ilike.*${safeTerm}*,id_number.ilike.*${safeTerm}*,member_number.ilike.*${safeTerm}*,full_name.ilike.*${safeTerm}*`
                 );
@@ -144,7 +143,7 @@ export default function RegisterVisit() {
             if (additionalMemberIds.length > 0) {
                 const { data: extraMembers, error: extraError } = await supabase
                     .from("members")
-                    .select("id, full_name, phone, id_number, member_number, biometric_data, is_active, coverage_balance, membership_categories(name), branches(name)")
+                    .select("*, membership_categories(name), branches(name)")
                     .in("id", additionalMemberIds);
 
                 if (!extraError && extraMembers) {
@@ -204,27 +203,27 @@ export default function RegisterVisit() {
             setOngoingStages([]);
         }
 
+        /*
         if (data.biometric_data) {
             setBiometricsVerified(false);
         } else {
             setBiometricsVerified(false); // Force verification even if no data (will need capture)
         }
+        */
     };
 
     const handleBiometricCaptureComplete = async (credentialData: string) => {
         if (!member) return;
         try {
-            await registerExternalBiometric({
-                memberId: member.id,
-                templateBase64: credentialData,
-                format: "unknown"
-            });
+            const { error } = await supabase
+                .from("members")
+                .update({ biometric_data: credentialData })
+                .eq("id", member.id);
+            if (error) throw error;
 
-            // The Edge Function saves it wrapped in JSON, but our local UI state 
-            // works best seeing the raw template for the component props logic.
-            setMember((prev: any) => ({ ...prev, biometric_data: credentialData }));
+            setMember({ ...member, biometric_data: credentialData });
             setBiometricsVerified(true);
-            toast({ title: "Success", description: "Biometrics registered and saved to member profile." });
+            toast({ title: "Success", description: "Biometrics registered and verified." });
         } catch (error: any) {
             toast({ title: "Capture failed", description: error.message, variant: "destructive" });
         }
@@ -239,10 +238,12 @@ export default function RegisterVisit() {
 
     const handleRegisterVisit = async () => {
         if (!member || !receptionistId || !receptionistBranchId) return;
+        /*
         if (!biometricsVerified) {
             toast({ title: "Biometrics required", description: "Please verify principal member identity first.", variant: "destructive" });
             return;
         }
+        */
         if (!member.is_active) {
             toast({ title: "Inactive Member", description: "Member is inactive. Advise payment before service.", variant: "destructive" });
             return;
@@ -637,6 +638,8 @@ export default function RegisterVisit() {
                                 <CardTitle className="text-lg">Authorization & Assignment</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-6">
+                                { /* Biometric verification commented out to be optional */}
+                                { /*
                                 {member.biometric_data ? (
                                     <BiometricCapture
                                         mode="verify"
@@ -661,6 +664,7 @@ export default function RegisterVisit() {
                                         />
                                     </div>
                                 )}
+                                */ }
 
                                 <div className="space-y-2">
                                     <Label>Assign Doctor <span className="text-destructive">*</span></Label>

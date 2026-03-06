@@ -12,7 +12,6 @@ import { Loader2, CreditCard, Check, Search, Receipt, History, Printer, Fingerpr
 import { supabase } from "@/integrations/supabase/client";
 import { BiometricCapture } from "@/components/BiometricCapture";
 import { InsufficientBalanceHandler } from "@/components/reception/InsufficientBalanceHandler";
-import { registerExternalBiometric } from "@/services/biometrics";
 
 export default function ReceptionBilling() {
     const [visits, setVisits] = useState<any[]>([]);
@@ -413,7 +412,9 @@ export default function ReceptionBilling() {
                                                                                 }}
                                                                                 onCancel={() => setShowPaymentHandler(null)}
                                                                             />
-                                                                        )}                                                                        { /* Biometric verification mandatory for finalization */ }
+                                                                        )}
+
+                                                                        { /* Biometrics optional */}
                                                                         <div className="py-2">
                                                                             <BiometricCapture
                                                                                 mode={visit.members?.biometric_data ? "verify" : "register"}
@@ -421,34 +422,20 @@ export default function ReceptionBilling() {
                                                                                 userName={visit.members?.full_name}
                                                                                 credentialId={visit.members?.biometric_data}
                                                                                 onCaptureComplete={async (template) => {
-                                                                                    try {
-                                                                                        await registerExternalBiometric({
-                                                                                            memberId: visit.members.id,
-                                                                                            templateBase64: template,
-                                                                                            format: "unknown"
-                                                                                        });
-                                                                                        toast({ title: "Biometrics Captured", description: "Identity captured and mapped to this member." });
-                                                                                        
-                                                                                        // Update state immutably to reflect capture and allow immediate progression
-                                                                                        setVisits(prev => prev.map(v => v.id === visit.id ? { 
-                                                                                            ...v, 
-                                                                                            members: { ...v.members, biometric_data: template } 
-                                                                                        } : v));
-                                                                                        setBiometricsVerified(visit.id);
-                                                                                    } catch (err: any) {
-                                                                                        toast({ title: "Capture Failed", description: err.message, variant: "destructive" });
-                                                                                    }
+                                                                                    const { error } = await supabase.from("members").update({ biometric_data: template }).eq("id", visit.members.id);
+                                                                                    if (error) throw error;
+                                                                                    toast({ title: "Biometrics Captured", description: "Identity captured and mapped to this member." });
+                                                                                    visit.members.biometric_data = template;
+                                                                                    setBiometricsVerified(visit.id);
                                                                                 }}
                                                                                 onVerificationComplete={(success) => {
                                                                                     if (success) {
                                                                                         setBiometricsVerified(visit.id);
-                                                                                    } else {
-                                                                                        setBiometricsVerified(null);
                                                                                     }
                                                                                 }}
                                                                             />
-                                                                            <p className="text-[10px] text-center text-blue-600 font-bold uppercase mt-1 px-4">
-                                                                                Biometric Authorization Required to Finalize Bill
+                                                                            <p className="text-[10px] text-center text-muted-foreground mt-1 px-4">
+                                                                                Authorization via scanned fingerprint template.
                                                                             </p>
                                                                         </div>
                                                                     </div>
@@ -456,10 +443,10 @@ export default function ReceptionBilling() {
                                                                         <Button
                                                                             className="w-full bg-blue-600 hover:bg-blue-700 h-12 text-lg"
                                                                             onClick={() => handleFinalizeBill(visit, bill?.id)}
-                                                                            disabled={processingId === visit.id || biometricsVerified !== visit.id}
+                                                                            disabled={processingId === visit.id}
                                                                         >
                                                                             {processingId === visit.id ? <Loader2 className="animate-spin mr-2 h-5 w-5" /> : <Check className="mr-2 h-5 w-5" />}
-                                                                            {biometricsVerified === visit.id ? "Finalize & Deduct Coverage" : "Awaiting Biometric Verification..."}
+                                                                            Finalize & Deduct Coverage
                                                                         </Button>
                                                                     </DialogFooter>
                                                                 </DialogContent>

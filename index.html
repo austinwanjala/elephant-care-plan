@@ -9,32 +9,27 @@
   <meta name="description" content="Premium Dental Insurance Scheme" />
   <meta name="author" content="Elephant Dental Hospital" />
   <link rel="icon" type="image/png" href="/img/elephant-logo.png" />
-  <script src="/WebSdk.js"></script>
-  <script src="/DpCore.js"></script>
-  <script src="/DpDevices.js"></script>
   <script>
-    // Fallback mock ONLY if the real WebSdk script failed to load
-    if (typeof window.WebSdk === 'undefined') {
-      console.warn('Real DigitalPersona WebSdk not loaded. Using fallback mock – fingerprint capture will not work.');
-      window.WebSdk = {
-        WebChannelOptions: class { constructor() {} },
-        WebChannelClient: class {
-          constructor() {}
-          onConnectionFailed() {}
-          onConnectionSucceed() {}
-          onDataReceivedBin() {}
-          onDataReceivedTxt() {}
-          connect() {
-            console.error('WebSdk fallback: real service not available.');
-            setTimeout(() => { if (typeof this.onConnectionFailed === 'function') this.onConnectionFailed(); }, 100);
-          }
-          disconnect() {}
-          sendDataBin() {}
-          sendDataTxt() {}
-          isConnected() { return false; }
+    // Define a mock WebSdk to prevent "WebSdk is not defined" errors
+    // from DigitalPersona when the service isn't locally running.
+    window.WebSdk = {
+      WebChannelOptions: class { constructor() {} },
+      WebChannelClient: class {
+        constructor() {}
+        onConnectionFailed() {}
+        onConnectionSucceed() {}
+        onDataReceivedBin() {}
+        onDataReceivedTxt() {}
+        connect() {
+          console.warn("Using mocked WebSdk. Triggering failure fallback.");
+          setTimeout(() => { if (this.onConnectionFailed) this.onConnectionFailed(); }, 100);
         }
-      };
-    }
+        disconnect() {}
+        sendDataBin() {}
+        sendDataTxt() {}
+        isConnected() { return false; }
+      }
+    };
   </script>
   <meta property="og:title" content="Elephant Care Plan" />
   <meta property="og:description" content="Dental Insurance That Doubles Your Investment" />

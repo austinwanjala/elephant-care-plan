@@ -12,23 +12,14 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const receivedHeaders = Array.from(req.headers.keys());
-  console.log(`Request Method: ${req.method} | Headers: ${receivedHeaders.join(", ")}`);
-
-  const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
+  const authHeader = req.headers.get("Authorization");
   if (!authHeader) {
-    console.warn("DEBUG/401: Authorization header missing!");
-    return new Response(JSON.stringify({ 
-      error: "Unauthorized", 
-      details: "Authorization header is missing",
-      received_headers: receivedHeaders
-    }), {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-  const token = authHeader.replace("Bearer ", "").trim();
-  console.log(`DEBUG/Auth: token length: ${token.length}`);
+  const token = authHeader.replace("Bearer ", "");
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -137,15 +128,6 @@ serve(async (req) => {
     }
 
     // Simple comparison for now (exact match) — supports deterministic templates
-    console.log(`Verifying member: ${mid}`);
-    console.log(`Stored template length: ${storedTemplate?.length || 0}`);
-    console.log(`Provided template length: ${template.length}`);
-    
-    if (storedTemplate && template) {
-      console.log(`Stored prefix: ${storedTemplate.substring(0, 50)}...`);
-      console.log(`Provided prefix: ${template.substring(0, 50)}...`);
-    }
-
     const success = !!storedTemplate && storedTemplate === template;
 
     return new Response(JSON.stringify({ success }), {

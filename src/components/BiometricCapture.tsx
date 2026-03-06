@@ -79,7 +79,6 @@ export const BiometricCapture = ({
           <ExternalBiometricCapture
             mode={mode}
             memberId={effectiveMemberId}
-            credentialId={credentialId}
             onRegistered={(template) => {
               setCaptured(true);
               setVerified(null);

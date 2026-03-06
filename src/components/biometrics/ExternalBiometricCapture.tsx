@@ -8,6 +8,8 @@ import { useToast } from "@/hooks/use-toast";
 import { AlertCircle, Cpu, Fingerprint, Upload, Usb, Wifi } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { registerExternalBiometric, verifyExternalBiometric, BiometricFormat } from "@/services/biometrics";
+import { DeviceConnected, DeviceDisconnected, DeviceSelection, Devices, CommunicationFailed, SamplesAcquired, SampleFormat, ErrorOccurred } from "@digitalpersona/devices";
+
 
 type Mode = "register" | "verify";
 
@@ -62,6 +64,57 @@ export default function ExternalBiometricCapture({
         timeoutRef.current = window.setTimeout(() => reject(new Error("Capture timed out. Please try again and ensure your finger is on the scanner.")), timeoutMs || maxDurationMs);
       }),
     ]);
+
+  useEffect(() => {
+    let dpDevices: Devices | null = null;
+    
+    // We only set this up if we are busy so we don't hold the device open indefinitely
+    if (busy) {
+      dpDevices = new Devices();
+      
+      const onDeviceConnected = (e: DeviceConnected) => {
+        console.log("DP Device Connected:", e.deviceUid);
+      };
+      
+      const onDeviceDisconnected = (e: DeviceDisconnected) => {
+        console.log("DP Device Disconnected:", e.deviceUid);
+      };
+      
+      const onSamplesAcquired = async (e: SamplesAcquired) => {
+        console.log("DP Sample Acquired", e);
+        try {
+          if (e.samples.length > 0) {
+            const template = e.samples[0].Data;
+            setStatus("Template captured successfully!");
+            await processTemplate(template, "unknown"); // Or map the format appropriately
+          }
+        } catch (err: any) {
+          toast({ title: "Template Processing Failed", description: err.message, variant: "destructive" });
+        } finally {
+          setBusy(false);
+          dpDevices?.stopAcquisition(e.deviceUid);
+        }
+      };
+      
+      const onErrorOccurred = (e: ErrorOccurred) => {
+       console.error("DP Error:", e);
+       setStatus("Hardware connection error occurred.");
+      };
+
+      dpDevices.on("DeviceConnected", onDeviceConnected);
+      dpDevices.on("DeviceDisconnected", onDeviceDisconnected);
+      dpDevices.on("SamplesAcquired", onSamplesAcquired);
+      dpDevices.on("ErrorOccurred", onErrorOccurred);
+      
+      // We will tell DP to enumerate and start capturing when "WebUSB/DigitalPersona" is clicked
+       return () => {
+         dpDevices?.off("DeviceConnected", onDeviceConnected);
+         dpDevices?.off("DeviceDisconnected", onDeviceDisconnected);
+         dpDevices?.off("SamplesAcquired", onSamplesAcquired);
+         dpDevices?.off("ErrorOccurred", onErrorOccurred);
+       }
+    }
+  }, [busy]);
 
   const handleRegister = async (templateBase64: string, format: BiometricFormat = "unknown") => {
     if (mode !== "register") return;
@@ -167,121 +220,46 @@ export default function ExternalBiometricCapture({
   }, [supportsHID, maxDurationMs, mode]);
 
   const captureViaUSB = useCallback(async () => {
-    if (!supportsUSB) {
-      toast({ title: "USB Not Supported", description: "This browser does not support WebUSB.", variant: "destructive" });
-      return;
-    }
+    // We are routing 'WebUSB' capture to use the local Digital Persona websocket 
+    // service which is the only reliable way to interact with Digital Persona 4500 natively.
     setBusy(true);
-    setStatus("Connecting to USB device...");
+    setStatus("Connecting to DigitalPersona service...");
     try {
-      const navAny = navigator as any;
-      const device: USBDevice = await navAny.usb.requestDevice({ filters: [] });
-      if (!device) throw new Error("No USB device selected");
-
-      setStatus("USB Device found. Opening connection...");
-      await device.open();
-
-      console.log("Device Connected:", {
-        name: device.productName,
-        vendorId: device.vendorId,
-        productId: device.productId,
-        classes: device.configuration?.interfaces.map(i => i.alternates[0].interfaceClass)
-      });
-
-      // Reset device to ensure power on
-      try { await device.reset(); } catch (e) { console.warn("Reset failed, continuing..."); }
-
-      if (!device.configuration) await device.selectConfiguration(1);
-
-      // Try to claim the first available interface
-      let interfaceNum = 0;
-      try {
-        await device.claimInterface(0);
-      } catch (e) {
-        interfaceNum = 1;
-        await device.claimInterface(1);
+      const dpReader = new Devices();
+      const deviceList = await dpReader.enumerateDevices();
+      
+      if (deviceList.length === 0) {
+         throw new Error("No DigitalPersona devices found. Ensure the scanner is plugged in and the 'DigitalPersona Lite Client' service is running on your machine.");
       }
-
-      const activateDevice = async () => {
-        const commands = [
-          { request: 0x01, value: 0x0000 },
-          { request: 0x12, value: 0x0000 },
-        ];
-        for (const cmd of commands) {
-          try {
-            await device.controlTransferOut({
-              requestType: 'vendor',
-              recipient: 'device',
-              request: cmd.request,
-              value: cmd.value,
-              index: interfaceNum,
-            });
-          } catch (err) {
-            console.warn(`Command 0x${cmd.request.toString(16)} failed, continuing...`);
+      
+      const deviceId = deviceList[0];
+      setStatus(`Connected to ${deviceId}. LED should turn on...`);
+      
+      await dpReader.startAcquisition(SampleFormat.Intermediate, deviceId);
+      
+      // We wait for the 'SamplesAcquired' event to fire in the background effect.
+      // Set a generic timeout just in case it hangs
+      setTimeout(() => {
+        setBusy((prev) => {
+          if (prev) {
+             dpReader.stopAcquisition(deviceId).catch(console.error);
+             setStatus("Capture timed out. Please try again.");
+             toast({ title: "Capture Timed Out", description: "No finger detected.", variant: "destructive" });
           }
-        }
-      };
-
-      // Retry powering device up to 3 times
-      let powered = false;
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        setStatus(`Activating scanner (attempt ${attempt}/3)...`);
-        await activateDevice();
-        await new Promise(r => setTimeout(r, 1000)); // wait 1s for LED
-        powered = true; // assume success; LED feedback not accessible via WebUSB
-        if (powered) break;
-      }
-
-      if (!powered) throw new Error("Scanner did not power on. Make sure no other software (Windows Hello, DigitalPersona) is running and driver is set to WinUSB.");
-
-      setStatus("Scanner activated. LED should be ON. Please scan...");
-
-      // Poll for data
-      const alt = device.configuration?.interfaces[interfaceNum]?.alternates[0];
-      const endpointIn = alt?.endpoints.find(e => e.direction === 'in');
-      let bytes: Uint8Array = new Uint8Array(0);
-      const startTime = Date.now();
-      const timeoutLimit = Math.max(maxDurationMs, 15000); // at least 15s
-
-      while (bytes.length < 100 && (Date.now() - startTime < timeoutLimit)) {
-        let result: USBInTransferResult;
-        if (endpointIn) {
-          result = await finishWithTimeout(device.transferIn(endpointIn.endpointNumber, 1024 * 16), timeoutLimit) as USBInTransferResult;
-        } else {
-          result = await finishWithTimeout(
-            device.controlTransferIn({ requestType: "vendor", recipient: "device", request: 1, value: 0x0000, index: 0x0000 }, 2048),
-            timeoutLimit
-          ) as USBInTransferResult;
-        }
-
-        if (result && result.data && result.data.byteLength >= 100) {
-          bytes = new Uint8Array(result.data.buffer.slice(0));
-          break;
-        }
-        await new Promise(r => setTimeout(r, 500));
-        setStatus(`Waiting for scan... (${Math.round((timeoutLimit - (Date.now() - startTime)) / 1000)}s)`);
-      }
-
-      if (bytes.length < 100) {
-        throw new Error("Capture timed out or data too small. Ensure your finger stays on the scanner until capture is complete.");
-      }
-
-      setStatus("Template captured successfully!");
-      const bin = Array.from(bytes).map(b => String.fromCharCode(b)).join("");
-      const base64 = btoa(bin);
-
-      await processTemplate(base64, "unknown");
+          return false;
+        });
+      }, Math.max(maxDurationMs, 10000));
+      
     } catch (err: any) {
-      let msg = err.message || "Vendor-specific USB command not supported by this device.";
-      if (err.name === "SecurityError" || msg.toLowerCase().includes("access denied")) {
-        msg = "Access Denied: The device may be in use or needs WinUSB driver. Use Zadig to replace the driver and close other biometric software.";
+      let msg = err.message || "Failed to connect to DigitalPersona service.";
+      if (msg.toLowerCase().includes("failed to fetch") || msg.toLowerCase().includes("network error")) {
+        msg = "Could not reach DigitalPersona local service. Please install and run the DigitalPersona WebSDK Lite Client on this machine.";
       }
-      toast({ title: "USB Capture Failed", description: msg, variant: "destructive" });
-      setStatus("USB capture failed: " + msg);
-    } finally {
+      toast({ title: "DigitalPersona Capture Failed", description: msg, variant: "destructive" });
+      setStatus("Capture failed: " + msg);
       setBusy(false);
     }
-  }, [supportsUSB, maxDurationMs, processTemplate, toast]);
+  }, [maxDurationMs, processTemplate, toast]);
 
   const handleFile = async (file: File) => {
     setBusy(true);
@@ -314,16 +292,16 @@ export default function ExternalBiometricCapture({
           <Button
             type="button"
             variant="default"
-            onClick={captureViaHID}
-            disabled={!supportsHID || busy}
+            onClick={captureViaUSB}
+            disabled={busy}
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 shadow-md ring-2 ring-blue-400/20"
           >
-            <Cpu className="h-4 w-4" />
-            WebHID (Primary)
-          </Button>
-          <Button type="button" variant="secondary" onClick={captureViaUSB} disabled={!supportsUSB || busy} className="flex items-center gap-2 border border-slate-200">
             <Usb className="h-4 w-4" />
-            WebUSB
+            DP 4500 (Primary)
+          </Button>
+          <Button type="button" variant="secondary" onClick={captureViaHID} disabled={!supportsHID || busy} className="flex items-center gap-2 border border-slate-200">
+            <Cpu className="h-4 w-4" />
+            General HID
           </Button>
           <div className="flex items-center gap-2">
             <Label htmlFor="biometric-file" className="sr-only">Template file</Label>
@@ -358,35 +336,15 @@ export default function ExternalBiometricCapture({
           </div>
         )}
 
-        {status?.toLowerCase().includes("waiting for scan") && (
-          <div className="space-y-3">
-            <div className="text-[10px] text-blue-600 dark:text-blue-400 italic font-medium">
-              <strong>Device Status:</strong> Visible in WebUSB but hidden in WebHID? This confirms your scanner is a <strong>Raw USB Device</strong>. The "Access Denied" error means Windows is blocking the browser from speaking to it.
-            </div>
-
-            <div className="bg-amber-50 dark:bg-amber-950/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800 space-y-3 shadow-sm">
-              <p className="text-[11px] font-bold uppercase text-amber-800 dark:text-amber-400 flex items-center gap-2">
-                <Usb className="h-3 w-3" /> DigitalPersona 4500 Guide
-              </p>
-              <div className="text-[10px] text-amber-700 dark:text-amber-300 space-y-2">
-                <p>For the <strong>DigitalPersona 4500 (Vendor: 05ba, Product: 000a)</strong> to light up in Chrome, you must replace the "DigitalPersona" driver with "WinUSB" using Zadig:</p>
-                <ol className="list-decimal pl-4 space-y-1 font-medium">
-                  <li>In Zadig, find <strong>"DigitalPersona U.are.U 4500 Fingerprint Reader"</strong>.</li>
-                  <li>Select <strong>WinUSB (v6.1.x.x)</strong> in the target box.</li>
-                  <li>Click <strong>Replace Driver</strong>.</li>
-                  <li>Click the <strong>WebUSB</strong> button in this portal (DigitalPersona does not use WebHID).</li>
-                </ol>
-              </div>
-            </div>
-
-            <div className="bg-slate-100 dark:bg-slate-900/50 p-3 rounded-md border border-slate-200 dark:border-slate-800 space-y-2">
-              <p className="text-[10px] font-bold uppercase text-slate-500">Still No Light?</p>
-              <ul className="text-[10px] text-slate-600 dark:text-slate-400 list-disc pl-4 space-y-1">
-                <li>Use the <strong>WebUSB</strong> button (not HID) since HID does not see your device.</li>
-                <li>Ensure no other biometric programs (like Windows Hello) are running.</li>
-                <li>Try a USB 2.0 port if you are on a Blue USB 3.0 port.</li>
-              </ul>
-            </div>
+        {status?.toLowerCase().includes("service") && (
+          <div className="bg-amber-50 dark:bg-amber-950/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800 space-y-3 shadow-sm mt-4">
+             <p className="text-[11px] font-bold uppercase text-amber-800 dark:text-amber-400 flex items-center gap-2">
+                <AlertCircle className="h-3 w-3" /> DigitalPersona WebSDK Missing
+             </p>
+             <div className="text-[10px] text-amber-700 dark:text-amber-300 space-y-2">
+                 <p>To use the <strong>U.are.U 4500 reader</strong>, it requires the official HID DigitalPersona local background service to communicate with the browser securely.</p>
+                 <p>Please ensure you have installed the <strong>"DigitalPersona Lite Client" (WebSDK)</strong>. Once installed, the service runs quietly in the background on your PC and the "DP 4500" button will successfully trigger the blue laser.</p>
+             </div>
           </div>
         )}
       </div>

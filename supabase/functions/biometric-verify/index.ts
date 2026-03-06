@@ -128,15 +128,6 @@ serve(async (req) => {
     }
 
     // Simple comparison for now (exact match) — supports deterministic templates
-    console.log(`Verifying member: ${mid}`);
-    console.log(`Stored template length: ${storedTemplate?.length || 0}`);
-    console.log(`Provided template length: ${template.length}`);
-    
-    if (storedTemplate && template) {
-      console.log(`Stored prefix: ${storedTemplate.substring(0, 50)}...`);
-      console.log(`Provided prefix: ${template.substring(0, 50)}...`);
-    }
-
     const success = !!storedTemplate && storedTemplate === template;
 
     return new Response(JSON.stringify({ success }), {

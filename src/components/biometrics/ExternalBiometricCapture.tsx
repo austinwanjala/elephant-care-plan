@@ -20,7 +20,6 @@ interface ExternalBiometricCaptureProps {
   onVerified?: (success: boolean) => void;
   className?: string;
   maxDurationMs?: number; // default 5000
-  credentialId?: string | null;
 }
 
 const toBase64 = async (file: File) =>
@@ -42,7 +41,6 @@ export default function ExternalBiometricCapture({
   onVerified,
   className,
   maxDurationMs = 5000,
-  credentialId,
 }: ExternalBiometricCaptureProps) {
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
@@ -206,43 +204,15 @@ export default function ExternalBiometricCapture({
 
   const handleVerify = async (templateBase64: string) => {
     if (mode !== "verify") return;
-    
-    setStatus("Verifying identity...");
-    
-    // 1. Try server-side verification first (canonical)
     const resp = await verifyExternalBiometric({ memberId, templateBase64 });
-    
-    let success = resp.success;
-
-    // 2. FALLBACK: Check for similarity if server-side bit-for-bit match fails
-    // This is necessary because raw biometric images vary slightly between scans
-    if (!success && credentialId && templateBase64.startsWith('iVBORw')) {
-       try {
-          const parsed = JSON.parse(credentialId);
-          const stored = parsed.template;
-          
-          if (stored && stored.startsWith('iVBORw')) {
-             console.log("Server verification failed. Attempting similarity check...");
-             // Simple similarity check: Lengths within 5%? (Crude but better than nothing)
-             const lenDiff = Math.abs(stored.length - templateBase64.length) / stored.length;
-             if (lenDiff < 0.05) {
-                console.log(`Similarity within thresholds (${(lenDiff * 100).toFixed(2)}% diff). Verification granted.`);
-                success = true;
-             }
-          }
-       } catch (e) {
-          console.error("Similarity check error:", e);
-       }
-    }
-
-    onVerified?.(success);
-    setStatus(success ? "Verification successful" : "Verification failed");
+    onVerified?.(resp.success);
+    setStatus(resp.success ? "Verification successful" : "Verification failed");
     toast({
-      title: success ? "Verification Successful" : "Verification Failed",
-      description: success ? "Identity confirmed." : "Biometric template did not match. Please try again.",
-      variant: success ? "default" : "destructive",
+      title: resp.success ? "Verification Successful" : "Verification Failed",
+      description: resp.success ? "Identity confirmed." : "Biometric template did not match.",
+      variant: resp.success ? "default" : "destructive",
     });
-    return { ...resp, success };
+    return resp;
   };
 
   const processTemplate = async (templateBase64: string, format: BiometricFormat = "unknown") => {

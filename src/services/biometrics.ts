@@ -15,11 +15,18 @@ export async function registerExternalBiometric(params: {
     console.warn("DEBUG: No session found!");
     throw new Error("You must be logged in to perform biometric actions.");
   }
+  
+  const token = session.access_token;
+  console.log(`DEBUG: Token detected. Length: ${token.length}. Prefix: ${token.substring(0, 10)}... Suffix: ...${token.substring(token.length - 10)}`);
+
+
+  const apiKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  console.log(`DEBUG: API Key prefix: ${apiKey?.substring(0, 10)}...`);
 
   const { data, error } = await supabase.functions.invoke("biometric-verify", {
     headers: {
       Authorization: `Bearer ${session?.access_token}`,
-      "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      "apikey": apiKey,
     },
     body: {
       action: "register",
@@ -30,6 +37,7 @@ export async function registerExternalBiometric(params: {
   });
 
   if (error) {
+    console.error("DEBUG: registerExternalBiometric error object:", JSON.stringify(error));
     throw new Error(error.message || "Failed to register biometric");
   }
   return data;
@@ -45,10 +53,17 @@ export async function verifyExternalBiometric(params: {
     throw new Error("You must be logged in to perform biometric actions.");
   }
 
+  const token = session.access_token;
+  console.log(`DEBUG: Token detected (Verify). Length: ${token.length}. Prefix: ${token.substring(0, 10)}... Suffix: ...${token.substring(token.length - 10)}`);
+
+
+  const apiKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  console.log(`DEBUG: API Key prefix (Verify): ${apiKey?.substring(0, 10)}...`);
+
   const { data, error } = await supabase.functions.invoke("biometric-verify", {
     headers: {
       Authorization: `Bearer ${session?.access_token}`,
-      "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      "apikey": apiKey,
     },
     body: {
       action: "verify",
@@ -58,6 +73,7 @@ export async function verifyExternalBiometric(params: {
   });
 
   if (error) {
+    console.error("DEBUG: verifyExternalBiometric error object:", JSON.stringify(error));
     throw new Error(error.message || "Failed to verify biometric");
   }
   return data as { success: boolean };

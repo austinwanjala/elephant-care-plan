@@ -12,12 +12,17 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  console.log(`Request Method: ${req.method}`);
+  const receivedHeaders = Array.from(req.headers.keys());
+  console.log(`Request Method: ${req.method} | Headers: ${receivedHeaders.join(", ")}`);
 
   const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
   if (!authHeader) {
     console.warn("DEBUG/401: Authorization header missing!");
-    return new Response(JSON.stringify({ error: "Unauthorized", details: "Authorization header is missing" }), {
+    return new Response(JSON.stringify({ 
+      error: "Unauthorized", 
+      details: "Authorization header is missing",
+      received_headers: receivedHeaders
+    }), {
       status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

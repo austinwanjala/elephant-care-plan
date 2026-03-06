@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, CreditCard, Check, Search, Receipt, History, Printer, Fingerprint } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { verifyCredential, registerCredential } from "@/lib/webauthn";
+import { BiometricCapture } from "@/components/BiometricCapture";
 import { InsufficientBalanceHandler } from "@/components/reception/InsufficientBalanceHandler";
 
 export default function ReceptionBilling() {
@@ -415,47 +415,28 @@ export default function ReceptionBilling() {
                                                                         )}
 
                                                                         { /* Biometrics optional */}
-                                                                        <div className="py-2 opacity-50 grayscale hover:opacity-100 hover:grayscale-0 transition-all">
-                                                                            <Button
-                                                                                variant={biometricsVerified === visit.id ? "default" : "outline"}
-                                                                                className={`w-full py-6 text-lg border-2 ${biometricsVerified === visit.id ? 'bg-green-600 hover:bg-green-700 border-green-600' : 'border-blue-200 hover:border-blue-400 text-blue-700'}`}
-                                                                                onClick={async () => {
-                                                                                    if (biometricsVerified === visit.id) return; // Already verified
-                                                                                    /* Biometric logic preserved but now optional */
-                                                                                    if (!visit.members.biometric_data) {
-                                                                                        try {
-                                                                                            const credentialData = await registerCredential(visit.members.id, visit.members.full_name);
-                                                                                            const { error } = await supabase.from("members").update({ biometric_data: credentialData }).eq("id", visit.members.id);
-                                                                                            if (error) throw error;
-                                                                                            toast({ title: "Biometrics Captured", description: "Identity captured and mapped to this member." });
-                                                                                            visit.members.biometric_data = credentialData;
-                                                                                            setBiometricsVerified(visit.id);
-                                                                                        } catch (err: any) {
-                                                                                            toast({ title: "Capture Failed", description: err.message || "Failed to capture biometrics.", variant: "destructive" });
-                                                                                        }
-                                                                                        return;
-                                                                                    }
-                                                                                    try {
-                                                                                        const isVerified = await verifyCredential(visit.members.biometric_data);
-                                                                                        if (isVerified) {
-                                                                                            setBiometricsVerified(visit.id);
-                                                                                            toast({ title: "Biometrics Verified", description: "Identity confirmed via biometric scan." });
-                                                                                        }
-                                                                                    } catch (err: any) {
-                                                                                        console.error("Biometric error:", err);
-                                                                                        toast({ title: "Verification Error", description: err.message || "Biometric validation failed.", variant: "destructive" });
+                                                                        <div className="py-2">
+                                                                            <BiometricCapture
+                                                                                mode={visit.members?.biometric_data ? "verify" : "register"}
+                                                                                memberId={visit.members?.id}
+                                                                                userName={visit.members?.full_name}
+                                                                                credentialId={visit.members?.biometric_data}
+                                                                                onCaptureComplete={async (template) => {
+                                                                                    const { error } = await supabase.from("members").update({ biometric_data: template }).eq("id", visit.members.id);
+                                                                                    if (error) throw error;
+                                                                                    toast({ title: "Biometrics Captured", description: "Identity captured and mapped to this member." });
+                                                                                    visit.members.biometric_data = template;
+                                                                                    setBiometricsVerified(visit.id);
+                                                                                }}
+                                                                                onVerificationComplete={(success) => {
+                                                                                    if (success) {
+                                                                                        setBiometricsVerified(visit.id);
                                                                                     }
                                                                                 }}
-                                                                            >
-                                                                                {biometricsVerified === visit.id ? (
-                                                                                    <><Check className="mr-2 h-6 w-6" /> Biometrics Confirmed</>
-                                                                                ) : !visit.members?.biometric_data ? (
-                                                                                    <><Fingerprint className="mr-2 h-6 w-6" /> Capture Member Biometrics (Optional)</>
-                                                                                ) : (
-                                                                                    <><Fingerprint className="mr-2 h-6 w-6" /> Verify Member Biometrics (Optional)</>
-                                                                                )}
-                                                                            </Button>
-                                                                            <p className="text-[10px] text-center text-muted-foreground mt-1">Authorization via biometrics is now optional.</p>
+                                                                            />
+                                                                            <p className="text-[10px] text-center text-muted-foreground mt-1 px-4">
+                                                                                Authorization via scanned fingerprint template.
+                                                                            </p>
                                                                         </div>
                                                                     </div>
                                                                     <DialogFooter>

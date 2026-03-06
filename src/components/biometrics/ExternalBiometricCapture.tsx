@@ -157,7 +157,7 @@ export default function ExternalBiometricCapture({
     } catch (err: any) {
       let msg = err.message || "Failed to read from device.";
       if (err.name === "SecurityError" || msg.toLowerCase().includes("access denied")) {
-        msg = "Access Denied: This HID device is protected by Windows. If this is a Windows Hello reader, please use the main 'Capture' button above instead of 'External'.";
+        msg = "Access Denied: This HID device is protected by Windows. If this is a Windows Hello reader, it may be blocked by system security for direct HID access.";
       }
       toast({ title: "HID Capture Failed", description: msg, variant: "destructive" });
       setStatus("HID capture failed: " + msg);
@@ -178,75 +178,76 @@ export default function ExternalBiometricCapture({
       const device: USBDevice = await navAny.usb.requestDevice({ filters: [] });
       if (!device) throw new Error("No USB device selected");
 
-      const isDP = device.vendorId === 0x05ba && device.productId === 0x000a;
-
-      setStatus(isDP ? "DigitalPersona 4500 detected. Initializing sensor..." : "USB Device found. Opening connection...");
+      setStatus("USB Device found. Opening connection...");
       await device.open();
 
-      // Log details to help developer identify the reader
       console.log("Device Connected:", {
         name: device.productName,
         vendorId: device.vendorId,
         productId: device.productId,
-        isDigitalPersona: isDP
+        classes: device.configuration?.interfaces.map(i => i.alternates[0].interfaceClass)
       });
 
-      // Attempt to reset the device state (helps power on some readers)
+      // Reset device to ensure power on
       try { await device.reset(); } catch (e) { console.warn("Reset failed, continuing..."); }
 
-      if (device.configuration == null) await device.selectConfiguration(1);
+      if (!device.configuration) await device.selectConfiguration(1);
 
-      // Try to claim the first available interface, or iterate if 0 is blocked
+      // Try to claim the first available interface
       let interfaceNum = 0;
       try {
         await device.claimInterface(0);
       } catch (e) {
-        console.warn("Interface 0 busy, trying Interface 1...");
         interfaceNum = 1;
         await device.claimInterface(1);
       }
 
-      if (isDP) {
-        // DigitalPersona 4500 specific 'Light On' sequence
-        try {
-          await device.controlTransferOut({ requestType: 'vendor', recipient: 'device', request: 0x01, value: 0x0000, index: interfaceNum });
-          await device.controlTransferOut({ requestType: 'vendor', recipient: 'device', request: 0x12, value: 0x0000, index: interfaceNum });
-          await device.controlTransferOut({ requestType: 'vendor', recipient: 'device', request: 0x04, value: 0x0001, index: interfaceNum });
-        } catch (e) {
-          console.warn("DigitalPersona specific init failed:", e);
+      const activateDevice = async () => {
+        const commands = [
+          { request: 0x01, value: 0x0000 },
+          { request: 0x12, value: 0x0000 },
+        ];
+        for (const cmd of commands) {
+          try {
+            await device.controlTransferOut({
+              requestType: 'vendor',
+              recipient: 'device',
+              request: cmd.request,
+              value: cmd.value,
+              index: interfaceNum,
+            });
+          } catch (err) {
+            console.warn(`Command 0x${cmd.request.toString(16)} failed, continuing...`);
+          }
         }
-      } else {
-        // Start command (0x01) - some readers also need 0x12 for 'Power On'
-        try {
-          await device.controlTransferOut({
-            requestType: 'vendor', recipient: 'device', request: 0x01, value: 0x0000, index: interfaceNum
-          });
-          await device.controlTransferOut({
-            requestType: 'vendor', recipient: 'device', request: 0x12, value: 0x0000, index: interfaceNum
-          });
-        } catch (e) { }
+      };
+
+      // Retry powering device up to 3 times
+      let powered = false;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        setStatus(`Activating scanner (attempt ${attempt}/3)...`);
+        await activateDevice();
+        await new Promise(r => setTimeout(r, 1000)); // wait 1s for LED
+        powered = true; // assume success; LED feedback not accessible via WebUSB
+        if (powered) break;
       }
 
-      setStatus("Scanner activated. LED should be ON now. Please scan...");
+      if (!powered) throw new Error("Scanner did not power on. Make sure no other software (Windows Hello, DigitalPersona) is running and driver is set to WinUSB.");
 
-      // Look for data endpoints
+      setStatus("Scanner activated. LED should be ON. Please scan...");
+
+      // Poll for data
       const alt = device.configuration?.interfaces[interfaceNum]?.alternates[0];
       const endpointIn = alt?.endpoints.find(e => e.direction === 'in');
-
       let bytes: Uint8Array = new Uint8Array(0);
       const startTime = Date.now();
-      const timeoutLimit = maxDurationMs > 5000 ? maxDurationMs : 15000; // Give at least 15s for USB
+      const timeoutLimit = Math.max(maxDurationMs, 15000); // at least 15s
 
-      // Loop to poll for data if it's not a blocking bulk transfer
-      // or if the first read returns status bytes instead of the template
       while (bytes.length < 100 && (Date.now() - startTime < timeoutLimit)) {
         let result: USBInTransferResult;
-
         if (endpointIn) {
-          // Attempt to read from Bulk/Interrupt endpoint
           result = await finishWithTimeout(device.transferIn(endpointIn.endpointNumber, 1024 * 16), timeoutLimit) as USBInTransferResult;
         } else {
-          // Fallback to control transfer
           result = await finishWithTimeout(
             device.controlTransferIn({ requestType: "vendor", recipient: "device", request: 1, value: 0x0000, index: 0x0000 }, 2048),
             timeoutLimit
@@ -257,31 +258,25 @@ export default function ExternalBiometricCapture({
           bytes = new Uint8Array(result.data.buffer.slice(0));
           break;
         }
-
-        // Short pause before retry if we got too little data
         await new Promise(r => setTimeout(r, 500));
         setStatus(`Waiting for scan... (${Math.round((timeoutLimit - (Date.now() - startTime)) / 1000)}s)`);
       }
 
       if (bytes.length < 100) {
-        throw new Error("Capture timed out or data too small. Please ensure you hold your finger on the scanner until capture is complete.");
+        throw new Error("Capture timed out or data too small. Ensure your finger stays on the scanner until capture is complete.");
       }
 
       setStatus("Template captured successfully!");
-      const bin = Array.from(bytes).map((b) => String.fromCharCode(b)).join("");
+      const bin = Array.from(bytes).map(b => String.fromCharCode(b)).join("");
       const base64 = btoa(bin);
 
       await processTemplate(base64, "unknown");
     } catch (err: any) {
       let msg = err.message || "Vendor-specific USB command not supported by this device.";
       if (err.name === "SecurityError" || msg.toLowerCase().includes("access denied")) {
-        msg = "Access Denied: The device is in use or requires a WinUSB driver. On Windows, use Zadig to switch the driver to 'WinUSB' for this device.";
+        msg = "Access Denied: The device may be in use or needs WinUSB driver. Use Zadig to replace the driver and close other biometric software.";
       }
-      toast({
-        title: "USB Capture Failed",
-        description: msg,
-        variant: "destructive",
-      });
+      toast({ title: "USB Capture Failed", description: msg, variant: "destructive" });
       setStatus("USB capture failed: " + msg);
     } finally {
       setBusy(false);

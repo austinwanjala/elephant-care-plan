@@ -1,9 +1,6 @@
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Fingerprint, Check, AlertCircle, Loader2, ShieldCheck, ShieldX } from "lucide-react";
+import { useState } from "react";
+import { Fingerprint, AlertCircle, ShieldCheck, ShieldX } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useToast } from "@/hooks/use-toast";
-import { registerCredential, verifyCredential } from "@/lib/webauthn";
 import ExternalBiometricCapture from "@/components/biometrics/ExternalBiometricCapture";
 
 interface BiometricCaptureProps {
@@ -18,6 +15,10 @@ interface BiometricCaptureProps {
   allowExternal?: boolean;
 }
 
+/**
+ * BiometricCapture component refactored to use direct fingerprint capture.
+ * WebAuthn dependencies have been removed in favor of direct HID/USB scanner access.
+ */
 export const BiometricCapture = ({
   mode,
   userId,
@@ -27,225 +28,87 @@ export const BiometricCapture = ({
   onVerificationComplete,
   className,
   memberId,
-  allowExternal = true,
+  allowExternal = true, // Redundant now but kept for compatibility
 }: BiometricCaptureProps) => {
-  const [isLoading, setIsLoading] = useState(false);
   const [captured, setCaptured] = useState(false);
   const [verified, setVerified] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isSupported, setIsSupported] = useState(false);
-  const [showExternal, setShowExternal] = useState(false);
-  const { toast } = useToast();
 
-  useEffect(() => {
-    // Check if WebAuthn is supported
-    if (window.PublicKeyCredential) {
-      setIsSupported(true);
-    }
-  }, []);
-
-  const handleCapture = async () => {
-    setIsLoading(true);
-    setError(null);
-    setCaptured(false);
-    setVerified(null);
-
-    try {
-      if (mode === "register") {
-        if (!userId || !userName) {
-          throw new Error("User details required for registration");
-        }
-
-        const credentialData = await registerCredential(userId, userName);
-
-        setCaptured(true);
-        onCaptureComplete?.(credentialData);
-        toast({
-          title: "Biometric Registered Successfully",
-          description: "Fingerprint/biometric data has been secured securely.",
-        });
-      } else if (mode === "verify") {
-        if (!credentialId) {
-          throw new Error("No biometric data found for this user");
-        }
-
-        const isValid = await verifyCredential(credentialId);
-
-        if (isValid) {
-          setVerified(true);
-          onVerificationComplete?.(true);
-          toast({
-            title: "Verification Successful",
-            description: "Member identity has been verified.",
-          });
-        } else {
-          setVerified(false);
-          onVerificationComplete?.(false);
-          setError("Verification failed. Fingerprint did not match or was cancelled.");
-          toast({
-            title: "Verification Failed",
-            description: "Biometric verification was unsuccessful.",
-            variant: "destructive",
-          });
-        }
-      }
-    } catch (err: any) {
-      console.error("Biometric error:", err);
-      const errorMessage = err.message || "An unexpected error occurred";
-
-      setError(errorMessage);
-      if (mode === "verify") {
-        setVerified(false);
-        onVerificationComplete?.(false);
-      }
-
-      toast({
-        title: mode === "register" ? "Capture Failed" : "Verification Failed",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const hasNoBiometricData = mode === "verify" && !credentialId;
+  // Map userId to memberId for backward compatibility
+  const effectiveMemberId = memberId || userId;
 
   return (
-    <div className={cn("space-y-3", className)}>
+    <div className={cn("space-y-4", className)}>
       <div className={cn(
-        "flex items-center gap-4 p-4 border rounded-lg transition-all",
-        captured && "border-green-500 bg-green-50 dark:bg-green-950/20",
-        verified === true && "border-green-500 bg-green-50 dark:bg-green-950/20",
-        verified === false && "border-destructive bg-destructive/10",
-        error && !captured && verified === null && "border-amber-500 bg-amber-50 dark:bg-amber-950/20",
-        !captured && verified === null && !error && "bg-muted/50"
+        "p-5 border rounded-xl transition-all shadow-sm",
+        captured && "border-green-500 bg-green-50/50 dark:bg-green-950/10",
+        verified === true && "border-green-500 bg-green-50/50 dark:bg-green-950/10",
+        verified === false && "border-destructive/50 bg-destructive/5",
+        !captured && verified === null && "bg-card border-border"
       )}>
-        <div className={cn(
-          "w-12 h-12 rounded-full flex items-center justify-center shrink-0 transition-colors",
-          captured || verified === true ? "bg-green-100 dark:bg-green-900/30" :
-            verified === false ? "bg-destructive/20" :
-              "bg-primary/10"
-        )}>
-          {isLoading ? (
-            <Loader2 className="h-6 w-6 text-primary animate-spin" />
-          ) : captured || verified === true ? (
-            <ShieldCheck className="h-6 w-6 text-green-600 dark:text-green-400" />
-          ) : verified === false ? (
-            <ShieldX className="h-6 w-6 text-destructive" />
-          ) : (
-            <Fingerprint className="h-6 w-6 text-primary" />
-          )}
-        </div>
-
-        <div className="flex-1 min-w-0">
-          <p className="font-medium text-sm">
-            {mode === "register" ? "Fingerprint Registration" : "Fingerprint Verification"}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {isLoading && mode === "register" && "Follow browser prompts..."}
-            {isLoading && mode === "verify" && "Verify your identity..."}
-            {!isLoading && mode === "register" && !captured && "Securely register your fingerprint/FaceID"}
-            {!isLoading && mode === "register" && captured && "Biometric registered successfully"}
-            {!isLoading && mode === "verify" && verified === null && !hasNoBiometricData && "Click Verify to confirm identity"}
-            {!isLoading && mode === "verify" && verified === true && "Identity verified successfully"}
-            {!isLoading && mode === "verify" && verified === false && "Biometric verification failed"}
-            {hasNoBiometricData && "No biometric data registered for this member"}
-          </p>
-          {error && !captured && verified === null && (
-            <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">
-              <AlertCircle className="h-3 w-3" />
-              {error}
-            </p>
-          )}
-        </div>
-
-        <Button
-          type="button"
-          variant={captured || verified === true ? "outline" : hasNoBiometricData ? "secondary" : "default"}
-          size="sm"
-          onClick={handleCapture}
-          disabled={isLoading || captured || verified === true || hasNoBiometricData || !isSupported}
-          className={cn(
-            captured || verified === true ? "border-green-500 text-green-600" : ""
-          )}
-        >
-          {isLoading ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin mr-1" />
-              {mode === "register" ? "Waiting..." : "Waiting..."}
-            </>
-          ) : captured ? (
-            <>
-              <Check className="h-4 w-4 mr-1" />
-              Registered
-            </>
-          ) : verified === true ? (
-            <>
-              <Check className="h-4 w-4 mr-1" />
-              Verified
-            </>
-          ) : verified === false ? (
-            "Retry"
-          ) : hasNoBiometricData ? (
-            "No Data"
-          ) : !isSupported ? (
-            "Not Supported"
-          ) : mode === "register" ? (
-            <>
-              <Fingerprint className="h-4 w-4 mr-1" />
-              Capture
-            </>
-          ) : (
-            <>
-              <Fingerprint className="h-4 w-4 mr-1" />
-              Verify
-            </>
-          )}
-        </Button>
-      </div>
-
-      {!isSupported && (
-        <p className="text-xs text-muted-foreground bg-amber-50 dark:bg-amber-950/20 p-2 rounded border border-amber-200 dark:border-amber-800">
-          <AlertCircle className="h-3 w-3 inline mr-1" />
-          WebAuthn biometrics requires a compatible device (Fingerprint/FaceID) and HTTPS context.
-        </p>
-      )}
-
-      {allowExternal && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">
-              Prefer using an external biometric reader (USB/HID/Windows Hello)?
-            </p>
-            <Button type="button" variant="outline" size="xs" onClick={() => setShowExternal(!showExternal)}>
-              {showExternal ? "Hide external options" : "Use external device"}
-            </Button>
+        <div className="flex items-center gap-4 mb-4">
+          <div className={cn(
+            "w-12 h-12 rounded-full flex items-center justify-center shrink-0 transition-all",
+            captured || verified === true ? "bg-green-100 text-green-600 dark:bg-green-900/30" :
+            verified === false ? "bg-destructive/10 text-destructive" :
+            "bg-primary/10 text-primary"
+          )}>
+            {captured || verified === true ? (
+              <ShieldCheck className="h-6 w-6" />
+            ) : verified === false ? (
+              <ShieldX className="h-6 w-6" />
+            ) : (
+              <Fingerprint className="h-6 w-6" />
+            )}
           </div>
 
-          {showExternal && (
-            <ExternalBiometricCapture
-              mode={mode}
-              memberId={memberId}
-              onRegistered={() => {
-                // Mark registered success visually, but keep WebAuthn state untouched
-                // Consumers can react via onCaptureComplete if needed
-              }}
-              onVerified={(success) => {
-                if (success) {
-                  setVerified(true);
-                  onVerificationComplete?.(true);
-                } else {
-                  setVerified(false);
-                  onVerificationComplete?.(false);
-                }
-              }}
-              className="mt-1"
-              maxDurationMs={5000}
-            />
-          )}
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-sm">
+              {mode === "register" ? "Fingerprint Registration" : "Fingerprint Verification"}
+            </h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {captured ? "Template captured and registered" : 
+               verified === true ? "Identity verified successfully" :
+               verified === false ? "Verification failed" :
+               mode === "register" ? `Securely register fingerprint for ${userName || 'the member'}` : "Verify identity using an external scanner"}
+            </p>
+          </div>
         </div>
+
+        <div className="border-t pt-4 border-dashed">
+          <ExternalBiometricCapture
+            mode={mode}
+            memberId={effectiveMemberId}
+            onRegistered={(template) => {
+              setCaptured(true);
+              setVerified(null);
+              setError(null);
+              onCaptureComplete?.(template);
+            }}
+            onVerified={(success) => {
+              setVerified(success);
+              setCaptured(false);
+              setError(success ? null : "Identity verification failed. Please try again.");
+              onVerificationComplete?.(success);
+            }}
+            className="mt-1"
+          />
+        </div>
+
+        {error && !verified && (
+          <div className="mt-3 p-2 bg-destructive/10 text-destructive rounded-md text-[11px] flex items-center gap-2">
+            <AlertCircle className="h-3 w-3" />
+            <span>{error}</span>
+          </div>
+        )}
+      </div>
+      
+      {mode === "verify" && !credentialId && !verified && (
+        <p className="text-[11px] text-amber-600 bg-amber-50 dark:bg-amber-950/20 p-2 rounded-md border border-amber-200 dark:border-amber-800">
+          <AlertCircle className="h-3 w-3 inline mr-1" />
+          Note: No existing biometric data found for this member. A successful scan will be compared against the server.
+        </p>
       )}
     </div>
   );
-};
+};

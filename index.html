@@ -9,7 +9,28 @@
   <meta name="description" content="Premium Dental Insurance Scheme" />
   <meta name="author" content="Elephant Dental Hospital" />
   <link rel="icon" type="image/png" href="/img/elephant-logo.png" />
-
+  <script>
+    // Define a mock WebSdk to prevent "WebSdk is not defined" errors
+    // from DigitalPersona when the service isn't locally running.
+    window.WebSdk = {
+      WebChannelOptions: class { constructor() {} },
+      WebChannelClient: class {
+        constructor() {}
+        onConnectionFailed() {}
+        onConnectionSucceed() {}
+        onDataReceivedBin() {}
+        onDataReceivedTxt() {}
+        connect() {
+          console.warn("Using mocked WebSdk. Triggering failure fallback.");
+          setTimeout(() => { if (this.onConnectionFailed) this.onConnectionFailed(); }, 100);
+        }
+        disconnect() {}
+        sendDataBin() {}
+        sendDataTxt() {}
+        isConnected() { return false; }
+      }
+    };
+  </script>
   <meta property="og:title" content="Elephant Care Plan" />
   <meta property="og:description" content="Dental Insurance That Doubles Your Investment" />
   <meta property="og:type" content="website" />

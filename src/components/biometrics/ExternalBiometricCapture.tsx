@@ -252,7 +252,7 @@ export default function ExternalBiometricCapture({
       
     } catch (err: any) {
       let msg = err.message || "Failed to connect to DigitalPersona service.";
-      if (msg.toLowerCase().includes("failed to fetch") || msg.toLowerCase().includes("network error")) {
+      if (msg.toLowerCase().includes("failed to fetch") || msg.toLowerCase().includes("network error") || msg.toLowerCase().includes("communication failure")) {
         msg = "Could not reach DigitalPersona local service. Please install and run the DigitalPersona WebSDK Lite Client on this machine.";
       }
       toast({ title: "DigitalPersona Capture Failed", description: msg, variant: "destructive" });

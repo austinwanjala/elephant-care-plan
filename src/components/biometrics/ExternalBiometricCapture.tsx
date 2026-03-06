@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AlertCircle, Cpu, Fingerprint, Upload, Usb, Wifi } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { registerExternalBiometric, verifyExternalBiometric, BiometricFormat } from "@/services/biometrics";
-import { DeviceConnected, DeviceDisconnected, DeviceSelection, Devices, CommunicationFailed, SamplesAcquired, SampleFormat, ErrorOccurred } from "@digitalpersona/devices";
+import { DeviceConnected, DeviceDisconnected, FingerprintReader, CommunicationFailed, SamplesAcquired, SampleFormat, ErrorOccurred } from "@digitalpersona/devices";
 
 
 type Mode = "register" | "verify";
@@ -66,11 +66,11 @@ export default function ExternalBiometricCapture({
     ]);
 
   useEffect(() => {
-    let dpDevices: Devices | null = null;
+    let dpDevices: FingerprintReader | null = null;
     
     // We only set this up if we are busy so we don't hold the device open indefinitely
     if (busy) {
-      dpDevices = new Devices();
+      dpDevices = new FingerprintReader();
       
       const onDeviceConnected = (e: DeviceConnected) => {
         console.log("DP Device Connected:", e.deviceUid);
@@ -225,7 +225,7 @@ export default function ExternalBiometricCapture({
     setBusy(true);
     setStatus("Connecting to DigitalPersona service...");
     try {
-      const dpReader = new Devices();
+      const dpReader = new FingerprintReader();
       const deviceList = await dpReader.enumerateDevices();
       
       if (deviceList.length === 0) {

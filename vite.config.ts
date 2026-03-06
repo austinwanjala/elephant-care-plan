@@ -16,6 +16,7 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "WebSdk": path.resolve(__dirname, "./src/mocks/WebSdk.js"),
     },
   },
 }));

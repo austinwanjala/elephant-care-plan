@@ -66,20 +66,20 @@ export default function ExternalBiometricCapture({
     const onDeviceConnected = (e: DeviceConnected) => {
       console.log("DP Device Connected:", e.deviceUid);
     };
-    
+
     const onDeviceDisconnected = (e: DeviceDisconnected) => {
       console.log("DP Device Disconnected:", e.deviceUid);
       setStatus("Scanner disconnected.");
       setBusy(false);
     };
-    
+
     const onQualityReported = (e: QualityReported) => {
       console.log("DP Quality Reported:", e.quality);
       if (e.quality === 0) {
         setStatus("High quality scan detected! Finalizing...");
         // In streaming mode, once we hit quality 0, we can stop and use the latest sample
         if (streamingRef.current && lastSuccessRef.current) {
-           finalizeCapture(lastSuccessRef.current, e.deviceId);
+          finalizeCapture(lastSuccessRef.current, e.deviceId);
         }
       } else {
         setStatus(`Place finger on scanner... (Quality: ${e.quality})`);
@@ -91,7 +91,7 @@ export default function ExternalBiometricCapture({
         setStatus("Processing biometric template...");
         await processTemplate(cleanData, "unknown");
         toast({ title: "Capture Success", description: "Fingerprint template processed." });
-        
+
         // Stop the sensor
         if (deviceUid) {
           reader.stopAcquisition(deviceUid).catch(console.error);
@@ -112,7 +112,7 @@ export default function ExternalBiometricCapture({
         if (e.samples && e.samples.length > 0) {
           const sample = e.samples[0] as any;
           const rawData = sample.Data || sample.data || (typeof sample === 'string' ? sample : null);
-          
+
           if (!rawData) return;
 
           const dataStr = String(rawData);
@@ -122,14 +122,14 @@ export default function ExternalBiometricCapture({
           }
 
           const cleanData = (base64Only || "").replace(/\s/g, '');
-          
+
           // CRITICAL: DigitalPersona sends Base64URL (with - and _). 
           // Browser data URIs REQUIRE standard Base64 (with + and /).
           const normalizedBase64 = cleanData.replace(/-/g, '+').replace(/_/g, '/');
-          
+
           const isPng = normalizedBase64.startsWith('iVBORw0');
           const isBmp = normalizedBase64.startsWith('Qk0');
-          
+
           if (isPng || isBmp || e.sampleFormat === 5 || e.sampleFormat === 1) {
             const mime = isPng ? 'image/png' : 'image/bmp';
             const previewUrl = `data:${mime};base64,${normalizedBase64}`;
@@ -155,7 +155,7 @@ export default function ExternalBiometricCapture({
         setBusy(false);
       }
     };
-    
+
     const onErrorOccurred = (e: ErrorOccurred) => {
       console.error("DP Error:", e);
       setStatus("Hardware connection error occurred.");
@@ -206,33 +206,33 @@ export default function ExternalBiometricCapture({
 
   const handleVerify = async (templateBase64: string) => {
     if (mode !== "verify") return;
-    
+
     setStatus("Verifying identity...");
-    
+
     // 1. Try server-side verification first (canonical)
     const resp = await verifyExternalBiometric({ memberId, templateBase64 });
-    
+
     let success = resp.success;
 
     // 2. FALLBACK: Check for similarity if server-side bit-for-bit match fails
     // This is necessary because raw biometric images vary slightly between scans
     if (!success && credentialId && templateBase64.startsWith('iVBORw')) {
-       try {
-          const parsed = JSON.parse(credentialId);
-          const stored = parsed.template;
-          
-          if (stored && stored.startsWith('iVBORw')) {
-             console.log("Server verification failed. Attempting similarity check...");
-             // Simple similarity check: Lengths within 5%? (Crude but better than nothing)
-             const lenDiff = Math.abs(stored.length - templateBase64.length) / stored.length;
-             if (lenDiff < 0.05) {
-                console.log(`Similarity within thresholds (${(lenDiff * 100).toFixed(2)}% diff). Verification granted.`);
-                success = true;
-             }
+      try {
+        const parsed = JSON.parse(credentialId);
+        const stored = parsed.template;
+
+        if (stored && stored.startsWith('iVBORw')) {
+          console.log("Server verification failed. Attempting similarity check...");
+          // Simple similarity check: Lengths within 5%? (Crude but better than nothing)
+          const lenDiff = Math.abs(stored.length - templateBase64.length) / stored.length;
+          if (lenDiff < 0.05) {
+            console.log(`Similarity within thresholds (${(lenDiff * 100).toFixed(2)}% diff). Verification granted.`);
+            success = true;
           }
-       } catch (e) {
-          console.error("Similarity check error:", e);
-       }
+        }
+      } catch (e) {
+        console.error("Similarity check error:", e);
+      }
     }
 
     onVerified?.(success);
@@ -326,16 +326,16 @@ export default function ExternalBiometricCapture({
     setStatus("Connecting to scanner...");
     lastSuccessRef.current = null;
     setPreview(null);
-    
+
     try {
       const deviceList = await dpReader.enumerateDevices();
       if (deviceList.length === 0) {
-         throw new Error("No DigitalPersona devices found. Ensure the scanner is plugged in.");
+        throw new Error("No DigitalPersona devices found. Ensure the scanner is plugged in.");
       }
-      
+
       const deviceId = deviceList[0];
       setStatus("Live preview active. Place finger on scanner...");
-      
+
       // Mandatory hack to enable streaming for "Live Preview"
       const readerObj = dpReader as any;
       if (readerObj.channel && typeof readerObj.channel.send === 'function') {
@@ -345,8 +345,8 @@ export default function ExternalBiometricCapture({
           SampleType: 5, // PngImage
           Streaming: true
         };
-        
-        const encodedParams = (window as any).dp?.core?.Base64Url?.fromJSON 
+
+        const encodedParams = (window as any).dp?.core?.Base64Url?.fromJSON
           ? (window as any).dp.core.Base64Url.fromJSON(params)
           : btoa(JSON.stringify(params)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 
@@ -358,22 +358,22 @@ export default function ExternalBiometricCapture({
         streamingRef.current = false;
         await dpReader.startAcquisition(SampleFormat.PngImage, deviceId);
       }
-      
+
       if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
       timeoutRef.current = window.setTimeout(() => {
         if (streamingRef.current && lastSuccessRef.current) {
-           // Timeout hit but we have a preview image? Use the last one as a fallback!
-           // This handles cases where people keep their finger on it but it never hits quality 0.
-           (dpReader as any).onQualityReported({ quality: 0, deviceId: deviceId });
+          // Timeout hit but we have a preview image? Use the last one as a fallback!
+          // This handles cases where people keep their finger on it but it never hits quality 0.
+          (dpReader as any).onQualityReported({ quality: 0, deviceId: deviceId });
         } else if (busy) {
-           dpReader.stopAcquisition(deviceId).catch(console.error);
-           streamingRef.current = false;
-           setStatus("Capture timed out.");
-           setBusy(false);
-           toast({ title: "Timeout", description: "No finger detected.", variant: "destructive" });
+          dpReader.stopAcquisition(deviceId).catch(console.error);
+          streamingRef.current = false;
+          setStatus("Capture timed out.");
+          setBusy(false);
+          toast({ title: "Timeout", description: "No finger detected.", variant: "destructive" });
         }
-      }, 20000); 
-      
+      }, 20000);
+
     } catch (err: any) {
       console.error("USB Capture Error:", err);
       toast({ title: "Capture Failed", description: err.message, variant: "destructive" });
@@ -434,19 +434,19 @@ export default function ExternalBiometricCapture({
 
         {preview && (
           <div className="flex flex-col items-center justify-center p-4 bg-white dark:bg-slate-900 border rounded-xl shadow-inner animate-in fade-in zoom-in duration-300">
-             <Label className="text-[10px] uppercase tracking-wider text-blue-500 mb-3 font-bold animate-pulse">Live Scanning View</Label>
-             <div className="relative group">
-               <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
-               <div className="relative border-4 border-slate-100 dark:border-slate-800 rounded-lg overflow-hidden bg-white shadow-2xl">
-                 <img 
-                    src={preview} 
-                    alt="Fingerprint Preview" 
-                    className="w-40 h-52 object-contain bg-slate-50 grayscale hover:grayscale-0 transition-all duration-500"
-                 />
-                 <div className="absolute inset-0 border border-white/20 pointer-events-none"></div>
-               </div>
-             </div>
-             <p className="mt-3 text-[10px] text-blue-500 font-medium">Capture details: Real-time • RAW</p>
+            <Label className="text-[10px] uppercase tracking-wider text-blue-500 mb-3 font-bold animate-pulse">Live Scanning View</Label>
+            <div className="relative group">
+              <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+              <div className="relative border-4 border-slate-100 dark:border-slate-800 rounded-lg overflow-hidden bg-white shadow-2xl">
+                <img
+                  src={preview}
+                  alt="Fingerprint Preview"
+                  className="w-40 h-52 object-contain bg-slate-50 grayscale hover:grayscale-0 transition-all duration-500"
+                />
+                <div className="absolute inset-0 border border-white/20 pointer-events-none"></div>
+              </div>
+            </div>
+            <p className="mt-3 text-[10px] text-blue-500 font-medium">Capture details: Real-time • RAW</p>
           </div>
         )}
 
@@ -473,12 +473,12 @@ export default function ExternalBiometricCapture({
 
         {status?.toLowerCase().includes("service") && (
           <div className="bg-amber-50 dark:bg-amber-950/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800 space-y-3 shadow-sm mt-4">
-             <p className="text-[11px] font-bold uppercase text-amber-800 dark:text-amber-400 flex items-center gap-2">
-                <AlertCircle className="h-3 w-3" /> DigitalPersona WebSDK Missing
-             </p>
-             <div className="text-[10px] text-amber-700 dark:text-amber-300 space-y-2">
-                 <p>To use the <strong>U.are.U 4500 reader</strong>, ensure you have installed the <strong>"DigitalPersona Lite Client" (WebSDK)</strong>.</p>
-             </div>
+            <p className="text-[11px] font-bold uppercase text-amber-800 dark:text-amber-400 flex items-center gap-2">
+              <AlertCircle className="h-3 w-3" /> DigitalPersona WebSDK Missing
+            </p>
+            <div className="text-[10px] text-amber-700 dark:text-amber-300 space-y-2">
+              <p>To use the <strong>U.are.U 4500 reader</strong>, ensure you have installed the <strong>"DigitalPersona Lite Client" (WebSDK)</strong>.</p>
+            </div>
           </div>
         )}
       </div>

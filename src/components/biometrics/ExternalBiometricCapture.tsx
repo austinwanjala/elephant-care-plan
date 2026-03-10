@@ -8,10 +8,8 @@ import { useToast } from "@/hooks/use-toast";
 import { AlertCircle, Cpu, Fingerprint, Upload, Usb, Wifi } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { registerExternalBiometric, verifyExternalBiometric, BiometricFormat } from "@/services/biometrics";
+import { DeviceConnected, DeviceDisconnected, FingerprintReader, CommunicationFailed, SamplesAcquired, SampleFormat, ErrorOccurred, QualityReported } from "@/lib/digitalpersona";
 
-// Hardcoded fallbacks for DigitalPersona constants in case they are not yet in window.dp
-const SAMPLE_FORMAT_RAW = 1;
-const SAMPLE_FORMAT_PNG = 5;
 
 type Mode = "register" | "verify";
 
@@ -54,48 +52,35 @@ export default function ExternalBiometricCapture({
   const timeoutRef = useRef<number | null>(null);
   const streamingRef = useRef(false);
   const lastSuccessRef = useRef<string | null>(null);
-  const activeDeviceRef = useRef<string | null>(null);
 
   useEffect(() => {
     setSupportsHID(!!(navigator as any).hid);
     setSupportsUSB(!!(navigator as any).usb);
 
-    // Access fresh globals from window.dp
-    const dp = (window as any).dp || {};
-    const dpDevices = dp.devices || {};
-    const FingerprintReaderClass = dpDevices.FingerprintReader;
-
-    if (!FingerprintReaderClass) {
-      console.warn("DigitalPersona FingerprintReader not found in window.dp.devices");
-      return;
-    }
-
     // Initialize the DigitalPersona reader once
-    const reader = new FingerprintReaderClass();
+    const reader = new FingerprintReader();
     readerRef.current = reader;
 
     const onDeviceConnected = (e: DeviceConnected) => {
       console.log("DP Device Connected:", e.deviceUid);
     };
-
+    
     const onDeviceDisconnected = (e: DeviceDisconnected) => {
       console.log("DP Device Disconnected:", e.deviceUid);
       setStatus("Scanner disconnected.");
       setBusy(false);
     };
-
-    const onQualityReported = (e: any) => {
-      const quality = e.quality !== undefined ? e.quality : e.Quality;
-      const deviceId = e.deviceId || e.DeviceId || e.DeviceUid || activeDeviceRef.current;
-      
-      console.log("DP Quality Reported:", quality);
-      if (quality === 0) {
+    
+    const onQualityReported = (e: QualityReported) => {
+      console.log("DP Quality Reported:", e.quality);
+      if (e.quality === 0) {
         setStatus("High quality scan detected! Finalizing...");
+        // In streaming mode, once we hit quality 0, we can stop and use the latest sample
         if (streamingRef.current && lastSuccessRef.current) {
-          finalizeCapture(lastSuccessRef.current, deviceId || undefined);
+           finalizeCapture(lastSuccessRef.current, e.deviceId);
         }
       } else {
-        setStatus(`Place finger on scanner... (Quality: ${quality})`);
+        setStatus(`Place finger on scanner... (Quality: ${e.quality})`);
       }
     };
 
@@ -104,7 +89,7 @@ export default function ExternalBiometricCapture({
         setStatus("Processing biometric template...");
         await processTemplate(cleanData, "unknown");
         toast({ title: "Capture Success", description: "Fingerprint template processed." });
-
+        
         // Stop the sensor
         if (deviceUid) {
           reader.stopAcquisition(deviceUid).catch(console.error);
@@ -122,15 +107,11 @@ export default function ExternalBiometricCapture({
     const onSamplesAcquired = async (e: SamplesAcquired) => {
       console.log("DP Sample Acquired Event:", e);
       try {
-        const samples = (e as any).samples || (e as any).Samples || [];
-        if (samples && samples.length > 0) {
-          const sample = samples[0] as any;
+        if (e.samples && e.samples.length > 0) {
+          const sample = e.samples[0] as any;
           const rawData = sample.Data || sample.data || (typeof sample === 'string' ? sample : null);
-
-          if (!rawData) {
-            console.warn("Sample received but no data found in it.");
-            return;
-          }
+          
+          if (!rawData) return;
 
           const dataStr = String(rawData);
           let base64Only = dataStr;
@@ -139,44 +120,40 @@ export default function ExternalBiometricCapture({
           }
 
           const cleanData = (base64Only || "").replace(/\s/g, '');
-
+          
           // CRITICAL: DigitalPersona sends Base64URL (with - and _). 
           // Browser data URIs REQUIRE standard Base64 (with + and /).
-          let normalizedBase64 = cleanData.replace(/-/g, '+').replace(/_/g, '/');
+          const normalizedBase64 = cleanData.replace(/-/g, '+').replace(/_/g, '/');
           
-          // Add padding if missing
-          while (normalizedBase64.length % 4 !== 0) {
-            normalizedBase64 += '=';
-          }
-
           const isPng = normalizedBase64.startsWith('iVBORw0');
           const isBmp = normalizedBase64.startsWith('Qk0');
-          const sampleFormat = (e as any).sampleFormat || (e as any).SampleFormat;
-
-          if (isPng || isBmp || sampleFormat === 5 || sampleFormat === 1) {
+          
+          if (isPng || isBmp || e.sampleFormat === 5 || e.sampleFormat === 1) {
             const mime = isPng ? 'image/png' : 'image/bmp';
             const previewUrl = `data:${mime};base64,${normalizedBase64}`;
             setPreview(previewUrl);
+            console.log("Setting preview URL (first 50 chars):", previewUrl.substring(0, 50));
             lastSuccessRef.current = normalizedBase64;
           } else {
-            console.warn("Acquired sample is not a recognized image format. Format ID:", sampleFormat);
+            console.warn("Acquired sample is not a recognized image format. Format ID:", e.sampleFormat);
           }
 
           if (!streamingRef.current) {
             // Standard mode: finalize on first sample
-            const deviceId = e.deviceUid || (e as any).DeviceUid || activeDeviceRef.current;
-            await finalizeCapture(normalizedBase64, deviceId || undefined);
+            await finalizeCapture(normalizedBase64, e.deviceUid);
+          } else {
+            // Streaming mode: we wait for onQualityReported to trigger finalizeCapture
+            // or for a manual "Capture" action if we added it.
+            // For now, if quality 0 was already hit or if it's the first sample, we track it.
           }
         }
       } catch (err: any) {
         console.error("DP onSamplesAcquired error:", err);
-        // Don't show toast for every streaming frame error to avoid spamming
-        if (!streamingRef.current) {
-          toast({ title: "Capture Failed", description: err.message, variant: "destructive" });
-        }
+        toast({ title: "Capture Failed", description: err.message, variant: "destructive" });
+        setBusy(false);
       }
     };
-
+    
     const onErrorOccurred = (e: ErrorOccurred) => {
       console.error("DP Error:", e);
       setStatus("Hardware connection error occurred.");
@@ -310,90 +287,63 @@ export default function ExternalBiometricCapture({
 
   const captureViaUSB = useCallback(async () => {
     const dpReader = readerRef.current;
-    const dp = (window as any).dp || {};
-    const dpDevices = dp.devices || {};
-    const dpCore = dp.core || {};
-    
-    // Get fresh SampleFormat enum or use fallback
-    const pngFormat = dpDevices.SampleFormat?.PngImage || SAMPLE_FORMAT_PNG;
-
     if (!dpReader) {
       toast({ title: "SDK Not Ready", description: "The DigitalPersona SDK is still initializing.", variant: "destructive" });
       return;
     }
 
     setBusy(true);
-    setStatus("Initializing scanner...");
+    setStatus("Connecting to scanner...");
     lastSuccessRef.current = null;
     setPreview(null);
-
+    
     try {
       const deviceList = await dpReader.enumerateDevices();
       if (deviceList.length === 0) {
-        throw new Error("No DigitalPersona devices found. Ensure the scanner is plugged in.");
+         throw new Error("No DigitalPersona devices found. Ensure the scanner is plugged in.");
       }
-
+      
       const deviceId = deviceList[0];
-      activeDeviceRef.current = deviceId;
-      console.log("Using device:", deviceId);
-
-      // Attempt to enable streaming for "Live Preview"
+      setStatus("Live preview active. Place finger on scanner...");
+      
+      // Mandatory hack to enable streaming for "Live Preview"
       const readerObj = dpReader as any;
       if (readerObj.channel && typeof readerObj.channel.send === 'function') {
         streamingRef.current = true;
-        
-        // Use DeviceUID instead of DeviceID, as it's more standard in WebSDK
         const params = {
-          DeviceUID: deviceId,
-          SampleFormat: pngFormat,
+          DeviceID: deviceId,
+          SampleType: 5, // PngImage
           Streaming: true
         };
-
-        const encodedParams = dpCore.Base64Url?.fromJSON
-          ? dpCore.Base64Url.fromJSON(params)
+        
+        const encodedParams = (window as any).dp?.core?.Base64Url?.fromJSON 
+          ? (window as any).dp.core.Base64Url.fromJSON(params)
           : btoa(JSON.stringify(params)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 
-        try {
-          // Method 9 is StartAcquisition with support for Streaming
-          await readerObj.channel.send({
-            Method: 9,
-            Parameters: encodedParams
-          });
-        } catch (err9) {
-          console.warn("Method 9 failed, trying Method 3...", err9);
-          try {
-            await readerObj.channel.send({
-              Method: 3,
-              Parameters: encodedParams
-            });
-          } catch (err3) {
-            console.error("Both Method 9 and 3 failed for streaming. Falling back to standard acquisition.");
-            streamingRef.current = false;
-            // Fallback to standard non-streaming acquisition
-            await dpReader.startAcquisition(pngFormat, deviceId);
-          }
-        }
+        await readerObj.channel.send({
+          command: { Method: 3, Parameters: encodedParams }
+        });
+        console.log("Streaming initiated with custom command.");
       } else {
         streamingRef.current = false;
-        await dpReader.startAcquisition(pngFormat, deviceId);
+        await dpReader.startAcquisition(SampleFormat.PngImage, deviceId);
       }
-
-      setStatus("Live preview active. Place finger on scanner...");
-
+      
       if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
       timeoutRef.current = window.setTimeout(() => {
         if (streamingRef.current && lastSuccessRef.current) {
-          console.log("Capture timeout hit, but we have a preview. Finalizing with last good sample.");
-          finalizeCapture(lastSuccessRef.current, deviceId);
+           // Timeout hit but we have a preview image? Use the last one as a fallback!
+           // This handles cases where people keep their finger on it but it never hits quality 0.
+           (dpReader as any).onQualityReported({ quality: 0, deviceId: deviceId });
         } else if (busy) {
-          dpReader.stopAcquisition(deviceId).catch(console.error);
-          streamingRef.current = false;
-          setStatus("Capture timed out. No fingerprint detected.");
-          setBusy(false);
-          toast({ title: "Timeout", description: "No finger detected.", variant: "destructive" });
+           dpReader.stopAcquisition(deviceId).catch(console.error);
+           streamingRef.current = false;
+           setStatus("Capture timed out.");
+           setBusy(false);
+           toast({ title: "Timeout", description: "No finger detected.", variant: "destructive" });
         }
-      }, 30000);
-
+      }, 20000); 
+      
     } catch (err: any) {
       console.error("USB Capture Error:", err);
       toast({ title: "Capture Failed", description: err.message, variant: "destructive" });
@@ -401,12 +351,6 @@ export default function ExternalBiometricCapture({
       setBusy(false);
     }
   }, [toast, busy]);
-
-  const confirmCapture = () => {
-    if (lastSuccessRef.current) {
-      finalizeCapture(lastSuccessRef.current, activeDeviceRef.current || undefined);
-    }
-  };
 
   const handleFile = async (file: File) => {
     setBusy(true);
@@ -444,19 +388,8 @@ export default function ExternalBiometricCapture({
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 shadow-md ring-2 ring-blue-400/20"
           >
             <Usb className="h-4 w-4" />
-            {busy ? "Scanner Active..." : "Start Fingerprint Scan"}
+            Start Fingerprint Scan
           </Button>
-          {busy && lastSuccessRef.current && (
-             <Button
-               type="button"
-               variant="outline"
-               onClick={confirmCapture}
-               className="flex items-center gap-2 border-green-500 text-green-600 hover:bg-green-50"
-             >
-               <Fingerprint className="h-4 w-4" />
-               Capture Now
-             </Button>
-          )}
           <div className="flex items-center gap-2">
             <Label htmlFor="biometric-file" className="sr-only">Template file</Label>
             <Input
@@ -471,19 +404,19 @@ export default function ExternalBiometricCapture({
 
         {preview && (
           <div className="flex flex-col items-center justify-center p-4 bg-white dark:bg-slate-900 border rounded-xl shadow-inner animate-in fade-in zoom-in duration-300">
-            <Label className="text-[10px] uppercase tracking-wider text-blue-500 mb-3 font-bold animate-pulse">Live Scanning View</Label>
-            <div className="relative group">
-              <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
-              <div className="relative border-4 border-slate-100 dark:border-slate-800 rounded-lg overflow-hidden bg-white shadow-2xl">
-                <img
-                  src={preview}
-                  alt="Fingerprint Preview"
-                  className="w-40 h-52 object-contain bg-slate-50 grayscale hover:grayscale-0 transition-all duration-500"
-                />
-                <div className="absolute inset-0 border border-white/20 pointer-events-none"></div>
-              </div>
-            </div>
-            <p className="mt-3 text-[10px] text-blue-500 font-medium">Capture details: Real-time • RAW</p>
+             <Label className="text-[10px] uppercase tracking-wider text-blue-500 mb-3 font-bold animate-pulse">Live Scanning View</Label>
+             <div className="relative group">
+               <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+               <div className="relative border-4 border-slate-100 dark:border-slate-800 rounded-lg overflow-hidden bg-white shadow-2xl">
+                 <img 
+                    src={preview} 
+                    alt="Fingerprint Preview" 
+                    className="w-40 h-52 object-contain bg-slate-50 grayscale hover:grayscale-0 transition-all duration-500"
+                 />
+                 <div className="absolute inset-0 border border-white/20 pointer-events-none"></div>
+               </div>
+             </div>
+             <p className="mt-3 text-[10px] text-blue-500 font-medium">Capture details: Real-time • RAW</p>
           </div>
         )}
 
@@ -510,12 +443,12 @@ export default function ExternalBiometricCapture({
 
         {status?.toLowerCase().includes("service") && (
           <div className="bg-amber-50 dark:bg-amber-950/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800 space-y-3 shadow-sm mt-4">
-            <p className="text-[11px] font-bold uppercase text-amber-800 dark:text-amber-400 flex items-center gap-2">
-              <AlertCircle className="h-3 w-3" /> DigitalPersona WebSDK Missing
-            </p>
-            <div className="text-[10px] text-amber-700 dark:text-amber-300 space-y-2">
-              <p>To use the <strong>U.are.U 4500 reader</strong>, ensure you have installed the <strong>"DigitalPersona Lite Client" (WebSDK)</strong>.</p>
-            </div>
+             <p className="text-[11px] font-bold uppercase text-amber-800 dark:text-amber-400 flex items-center gap-2">
+                <AlertCircle className="h-3 w-3" /> DigitalPersona WebSDK Missing
+             </p>
+             <div className="text-[10px] text-amber-700 dark:text-amber-300 space-y-2">
+                 <p>To use the <strong>U.are.U 4500 reader</strong>, ensure you have installed the <strong>"DigitalPersona Lite Client" (WebSDK)</strong>.</p>
+             </div>
           </div>
         )}
       </div>

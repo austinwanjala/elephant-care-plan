@@ -369,6 +369,7 @@ export default function AdminMembers() {
                 <TableHead>Branch</TableHead>
                 <TableHead>Coverage</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Biometric</TableHead>
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>
@@ -392,6 +393,17 @@ export default function AdminMembers() {
                     </Badge>
                   </TableCell>
                   <TableCell>
+                    {m.biometric_data ? (
+                      <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-200">
+                        <ShieldCheck className="mr-1 h-3 w-3" /> Captured
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-muted-foreground">
+                        Pending
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
@@ -400,7 +412,7 @@ export default function AdminMembers() {
                         <DropdownMenuItem onClick={() => { setSelectedMember(m); setDependantsDialogOpen(true); }}><Users className="mr-2 h-4 w-4" /> View Dependants</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => { setSelectedMember(m); setHistoryDialogOpen(true); }}><History className="mr-2 h-4 w-4" /> View History</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => { setSelectedMember(m); setCardDialogOpen(true); }}><CreditCardIcon className="mr-2 h-4 w-4" /> Digital Card</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => { setSelectedMember(m); setBiometricDialogOpen(true); }}><Fingerprint className="mr-2 h-4 w-4" /> Biometric</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => { setSelectedMember(m); setBiometricDialogOpen(true); }}><Fingerprint className="mr-2 h-4 w-4" /> {m.biometric_data ? "Update Biometric" : "Capture Biometric"}</DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteMember(m.id)}><Trash2 className="mr-2 h-4 w-4" /> Deactivate</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>

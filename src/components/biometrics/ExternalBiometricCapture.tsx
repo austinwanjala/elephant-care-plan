@@ -111,9 +111,18 @@ export default function ExternalBiometricCapture({
       try {
         if (e.samples && e.samples.length > 0) {
           const sample = e.samples[0] as any;
-          const rawData = sample.Data || sample.data || (typeof sample === 'string' ? sample : null);
+          // Robust extraction of the data part
+          let rawData = null;
+          if (typeof sample === 'string') {
+            rawData = sample;
+          } else if (sample && typeof sample === 'object') {
+            rawData = sample.Data || sample.data || sample.RawData || sample.rawData;
+          }
 
-          if (!rawData) return;
+          if (!rawData) {
+            console.warn("DP Sample acquired but no data found in sample object:", sample);
+            return;
+          }
 
           const dataStr = String(rawData);
           let base64Only = dataStr;
@@ -121,23 +130,29 @@ export default function ExternalBiometricCapture({
             base64Only = dataStr.split(',')[1] || dataStr;
           }
 
-          const cleanData = (base64Only || "").replace(/\s/g, '');
+          const cleanData = (base64Only || "").replace(/\s/g, '').replace(/[\r\n]/g, '');
 
           // CRITICAL: DigitalPersona sends Base64URL (with - and _). 
           // Browser data URIs REQUIRE standard Base64 (with + and /).
           const normalizedBase64 = cleanData.replace(/-/g, '+').replace(/_/g, '/');
 
-          const isPng = normalizedBase64.startsWith('iVBORw0');
+          const isPng = normalizedBase64.startsWith('iVBORw0KGgo');
           const isBmp = normalizedBase64.startsWith('Qk0');
 
           if (isPng || isBmp || e.sampleFormat === 5 || e.sampleFormat === 1) {
-            const mime = isPng ? 'image/png' : 'image/bmp';
-            const previewUrl = `data:${mime};base64,${normalizedBase64}`;
+            const mime = isPng ? 'image/png' : (isBmp ? 'image/bmp' : 'image/png');
+
+            // Add padding if missing (Base64Url often omits it)
+            let paddedBase64 = normalizedBase64;
+            while (paddedBase64.length % 4 !== 0) {
+              paddedBase64 += '=';
+            }
+
+            const previewUrl = `data:${mime};base64,${paddedBase64}`;
             setPreview(previewUrl);
-            console.log("Setting preview URL (first 50 chars):", previewUrl.substring(0, 50));
-            lastSuccessRef.current = normalizedBase64;
+            lastSuccessRef.current = paddedBase64;
           } else {
-            console.warn("Acquired sample is not a recognized image format. Format ID:", e.sampleFormat);
+            console.warn("Acquired sample format not recognized as image. Format:", e.sampleFormat, "Data start:", normalizedBase64.substring(0, 20));
           }
 
           if (!streamingRef.current) {
@@ -330,7 +345,7 @@ export default function ExternalBiometricCapture({
     try {
       const deviceList = await dpReader.enumerateDevices();
       if (deviceList.length === 0) {
-        throw new Error("No DigitalPersona devices found. Ensure the scanner is plugged in.");
+        throw new Error("No DigitalPersona devices found. IMPORTANT: If the device is illuminated but not found, or if it 'turned off' after using Zadig, you may have the wrong driver. Please revert from WinUSB to the original DigitalPersona drivers in Device Manager.");
       }
 
       const deviceId = deviceList[0];
@@ -435,16 +450,12 @@ export default function ExternalBiometricCapture({
         {preview && (
           <div className="flex flex-col items-center justify-center p-4 bg-white dark:bg-slate-900 border rounded-xl shadow-inner animate-in fade-in zoom-in duration-300">
             <Label className="text-[10px] uppercase tracking-wider text-blue-500 mb-3 font-bold animate-pulse">Live Scanning View</Label>
-            <div className="relative group">
-              <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
-              <div className="relative border-4 border-slate-100 dark:border-slate-800 rounded-lg overflow-hidden bg-white shadow-2xl">
-                <img
-                  src={preview}
-                  alt="Fingerprint Preview"
-                  className="w-40 h-52 object-contain bg-slate-50 grayscale hover:grayscale-0 transition-all duration-500"
-                />
-                <div className="absolute inset-0 border border-white/20 pointer-events-none"></div>
-              </div>
+            <div className="relative border-2 border-blue-200 dark:border-blue-900 rounded-lg overflow-hidden bg-white shadow-lg">
+              <img
+                src={preview}
+                alt="Fingerprint Preview"
+                className="w-48 h-64 object-contain bg-slate-50 hover:scale-105 transition-all duration-300"
+              />
             </div>
             <p className="mt-3 text-[10px] text-blue-500 font-medium">Capture details: Real-time • RAW</p>
           </div>
@@ -466,10 +477,19 @@ export default function ExternalBiometricCapture({
         )}
 
         {status?.toLowerCase().includes("access denied") && (
-          <div className="text-[10px] bg-amber-50 dark:bg-amber-950/20 p-2 rounded border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400">
-            <strong>Pro Tip:</strong> Reader likely needs the <strong>WinUSB</strong> driver. Use <a href="https://zadig.akeo.ie/" target="_blank" rel="noopener noreferrer" className="underline font-bold">Zadig</a> to replace the current driver.
+          <div className="text-[10px] bg-red-50 dark:bg-red-950/20 p-2 rounded border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400">
+            <strong>CRITICAL:</strong> Access denied. This usually means another application is using the scanner OR the driver is incorrect.
           </div>
         )}
+
+        <div className="text-[10px] bg-amber-50 dark:bg-amber-950/20 p-3 rounded border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 mt-2">
+          <strong>Scanner Setup Guide:</strong>
+          <ul className="list-disc ml-4 mt-1 space-y-1">
+            <li>Ensure <strong>DigitalPersona Lite Client</strong> is installed and running.</li>
+            <li><strong>DO NOT use Zadig or WinUSB</strong> for this scanner; it requires the official DigitalPersona drivers.</li>
+            <li>If you used Zadig, go to <strong>Device Manager</strong>, find the device, right-click and select <strong>Uninstall Device</strong> (check "attempt to remove driver"), then unplug and replug the scanner.</li>
+          </ul>
+        </div>
 
         {status?.toLowerCase().includes("service") && (
           <div className="bg-amber-50 dark:bg-amber-950/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800 space-y-3 shadow-sm mt-4">

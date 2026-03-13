@@ -179,7 +179,7 @@ export default function ExternalBiometricCapture({
 
     const onCommunicationFailed = () => {
       console.error("DP Communication Failed");
-      setStatus("Could not reach DigitalPersona service.");
+      setStatus("Communication failure: The scanner service is not responding.");
       setBusy(false);
     };
 
@@ -391,8 +391,12 @@ export default function ExternalBiometricCapture({
 
     } catch (err: any) {
       console.error("USB Capture Error:", err);
-      toast({ title: "Capture Failed", description: err.message, variant: "destructive" });
-      setStatus("Error: " + err.message);
+      let errorMsg = err.message;
+      if (errorMsg.includes("Communication failure")) {
+        errorMsg = "Scanner Service Unreachable. Please ensure 'DigitalPersona Lite Client' is installed and running.";
+      }
+      toast({ title: "Capture Failed", description: errorMsg, variant: "destructive" });
+      setStatus("Error: " + errorMsg);
       setBusy(false);
     }
   }, [toast, busy]);
@@ -491,13 +495,18 @@ export default function ExternalBiometricCapture({
           </ul>
         </div>
 
-        {status?.toLowerCase().includes("service") && (
+        {(status?.toLowerCase().includes("service") || status?.toLowerCase().includes("communication")) && (
           <div className="bg-amber-50 dark:bg-amber-950/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800 space-y-3 shadow-sm mt-4">
             <p className="text-[11px] font-bold uppercase text-amber-800 dark:text-amber-400 flex items-center gap-2">
-              <AlertCircle className="h-3 w-3" /> DigitalPersona WebSDK Missing
+              <AlertCircle className="h-3 w-3" /> Scanner Service Issue
             </p>
             <div className="text-[10px] text-amber-700 dark:text-amber-300 space-y-2">
-              <p>To use the <strong>U.are.U 4500 reader</strong>, ensure you have installed the <strong>"DigitalPersona Lite Client" (WebSDK)</strong>.</p>
+              <p>The <strong>DigitalPersona Lite Client (WebSDK)</strong> service is not responding.</p>
+              <ol className="list-decimal ml-4 space-y-1">
+                <li>Check if <strong>DigitalPersona</strong> is in your system tray (near the clock).</li>
+                <li>Restart the <strong>DigitalPersona Lite Client</strong> service in the Windows "Services" app.</li>
+                <li>If not installed, please install the SDK provided with your scanner.</li>
+              </ol>
             </div>
           </div>
         )}

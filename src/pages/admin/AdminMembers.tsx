@@ -288,8 +288,6 @@ export default function AdminMembers() {
   };
 
   const handleBiometricCaptureComplete = async (data: string) => {
-    if (!selectedMember) return;
-    await supabase.from("members").update({ biometric_data: data }).eq("id", selectedMember.id);
     setBiometricDialogOpen(false);
     loadData();
   };

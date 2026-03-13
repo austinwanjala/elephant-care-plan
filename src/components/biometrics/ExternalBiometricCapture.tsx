@@ -9,6 +9,7 @@ import { AlertCircle, Cpu, Fingerprint, Upload, Usb, Wifi } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { registerExternalBiometric, verifyExternalBiometric, BiometricFormat } from "@/services/biometrics";
 import { DeviceConnected, DeviceDisconnected, FingerprintReader, CommunicationFailed, SamplesAcquired, SampleFormat, ErrorOccurred, QualityReported } from "@/lib/digitalpersona";
+import { supabase } from "@/integrations/supabase/client";
 
 
 type Mode = "register" | "verify";
@@ -54,6 +55,8 @@ export default function ExternalBiometricCapture({
   const timeoutRef = useRef<number | null>(null);
   const streamingRef = useRef(false);
   const lastSuccessRef = useRef<string | null>(null);
+  const finalizeRef = useRef<((cleanData: string, deviceUid?: string) => Promise<void>) | null>(null);
+  const isFinalizingRef = useRef(false);
 
   useEffect(() => {
     setSupportsHID(!!(navigator as any).hid);
@@ -87,24 +90,33 @@ export default function ExternalBiometricCapture({
     };
 
     const finalizeCapture = async (cleanData: string, deviceUid?: string) => {
+      if (isFinalizingRef.current) return;
+      isFinalizingRef.current = true;
+
       try {
         setStatus("Processing biometric template...");
         await processTemplate(cleanData, "unknown");
+        setPreview(null); // Clear preview on success
         toast({ title: "Capture Success", description: "Fingerprint template processed." });
-
-        // Stop the sensor
+        console.log("Biometric capture finalized and processed successfully.");
+      } catch (err: any) {
+        console.error("Finalize error details:", err);
+        setStatus(`Processing failed: ${err.message || "Unknown error"}`);
+        toast({ title: "Processing Error", description: err.message || "Could not process template.", variant: "destructive" });
+      } finally {
+        // Always cleanup
         if (deviceUid) {
+          console.log("Stopping acquisition for device:", deviceUid);
           reader.stopAcquisition(deviceUid).catch(console.error);
         }
         streamingRef.current = false;
         setBusy(false);
+        isFinalizingRef.current = false;
         if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
-      } catch (err: any) {
-        console.error("Finalize error:", err);
-        setStatus("Processing failed.");
-        setBusy(false);
       }
     };
+
+    finalizeRef.current = finalizeCapture;
 
     const onSamplesAcquired = async (e: SamplesAcquired) => {
       console.log("DP Sample Acquired Event:", e);
@@ -274,9 +286,9 @@ export default function ExternalBiometricCapture({
     setStatus("Waiting for HID device input...");
     try {
       const navAny = navigator as any;
-      const devices: HIDDevice[] = await navAny.hid.requestDevice({ filters: [] });
+      const devices = await navAny.hid.requestDevice({ filters: [] });
       if (!devices || devices.length === 0) throw new Error("No HID device selected");
-      const device = devices[0];
+      const device = devices[0] as any;
       await device.open();
 
       setStatus("HID Device opened. Attempting to power on sensor...");
@@ -338,11 +350,21 @@ export default function ExternalBiometricCapture({
     }
 
     setBusy(true);
-    setStatus("Connecting to scanner...");
-    lastSuccessRef.current = null;
-    setPreview(null);
+    setStatus("Verifying session...");
 
     try {
+      // 1. Force a session refresh to ensure the token is valid for the duration of the scan
+      const { data: { session }, error: sessionErr } = await supabase.auth.getSession();
+
+      if (sessionErr || !session) {
+        console.error("Session verification failed:", sessionErr);
+        throw new Error("Your session has expired or is invalid. Please log out and back in.");
+      }
+
+      setStatus("Connecting to scanner...");
+      lastSuccessRef.current = null;
+      setPreview(null);
+
       const deviceList = await dpReader.enumerateDevices();
       if (deviceList.length === 0) {
         throw new Error("No DigitalPersona devices found. IMPORTANT: If the device is illuminated but not found, or if it 'turned off' after using Zadig, you may have the wrong driver. Please revert from WinUSB to the original DigitalPersona drivers in Device Manager.");
@@ -378,8 +400,9 @@ export default function ExternalBiometricCapture({
       timeoutRef.current = window.setTimeout(() => {
         if (streamingRef.current && lastSuccessRef.current) {
           // Timeout hit but we have a preview image? Use the last one as a fallback!
-          // This handles cases where people keep their finger on it but it never hits quality 0.
-          (dpReader as any).onQualityReported({ quality: 0, deviceId: deviceId });
+          if (finalizeRef.current) {
+            finalizeRef.current(lastSuccessRef.current, deviceId);
+          }
         } else if (busy) {
           dpReader.stopAcquisition(deviceId).catch(console.error);
           streamingRef.current = false;

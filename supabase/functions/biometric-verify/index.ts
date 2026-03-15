@@ -131,7 +131,7 @@ serve(async (req) => {
     console.log(`Verifying member: ${mid}`);
     console.log(`Stored template length: ${storedTemplate?.length || 0}`);
     console.log(`Provided template length: ${template.length}`);
-    
+
     if (storedTemplate && template) {
       console.log(`Stored prefix: ${storedTemplate.substring(0, 50)}...`);
       console.log(`Provided prefix: ${template.substring(0, 50)}...`);

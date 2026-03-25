@@ -318,6 +318,7 @@ export type Database = {
           location: string
           name: string
           phone: string | null
+          status: string | null
           updated_at: string
         }
         Insert: {
@@ -329,6 +330,7 @@ export type Database = {
           location: string
           name: string
           phone?: string | null
+          status?: string | null
           updated_at?: string
         }
         Update: {
@@ -340,9 +342,58 @@ export type Database = {
           location?: string
           name?: string
           phone?: string | null
+          status?: string | null
           updated_at?: string
         }
         Relationships: []
+      }
+      branch_fines: {
+        Row: {
+          amount: number
+          auditor_id: string | null
+          branch_id: string | null
+          created_at: string | null
+          id: string
+          reason: string
+          status: string | null
+          warning_level: number
+        }
+        Insert: {
+          amount?: number
+          auditor_id?: string | null
+          branch_id?: string | null
+          created_at?: string | null
+          id?: string
+          reason: string
+          status?: string | null
+          warning_level: number
+        }
+        Update: {
+          amount?: number
+          auditor_id?: string | null
+          branch_id?: string | null
+          created_at?: string | null
+          id?: string
+          reason?: string
+          status?: string | null
+          warning_level?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "branch_fines_auditor_id_fkey"
+            columns: ["auditor_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "branch_fines_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       claims: {
         Row: {
@@ -1067,6 +1118,7 @@ export type Database = {
           is_active: boolean
           level: Database["public"]["Enums"]["membership_level"]
           management_fee: number
+          marketer_commission: number
           name: string
           payment_amount: number
           registration_fee: number
@@ -1079,6 +1131,7 @@ export type Database = {
           is_active?: boolean
           level: Database["public"]["Enums"]["membership_level"]
           management_fee?: number
+          marketer_commission?: number
           name: string
           payment_amount: number
           registration_fee?: number
@@ -1091,6 +1144,7 @@ export type Database = {
           is_active?: boolean
           level?: Database["public"]["Enums"]["membership_level"]
           management_fee?: number
+          marketer_commission?: number
           name?: string
           payment_amount?: number
           registration_fee?: number
@@ -1661,6 +1715,7 @@ export type Database = {
       | "super_admin"
       | "finance"
       | "auditor"
+      | "super_agent"
       approval_type: "all_branches" | "pre_approved_only"
       claim_status: "pending" | "approved" | "rejected" | "completed"
       membership_level:
@@ -1809,6 +1864,7 @@ export const Constants = {
         "super_admin",
         "finance",
         "auditor",
+        "super_agent",
       ],
       approval_type: ["all_branches", "pre_approved_only"],
       claim_status: ["pending", "approved", "rejected", "completed"],

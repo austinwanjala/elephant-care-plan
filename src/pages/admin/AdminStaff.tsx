@@ -346,6 +346,7 @@ export default function AdminStaff() {
                       <SelectItem value="doctor">Doctor</SelectItem>
                       {(isSuperAdmin || currentUserRole === 'admin') && <SelectItem value="branch_director">Branch Director</SelectItem>}
                       <SelectItem value="marketer">Marketer</SelectItem>
+                      {(isSuperAdmin || currentUserRole === 'admin') && <SelectItem value="super_agent">Super Agent</SelectItem>}
                       {(isSuperAdmin || currentUserRole === 'admin') && <SelectItem value="finance">Finance Officer</SelectItem>}
                       {isSuperAdmin && <SelectItem value="auditor">Auditor</SelectItem>}
                       {isSuperAdmin && <SelectItem value="admin">Administrator</SelectItem>}
@@ -353,7 +354,7 @@ export default function AdminStaff() {
                     </SelectContent>
                   </Select>
                 </div>
-                {formData.role !== 'marketer' && formData.role !== 'admin' && formData.role !== 'super_admin' && formData.role !== 'finance' && (
+                {formData.role !== 'marketer' && formData.role !== 'super_agent' && formData.role !== 'admin' && formData.role !== 'super_admin' && formData.role !== 'finance' && (
                   <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
                     <Label>Assigned Branch</Label>
                     <Select
@@ -421,6 +422,7 @@ export default function AdminStaff() {
                         <SelectItem value="doctor">Doctor</SelectItem>
                         {(isSuperAdmin || currentUserRole === 'admin') && <SelectItem value="branch_director">Branch Director</SelectItem>}
                         <SelectItem value="marketer">Marketer</SelectItem>
+                        {(isSuperAdmin || currentUserRole === 'admin') && <SelectItem value="super_agent">Super Agent</SelectItem>}
                         {(isSuperAdmin || currentUserRole === 'admin') && <SelectItem value="finance">Finance Officer</SelectItem>}
                         {isSuperAdmin && <SelectItem value="auditor">Auditor</SelectItem>}
                         {isSuperAdmin && <SelectItem value="admin">Administrator</SelectItem>}
@@ -428,7 +430,7 @@ export default function AdminStaff() {
                       </SelectContent>
                     </Select>
                   </div>
-                  {editingUser.type !== 'marketer' && editingUser.displayRole !== 'admin' && editingUser.displayRole !== 'super_admin' && (
+                  {editingUser.type !== 'marketer' && editingUser.displayRole !== 'super_agent' && editingUser.displayRole !== 'admin' && editingUser.displayRole !== 'super_admin' && (
                     <div className="space-y-2">
                       <Label>Branch</Label>
                       <Select

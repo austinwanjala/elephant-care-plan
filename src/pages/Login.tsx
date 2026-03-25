@@ -179,6 +179,8 @@ const Login = () => {
         navigate("/auditor");
       } else if (role === "marketer") {
         navigate("/marketer");
+      } else if (role === "super_agent") {
+        navigate("/super-agent");
       } else {
         // Member: ensure the member profile exists before routing (prevents "You don't have member privileges")
         const { error: ensureMemberError } = await supabase.rpc("ensure_member_profile");

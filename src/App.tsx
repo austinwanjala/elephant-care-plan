@@ -25,6 +25,7 @@ import { AdminLayout } from "./components/admin/AdminLayout";
 import { SuperAdminLayout } from "./components/super-admin/SuperAdminLayout";
 import { FinanceLayout } from "./components/finance/FinanceLayout";
 import { AuditorLayout } from "./components/auditor/AuditorLayout";
+import { SuperAgentLayout } from "./components/super-agent/SuperAgentLayout";
 
 // Member Pages
 import MemberDashboard from "./pages/member/MemberDashboard";
@@ -96,9 +97,16 @@ import FinanceDashboard from "./pages/finance/Dashboard";
 import AuditorDashboard from "./pages/auditor/Dashboard";
 import AuditorMembers from "./pages/auditor/Members";
 import AuditorVisits from "./pages/auditor/Visits";
+import AuditorBranches from "./pages/auditor/Branches";
 import AuditorFinancials from "./pages/auditor/Financials";
 import AuditorLogs from "./pages/auditor/Logs";
 import StaffMessages from "./pages/staff/Messages";
+
+// Super Agent Pages
+import SuperAgentDashboard from "./pages/super-agent/Dashboard";
+import SuperAgentMarketers from "./pages/super-agent/Marketers";
+import SuperAgentCommissions from "./pages/super-agent/Commissions";
+
 import { DynamicTheme } from "./components/DynamicTheme";
 
 const queryClient = new QueryClient();
@@ -239,9 +247,17 @@ const App = () => (
             <Route index element={<AuditorDashboard />} />
             <Route path="members" element={<AuditorMembers />} />
             <Route path="visits" element={<AuditorVisits />} />
+            <Route path="branches" element={<AuditorBranches />} />
             <Route path="financials" element={<AuditorFinancials />} />
             <Route path="logs" element={<AuditorLogs />} />
             <Route path="messages" element={<StaffMessages />} />
+          </Route>
+
+          {/* Super Agent Routes */}
+          <Route path="/super-agent" element={<SuperAgentLayout />}>
+            <Route index element={<SuperAgentDashboard />} />
+            <Route path="marketers" element={<SuperAgentMarketers />} />
+            <Route path="commissions" element={<SuperAgentCommissions />} />
           </Route>
 
           {/* 404 Route */}

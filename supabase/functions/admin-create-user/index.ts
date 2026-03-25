@@ -15,7 +15,8 @@ type AppRole =
   | "admin"
   | "super_admin"
   | "finance"
-  | "auditor";
+  | "auditor"
+  | "super_agent";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -103,6 +104,7 @@ serve(async (req) => {
         "marketer",
         "finance",
         "auditor",
+        "super_agent",
         "member",
       ].includes(requestedRole);
 
@@ -182,6 +184,23 @@ serve(async (req) => {
 
         if (setupErr) {
           console.error("[admin-create-user] sync_user_setup failed", setupErr);
+        }
+
+        // Force role mapping if super_agent (since old sync algorithms might skip it)
+        if (requestedRole === "super_agent") {
+            const { error: roleErr } = await supabaseAdmin.from("user_roles").upsert({
+                user_id: createdUserId,
+                role: "super_agent"
+            });
+            const { error: staffErr } = await supabaseAdmin.from("staff").upsert({
+                user_id: createdUserId,
+                full_name: metadata.full_name || "Super Agent",
+                email: data.user?.email,
+                phone: metadata.phone || null,
+                is_active: true
+            });
+            if (roleErr) console.error("[admin-create-user] super_agent role force failed", roleErr);
+            if (staffErr) console.error("[admin-create-user] super_agent staff force failed", staffErr);
         }
       }
     } catch (e: any) {

@@ -206,11 +206,15 @@ export default function DirectorDashboard() {
             <div className="soft-glow-blue bottom-[-5%] right-[-5%]" />
 
             <div className="flex flex-col gap-8 relative z-10 max-w-7xl mx-auto">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                    <div>
-                        <h1 className="text-4xl font-serif font-bold tracking-tight text-slate-900 leading-tight">Branch Performance</h1>
-                        <p className="text-slate-500 mt-1 font-medium italic">Comprehensive oversight for {branchName}</p>
+                <div className="relative w-full h-48 md:h-64 rounded-3xl overflow-hidden mb-2 shadow-2xl group">
+                    <img src="https://images.unsplash.com/photo-1504813184591-01572f98c85f?auto=format&fit=crop&w=1200&q=80" alt="Branch Director" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                    <div className="absolute inset-0 bg-gradient-to-r from-slate-900/90 via-slate-900/60 to-transparent flex flex-col justify-center px-8 md:px-12 backdrop-blur-[2px]">
+                        <h1 className="text-4xl md:text-5xl font-serif font-black text-white tracking-tight leading-tight drop-shadow-xl">Branch Performance.</h1>
+                        <p className="text-emerald-400 mt-2 font-black tracking-widest uppercase text-xs md:text-sm drop-shadow-md">Comprehensive oversight for {branchName}</p>
                     </div>
+                </div>
+
+                <div className="flex flex-col md:flex-row md:items-center justify-end gap-6">
                     <div className="flex items-center gap-3 bg-white/70 backdrop-blur-md px-6 py-3 rounded-2xl border border-slate-200 shadow-xl shadow-slate-100/50 text-slate-700 font-black text-sm uppercase tracking-wider">
                         <Calendar className="h-4 w-4 text-primary" />
                         <span>{new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>

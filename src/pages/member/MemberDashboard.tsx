@@ -15,7 +15,9 @@ import {
   RefreshCw,
   Activity,
   CheckCircle2,
+  Clock,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import {
   Table,
@@ -317,11 +319,15 @@ const MemberDashboard = () => {
       <div className="soft-glow-blue bottom-[-5%] right-[-10%]" />
 
       <main className="container mx-auto px-4 py-8 relative z-10">
-        <div className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h1 className="text-4xl font-serif font-bold text-slate-900 tracking-tight">Member Portal</h1>
-            <p className="text-slate-500 mt-1 font-medium">Welcome back, {member.full_name}. Here is your cover summary.</p>
+        <div className="relative w-full h-48 md:h-64 rounded-3xl overflow-hidden mb-8 shadow-2xl group">
+          <img src="https://images.unsplash.com/photo-1606811841689-23dfddce3e95?auto=format&fit=crop&w=1200&q=80" alt="Dental Care" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-900/90 via-slate-900/60 to-transparent flex flex-col justify-center px-8 md:px-12 backdrop-blur-[2px]">
+            <h1 className="text-4xl md:text-5xl font-serif font-black text-white tracking-tight leading-tight drop-shadow-xl">Member Portal.</h1>
+            <p className="text-emerald-400 mt-2 font-black tracking-widest uppercase text-xs md:text-sm drop-shadow-md">Welcome back, {member.full_name}.</p>
           </div>
+        </div>
+
+        <div className="mb-10 flex flex-col md:flex-row justify-end items-start md:items-center gap-4">
           <div className="flex gap-2">
             <Button variant="outline" className="rounded-xl border-slate-200 bg-white/50 backdrop-blur-sm font-bold text-xs px-5 shadow-sm hover:bg-white" onClick={loadMemberData}>
               <RefreshCw className="mr-2 h-3.5 w-3.5" /> Sync Data

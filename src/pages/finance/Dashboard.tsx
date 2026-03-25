@@ -105,11 +105,15 @@ export default function FinanceDashboard() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-amber-900">Finance Overview</h1>
-          <p className="text-muted-foreground mt-1">Treasury and payout management dashboard.</p>
+      <div className="relative w-full h-48 md:h-64 rounded-3xl overflow-hidden mb-6 shadow-xl group">
+        <img src="https://images.unsplash.com/photo-1554224154-26032ffc0d07?auto=format&fit=crop&w=1200&q=80" alt="Finance Dashboard" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-900/90 via-slate-900/60 to-transparent flex flex-col justify-center px-8 md:px-12 backdrop-blur-[2px]">
+            <h1 className="text-4xl md:text-5xl font-serif font-black text-white tracking-tight leading-tight drop-shadow-xl">Finance Overview.</h1>
+            <p className="text-emerald-400 mt-2 font-black tracking-widest uppercase text-xs md:text-sm drop-shadow-md">Treasury and payout management dashboard.</p>
         </div>
+      </div>
+
+      <div className="flex flex-col lg:flex-row lg:items-center justify-end gap-4 mt-4">
         <Badge variant="outline" className="px-3 py-1.5 text-sm bg-amber-50 border-amber-200 text-amber-700">
           <Calendar className="h-3.5 w-3.5 mr-1.5" />
           {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}

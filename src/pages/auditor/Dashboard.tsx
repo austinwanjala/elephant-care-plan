@@ -130,10 +130,11 @@ export default function AuditorDashboard() {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-start">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Auditor Dashboard</h1>
-                    <p className="text-muted-foreground">Overview of financial and operational metrics</p>
+            <div className="relative w-full h-48 md:h-64 rounded-3xl overflow-hidden mb-6 shadow-xl group">
+                <img src="https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=1200&q=80" alt="Audit & Financials" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                <div className="absolute inset-0 bg-gradient-to-r from-slate-900/90 via-slate-900/60 to-transparent flex flex-col justify-center px-8 md:px-12 backdrop-blur-[2px]">
+                    <h1 className="text-4xl md:text-5xl font-serif font-black text-white tracking-tight leading-tight drop-shadow-xl">Auditor Dashboard.</h1>
+                    <p className="text-emerald-400 mt-2 font-black tracking-widest uppercase text-xs md:text-sm drop-shadow-md">Overview of financial and operational metrics</p>
                 </div>
             </div>
 

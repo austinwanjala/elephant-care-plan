@@ -80,39 +80,43 @@ const Index = () => {
       </nav>
 
       {/* Hero Section */}
-      <section className="hero-gradient pt-32 pb-20 px-4">
-        <div className="container mx-auto">
-          <div className="max-w-3xl mx-auto text-center animate-slide-up">
-            <h1 className="text-4xl md:text-6xl font-serif font-bold text-primary-foreground mb-6 leading-tight">
+      <section className="relative pt-32 pb-20 px-4 min-h-[90vh] flex items-center justify-center overflow-hidden">
+        <div className="absolute inset-0 z-0">
+          <img src="https://images.unsplash.com/photo-1606811841689-23dfddce3e95?auto=format&fit=crop&w=1920&q=80" alt="Hero Background" className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-900/95 via-slate-900/80 to-background"></div>
+        </div>
+        <div className="container mx-auto relative z-10">
+          <div className="max-w-4xl mx-auto text-center animate-slide-up">
+            <h1 className="text-5xl md:text-7xl font-serif font-black text-white mb-6 leading-tight drop-shadow-2xl">
               {hero_title}
             </h1>
-            <p className="text-xl text-primary-foreground/80 mb-8">
+            <p className="text-xl md:text-2xl text-slate-300 font-medium mb-10 max-w-3xl mx-auto drop-shadow-md">
               {hero_subtitle}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link to={registerUrl}>
-                <Button size="lg" className="btn-accent text-lg px-8 py-6">
+                <Button size="lg" className="bg-emerald-500 hover:bg-emerald-600 text-white border-0 text-lg px-8 py-7 rounded-2xl shadow-[0_0_30px_rgba(16,185,129,0.4)] font-bold transition-all hover:scale-105">
                   Join Now <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
               <Link to="/login">
-                <Button size="lg" variant="outline" className="text-lg px-8 py-6 border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10">
+                <Button size="lg" variant="outline" className="text-lg px-8 py-7 border-emerald-500/30 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-2xl font-bold backdrop-blur-sm transition-all shadow-lg hover:scale-105">
                   Member Login
                 </Button>
               </Link>
             </div>
-            <div className="mt-12 flex flex-wrap justify-center gap-8">
+            <div className="mt-16 bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 flex flex-wrap justify-center gap-12 sm:gap-24 shadow-2xl">
               <div className="text-center">
-                <p className="text-4xl font-bold text-primary-foreground">2×</p>
-                <p className="text-primary-foreground/70">Coverage Multiplier</p>
+                <p className="text-5xl font-black text-emerald-400 drop-shadow-[0_0_15px_rgba(52,211,153,0.5)]">2×</p>
+                <p className="text-white/70 font-bold uppercase tracking-widest text-xs mt-2">Coverage Multiplier</p>
               </div>
               <div className="text-center">
-                <p className="text-4xl font-bold text-primary-foreground">3+</p>
-                <p className="text-primary-foreground/70">Hospital Branches</p>
+                <p className="text-5xl font-black text-blue-400 drop-shadow-[0_0_15px_rgba(96,165,250,0.5)]">3+</p>
+                <p className="text-white/70 font-bold uppercase tracking-widest text-xs mt-2">Hospital Branches</p>
               </div>
               <div className="text-center">
-                <p className="text-4xl font-bold text-primary-foreground">5K+</p>
-                <p className="text-primary-foreground/70">Happy Members</p>
+                <p className="text-5xl font-black text-rose-400 drop-shadow-[0_0_15px_rgba(251,113,133,0.5)]">5K+</p>
+                <p className="text-white/70 font-bold uppercase tracking-widest text-xs mt-2">Happy Members</p>
               </div>
             </div>
           </div>

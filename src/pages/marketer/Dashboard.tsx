@@ -112,11 +112,15 @@ export default function MarketerDashboard() {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-blue-900">Marketer Portal</h1>
-                    <p className="text-muted-foreground">Referral tracking and earnings overview.</p>
+            <div className="relative w-full h-48 md:h-64 rounded-3xl overflow-hidden mb-6 shadow-xl group">
+                <img src="https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=1200&q=80" alt="Marketer Dashboard" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                <div className="absolute inset-0 bg-gradient-to-r from-slate-900/90 via-slate-900/60 to-transparent flex flex-col justify-center px-8 md:px-12 backdrop-blur-[2px]">
+                    <h1 className="text-4xl md:text-5xl font-serif font-black text-white tracking-tight leading-tight drop-shadow-xl">Marketer Portal.</h1>
+                    <p className="text-blue-400 mt-2 font-black tracking-widest uppercase text-xs md:text-sm drop-shadow-md">Referral tracking and earnings overview.</p>
                 </div>
+            </div>
+
+            <div className="flex flex-col md:flex-row md:items-center justify-end gap-4 mt-4">
                 <div className="flex items-center gap-2">
                     <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-sm py-1 px-3">
                         Marketer Code: {marketer.code}

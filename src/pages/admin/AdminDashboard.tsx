@@ -234,11 +234,15 @@ export default function AdminDashboard() {
       <div className="soft-glow-blue bottom-[-5%] right-[-5%]" />
 
       <div className="flex flex-col gap-8 relative z-10 max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-          <div>
-            <h1 className="text-4xl font-serif font-bold tracking-tight text-slate-900 leading-tight">Admin Executive Suite</h1>
-            <p className="text-slate-500 mt-1 font-medium italic">High-level strategic overview of your dental network</p>
+        <div className="relative w-full h-48 md:h-64 rounded-3xl overflow-hidden mb-2 shadow-2xl group">
+          <img src="https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&w=1200&q=80" alt="Executive Medical Analytics" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-900/90 via-slate-900/60 to-transparent flex flex-col justify-center px-8 md:px-12 backdrop-blur-[2px]">
+            <h1 className="text-4xl md:text-5xl font-serif font-black text-white tracking-tight leading-tight drop-shadow-xl">Admin Executive Suite.</h1>
+            <p className="text-blue-400 mt-2 font-black tracking-widest uppercase text-xs md:text-sm drop-shadow-md">High-level strategic overview of your dental network</p>
           </div>
+        </div>
+
+        <div className="flex flex-col md:flex-row justify-end items-start md:items-center gap-6">
           <div className="flex items-center gap-3 bg-white/70 backdrop-blur-md p-1.5 rounded-2xl border border-slate-200 shadow-xl shadow-slate-100/50">
             <Button
               variant={showAllTime ? "default" : "outline"}

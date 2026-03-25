@@ -85,11 +85,15 @@ export default function ReceptionDashboard() {
             <div className="soft-glow-blue bottom-[-5%] right-[-5%]" />
 
             <div className="flex flex-col gap-8 relative z-10 max-w-7xl mx-auto">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <div>
-                        <h1 className="text-4xl font-serif font-bold tracking-tight text-slate-900">Reception Dashboard</h1>
-                        <p className="text-slate-500 mt-1">Ready to assist our patients with care and efficiency.</p>
+                <div className="relative w-full h-48 md:h-64 rounded-3xl overflow-hidden mb-2 shadow-2xl group">
+                    <img src="https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=1200&q=80" alt="Reception Desk" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                    <div className="absolute inset-0 bg-gradient-to-r from-slate-900/90 via-slate-900/60 to-transparent flex flex-col justify-center px-8 md:px-12 backdrop-blur-[2px]">
+                        <h1 className="text-4xl md:text-5xl font-serif font-black text-white tracking-tight leading-tight drop-shadow-xl">Reception Front-Desk.</h1>
+                        <p className="text-emerald-400 mt-2 font-black tracking-widest uppercase text-xs md:text-sm drop-shadow-md">Ready to assist our patients with care and efficiency.</p>
                     </div>
+                </div>
+
+                <div className="flex flex-col md:flex-row justify-end items-start md:items-center gap-4">
                     <Button onClick={() => navigate("/reception/register-visit")} className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xl shadow-emerald-200/50 rounded-2xl px-8 h-12 font-black transition-all hover:scale-105 active:scale-95">
                         <UserPlus className="h-5 w-5" /> Register New Visit
                     </Button>

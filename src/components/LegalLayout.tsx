@@ -17,7 +17,7 @@ export const LegalLayout = ({ children, title, subtitle }: LegalLayoutProps) => 
                 <div className="container mx-auto px-4 py-6">
                     <div className="flex flex-col md:flex-row justify-between items-center gap-6">
                         <div className="flex items-center gap-4">
-                            <img src="/img/elephant-logo.png" alt="Logo" className="w-16 h-16 object-contain" />
+                            <img src="/img/ogo.jpeg" alt="Logo" className="w-16 h-16 object-contain" />
                             <div>
                                 <div className="flex text-3xl font-black tracking-tighter leading-none">
                                     <span className="text-orange-600">ELEPHANT</span>

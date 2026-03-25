@@ -90,8 +90,9 @@ serve(async (req) => {
     const isDirector = callerRole === "branch_director";
     const isReceptionist = callerRole === "receptionist";
     const isMarketer = callerRole === "marketer";
+    const isSuperAgent = callerRole === "super_agent";
 
-    const allowCreateMember = isSuperAdmin || isAdmin || isDirector || isReceptionist || isMarketer;
+    const allowCreateMember = isSuperAdmin || isAdmin || isDirector || isReceptionist || isMarketer || isSuperAgent;
 
     const allowCreateStaffByDirector = isDirector && ["receptionist", "doctor", "marketer"].includes(requestedRole);
 
@@ -109,12 +110,15 @@ serve(async (req) => {
       ].includes(requestedRole);
 
     const allowCreateAdminLevel = isSuperAdmin && ["admin", "super_admin"].includes(requestedRole);
+    
+    const allowCreateStaffBySuperAgent = isSuperAgent && ["marketer"].includes(requestedRole);
 
     const isAllowed =
       (requestedRole === "member" && allowCreateMember) ||
       allowCreateStaffByDirector ||
       allowCreateStaffByAdmin ||
-      allowCreateAdminLevel;
+      allowCreateAdminLevel ||
+      allowCreateStaffBySuperAgent;
 
     if (!isAllowed) {
       console.warn("[admin-create-user] Permission denied", { callerRole, requestedRole });

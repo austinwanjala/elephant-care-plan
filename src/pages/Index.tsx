@@ -59,7 +59,7 @@ const Index = () => {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
-              <img src="/img/elephant-logo.png" alt="Elephant Logo" className="w-8 h-8 object-contain" />
+              <img src="/img/elephantlogo.jpeg" alt="Elephant Logo" className="w-8 h-8 object-contain" />
             </div>
             <span className="text-xl font-serif font-bold text-foreground">{app_name}</span>
           </div>
@@ -204,7 +204,7 @@ const Index = () => {
             <div className="qr-card">
               <div className="text-center">
                 <div className="w-24 h-24 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4 overflow-hidden">
-                  <img src="/img/elephant-logo.png" alt="Elephant Logo" className="w-16 h-16 object-contain" />
+                  <img src="/img/elephantlogo.jpeg" alt="Elephant Logo" className="w-16 h-16 object-contain" />
                 </div>
                 <h3 className="text-xl font-semibold text-foreground mb-2">Your Digital Card</h3>
                 <p className="text-muted-foreground text-sm mb-4">Sample Member Card</p>
@@ -242,7 +242,7 @@ const Index = () => {
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
-                  <img src="/img/elephant-logo.png" alt="Elephant Logo" className="w-8 h-8 object-contain" />
+                  <img src="/img/elephantlogo.jpeg" alt="Elephant Logo" className="w-8 h-8 object-contain" />
                 </div>
                 <span className="text-xl font-serif font-bold text-foreground">{app_name}</span>
               </div>

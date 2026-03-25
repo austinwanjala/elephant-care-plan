@@ -175,7 +175,7 @@ export default function ReceptionBilling() {
             <body>
                 <div class="header" style="border-bottom: 2px solid #10b981; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; padding-bottom: 15px;">
                     <div style="display: flex; align-items: center; gap: 15px;">
-                        <img src="/img/elephant-logo.png" style="width: 70px; height: 70px; object-fit: contain;" />
+                        <img src="/img/elephantlogo.jpeg" style="width: 70px; height: 70px; object-fit: contain;" />
                         <div>
                             <div style="font-size: 32px; font-weight: 800; color: #064e3b; line-height: 1; letter-spacing: 1px;">ELEPHANT</div>
                             <div style="font-size: 32px; font-weight: 800; color: #10b981; line-height: 1; letter-spacing: 1px;">DENTAL</div>

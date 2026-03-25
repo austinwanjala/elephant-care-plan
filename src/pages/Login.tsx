@@ -292,26 +292,41 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex">
-      <div className="flex-1 flex flex-col justify-center px-4 sm:px-6 lg:px-20 xl:px-24">
-        <div className="mx-auto w-full max-w-sm">
-          <Link to="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-8">
-            <ArrowLeft className="h-4 w-4" />
-            Back to home
-          </Link>
+    <div className="min-h-screen relative flex items-center justify-center overflow-hidden">
+      {/* Clear Clinical Background Image */}
+      <div 
+        className="absolute inset-0 z-0 bg-slate-900/20"
+        style={{ 
+          backgroundImage: 'linear-gradient(to bottom, rgba(15, 23, 42, 0.4), rgba(15, 23, 42, 0.6)), url("https://images.unsplash.com/photo-1606811841689-23dfddce3e95?q=80&w=2000")',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundAttachment: 'fixed',
+        }}
+      />
 
-          <div className="flex items-center gap-2 mb-12">
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
-              <img src="/img/elephant-logo.png" alt="Elephant Logo" className="w-8 h-8 object-contain" />
-            </div>
-            <span className="text-xl font-serif font-bold text-foreground">{settings.app_name || "Elephant Dental"}</span>
+      <div className="relative z-10 w-full max-w-lg px-4 sm:px-0">
+        <Link to="/" className="inline-flex items-center gap-2 text-white hover:text-white/80 transition-colors mb-6 font-medium bg-black/20 backdrop-blur px-4 py-2 rounded-full shadow-sm text-sm border border-white/20">
+          <ArrowLeft className="h-4 w-4" />
+          Back to home
+        </Link>
+        
+        <div className="bg-white/90 backdrop-blur-xl shadow-[0_8px_40px_-12px_rgba(0,0,0,0.1)] rounded-3xl overflow-hidden border border-white/60">
+          
+          <div className="w-full h-32 sm:h-40 bg-white relative flex items-center justify-center border-b border-slate-100 p-4">
+            <img src="/img/elephantlogo.jpg" alt="Elephant Dental Banner" className="w-full h-full object-contain" />
           </div>
 
-          <div className="space-y-4">
+          <div className="p-8 sm:p-10">
+            <div className="text-center mb-8">
+              <h1 className="text-2xl font-serif font-bold text-slate-900 tracking-tight">{settings.app_name || "Elephant Dental"}</h1>
+              <p className="text-sm text-slate-500 mt-2">Welcome back! Please enter your details.</p>
+            </div>
+
+            <div className="space-y-4">
             <Button
               type="button"
               variant="outline"
-              className="w-full relative"
+              className="w-full relative h-12 bg-white hover:bg-slate-50 text-slate-700 border-slate-200 font-medium transition-all hover:shadow-sm"
               onClick={async () => {
                 try {
                   const { error } = await supabase.auth.signInWithOAuth({
@@ -335,32 +350,23 @@ const Login = () => {
                 }
               }}
             >
-              <div className="flex items-center justify-center gap-2">
-                <svg
-                  className="h-4 w-4"
-                  aria-hidden="true"
-                  focusable="false"
-                  data-prefix="fab"
-                  data-icon="google"
-                  role="img"
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 488 512"
-                >
-                  <path
-                    fill="currentColor"
-                    d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"
-                  ></path>
+              <div className="flex items-center justify-center gap-3">
+                <svg className="h-5 w-5" aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                 </svg>
                 Continue with Google
               </div>
             </Button>
 
-            <div className="relative">
+            <div className="relative my-6">
               <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
+                <span className="w-full border-t border-slate-200" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">Or continue with email</span>
+                <span className="bg-white/90 px-3 text-slate-400 font-medium tracking-wider rounded-full">Or continue with email</span>
               </div>
             </div>
           </div>
@@ -417,27 +423,17 @@ const Login = () => {
               </div>
             </div>
 
-            <Button type="submit" className="w-full btn-primary" disabled={loading}>
-              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Sign in"}
+            <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-white h-12 text-md shadow-lg shadow-primary/25 transition-all mt-4" disabled={loading}>
+              {loading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : "Sign In to Portal"}
             </Button>
           </form>
 
-          <p className="mt-6 text-center text-sm text-muted-foreground">
+          <p className="mt-8 text-center text-sm text-slate-500 font-medium">
             Don&apos;t have an account?{" "}
-            <Link to="/register" className="text-primary hover:underline">
-              Register
+            <Link to="/register" className="text-primary hover:text-primary/80 transition-colors font-bold hover:underline">
+              Create an account
             </Link>
           </p>
-        </div>
-      </div>
-
-      <div className="hidden lg:block relative flex-1 bg-gradient-to-br from-primary/10 to-primary/5">
-        <div className="absolute inset-0 flex items-center justify-center p-12">
-          <div className="max-w-md space-y-6">
-            <h2 className="text-4xl font-serif font-bold text-foreground">Welcome back</h2>
-            <p className="text-lg text-muted-foreground">
-              Sign in to access your Elephant Dental portal and manage your membership, appointments, and more.
-            </p>
           </div>
         </div>
       </div>

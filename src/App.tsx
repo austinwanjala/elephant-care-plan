@@ -35,6 +35,7 @@ import MemberProfile from "./pages/member/MemberProfile";
 import MemberSchemeSelection from "./pages/member/MemberSchemeSelection";
 import MemberDependants from "./pages/member/MemberDependants";
 import MemberAppointments from "./pages/member/MemberAppointments";
+import MemberChangePassword from "./pages/member/MemberChangePassword";
 
 // Reception Pages
 import ReceptionDashboard from "./pages/reception/Dashboard";
@@ -138,6 +139,7 @@ const App = () => (
             <Route path="scheme-selection" element={<MemberSchemeSelection />} />
             <Route path="dependants" element={<MemberDependants />} />
             <Route path="appointments" element={<MemberAppointments />} />
+            <Route path="change-password" element={<MemberChangePassword />} />
           </Route>
 
           {/* Receptionist Routes */}

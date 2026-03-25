@@ -215,7 +215,7 @@ export default function MemberPayments() {
         <body>
           <div class="header">
             <div style="display: flex; align-items: center; gap: 15px;">
-              <img src="/img/elephant-logo.png" style="width: 60px; height: 60px; object-fit: contain;" />
+              <img src="/img/elephantlogo.jpeg" style="width: 60px; height: 60px; object-fit: contain;" />
               <div>
                 <div class="logo-text" style="color: #064e3b;">ELEPHANT</div>
                 <div class="logo-text" style="color: #10b981;">DENTAL</div>

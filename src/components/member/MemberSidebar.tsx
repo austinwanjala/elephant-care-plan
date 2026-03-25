@@ -8,6 +8,7 @@ import {
   LogOut,
   UserPlus,
   CalendarClock,
+  KeyRound,
 } from "lucide-react";
 import {
   Sidebar,
@@ -32,6 +33,7 @@ const menuItems = [
   { title: "Book Appointment", url: "/dashboard/appointments", icon: CalendarClock },
   { title: "My Dependants", url: "/dashboard/dependants", icon: UserPlus },
   { title: "Profile Settings", url: "/dashboard/profile", icon: UserCog },
+  { title: "Change Password", url: "/dashboard/change-password", icon: KeyRound },
 ];
 
 import { useSystemSettings } from "@/hooks/useSystemSettings";
@@ -60,7 +62,7 @@ export function MemberSidebar() {
       <SidebarHeader className="p-4 border-b border-border">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden">
-            <img src="/img/elephant-logo.png" alt="Elephant Logo" className="w-8 h-8 object-contain" />
+            <img src="/img/elephantlogo.jpeg" alt="Elephant Logo" className="w-8 h-8 object-contain" />
           </div>
           {!collapsed && (
             <div>

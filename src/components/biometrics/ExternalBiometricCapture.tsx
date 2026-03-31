@@ -148,24 +148,22 @@ export default function ExternalBiometricCapture({
           // Browser data URIs REQUIRE standard Base64 (with + and /).
           const normalizedBase64 = cleanData.replace(/-/g, '+').replace(/_/g, '/');
 
-          const isPng = normalizedBase64.startsWith('iVBORw0KGgo');
-          const isBmp = normalizedBase64.startsWith('Qk0');
-
-          if (isPng || isBmp || e.sampleFormat === 5 || e.sampleFormat === 1) {
-            const mime = isPng ? 'image/png' : (isBmp ? 'image/bmp' : 'image/png');
-
-            // Add padding if missing (Base64Url often omits it)
-            let paddedBase64 = normalizedBase64;
-            while (paddedBase64.length % 4 !== 0) {
-              paddedBase64 += '=';
-            }
-
-            const previewUrl = `data:${mime};base64,${paddedBase64}`;
-            setPreview(previewUrl);
-            lastSuccessRef.current = paddedBase64;
-          } else {
-            console.warn("Acquired sample format not recognized as image. Format:", e.sampleFormat, "Data start:", normalizedBase64.substring(0, 20));
+          // Do NOT generate raw fingerprint data from the web browser.
+          // Capture must be a DPFPTemplate/DPFPFeatureSet format if supported by SDK (Intermediate usually is).
+          // Removed preview URL entirely to comply with: "Never store raw images... Do not generate raw fingerprint data."
+          const isImage = normalizedBase64.startsWith('iVBORw0KGgo') || normalizedBase64.startsWith('Qk0');
+          if (isImage) {
+            console.warn("Raw image detected. Please ensure the DigitalPersona SDK is configured to output Templates (DPFPTemplate) or Feature Sets (DPFPFeatureSet), NOT raw images.");
           }
+
+          // Fallback parsing (since we use base64).
+          // Ensure we comply with Base64 encoding requirement
+          let paddedBase64 = normalizedBase64;
+          while (paddedBase64.length % 4 !== 0) {
+            paddedBase64 += '=';
+          }
+
+          lastSuccessRef.current = paddedBase64;
 
           if (!streamingRef.current) {
             // Standard mode: finalize on first sample
@@ -381,8 +379,8 @@ export default function ExternalBiometricCapture({
         streamingRef.current = true;
         const params = {
           DeviceID: deviceId,
-          SampleType: 5, // PngImage
-          Streaming: true
+          SampleType: 2, // Intermediate (FeatureSet/Template), NOT raw image (5)
+          Streaming: false
         };
 
         const encodedParams = (window as any).dp?.core?.Base64Url?.fromJSON
@@ -395,7 +393,8 @@ export default function ExternalBiometricCapture({
         console.log("Streaming initiated with custom command.");
       } else {
         streamingRef.current = false;
-        await dpReader.startAcquisition(SampleFormat.PngImage, deviceId);
+        // Strict Requirement: Output MUST be a DigitalPersona Template / Feature Set
+        await dpReader.startAcquisition(SampleFormat.Intermediate, deviceId);
       }
 
       if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
@@ -499,42 +498,10 @@ export default function ExternalBiometricCapture({
           </div>
         </div>
 
-        {preview && (
-          <div className="relative flex flex-col items-center justify-center p-6 bg-gradient-to-b from-slate-50 to-slate-100/50 dark:from-slate-900/50 dark:to-slate-950/50 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl shadow-inner animate-in zoom-in-95 duration-500 overflow-hidden group/view">
-            <div className="absolute top-4 right-4 flex items-center gap-2 bg-green-100 dark:bg-green-900/30 px-2.5 py-1 rounded-full border border-green-200 dark:border-green-800/50">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-600 dark:bg-green-400"></span>
-              </span>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-green-700 dark:text-green-400">Live</span>
-            </div>
-
-            <Label className="text-[11px] uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400 mb-6 font-bold flex items-center gap-2">
-              <Cpu className="h-3.5 w-3.5" /> Sensor Feed
-            </Label>
-
-            <div className="relative p-1.5 rounded-2xl bg-gradient-to-br from-blue-500/40 via-indigo-500/20 to-purple-500/40 shadow-xl">
-              <div className="absolute inset-0 bg-blue-400/20 blur-2xl rounded-full mix-blend-screen"></div>
-              <div className="relative border border-white/30 dark:border-slate-700/80 rounded-xl overflow-hidden bg-black/5 dark:bg-black/40 backdrop-blur-md shadow-inner group/preview">
-                <img
-                  src={preview}
-                  alt="Fingerprint Preview"
-                  className="w-48 h-64 object-contain contrast-125 brightness-110 filter drop-shadow-md group-hover/preview:scale-[1.03] transition-transform duration-700 ease-out"
-                  style={{ filter: "hue-rotate(200deg) saturate(1.5)" }}
-                />
-                <div className="absolute inset-0 bg-blue-500/10 opacity-0 group-hover/view:opacity-100 group-hover/view:animate-pulse transition-opacity duration-500 pointer-events-none mix-blend-overlay"></div>
-                {busy && (
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-blue-400/80 shadow-[0_0_15px_3px_rgba(59,130,246,0.6)] animate-pulse"></div>
-                )}
-              </div>
-            </div>
-
-            <div className="mt-6 flex items-center gap-2.5 bg-white/80 dark:bg-slate-900/80 px-4 py-2 rounded-full border border-slate-200/80 dark:border-slate-800/80 shadow-sm backdrop-blur-sm transition-transform hover:scale-105 duration-300">
-              <div className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse"></div>
-              <p className="text-[10px] text-slate-600 dark:text-slate-300 font-bold tracking-wider uppercase">Capturing RAW Data</p>
-            </div>
-          </div>
-        )}
+        {/* PREVIEW REMOVED TO COMPLY WITH SECURITY RULES: 
+           "Never store raw images or unhashed data beyond what the SDK outputs. 
+            Do not generate raw fingerprint data from the web browser."
+        */}
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-4 border-t border-slate-200/60 dark:border-slate-800/60 gap-3">
           <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2 font-medium bg-slate-100/50 dark:bg-slate-900/30 px-3 py-1.5 rounded-full border border-slate-200/50 dark:border-slate-800/50 w-fit">

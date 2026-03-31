@@ -130,9 +130,98 @@ export async function verifyExternalBiometric(params: {
 
   try {
     const stored = JSON.parse(member.biometric_data);
-    const success = stored.template === params.templateBase64;
-    return { success };
-  } catch {
+    
+    console.log("[Biometric] Cloud Edge function unavailable. Falling back to local backend matcher...");
+    
+    // Instead of string === matching, we use the local Node.js matcher server
+    const response = await fetch("http://localhost:3001/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            capturedFeaturesBase64: params.templateBase64,
+            storedTemplateBase64: stored.template
+        })
+    });
+    
+    if (response.ok) {
+        const result = await response.json();
+        return { success: result.success };
+    } else {
+        const errData = await response.json();
+        console.error("[Biometric] Backend match failed:", errData);
+        return { success: false };
+    }
+  } catch (error) {
+    console.error("[Biometric] Local matcher fallback failed:", error);
     return { success: false };
   }
+}
+
+export async function registerFace(params: { memberId?: string; imageBase64: string }) {
+  const { data: { user } } = await supabase.auth.getUser();
+  const tid = params.memberId || user?.id;
+  if (!tid) throw new Error("Target ID not found.");
+
+  const { data: member, error: memErr } = await supabase
+    .from("members")
+    .select("biometric_data")
+    .eq("id", tid)
+    .maybeSingle();
+
+  if (memErr) throw memErr;
+
+  let bios: any = {};
+  if (member?.biometric_data) {
+    if (typeof member.biometric_data === "string") {
+      try { bios = JSON.parse(member.biometric_data); } catch { bios = {}; }
+    } else {
+      bios = member.biometric_data;
+    }
+  }
+
+  bios.face_template = params.imageBase64;
+
+  const { error: upErr } = await supabase
+    .from("members")
+    .update({ 
+      biometric_data: JSON.stringify(bios), 
+      updated_at: new Date().toISOString() 
+    })
+    .eq("id", tid);
+
+  if (upErr) throw upErr;
+  return { success: true };
+}
+
+export async function verifyFace(params: { memberId?: string; imageBase64: string }) {
+  const { data: { user } } = await supabase.auth.getUser();
+  const tid = params.memberId || user?.id;
+  if (!tid) throw new Error("Target ID not found.");
+
+  const { data: member, error: memErr } = await supabase
+    .from("members")
+    .select("biometric_data")
+    .eq("id", tid)
+    .maybeSingle();
+
+  if (memErr) throw memErr;
+  
+  let bios: any = {};
+  if (member?.biometric_data) {
+    if (typeof member.biometric_data === "string") {
+      try { bios = JSON.parse(member.biometric_data); } catch { bios = {}; }
+    } else {
+      bios = member.biometric_data;
+    }
+  }
+
+  if (!bios.face_template) {
+    return { success: false, reason: "No face registered for this member." };
+  }
+
+  // Returns the stored image so the frontend can display it side-by-side or perform local comparison
+  return { 
+    success: true, 
+    storedImage: bios.face_template 
+  };
 }

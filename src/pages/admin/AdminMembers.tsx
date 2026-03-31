@@ -393,11 +393,40 @@ export default function AdminMembers() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {m.biometric_data ? (
-                      <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-200">
-                        <ShieldCheck className="mr-1 h-3 w-3" /> Captured
-                      </Badge>
-                    ) : (
+                    {m.biometric_data ? (() => {
+                      try {
+                        const bios = typeof m.biometric_data === 'string' ? JSON.parse(m.biometric_data) : m.biometric_data;
+                        const hasFace = !!bios?.face_template;
+                        return (
+                          <div className="flex items-center gap-2">
+                            {hasFace ? (
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <div className="h-8 w-8 rounded-full bg-slate-100 border border-slate-200 overflow-hidden cursor-pointer hover:border-primary transition-colors">
+                                    <img src={bios.face_template} alt="Face" className="h-full w-full object-cover" />
+                                  </div>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-md p-1 bg-black border-0">
+                                  <DialogHeader className="hidden"><DialogTitle>Face ID Preview</DialogTitle></DialogHeader>
+                                  <img src={bios.face_template} alt="Member Face ID" className="w-full h-auto rounded-lg" />
+                                </DialogContent>
+                              </Dialog>
+                            ) : (
+                              <Badge variant="secondary" className="bg-green-100 text-green-800">
+                                <Fingerprint className="mr-1 h-3 w-3" /> Finger
+                              </Badge>
+                            )}
+                            {bios?.template && !hasFace && (
+                              <Badge variant="secondary" className="bg-green-100 text-green-800">
+                                <ShieldCheck className="mr-1 h-3 w-3" /> Captured
+                              </Badge>
+                            )}
+                          </div>
+                        );
+                      } catch (e) {
+                        return <Badge variant="secondary" className="bg-green-100 text-green-800">Captured</Badge>;
+                      }
+                    })() : (
                       <Badge variant="outline" className="text-muted-foreground">
                         Pending
                       </Badge>
@@ -432,6 +461,24 @@ export default function AdminMembers() {
             <div className="space-y-2"><Label>Phone</Label><Input value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} /></div>
             <div className="space-y-2"><Label>ID Number</Label><Input value={formData.idNumber} onChange={e => setFormData({ ...formData, idNumber: e.target.value })} /></div>
             <div className="space-y-2"><Label>Date of Birth</Label><Input type="date" max={new Date().toISOString().split("T")[0]} value={formData.dob} onChange={e => setFormData({ ...formData, dob: e.target.value })} /></div>
+
+            {selectedMember?.biometric_data && (() => {
+              try {
+                const bios = typeof selectedMember.biometric_data === 'string' ? JSON.parse(selectedMember.biometric_data) : selectedMember.biometric_data;
+                if (!bios?.face_template) return null;
+                return (
+                  <div className="space-y-2 pt-2">
+                    <Label className="text-xs font-bold uppercase tracking-widest text-slate-500">Registered Face Profile</Label>
+                    <div className="relative group aspect-video rounded-xl bg-slate-100 border-2 border-slate-200 overflow-hidden shadow-inner">
+                      <img src={bios.face_template} alt="Profile Face" className="w-full h-full object-cover" />
+                      <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
+                         <span className="text-[9px] font-black text-white uppercase tracking-widest">Formal Verification Photo</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              } catch (e) { return null; }
+            })()}
 
             <div className="pt-4 border-t space-y-4">
               <div className="space-y-2">

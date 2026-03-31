@@ -1,6 +1,7 @@
 "use client";
 
 import { supabase } from "@/integrations/supabase/client";
+import * as faceapi from '@vladmandic/face-api';
 
 export type BiometricFormat = "ansi" | "iso19794-2" | "wsq" | "unknown";
 
@@ -219,9 +220,45 @@ export async function verifyFace(params: { memberId?: string; imageBase64: strin
     return { success: false, reason: "No face registered for this member." };
   }
 
-  // Returns the stored image so the frontend can display it side-by-side or perform local comparison
-  return { 
-    success: true, 
-    storedImage: bios.face_template 
-  };
+  try {
+    console.log("[Biometric] Loading AI models for facial matching...");
+    // Load models if not already loaded (face-api handles this efficiently)
+    await Promise.all([
+      faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
+      faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
+      faceapi.nets.faceRecognitionNet.loadFromUri('/models')
+    ]);
+
+    // Create image elements for processing
+    const capturedImg = await faceapi.fetchImage(params.imageBase64);
+    const storedImg = await faceapi.fetchImage(bios.face_template);
+
+    // Get descriptors for both images
+    const capturedDesc = await faceapi.detectSingleFace(capturedImg, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
+    const storedDesc = await faceapi.detectSingleFace(storedImg, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
+
+    if (!capturedDesc || !storedDesc) {
+      console.warn("[Biometric] No face detected in one or both images.");
+      return { success: false, reason: "Face not clearly visible. Please ensure good lighting.", storedImage: bios.face_template };
+    }
+
+    // Compare using Euclidean distance
+    const distance = faceapi.euclideanDistance(capturedDesc.descriptor, storedDesc.descriptor);
+    const threshold = 0.6; // Industry standard for face-api matching (lower is stricter)
+    const matches = distance < threshold;
+
+    console.log(`[Biometric] Face match distance: ${distance.toFixed(4)} (Threshold: ${threshold})`);
+
+    return { 
+      success: matches, 
+      reason: matches ? "Match confirmed" : "Faces do not match. Identity rejected.",
+      storedImage: bios.face_template,
+      score: (1 - distance) * 100
+    };
+  } catch (error: any) {
+    console.error("[Biometric] AI matching failed:", error);
+    // Return true with a warning if the engine fails, or strictly false.
+    // Given the user wants "match exactly", let's be strict.
+    return { success: false, reason: "Verification platform error. Please retry.", storedImage: bios.face_template };
+  }
 }

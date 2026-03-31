@@ -7,6 +7,13 @@ import { Camera, RefreshCcw, ShieldCheck, ShieldX, UserCheck, UserPlus, Fingerpr
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { registerFace, verifyFace } from "@/services/biometrics";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface FaceBiometricCaptureProps {
   mode: "register" | "verify";
@@ -29,6 +36,29 @@ export default function FaceBiometricCapture({
   const [isProcessing, setIsProcessing] = useState(false);
   const [status, setStatus] = useState<"idle" | "capturing" | "verifying" | "success" | "error">("idle");
   const [storedImage, setStoredImage] = useState<string | null>(null);
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | undefined>(undefined);
+
+  const handleDevices = useCallback(
+    (mediaDevices: MediaDeviceInfo[]) =>
+      setDevices(mediaDevices.filter(({ kind }) => kind === "videoinput")),
+    [setDevices]
+  );
+
+  useEffect(() => {
+    const refreshDevices = () => {
+      navigator.mediaDevices.enumerateDevices().then(handleDevices).then(newDevices => {
+        // If selected device is gone, reset to default
+        if (selectedDeviceId && !newDevices?.find(d => d.deviceId === selectedDeviceId)) {
+          setSelectedDeviceId(undefined);
+        }
+      });
+    };
+
+    refreshDevices();
+    navigator.mediaDevices.addEventListener('devicechange', refreshDevices);
+    return () => navigator.mediaDevices.removeEventListener('devicechange', refreshDevices);
+  }, [handleDevices, selectedDeviceId]);
 
   const capture = useCallback(() => {
     const imageSrc = webcamRef.current?.getScreenshot();
@@ -109,33 +139,71 @@ export default function FaceBiometricCapture({
               {mode === "register" ? `Complete profile for ${userName || 'the member'}` : "Verify identity using facial recognition"}
             </p>
           </div>
+          {devices.length > 1 && !capturedImage && (
+            <div className="ml-auto w-48">
+              <Select value={selectedDeviceId} onValueChange={setSelectedDeviceId}>
+                <SelectTrigger className="h-9 rounded-lg text-[10px] bg-slate-50 border-slate-200">
+                  <Camera className="h-3 w-3 mr-2 text-indigo-500" />
+                  <SelectValue placeholder="Select Camera" />
+                </SelectTrigger>
+                <SelectContent>
+                  {devices.map((device, key) => (
+                    <SelectItem key={key} value={device.deviceId} className="text-[10px]">
+                      {device.label || `Webcam ${key + 1}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
         <div className="relative aspect-video rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-900 border-2 border-dashed border-slate-300 dark:border-slate-700">
           {!capturedImage ? (
-            <>
-              <Webcam
-                audio={false}
-                ref={webcamRef}
-                screenshotFormat="image/jpeg"
-                videoConstraints={{
-                  facingMode: "user",
-                  width: 1280,
-                  height: 720,
-                }}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 border-[30px] border-black/30 pointer-events-none">
-                <div className="w-full h-full border-2 border-white/50 rounded-[100%] flex items-center justify-center">
-                  <div className="w-1/2 h-2/3 border-2 border-blue-400/80 rounded-full border-dashed animate-pulse"></div>
+            devices.length > 0 ? (
+              <>
+                <Webcam
+                  key={selectedDeviceId || 'default'}
+                  audio={false}
+                  ref={webcamRef}
+                  screenshotFormat="image/jpeg"
+                  videoConstraints={{
+                    deviceId: selectedDeviceId,
+                    facingMode: selectedDeviceId ? undefined : "user",
+                    width: 1280,
+                    height: 720,
+                  }}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 border-[30px] border-black/30 pointer-events-none">
+                  <div className="w-full h-full border-2 border-white/50 rounded-[100%] flex items-center justify-center">
+                    <div className="w-1/2 h-2/3 border-2 border-blue-400/80 rounded-full border-dashed animate-pulse"></div>
+                  </div>
                 </div>
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full p-8 text-slate-400 bg-slate-50 dark:bg-slate-900">
+                <Camera className="h-12 w-12 mb-4 opacity-20" />
+                <p className="text-xs font-bold uppercase tracking-widest">Hardware Disconnected</p>
+                <p className="text-[10px] mt-1">Connect an external webcam to proceed with Face ID.</p>
+                <Button variant="outline" size="sm" className="mt-4 h-8 text-[10px]" onClick={() => window.location.reload()}>
+                  <RefreshCcw className="h-3 w-3 mr-2" /> Refresh System
+                </Button>
               </div>
-            </>
+            )
           ) : (
             <div className="flex w-full h-full">
               <div className={cn("relative flex-1 bg-slate-900 border-r border-white/10 overflow-hidden", storedImage && "w-1/2")}>
                 <img src={capturedImage} alt="Captured" className="w-full h-full object-cover grayscale-0" />
                 <div className="absolute top-2 left-2 bg-black/50 backdrop-blur-md text-[10px] text-white px-2 py-1 rounded">Captured</div>
+                
+                {/* Scanning Animation */}
+                {isProcessing && mode === "verify" && (
+                  <>
+                    <div className="absolute inset-0 bg-blue-500/10 pointer-events-none"></div>
+                    <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent shadow-[0_0_15px_rgba(59,130,246,0.8)] animate-[scan_2s_ease-in-out_infinite] z-10 transition-all"></div>
+                  </>
+                )}
               </div>
               {storedImage && (
                 <div className="relative w-1/2 bg-slate-900 overflow-hidden animate-in slide-in-from-right-full duration-500">

@@ -82,6 +82,7 @@ export function AdminSidebar() {
     { title: "Members", url: `${basePath}/members`, icon: Users },
     { title: "Branches", url: `${basePath}/branches`, icon: Building2 },
     { title: "Staff", url: `${basePath}/staff`, icon: UserCog },
+    { title: "Partners", url: `${basePath}/marketers`, icon: Users },
     { title: "Visits", url: `${basePath}/visits`, icon: ClipboardList },
     { title: "Appointments", url: `${basePath}/appointments`, icon: CalendarDays },
     { title: "Services", url: `${basePath}/services`, icon: Stethoscope },

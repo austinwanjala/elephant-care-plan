@@ -173,14 +173,34 @@ export default function ReceptionSearchMember() {
             {member && (
                 <Card className="border-primary/50">
                     <CardHeader className="bg-primary/5">
-                        <div className="flex justify-between items-start">
-                            <div>
-                                <CardTitle className="text-2xl">{member.full_name}</CardTitle>
-                                <CardDescription>Member Number: {member.member_number}</CardDescription>
+                        <div className="flex justify-between items-start gap-4">
+                            <div className="flex items-center gap-4">
+                                {member.biometric_data && (() => {
+                                    try {
+                                        const bios = typeof member.biometric_data === 'string' ? JSON.parse(member.biometric_data) : member.biometric_data;
+                                        if (!bios?.face_template) return null;
+                                        return (
+                                            <div className="h-20 w-20 rounded-2xl bg-white border-2 border-primary/20 overflow-hidden shadow-sm flex-shrink-0">
+                                                <img src={bios.face_template} alt="Member Face" className="h-full w-full object-cover" />
+                                            </div>
+                                        );
+                                    } catch (e) { return null; }
+                                })()}
+                                <div>
+                                    <CardTitle className="text-2xl">{member.full_name}</CardTitle>
+                                    <CardDescription>Member Number: {member.member_number}</CardDescription>
+                                </div>
                             </div>
-                            <Badge variant={member.is_active ? "default" : "destructive"}>
-                                {member.is_active ? "Active" : "Inactive"}
-                            </Badge>
+                            <div className="flex flex-col items-end gap-2">
+                                <Badge variant={member.is_active ? "default" : "destructive"}>
+                                    {member.is_active ? "Active" : "Inactive"}
+                                </Badge>
+                                {member.biometric_data && (
+                                    <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200">
+                                        <Fingerprint className="h-3 w-3 mr-1" /> Biometric Verified
+                                    </Badge>
+                                )}
+                            </div>
                         </div>
                     </CardHeader>
                     <CardContent className="pt-6 space-y-6">

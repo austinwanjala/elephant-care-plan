@@ -175,7 +175,7 @@ export default function ReceptionBilling() {
             <body>
                 <div class="header" style="border-bottom: 2px solid #10b981; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; padding-bottom: 15px;">
                     <div style="display: flex; align-items: center; gap: 15px;">
-                        <img src="/img/elephantlogo.jpeg" style="width: 70px; height: 70px; object-fit: contain;" />
+                        <img src="/img/elephantlogo.jpg" style="width: 70px; height: 70px; object-fit: contain;" />
                         <div>
                             <div style="font-size: 32px; font-weight: 800; color: #064e3b; line-height: 1; letter-spacing: 1px;">ELEPHANT</div>
                             <div style="font-size: 32px; font-weight: 800; color: #10b981; line-height: 1; letter-spacing: 1px;">DENTAL</div>
@@ -412,7 +412,7 @@ export default function ReceptionBilling() {
                                                                                 }}
                                                                                 onCancel={() => setShowPaymentHandler(null)}
                                                                             />
-                                                                        )}                                                                        { /* Biometric verification mandatory for finalization */ }
+                                                                        )}                                                                        { /* Biometric verification mandatory for finalization */}
                                                                         <div className="py-2">
                                                                             <BiometricCapture
                                                                                 mode={visit.members?.biometric_data ? "verify" : "register"}
@@ -423,11 +423,11 @@ export default function ReceptionBilling() {
                                                                                     const { error } = await supabase.from("members").update({ biometric_data: template }).eq("id", visit.members.id);
                                                                                     if (error) throw error;
                                                                                     toast({ title: "Biometrics Captured", description: "Identity captured and mapped to this member." });
-                                                                                    
+
                                                                                     // Update state immutably to reflect capture and allow immediate progression
-                                                                                    setVisits(prev => prev.map(v => v.id === visit.id ? { 
-                                                                                        ...v, 
-                                                                                        members: { ...v.members, biometric_data: template } 
+                                                                                    setVisits(prev => prev.map(v => v.id === visit.id ? {
+                                                                                        ...v,
+                                                                                        members: { ...v.members, biometric_data: template }
                                                                                     } : v));
                                                                                     setBiometricsVerified(visit.id);
                                                                                 }}

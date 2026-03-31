@@ -66,7 +66,7 @@ const MemberDependants = () => {
   }, []);
 
   const validateImage = (file: File) => {
-    const isAllowed = ["image/jpeg", "image/png"].includes(file.type);
+    const isAllowed = ["image/jpg", "image/png"].includes(file.type);
     if (!isAllowed) throw new Error("Only JPG/PNG images are allowed.");
     if (file.size > 5 * 1024 * 1024) throw new Error("Image must be 5MB or smaller.");
   };
@@ -177,33 +177,33 @@ const MemberDependants = () => {
       const insertedOrExisting = existing
         ? existing
         : await (async () => {
-            const { data: inserted, error } = await supabase
-              .from("dependants")
-              .insert(payload)
-              .select("*")
-              .single();
+          const { data: inserted, error } = await supabase
+            .from("dependants")
+            .insert(payload)
+            .select("*")
+            .single();
 
-            // Gracefully handle unique constraint violations
-            if (error) {
-              const code = (error as any)?.code || "";
-              const message = (error as any)?.message || "";
-              if (code === "23505" || /duplicate key value/i.test(message)) {
-                const { data: already } = await supabase
-                  .from("dependants")
-                  .select("*")
-                  .eq("member_id", payload.member_id)
-                  .eq("full_name", payload.full_name)
-                  .eq("dob", payload.dob)
-                  .eq("relationship", payload.relationship)
-                  .eq("id_number", payload.id_number)
-                  .maybeSingle();
-                if (already) return already as Dependant;
-              }
-              throw error;
+          // Gracefully handle unique constraint violations
+          if (error) {
+            const code = (error as any)?.code || "";
+            const message = (error as any)?.message || "";
+            if (code === "23505" || /duplicate key value/i.test(message)) {
+              const { data: already } = await supabase
+                .from("dependants")
+                .select("*")
+                .eq("member_id", payload.member_id)
+                .eq("full_name", payload.full_name)
+                .eq("dob", payload.dob)
+                .eq("relationship", payload.relationship)
+                .eq("id_number", payload.id_number)
+                .maybeSingle();
+              if (already) return already as Dependant;
             }
+            throw error;
+          }
 
-            return inserted as Dependant;
-          })();
+          return inserted as Dependant;
+        })();
 
       if (imageFile && insertedOrExisting?.id) {
         const url = await uploadDependantImage(insertedOrExisting.id, imageFile);
@@ -448,7 +448,7 @@ const MemberDependants = () => {
                       <Input
                         id="image-upload"
                         type="file"
-                        accept="image/png,image/jpeg"
+                        accept="image/png,image/jpg"
                         className="hidden"
                         onChange={(e) => setImageFile(e.target.files?.[0] || null)}
                       />
@@ -583,7 +583,7 @@ const MemberDependants = () => {
                   <Input
                     id="edit-image-upload"
                     type="file"
-                    accept="image/png,image/jpeg"
+                    accept="image/png,image/jpg"
                     className="hidden"
                     onChange={(e) => setEditImageFile(e.target.files?.[0] || null)}
                   />

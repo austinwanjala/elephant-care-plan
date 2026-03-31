@@ -39,6 +39,7 @@ export default function FaceBiometricCapture({
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  const [webcamKey, setWebcamKey] = useState(0);
 
   const handleDevices = useCallback(
     (mediaDevices: MediaDeviceInfo[]) =>
@@ -152,7 +153,10 @@ export default function FaceBiometricCapture({
             <div className="ml-auto flex items-center gap-2">
               {devices.length > 0 && (
                 <div className="w-48 lg:w-56 overflow-hidden">
-                  <Select value={selectedDeviceId} onValueChange={setSelectedDeviceId}>
+                  <Select value={selectedDeviceId} onValueChange={(val) => {
+                  setSelectedDeviceId(val);
+                  setWebcamKey(prev => prev + 1);
+                }}>
                     <SelectTrigger className="h-9 rounded-lg text-[10px] bg-slate-50 border-slate-200 focus:ring-indigo-500">
                       <Camera className="h-3 w-3 mr-2 text-indigo-500" />
                       <SelectValue placeholder="Select Camera" />
@@ -171,9 +175,9 @@ export default function FaceBiometricCapture({
                 variant="outline"
                 size="icon"
                 onClick={() => {
-                  // Clear specific device selection to let facingMode take over (vital for mobile)
                   setSelectedDeviceId(""); 
                   setFacingMode(prev => prev === "user" ? "environment" : "user");
+                  setWebcamKey(prev => prev + 1);
                 }}
                 className="h-9 w-9 border-slate-200 bg-white shadow-sm hover:bg-slate-50 transition-colors"
                 title="Switch Front/Back Camera"
@@ -189,16 +193,16 @@ export default function FaceBiometricCapture({
             devices.length > 0 ? (
               <>
                 <Webcam
-                  key={selectedDeviceId || facingMode}
+                  key={`${selectedDeviceId}_${webcamKey}`}
                   audio={false}
                   ref={webcamRef}
                   onUserMedia={() => {
-                    console.log("[Biometric] UserMedia authorized for device:", selectedDeviceId || facingMode);
+                    console.log("[Biometric] Hardware stream engaged for device:", selectedDeviceId || facingMode);
                     refreshDevices();
                   }}
                   screenshotFormat="image/jpeg"
                   videoConstraints={selectedDeviceId ? {
-                    deviceId: { ideal: selectedDeviceId },
+                    deviceId: { exact: selectedDeviceId },
                     width: 1280,
                     height: 720,
                   } : {

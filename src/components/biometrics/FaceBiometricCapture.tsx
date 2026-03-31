@@ -169,7 +169,11 @@ export default function FaceBiometricCapture({
               <Button
                 variant="outline"
                 size="icon"
-                onClick={() => setFacingMode(prev => prev === "user" ? "environment" : "user")}
+                onClick={() => {
+                  // Clear specific device selection to let facingMode take over (vital for mobile)
+                  setSelectedDeviceId(""); 
+                  setFacingMode(prev => prev === "user" ? "environment" : "user");
+                }}
                 className="h-9 w-9 border-slate-200 bg-white shadow-sm hover:bg-slate-50 transition-colors"
                 title="Switch Front/Back Camera"
               >
@@ -184,11 +188,11 @@ export default function FaceBiometricCapture({
             devices.length > 0 ? (
               <>
                 <Webcam
-                  key={selectedDeviceId || 'default'}
+                  key={selectedDeviceId || facingMode}
                   audio={false}
                   ref={webcamRef}
                   onUserMedia={() => {
-                    console.log("[Biometric] UserMedia authorized for device:", selectedDeviceId);
+                    console.log("[Biometric] UserMedia authorized for device:", selectedDeviceId || facingMode);
                     refreshDevices();
                   }}
                   screenshotFormat="image/jpeg"

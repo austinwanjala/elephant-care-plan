@@ -38,6 +38,7 @@ export default function FaceBiometricCapture({
   const [storedImage, setStoredImage] = useState<string | null>(null);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
 
   const handleDevices = useCallback(
     (mediaDevices: MediaDeviceInfo[]) =>
@@ -146,21 +147,34 @@ export default function FaceBiometricCapture({
               {mode === "register" ? `Complete profile for ${userName || 'the member'}` : "Verify identity using facial recognition"}
             </p>
           </div>
-          {devices.length > 1 && !capturedImage && (
-            <div className="ml-auto w-48">
-              <Select value={selectedDeviceId} onValueChange={setSelectedDeviceId}>
-                <SelectTrigger className="h-9 rounded-lg text-[10px] bg-slate-50 border-slate-200">
-                  <Camera className="h-3 w-3 mr-2 text-indigo-500" />
-                  <SelectValue placeholder="Select Camera" />
-                </SelectTrigger>
-                <SelectContent>
-                  {devices.map((device, key) => (
-                    <SelectItem key={key} value={device.deviceId} className="text-[10px]">
-                      {device.label || `Webcam ${key + 1}`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          {!capturedImage && (
+            <div className="ml-auto flex items-center gap-2">
+              {devices.length > 0 && (
+                <div className="w-48 lg:w-56 overflow-hidden">
+                  <Select value={selectedDeviceId} onValueChange={setSelectedDeviceId}>
+                    <SelectTrigger className="h-9 rounded-lg text-[10px] bg-slate-50 border-slate-200 focus:ring-indigo-500">
+                      <Camera className="h-3 w-3 mr-2 text-indigo-500" />
+                      <SelectValue placeholder="Select Camera" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {devices.map((device, key) => (
+                        <SelectItem key={key} value={device.deviceId} className="text-[10px]">
+                          {device.label || `Camera ${key + 1}`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setFacingMode(prev => prev === "user" ? "environment" : "user")}
+                className="h-9 w-9 border-slate-200 bg-white shadow-sm hover:bg-slate-50 transition-colors"
+                title="Switch Front/Back Camera"
+              >
+                <RefreshCcw className="h-4 w-4 text-indigo-600" />
+              </Button>
             </div>
           )}
         </div>
@@ -179,16 +193,22 @@ export default function FaceBiometricCapture({
                   }}
                   screenshotFormat="image/jpeg"
                   videoConstraints={selectedDeviceId ? {
-                    deviceId: { exact: selectedDeviceId },
+                    deviceId: { ideal: selectedDeviceId },
                     width: 1280,
                     height: 720,
                   } : {
-                    facingMode: "user",
+                    facingMode: facingMode,
                     width: 1280,
                     height: 720,
                   }}
                   className="w-full h-full object-cover"
                 />
+                <div className="absolute top-3 right-3 flex items-center gap-2 bg-black/50 backdrop-blur-lg px-3 py-1.5 rounded-full border border-white/20 animate-in fade-in slide-in-from-top-2 duration-500">
+                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]"></div>
+                  <span className="text-[9px] font-bold text-white uppercase tracking-widest truncate max-w-[120px]">
+                    {devices.find(d => d.deviceId === selectedDeviceId)?.label || "Live Stream"}
+                  </span>
+                </div>
                 <div className="absolute inset-0 border-[30px] border-black/30 pointer-events-none">
                   <div className="w-full h-full border-2 border-white/50 rounded-[100%] flex items-center justify-center">
                     <div className="w-1/2 h-2/3 border-2 border-blue-400/80 rounded-full border-dashed animate-pulse"></div>

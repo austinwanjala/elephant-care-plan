@@ -46,7 +46,6 @@ export function DoctorLayout({ children }: DoctorLayoutProps) {
             .from("user_roles")
             .select("role")
             .eq("user_id", user.id)
-            .limit(1)
             .maybeSingle();
 
         if (roleError) {
@@ -80,7 +79,6 @@ export function DoctorLayout({ children }: DoctorLayoutProps) {
             .from("staff")
             .select("full_name")
             .eq("user_id", user.id)
-            .limit(1)
             .maybeSingle();
 
         if (staffData) {
@@ -91,7 +89,6 @@ export function DoctorLayout({ children }: DoctorLayoutProps) {
                 .from("doctors")
                 .select("full_name")
                 .eq("user_id", user.id)
-                .limit(1)
                 .maybeSingle();
             if (doctorData) setUserName(doctorData.full_name);
         }

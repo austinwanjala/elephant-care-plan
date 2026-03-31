@@ -1,9 +1,8 @@
 (function (global, factory) {
     typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('@digitalpersona/core'), require('WebSdk')) :
-        typeof define === 'function' && define.amd ? define(['exports', '@digitalpersona/core', 'WebSdk'], factory) :
-            (global = global || self, factory((global.dp = global.dp || {}, global.dp.devices = global.dp.devices || {}), global.dp.core));
-}(this, function (exports, core) {
-    'use strict';
+    typeof define === 'function' && define.amd ? define(['exports', '@digitalpersona/core', 'WebSdk'], factory) :
+    (global = global || self, factory((global.dp = global.dp || {}, global.dp.devices = global.dp.devices || {}), global.dp.core));
+}(this, function (exports, core) { 'use strict';
 
     /*! *****************************************************************************
     Copyright (c) Microsoft Corporation. All rights reserved.
@@ -21,7 +20,7 @@
     ***************************************************************************** */
     /* global Reflect, Promise */
 
-    var extendStatics = function (d, b) {
+    var extendStatics = function(d, b) {
         extendStatics = Object.setPrototypeOf ||
             ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
             function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
@@ -412,9 +411,9 @@
         CardsReader.prototype.enumerateReaders = function () {
             return this.channel.send(new Request(new Command(Method.EnumerateReaders)))
                 .then(function (response) {
-                    var list = JSON.parse(core.Utf8.fromBase64Url(response.Data || "{}"));
-                    return JSON.parse(list.Readers || "[]");
-                });
+                var list = JSON.parse(core.Utf8.fromBase64Url(response.Data || "{}"));
+                return JSON.parse(list.Readers || "[]");
+            });
         };
         /** Lists all inserted cards.
          * @returns a promise to return a list of card information for connected cards.
@@ -422,10 +421,10 @@
         CardsReader.prototype.enumerateCards = function () {
             return this.channel.send(new Request(new Command(Method.EnumerateCards)))
                 .then(function (response) {
-                    var list = JSON.parse(core.Utf8.fromBase64Url(response.Data || "{}"));
-                    var cards = JSON.parse(list.Cards || "[]");
-                    return cards.map(function (s) { return JSON.parse(core.Utf16.fromBase64Url(s)); });
-                });
+                var list = JSON.parse(core.Utf8.fromBase64Url(response.Data || "{}"));
+                var cards = JSON.parse(list.Cards || "[]");
+                return cards.map(function (s) { return JSON.parse(core.Utf16.fromBase64Url(s)); });
+            });
         };
         /** Reads card data from a specific card.
          * @param reader - a name of a card reader where the card was presented.
@@ -436,9 +435,9 @@
         CardsReader.prototype.getCardInfo = function (reader) {
             return this.channel.send(new Request(new Command(Method.GetCardInfo, core.Base64Url.fromJSON({ Reader: reader }))))
                 .then(function (response) {
-                    var cardInfo = JSON.parse(core.Utf8.fromBase64Url(response.Data || "null"));
-                    return cardInfo;
-                });
+                var cardInfo = JSON.parse(core.Utf8.fromBase64Url(response.Data || "null"));
+                return cardInfo;
+            });
         };
         /** Reads a card unique identifier.
          * @param reader - a name of a card reader where the card was presented.
@@ -447,9 +446,9 @@
         CardsReader.prototype.getCardUid = function (reader) {
             return this.channel.send(new Request(new Command(Method.GetCardUID, core.Base64Url.fromJSON({ Reader: reader }))))
                 .then(function (response) {
-                    var data = core.Base64.fromBase64Url(response.Data || "");
-                    return data;
-                });
+                var data = core.Base64.fromBase64Url(response.Data || "");
+                return data;
+            });
         };
         /** Reads card authentication data.
          * @param reader - a name of a card reader where the card was presented.
@@ -460,9 +459,9 @@
         CardsReader.prototype.getCardAuthData = function (reader, pin) {
             return this.channel.send(new Request(new Command(Method.GetDPCardAuthData, core.Base64Url.fromJSON({ Reader: reader, PIN: pin || "" }))))
                 .then(function (response) {
-                    var data = JSON.parse(core.Utf8.fromBase64Url(response.Data || ""));
-                    return data;
-                });
+                var data = JSON.parse(core.Utf8.fromBase64Url(response.Data || ""));
+                return data;
+            });
         };
         /** Reads card enrollment data.
          * @param reader - a name of a card reader where the card was presented.
@@ -473,9 +472,9 @@
         CardsReader.prototype.getCardEnrollData = function (reader, pin) {
             return this.channel.send(new Request(new Command(Method.GetDPCardEnrollData, core.Base64Url.fromJSON({ Reader: reader, PIN: pin || "" }))))
                 .then(function (response) {
-                    var data = JSON.parse(core.Utf8.fromBase64Url(response.Data || ""));
-                    return data;
-                });
+                var data = JSON.parse(core.Utf8.fromBase64Url(response.Data || ""));
+                return data;
+            });
         };
         /** Starts listening for card reader events.
          * @param reader - an optional name of a card reader to listen.
@@ -514,7 +513,7 @@
         };
         return CardsReader;
     }(MultiCastEventSource
-        //    implements CommunicationEventSource, DeviceEventSource, CardsEventSource
+    //    implements CommunicationEventSource, DeviceEventSource, CardsEventSource
     ));
 
     /**
@@ -557,7 +556,7 @@
         SampleFormat[SampleFormat["Raw"] = 1] = "Raw";
         /** A fingerprint image encoded into an intermediate format. */
         SampleFormat[SampleFormat["Intermediate"] = 2] = "Intermediate";
-        /** A compressed fingerprint image (e.q. jpg2000, WSQ). */
+        /** A compressed fingerprint image (e.q. JPEG2000, WSQ). */
         SampleFormat[SampleFormat["Compressed"] = 3] = "Compressed";
         /** A Portable Network Graphics (PNG) format. */
         SampleFormat[SampleFormat["PngImage"] = 5] = "PngImage";
@@ -752,11 +751,11 @@
         FingerprintReader.prototype.enumerateDevices = function () {
             return this.channel.send(new Request(new Command(Method$1.EnumerateDevices)))
                 .then(function (response) {
-                    if (!response)
-                        return [];
-                    var deviceList = JSON.parse(core.Utf8.fromBase64Url(response.Data || "{}"));
-                    return JSON.parse(deviceList.DeviceIDs || "[]");
-                });
+                if (!response)
+                    return [];
+                var deviceList = JSON.parse(core.Utf8.fromBase64Url(response.Data || "{}"));
+                return JSON.parse(deviceList.DeviceIDs || "[]");
+            });
         };
         /** Reads a fingerprint reader device information.
          * @param deviceUid - a fingerprint reader ID.
@@ -767,9 +766,9 @@
         FingerprintReader.prototype.getDeviceInfo = function (deviceUid) {
             return this.channel.send(new Request(new Command(Method$1.GetDeviceInfo, core.Base64Url.fromJSON({ DeviceID: deviceUid }))))
                 .then(function (response) {
-                    var deviceInfo = JSON.parse(core.Utf8.fromBase64Url(response.Data || "null"));
-                    return deviceInfo;
-                });
+                var deviceInfo = JSON.parse(core.Utf8.fromBase64Url(response.Data || "null"));
+                return deviceInfo;
+            });
         };
         /** Activate a fingerprint acquisition mode.
          * This call will produce a {@link AcquisitionStarted} event if activation was successful.
@@ -824,7 +823,7 @@
         };
         return FingerprintReader;
     }(MultiCastEventSource
-        //    implements FingerprintsEventSource, DeviceEventSource, CommunicationEventSource
+    //    implements FingerprintsEventSource, DeviceEventSource, CommunicationEventSource
     ));
 
     /**@internal
@@ -904,17 +903,17 @@
         WindowsAuthClient.prototype.init = function () {
             return this.channel.send(new Request(new Command(Method$2.Init)), 3000)
                 .then(function (response) {
-                    var data = JSON.parse(response.Data || "{}");
-                    return { handle: data.Handle, data: data.Data };
-                });
+                var data = JSON.parse(response.Data || "{}");
+                return { handle: data.Handle, data: data.Data };
+            });
         };
         /** Used internally. Do not call this method. */
         WindowsAuthClient.prototype.continue = function (handle, data) {
             return this.channel.send(new Request(new Command(Method$2.Continue, JSON.stringify({ Handle: handle, Data: data }))))
                 .then(function (response) {
-                    var d = JSON.parse(response.Data || "{}");
-                    return d.Data;
-                });
+                var d = JSON.parse(response.Data || "{}");
+                return d.Data;
+            });
         };
         /** Used internally. Do not call this method. */
         WindowsAuthClient.prototype.term = function (handle) {

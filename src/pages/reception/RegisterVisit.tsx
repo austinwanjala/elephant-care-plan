@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Search, UserCheck, UserX, Fingerprint, ArrowRight, Loader2, CheckCircle, ArrowLeft, Users, Activity, AlertTriangle, CreditCard, ShieldCheck, Plus } from "lucide-react";
+import { Search, UserCheck, UserX, Fingerprint, ArrowRight, Loader2, CheckCircle, ArrowLeft, Users, Activity, AlertTriangle, CreditCard } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, Link } from "react-router-dom";
@@ -40,7 +40,6 @@ export default function RegisterVisit() {
     const [searchResults, setSearchResults] = useState<any[]>([]);
     const [selectionDialogOpen, setSelectionDialogOpen] = useState(false);
     const [showPaymentHandler, setShowPaymentHandler] = useState(false);
-    const [showBiometrics, setShowBiometrics] = useState(false);
     const { toast } = useToast();
     const navigate = useNavigate();
 
@@ -53,17 +52,6 @@ export default function RegisterVisit() {
             fetchDoctors();
         }
     }, [receptionistBranchId]);
-
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            if (searchTerm.trim().length >= 1) {
-                performSearch(searchTerm);
-            } else if (searchTerm.trim().length === 0) {
-                setSearchResults([]);
-            }
-        }, 300);
-        return () => clearTimeout(timer);
-    }, [searchTerm]);
 
     const fetchReceptionistInfo = async () => {
         const { data: { user } } = await supabase.auth.getUser();
@@ -110,19 +98,19 @@ export default function RegisterVisit() {
 
     const sanitizeSearchTerm = (raw: string) => raw.replace(/[(),]/g, " ").replace(/"/g, "").trim();
 
-    const handleSearch = (e: React.FormEvent) => {
+    const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
-        performSearch(searchTerm);
-    };
-
-    const performSearch = async (query: string) => {
-        const term = query.trim();
+        const term = searchTerm.trim();
         if (!term) return;
 
         const safeTerm = sanitizeSearchTerm(term);
         if (!safeTerm) return;
 
         setSearching(true);
+        setMember(null);
+        setDependants([]);
+        setSelectedPatientId("");
+        setBiometricsVerified(false);
 
         try {
             // 1. Search Members (Principal)
@@ -131,8 +119,7 @@ export default function RegisterVisit() {
                 .select("id, full_name, phone, id_number, member_number, biometric_data, is_active, coverage_balance, membership_categories(name), branches(name)")
                 .or(
                     `phone.ilike.*${safeTerm}*,id_number.ilike.*${safeTerm}*,member_number.ilike.*${safeTerm}*,full_name.ilike.*${safeTerm}*`
-                )
-                .limit(10);
+                );
 
             if (principalError) throw principalError;
 
@@ -140,36 +127,41 @@ export default function RegisterVisit() {
             const { data: dependantMatches, error: dependantError } = await supabase
                 .from("dependants")
                 .select("member_id")
-                .or(`full_name.ilike.*${safeTerm}*,id_number.ilike.*${safeTerm}*`)
-                .limit(10);
+                .or(`full_name.ilike.*${safeTerm}*,id_number.ilike.*${safeTerm}*`);
 
             if (dependantError) throw dependantError;
 
             // Collect all unique member IDs
-            const foundIds = new Set(principalMatches?.map(m => m.id) || []);
-            const additionalIds = (dependantMatches || [])
+            const foundMemberIds = new Set(principalMatches?.map(m => m.id) || []);
+            const additionalMemberIds = (dependantMatches || [])
                 .map(d => d.member_id)
-                .filter(id => !foundIds.has(id));
+                .filter(id => !foundMemberIds.has(id));
 
             let allResults = [...(principalMatches || [])];
 
-            if (additionalIds.length > 0) {
-                const { data: extraMembers } = await supabase
+            // If we found dependants whose principals aren't in the list, fetch them
+            if (additionalMemberIds.length > 0) {
+                const { data: extraMembers, error: extraError } = await supabase
                     .from("members")
                     .select("id, full_name, phone, id_number, member_number, biometric_data, is_active, coverage_balance, membership_categories(name), branches(name)")
-                    .in("id", additionalIds);
+                    .in("id", additionalMemberIds);
 
-                if (extraMembers) {
+                if (!extraError && extraMembers) {
                     allResults = [...allResults, ...extraMembers];
                 }
             }
 
-            setSearchResults(allResults);
-            if (allResults.length === 0 && query === searchTerm) {
-               // Only toast if it was a manual search or we're sure
+            if (allResults.length > 1) {
+                setSearchResults(allResults);
+                setSelectionDialogOpen(true);
+            } else if (allResults.length === 1) {
+                handleSelectMember(allResults[0]);
+            } else {
+                toast({ title: "Member not found", description: "No member found matching that criteria.", variant: "destructive" });
             }
         } catch (error: any) {
             console.error("Search error:", error);
+            toast({ title: "Search failed", description: error.message, variant: "destructive" });
         } finally {
             setSearching(false);
         }
@@ -179,9 +171,6 @@ export default function RegisterVisit() {
         setMember(data);
         setSelectedPatientId(data.id);
         setSelectionDialogOpen(false);
-        setSearchResults([]);
-        setSearchTerm(""); // Clear search after selection
-        setShowBiometrics(false); // Reset biometric view
 
         // Fetch dependants
         const { data: dependantsData } = await supabase
@@ -351,75 +340,17 @@ export default function RegisterVisit() {
                     <CardDescription>Enter Name, Phone, ID, or Member Number to find the member.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="relative">
-                        <form onSubmit={handleSearch} className="flex gap-2">
-                            <div className="relative flex-1">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                                <Input
-                                    placeholder="Type Name, Phone, ID, or Member # to search..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="pl-10 h-11 bg-slate-50 border-slate-200 focus:bg-white transition-all shadow-inner"
-                                />
-                                {searching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-primary" />}
-                            </div>
-                            <Button type="submit" disabled={searching} className="h-11 px-6 shadow-md transition-transform hover:scale-105 active:scale-95">
-                                Search 
-                            </Button>
-                        </form>
-
-                        {(searchResults.length > 0 || searching) && searchTerm.trim().length >= 1 && (
-                            <div className="absolute z-50 w-full mt-2 bg-white rounded-xl shadow-[0_10px_30px_-5px_rgba(0,0,0,0.2)] border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-top-2">
-                                <div className="max-h-[300px] overflow-y-auto divide-y divide-slate-100">
-                                    {searching && searchResults.length === 0 && (
-                                        <div className="p-8 text-center text-slate-400">
-                                            <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 opacity-50" />
-                                            <p className="text-xs font-medium animate-pulse">Searching for "{searchTerm}"...</p>
-                                        </div>
-                                    )}
-                                    
-                                    {!searching && searchResults.length === 0 && searchTerm.trim().length >= 1 && (
-                                        <div className="p-8 text-center text-slate-400">
-                                            <Search className="h-6 w-6 mx-auto mb-2 opacity-20" />
-                                            <p className="text-xs font-bold uppercase tracking-widest text-slate-300">No members found</p>
-                                            <p className="text-[10px] mt-1">Try a different name, phone or ID</p>
-                                        </div>
-                                    )}
-
-                                    {searchResults.map((m) => (
-                                        <div
-                                            key={m.id}
-                                            className="p-3 flex items-center justify-between hover:bg-slate-50 cursor-pointer transition-colors group"
-                                            onClick={() => handleSelectMember(m)}
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                                                    {m.full_name.charAt(0)}
-                                                </div>
-                                                <div>
-                                                    <p className="font-bold text-slate-900 leading-none group-hover:text-primary transition-colors">{m.full_name}</p>
-                                                    <p className="text-[10px] text-slate-500 mt-1 flex items-center gap-2">
-                                                        <span>#{m.member_number}</span>
-                                                        <span className="h-1 w-1 rounded-full bg-slate-300" />
-                                                        <span>{m.phone}</span>
-                                                        <span className="h-1 w-1 rounded-full bg-slate-300" />
-                                                        <span>{m.id_number}</span>
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-primary transition-colors mr-2" />
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="bg-slate-50 px-3 py-2 border-t border-slate-100 flex justify-between items-center">
-                                    <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">
-                                        {searching ? "Searching..." : `${searchResults.length} ${searchResults.length === 1 ? 'match' : 'matches'} found`}
-                                    </span>
-                                    <button onClick={() => setSearchResults([])} className="text-[10px] text-primary hover:underline font-bold uppercase tracking-wider">Close</button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                    <form onSubmit={handleSearch} className="flex gap-4">
+                        <Input
+                            placeholder="Name, Phone, ID, or Member #"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                        <Button type="submit" disabled={searching}>
+                            {searching ? <Loader2 className="animate-spin" /> : <Search className="h-4 w-4" />}
+                            <span className="ml-2">Search</span>
+                        </Button>
+                    </form>
                 </CardContent>
             </Card>
 
@@ -703,59 +634,28 @@ export default function RegisterVisit() {
                                 <CardTitle className="text-lg">Authorization & Assignment</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-6">
-                                {showBiometrics ? (
-                                    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
-                                        <div className="flex items-center justify-between">
-                                            <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
-                                                <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-                                                Live Facial Recognition
-                                            </h4>
-                                            <Button variant="ghost" size="sm" onClick={() => setShowBiometrics(false)} className="text-xs text-slate-500">Cancel</Button>
-                                        </div>
-                                        {member.biometric_data ? (
-                                            <BiometricCapture
-                                                mode="verify"
-                                                userId={member.id}
-                                                credentialId={member.biometric_data}
-                                                onVerificationComplete={handleBiometricVerificationComplete}
-                                            />
-                                        ) : (
-                                            <div className="space-y-4">
-                                                <div className="p-4 border rounded-lg bg-yellow-50/20 text-yellow-700 flex items-center gap-3 border-yellow-200 shadow-sm border-dashed">
-                                                    <Fingerprint className="h-6 w-6 shrink-0" />
-                                                    <div className="text-xs">
-                                                        <p className="font-bold uppercase tracking-wide">First-Time Enrollment</p>
-                                                        <p>No Face ID on record. Member must enroll their biometric profile now to authorize this visit.</p>
-                                                    </div>
-                                                </div>
-                                                <BiometricCapture
-                                                    mode="register"
-                                                    userId={member.id}
-                                                    userName={member.full_name}
-                                                    onCaptureComplete={handleBiometricCaptureComplete}
-                                                />
-                                            </div>
-                                        )}
-                                    </div>
+                                {member.biometric_data ? (
+                                    <BiometricCapture
+                                        mode="verify"
+                                        userId={member.id}
+                                        credentialId={member.biometric_data}
+                                        onVerificationComplete={handleBiometricVerificationComplete}
+                                    />
                                 ) : (
-                                    <div className="flex flex-col items-center gap-4 py-8 border-2 border-dashed rounded-xl bg-slate-50/50 hover:bg-white transition-all group">
-                                        <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
-                                            <ShieldCheck className="h-8 w-8" />
+                                    <div className="space-y-4">
+                                        <div className="p-4 border rounded-lg bg-yellow-50/20 text-yellow-700 flex items-center gap-3 border-yellow-200">
+                                            <Fingerprint className="h-6 w-6 shrink-0" />
+                                            <div>
+                                                <p className="font-medium">No Biometric Data Found</p>
+                                                <p className="text-xs font-medium">To proceed, you MUST capture the principal member's biometric data now.</p>
+                                            </div>
                                         </div>
-                                        <div className="text-center">
-                                            <h3 className="font-bold text-slate-900 italic">Identity Verification Required</h3>
-                                            <p className="text-xs text-slate-500 mt-1">Please confirm the principal member's identity before proceeding.</p>
-                                        </div>
-                                        <Button 
-                                            onClick={() => setShowBiometrics(true)}
-                                            className="px-8 shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90 rounded-full h-11"
-                                        >
-                                            {member.biometric_data ? (
-                                                <><UserCheck className="mr-2 h-4 w-4" /> Verify Face ID</>
-                                            ) : (
-                                                <><UserCheck className="mr-2 h-4 w-4" /> Enroll for Face ID</>
-                                            )}
-                                        </Button>
+                                        <BiometricCapture
+                                            mode="register"
+                                            userId={member.id}
+                                            userName={member.full_name}
+                                            onCaptureComplete={handleBiometricCaptureComplete}
+                                        />
                                     </div>
                                 )}
 
@@ -834,6 +734,32 @@ export default function RegisterVisit() {
                 </DialogContent>
             </Dialog>
 
+            <Dialog open={selectionDialogOpen} onOpenChange={setSelectionDialogOpen}>
+                <DialogContent className="max-w-xl">
+                    <DialogHeader>
+                        <DialogTitle>Select Member</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <p className="text-sm text-muted-foreground">Multiple matches found. Please select the correct member.</p>
+                        <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+                            {searchResults.map((m) => (
+                                <div
+                                    key={m.id}
+                                    className="p-4 border rounded-lg hover:border-primary cursor-pointer transition-colors flex justify-between items-center group"
+                                    onClick={() => handleSelectMember(m)}
+                                >
+                                    <div>
+                                        <div className="font-bold group-hover:text-primary transition-colors">{m.full_name}</div>
+                                        <div className="text-xs text-muted-foreground">#{m.member_number} • {m.phone} • {m.id_number}</div>
+                                        <div className="text-[10px] mt-1 text-primary/70">{m.membership_categories?.name} @ {m.branches?.name}</div>
+                                    </div>
+                                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

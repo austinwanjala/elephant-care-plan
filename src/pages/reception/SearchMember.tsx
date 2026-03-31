@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -22,32 +22,19 @@ export default function ReceptionSearchMember() {
     const [scanDialogOpen, setScanDialogOpen] = useState(false);
     const { toast } = useToast();
 
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            if (searchTerm.trim().length >= 1) {
-                performSearch(searchTerm);
-            } else if (searchTerm.trim().length === 0) {
-                setSearchResults([]);
-            }
-        }, 300);
-        return () => clearTimeout(timer);
-    }, [searchTerm]);
-
     const sanitizeSearchTerm = (raw: string) => raw.replace(/[(),]/g, " ").replace(/"/g, "").trim();
 
-    const handleSearch = (e: React.FormEvent) => {
+    const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
-        performSearch(searchTerm);
-    };
-
-    const performSearch = async (query: string) => {
-        const term = query.trim();
+        const term = searchTerm.trim();
         if (!term) return;
 
         const safeTerm = sanitizeSearchTerm(term);
         if (!safeTerm) return;
 
         setSearching(true);
+        setMember(null);
+        setSearchResults([]);
 
         try {
             // 1. Search Principals
@@ -56,8 +43,7 @@ export default function ReceptionSearchMember() {
                 .select("*, membership_categories(name), branches(name), dependants(*)")
                 .or(
                     `phone.ilike.*${safeTerm}*,id_number.ilike.*${safeTerm}*,member_number.ilike.*${safeTerm}*,full_name.ilike.*${safeTerm}*`
-                )
-                .limit(10);
+                );
 
             if (principalError) throw principalError;
 
@@ -65,8 +51,7 @@ export default function ReceptionSearchMember() {
             const { data: dependantMatches, error: dependantError } = await supabase
                 .from("dependants")
                 .select("member_id")
-                .or(`full_name.ilike.*${safeTerm}*,id_number.ilike.*${safeTerm}*`)
-                .limit(10);
+                .or(`full_name.ilike.*${safeTerm}*,id_number.ilike.*${safeTerm}*`);
 
             if (dependantError) throw dependantError;
 
@@ -89,13 +74,19 @@ export default function ReceptionSearchMember() {
                 }
             }
 
-            setSearchResults(allResults);
-            if (allResults.length === 1 && query === searchTerm) {
-                // If only one result and it's a full match, maybe auto-select?
-                // For now, just let the list show.
+            if (allResults.length > 0) {
+                if (allResults.length > 1) {
+                    toast({ title: "Multiple Member Matches", description: "Please select the correct member from the list." });
+                    setSearchResults(allResults);
+                } else {
+                    setMember(allResults[0]);
+                }
+            } else {
+                toast({ title: "Member not found", description: "No member found matching that criteria.", variant: "destructive" });
             }
         } catch (error: any) {
             console.error("Search error:", error);
+            toast({ title: "Search failed", description: error.message, variant: "destructive" });
         } finally {
             setSearching(false);
         }
@@ -118,82 +109,26 @@ export default function ReceptionSearchMember() {
                     <CardDescription>Enter Name, Phone, ID, or Member Number to find the member.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="relative">
-                        <form onSubmit={handleSearch} className="flex gap-2">
-                            <div className="relative flex-1">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                                <Input
-                                    placeholder="Type Name, Phone, ID, or Member #..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="pl-10 h-11 bg-slate-50 focus:bg-white transition-all shadow-inner"
-                                />
-                                {searching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-primary" />}
-                            </div>
-                            <Button type="submit" disabled={searching} className="h-11 px-6 shadow-md">
-                                Search
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                className="h-11 gap-2 border-primary/30 text-primary"
-                                onClick={() => setScanDialogOpen(true)}
-                            >
-                                <QrCode className="h-4 w-4" />
-                                Scan
-                            </Button>
-                        </form>
-
-                        {(searchResults.length > 0 || searching) && searchTerm.trim().length >= 1 && !member && (
-                            <div className="absolute z-50 w-full mt-2 bg-white rounded-xl shadow-[0_10px_30px_-5px_rgba(0,0,0,0.2)] border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-top-2">
-                                <div className="max-h-[300px] overflow-y-auto divide-y divide-slate-100">
-                                    {searching && searchResults.length === 0 && (
-                                        <div className="p-8 text-center text-slate-400">
-                                            <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 opacity-50" />
-                                            <p className="text-xs font-medium animate-pulse">Searching for "{searchTerm}"...</p>
-                                        </div>
-                                    )}
-
-                                    {!searching && searchResults.length === 0 && searchTerm.trim().length >= 1 && (
-                                        <div className="p-8 text-center text-slate-400">
-                                            <Search className="h-6 w-6 mx-auto mb-2 opacity-20" />
-                                            <p className="text-xs font-bold uppercase tracking-widest text-slate-300">No members found</p>
-                                            <p className="text-[10px] mt-1">Try a different name, phone or ID</p>
-                                        </div>
-                                    )}
-
-                                    {searchResults.map((res: any) => (
-                                        <div
-                                            key={res.id}
-                                            className="p-3 flex items-center justify-between hover:bg-slate-50 cursor-pointer transition-colors group"
-                                            onClick={() => {
-                                                setMember(res);
-                                                setSearchResults([]);
-                                                setSearchTerm("");
-                                            }}
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                                                    {(res.full_name || "M").charAt(0)}
-                                                </div>
-                                                <div>
-                                                    <p className="font-bold text-slate-900 leading-none group-hover:text-primary transition-colors">{res.full_name}</p>
-                                                    <p className="text-[10px] text-slate-500 mt-1">
-                                                        #{res.member_number} • {res.phone} • {res.id_number}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <Button size="sm" variant="ghost" className="text-xs group-hover:text-primary">Select</Button>
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="bg-slate-50 px-3 py-2 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400 font-medium">
-                                    <span>{searching ? "Searching..." : `${searchResults.length} ${searchResults.length === 1 ? 'match' : 'matches'} found`}</span>
-                                    <button onClick={() => setSearchResults([])} className="hover:text-primary active:scale-95 transition-all text-primary uppercase font-bold text-[9px] tracking-wider">Clear</button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                    <form onSubmit={handleSearch} className="flex gap-4">
+                        <Input
+                            placeholder="Name, Phone, ID, or Member #"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                        <Button type="submit" disabled={searching}>
+                            {searching ? <Loader2 className="animate-spin" /> : <Search className="h-4 w-4" />}
+                            <span className="ml-2">Search</span>
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className="gap-2 border-primary/30 text-primary"
+                            onClick={() => setScanDialogOpen(true)}
+                        >
+                            <QrCode className="h-4 w-4" />
+                            Scan Card
+                        </Button>
+                    </form>
                 </CardContent>
             </Card>
 
@@ -206,6 +141,34 @@ export default function ReceptionSearchMember() {
                 </DialogContent>
             </Dialog>
 
+            {searchResults.length > 0 && !member && (
+                <Card className="border-primary/50">
+                    <CardHeader className="bg-primary/5">
+                        <CardTitle className="text-xl">Select Member</CardTitle>
+                        <CardDescription>Multiple members found for your search. Please choose the correct one.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="pt-6 space-y-4">
+                        {searchResults.map((res: any) => (
+                            <div key={res.id} className="flex justify-between items-center p-4 border rounded-lg hover:bg-slate-50 transition-colors">
+                                <div>
+                                    <h4 className="font-bold text-lg">{res.full_name}</h4>
+                                    <div className="text-sm text-muted-foreground flex gap-3">
+                                        <span>Phone: {res.phone}</span>
+                                        <span>ID: {res.id_number}</span>
+                                        <span>Member #: {res.member_number}</span>
+                                    </div>
+                                </div>
+                                <Button onClick={() => {
+                                    setMember(res);
+                                    setSearchResults([]);
+                                }}>
+                                    Select
+                                </Button>
+                            </div>
+                        ))}
+                    </CardContent>
+                </Card>
+            )}
 
             {member && (
                 <Card className="border-primary/50">

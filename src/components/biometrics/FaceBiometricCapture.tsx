@@ -47,8 +47,9 @@ export default function FaceBiometricCapture({
   );
 
   const refreshDevices = useCallback(() => {
-    navigator.mediaDevices.enumerateDevices().then(handleDevices).then(newDevices => {
-      const videoInputs = newDevices?.filter(d => d.kind === "videoinput") || [];
+    navigator.mediaDevices.enumerateDevices().then(mediaDevices => {
+      const videoInputs = mediaDevices.filter(({ kind }) => kind === "videoinput");
+      setDevices(videoInputs);
       
       // If selected device is gone, or we haven't picked one yet
       if (selectedDeviceId && !videoInputs.find(d => d.deviceId === selectedDeviceId)) {
@@ -60,7 +61,7 @@ export default function FaceBiometricCapture({
         setSelectedDeviceId(videoInputs[0].deviceId);
       }
     });
-  }, [handleDevices, selectedDeviceId]);
+  }, [selectedDeviceId]);
 
   useEffect(() => {
     refreshDevices();
@@ -213,10 +214,26 @@ export default function FaceBiometricCapture({
                     {devices.find(d => d.deviceId === selectedDeviceId)?.label || "Live Stream"}
                   </span>
                 </div>
-                <div className="absolute inset-0 border-[30px] border-black/30 pointer-events-none">
-                  <div className="w-full h-full border-2 border-white/50 rounded-[100%] flex items-center justify-center">
-                    <div className="w-1/2 h-2/3 border-2 border-blue-400/80 rounded-full border-dashed animate-pulse"></div>
+                <div className="absolute inset-0 pointer-events-none">
+                  {/* Modern Square Frame with Corner Brackets */}
+                  <div className="absolute inset-[15%] border-[1px] border-white/20 rounded-2xl flex items-center justify-center overflow-hidden">
+                    {/* Scanning Grid (Subtle) */}
+                    <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff10_1px,transparent_1px),linear-gradient(to_bottom,#ffffff10_1px,transparent_1px)] bg-[size:20px_20px]"></div>
+                    
+                    {/* Diagnostic Corner Accents */}
+                    <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-blue-500/80 rounded-tl-xl shadow-[0_0_10px_rgba(59,130,246,0.5)]"></div>
+                    <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-blue-500/80 rounded-tr-xl shadow-[0_0_10px_rgba(59,130,246,0.5)]"></div>
+                    <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-blue-500/80 rounded-bl-xl shadow-[0_0_10px_rgba(59,130,246,0.5)]"></div>
+                    <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-blue-500/80 rounded-br-xl shadow-[0_0_10px_rgba(59,130,246,0.5)]"></div>
+
+                    {/* Central Verification Pulse */}
+                    <div className="w-2/3 h-5/6 border-2 border-blue-400/40 rounded-2xl border-dashed animate-pulse flex items-center justify-center">
+                        <div className="w-full h-[1px] bg-gradient-to-r from-transparent via-blue-400/80 to-transparent animate-[scan_3s_linear_infinite]"></div>
+                    </div>
                   </div>
+                  
+                  {/* Backdrop darkening for focus */}
+                  <div className="absolute inset-0 bg-slate-950/20"></div>
                 </div>
               </>
             ) : (
@@ -253,18 +270,20 @@ export default function FaceBiometricCapture({
           )}
           
           {status === "success" && (
-            <div className="absolute inset-0 flex items-center justify-center bg-green-500/10 backdrop-blur-[2px] animate-in fade-in duration-500">
-                <div className="p-4 bg-white/90 dark:bg-slate-900/90 rounded-full shadow-2xl scale-125">
-                    <ShieldCheck className="h-12 w-12 text-green-500" />
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-green-500/20 backdrop-blur-md animate-in fade-in duration-500 z-50">
+                <div className="p-6 bg-white dark:bg-slate-900 rounded-full shadow-[0_0_50px_rgba(34,197,94,0.4)] scale-125 mb-4 animate-[scaleIn_0.3s_ease-out]">
+                    <ShieldCheck className="h-16 w-16 text-green-500" />
                 </div>
+                <div className="text-white font-bold tracking-widest text-sm uppercase drop-shadow-lg">Verification Complete</div>
             </div>
           )}
 
           {status === "error" && (
-            <div className="absolute inset-0 flex items-center justify-center bg-red-500/10 backdrop-blur-[2px]">
-                <div className="p-4 bg-white/90 dark:bg-slate-900/90 rounded-full shadow-2xl">
-                    <ShieldX className="h-12 w-12 text-red-500" />
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-500/20 backdrop-blur-md z-50">
+                <div className="p-6 bg-white dark:bg-slate-900 rounded-full shadow-[0_0_50px_rgba(239,68,68,0.4)] mb-4 animate-[shake_0.5s_ease-in-out]">
+                    <ShieldX className="h-16 w-16 text-red-500" />
                 </div>
+                <div className="text-white font-bold tracking-widest text-sm uppercase drop-shadow-lg">Identity Rejected</div>
             </div>
           )}
         </div>

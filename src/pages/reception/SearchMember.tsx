@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Search, User, Phone, Mail, CreditCard, CalendarDays, ArrowLeft, Loader2, Fingerprint } from "lucide-react";
+import { Search, User, Phone, Mail, CreditCard, CalendarDays, ArrowLeft, Loader2, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 import { BiometricCapture } from "@/components/BiometricCapture";
@@ -196,8 +196,8 @@ export default function ReceptionSearchMember() {
                                     {member.is_active ? "Active" : "Inactive"}
                                 </Badge>
                                 {member.biometric_data && (
-                                    <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200">
-                                        <Fingerprint className="h-3 w-3 mr-1" /> Biometric Verified
+                                    <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200">
+                                        <ShieldCheck className="h-3 w-3 mr-1" /> Biometric Identity Verified
                                     </Badge>
                                 )}
                             </div>

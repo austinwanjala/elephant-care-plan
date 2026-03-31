@@ -402,8 +402,11 @@ export default function AdminMembers() {
                             {hasFace ? (
                               <Dialog>
                                 <DialogTrigger asChild>
-                                  <div className="h-8 w-8 rounded-full bg-slate-100 border border-slate-200 overflow-hidden cursor-pointer hover:border-primary transition-colors">
-                                    <img src={bios.face_template} alt="Face" className="h-full w-full object-cover" />
+                                  <div className="group relative h-8 w-8 rounded-full bg-slate-100 border border-slate-200 overflow-hidden cursor-pointer hover:border-primary transition-all">
+                                    <img src={bios.face_template} alt="Face" className="h-full w-full object-cover grayscale-[0.5] group-hover:grayscale-0 transition-all" />
+                                    <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                       <ShieldCheck className="h-4 w-4 text-white drop-shadow-md" />
+                                    </div>
                                   </div>
                                 </DialogTrigger>
                                 <DialogContent className="max-w-md p-1 bg-black border-0">
@@ -412,23 +415,18 @@ export default function AdminMembers() {
                                 </DialogContent>
                               </Dialog>
                             ) : (
-                              <Badge variant="secondary" className="bg-green-100 text-green-800">
-                                <Fingerprint className="mr-1 h-3 w-3" /> Finger
-                              </Badge>
-                            )}
-                            {bios?.template && !hasFace && (
-                              <Badge variant="secondary" className="bg-green-100 text-green-800">
-                                <ShieldCheck className="mr-1 h-3 w-3" /> Captured
+                              <Badge variant="secondary" className="bg-amber-50 text-amber-700 border-amber-200">
+                                <ShieldCheck className="mr-1 h-3 w-3" /> Legacy Bio
                               </Badge>
                             )}
                           </div>
                         );
                       } catch (e) {
-                        return <Badge variant="secondary" className="bg-green-100 text-green-800">Captured</Badge>;
+                        return <Badge variant="secondary" className="bg-green-100 text-green-800">Face ID Active</Badge>;
                       }
                     })() : (
-                      <Badge variant="outline" className="text-muted-foreground">
-                        Pending
+                      <Badge variant="outline" className="text-muted-foreground opacity-50">
+                        Unlocked
                       </Badge>
                     )}
                   </TableCell>
@@ -441,7 +439,7 @@ export default function AdminMembers() {
                         <DropdownMenuItem onClick={() => { setSelectedMember(m); setDependantsDialogOpen(true); }}><Users className="mr-2 h-4 w-4" /> View Dependants</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => { setSelectedMember(m); setHistoryDialogOpen(true); }}><History className="mr-2 h-4 w-4" /> View History</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => { setSelectedMember(m); setCardDialogOpen(true); }}><CreditCardIcon className="mr-2 h-4 w-4" /> Digital Card</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => { setSelectedMember(m); setBiometricDialogOpen(true); }}><Fingerprint className="mr-2 h-4 w-4" /> {m.biometric_data ? "Update Biometric" : "Capture Biometric"}</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => { setSelectedMember(m); setBiometricDialogOpen(true); }}><UserCheck className="mr-2 h-4 w-4" /> {m.biometric_data ? "Update Face ID" : "Enroll Face ID"}</DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteMember(m.id)}><Trash2 className="mr-2 h-4 w-4" /> Deactivate</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>

@@ -103,9 +103,9 @@ const Login = () => {
   const resolveRoleFromProfiles = async (userId: string) => {
     // Prefer staff/marketer/member based on existing profile rows.
     const [staffRes, marketerRes, memberRes] = await Promise.all([
-      supabase.from("staff").select("role").eq("user_id", userId).maybeSingle(),
-      supabase.from("marketers").select("id").eq("user_id", userId).maybeSingle(),
-      supabase.from("members").select("id").eq("user_id", userId).maybeSingle(),
+      supabase.from("staff").select("role").eq("user_id", userId).limit(1).maybeSingle(),
+      supabase.from("marketers").select("id").eq("user_id", userId).limit(1).maybeSingle(),
+      supabase.from("members").select("id").eq("user_id", userId).limit(1).maybeSingle(),
     ]);
 
     // Staff tables may not always have role populated for legacy users.

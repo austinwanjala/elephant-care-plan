@@ -36,6 +36,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       .from("user_roles")
       .select("role")
       .eq("user_id", user.id)
+      .limit(1)
       .maybeSingle();
 
     if (roleError) {
@@ -65,6 +66,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       .from("staff")
       .select("full_name")
       .eq("user_id", user.id)
+      .limit(1)
       .maybeSingle();
 
     if (staffData) {

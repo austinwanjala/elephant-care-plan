@@ -221,12 +221,13 @@ export async function verifyFace(params: { memberId?: string; imageBase64: strin
   }
 
   try {
+    const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
     console.log("[Biometric] Loading AI models for facial matching...");
-    // Load models if not already loaded (face-api handles this efficiently)
+    // Load models from CDN to ensure they are complete and not corrupted locally
     await Promise.all([
-      faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
-      faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
-      faceapi.nets.faceRecognitionNet.loadFromUri('/models')
+      faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+      faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL),
+      faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
     ]);
 
     // Create image elements for processing
@@ -234,8 +235,9 @@ export async function verifyFace(params: { memberId?: string; imageBase64: strin
     const storedImg = await faceapi.fetchImage(bios.face_template);
 
     // Get descriptors for both images
-    const capturedDesc = await faceapi.detectSingleFace(capturedImg, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
-    const storedDesc = await faceapi.detectSingleFace(storedImg, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
+    // Note: We use TinyFaceDetector for speed and reduced memory
+    const capturedDesc = await faceapi.detectSingleFace(capturedImg, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks(true).withFaceDescriptor();
+    const storedDesc = await faceapi.detectSingleFace(storedImg, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks(true).withFaceDescriptor();
 
     if (!capturedDesc || !storedDesc) {
       console.warn("[Biometric] No face detected in one or both images.");

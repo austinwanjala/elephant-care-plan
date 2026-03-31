@@ -37,7 +37,7 @@ export default function FaceBiometricCapture({
   const [status, setStatus] = useState<"idle" | "capturing" | "verifying" | "success" | "error">("idle");
   const [storedImage, setStoredImage] = useState<string | null>(null);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string | undefined>(undefined);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
 
   const handleDevices = useCallback(
     (mediaDevices: MediaDeviceInfo[]) =>
@@ -45,20 +45,27 @@ export default function FaceBiometricCapture({
     [setDevices]
   );
 
-  useEffect(() => {
-    const refreshDevices = () => {
-      navigator.mediaDevices.enumerateDevices().then(handleDevices).then(newDevices => {
-        // If selected device is gone, reset to default
-        if (selectedDeviceId && !newDevices?.find(d => d.deviceId === selectedDeviceId)) {
-          setSelectedDeviceId(undefined);
-        }
-      });
-    };
+  const refreshDevices = useCallback(() => {
+    navigator.mediaDevices.enumerateDevices().then(handleDevices).then(newDevices => {
+      const videoInputs = newDevices?.filter(d => d.kind === "videoinput") || [];
+      
+      // If selected device is gone, or we haven't picked one yet
+      if (selectedDeviceId && !videoInputs.find(d => d.deviceId === selectedDeviceId)) {
+        setSelectedDeviceId("");
+      }
+      
+      // Auto-select first device if none selected
+      if (!selectedDeviceId && videoInputs.length > 0) {
+        setSelectedDeviceId(videoInputs[0].deviceId);
+      }
+    });
+  }, [handleDevices, selectedDeviceId]);
 
+  useEffect(() => {
     refreshDevices();
     navigator.mediaDevices.addEventListener('devicechange', refreshDevices);
     return () => navigator.mediaDevices.removeEventListener('devicechange', refreshDevices);
-  }, [handleDevices, selectedDeviceId]);
+  }, [refreshDevices]);
 
   const capture = useCallback(() => {
     const imageSrc = webcamRef.current?.getScreenshot();
@@ -166,10 +173,17 @@ export default function FaceBiometricCapture({
                   key={selectedDeviceId || 'default'}
                   audio={false}
                   ref={webcamRef}
+                  onUserMedia={() => {
+                    console.log("[Biometric] UserMedia authorized for device:", selectedDeviceId);
+                    refreshDevices();
+                  }}
                   screenshotFormat="image/jpeg"
-                  videoConstraints={{
-                    deviceId: selectedDeviceId,
-                    facingMode: selectedDeviceId ? undefined : "user",
+                  videoConstraints={selectedDeviceId ? {
+                    deviceId: { exact: selectedDeviceId },
+                    width: 1280,
+                    height: 720,
+                  } : {
+                    facingMode: "user",
                     width: 1280,
                     height: 720,
                   }}

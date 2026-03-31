@@ -58,8 +58,8 @@ const Index = () => {
       <nav className="glass-effect fixed top-0 left-0 right-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
-              <img src="/img/elephantlogo.jpg" alt="Elephant Logo" className="w-8 h-8 object-contain" />
+            <div className="flex items-center justify-center shrink-0 p-1.5 bg-white/10 rounded-xl shadow-sm border border-white/10 backdrop-blur-sm">
+              <img src="/img/elephantlogo.jpg" alt="Elephant Logo" className="h-10 w-auto min-w-[40px] object-contain" />
             </div>
             <span className="text-xl font-serif font-bold text-foreground">{app_name}</span>
           </div>
@@ -241,8 +241,8 @@ const Index = () => {
           <div className="grid md:grid-cols-3 gap-8 mb-8">
             <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
-                  <img src="/img/elephantlogo.jpg" alt="Elephant Logo" className="w-8 h-8 object-contain" />
+                <div className="flex items-center justify-center shrink-0 p-1.5 bg-white/10 rounded-xl shadow-sm border border-white/10 backdrop-blur-sm">
+                  <img src="/img/elephantlogo.jpg" alt="Elephant Logo" className="h-10 w-auto min-w-[40px] object-contain" />
                 </div>
                 <span className="text-xl font-serif font-bold text-foreground">{app_name}</span>
               </div>

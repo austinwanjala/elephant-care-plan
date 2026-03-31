@@ -239,9 +239,13 @@ const Login = () => {
       const {
         data: { session },
       } = await supabase.auth.getSession();
+      
+      // If a session exists when hitting the login page, clear it to ensure 
+      // the user starts fresh as requested.
       if (session) {
-        setLoading(true);
-        await checkUserRoleAndNavigate(session.user.id);
+        console.log("Existing session detected on login page. Clearing session...");
+        await supabase.auth.signOut();
+        resetForm();
       }
     };
 
@@ -250,16 +254,19 @@ const Login = () => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_OUT") {
-        resetForm();
-        return;
-      }
-
-      if (session) {
+      // If we're on the login page, we only want to redirect if the user
+      // has JUST signed in. (Prevents auto-redirect from prior sessions).
+      if (event === "SIGNED_IN" && session) {
         setLoading(true);
         if (window.location.pathname === "/login") {
           await checkUserRoleAndNavigate(session.user.id);
         }
+        return;
+      }
+
+      if (event === "SIGNED_OUT") {
+        resetForm();
+        return;
       }
     });
 
@@ -312,8 +319,8 @@ const Login = () => {
         
         <div className="bg-white/90 backdrop-blur-xl shadow-[0_8px_40px_-12px_rgba(0,0,0,0.1)] rounded-3xl overflow-hidden border border-white/60">
           
-          <div className="w-full h-32 sm:h-40 bg-white relative flex items-center justify-center border-b border-slate-100 p-4">
-            <img src="/img/elephantlogo.jpg" alt="Elephant Dental Banner" className="w-full h-full object-contain" />
+          <div className="w-full h-32 sm:h-48 bg-white relative flex items-center justify-center border-b border-slate-100 p-6 overflow-hidden">
+            <img src="/img/elephantlogo.jpg" alt="Elephant Dental Banner" className="w-full h-full object-contain transform scale-110" />
           </div>
 
           <div className="p-8 sm:p-10">

@@ -36,16 +36,33 @@ export function DirectorSidebar() {
     }
 
     return (
-        <Sidebar collapsible="icon" className="border-r border-border">
-            <SidebarHeader className="p-4 border-b border-border">
-                <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center shrink-0 p-1.5 bg-white/60 dark:bg-white/10 rounded-xl shadow-sm border border-slate-200/50 backdrop-blur-sm">
-                        <img src="/img/elephantlogo.jpg" alt="Elephant Logo" className="h-11 w-auto min-w-[40px] object-contain" />
+        <Sidebar collapsible="icon" className="border-r border-border/60 transition-all duration-500">
+            <SidebarHeader className="p-4 border-b border-border/40 bg-white/50 dark:bg-slate-950/50 backdrop-blur-md">
+                <div className={cn("flex items-center transition-all duration-500", collapsed ? "justify-center gap-0" : "gap-4")}>
+                    <div className={cn(
+                        "flex items-center justify-center shrink-0 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800/80 backdrop-blur-xl transform transition-all duration-500",
+                        collapsed ? "p-1.5 h-10 w-10 shadow-none border-transparent" : "p-2.5 h-16 w-16 shadow-xl shadow-indigo-500/10"
+                    )}>
+                        <img 
+                            src="/img/elephantlogo.jpg" 
+                            alt="Elephant Logo" 
+                            className={cn(
+                                "w-auto object-contain rounded-xl transition-all duration-500", 
+                                collapsed ? "h-7" : "h-12"
+                            )} 
+                        />
                     </div>
                     {!collapsed && (
-                        <div>
-                            <span className="text-lg font-serif font-bold text-foreground">{settings.app_name || "Elephant Dental"}</span>
-                            <span className="ml-2 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs rounded-full">Director</span>
+                        <div className="flex flex-col overflow-hidden animate-in fade-in slide-in-from-left-4 duration-700">
+                            <span className="text-xl font-serif font-black text-slate-900 dark:text-white leading-[1.1] truncate tracking-tight">
+                                {settings.app_name || "Elephant Dental"}
+                            </span>
+                            <div className="flex items-center gap-2 mt-1.5 px-3 py-1 bg-gradient-to-r from-indigo-600 to-violet-600 rounded-full w-fit shadow-lg shadow-indigo-500/20">
+                                <div className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+                                <span className="text-[11px] font-black uppercase tracking-[0.1em] text-white">
+                                    Director Portal
+                                </span>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -54,33 +71,43 @@ export function DirectorSidebar() {
 
             <SidebarContent>
                 <SidebarGroup>
-                    <SidebarGroupLabel>Management</SidebarGroupLabel>
-                    <SidebarMenu>
+                    <SidebarGroupLabel className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Management & Strategy</SidebarGroupLabel>
+                    <SidebarMenu className="gap-2 px-2">
                         {menuItems.map((item) => (
                             <SidebarMenuItem key={item.title}>
                                 <SidebarMenuButton
                                     asChild
                                     isActive={isActive(item.url)}
                                     tooltip={item.title}
-                                    className="h-11 transition-all duration-300"
+                                    className={cn(
+                                        "h-12 w-full transition-all duration-300 rounded-xl group/btn relative overflow-hidden",
+                                        isActive(item.url) 
+                                            ? "bg-indigo-50 dark:bg-indigo-900/10 text-indigo-600 dark:text-indigo-400" 
+                                            : "text-slate-600 dark:text-slate-400 hover:bg-slate-100/50 dark:hover:bg-slate-800/50"
+                                    )}
                                 >
                                     <a
                                         href={item.url}
                                         onClick={(e) => { e.preventDefault(); navigate(item.url); }}
-                                        className="flex items-center gap-3"
+                                        className="flex items-center gap-3 w-full px-3"
                                     >
                                         <div className={cn(
-                                            "flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300",
-                                            isActive(item.url)
-                                                ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-110"
-                                                : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
+                                            "flex items-center justify-center transition-all duration-300",
+                                            isActive(item.url) ? "transform scale-110" : "group-hover/btn:scale-110"
                                         )}>
-                                            <item.icon className="h-4 w-4" />
+                                            <item.icon className={cn(
+                                                "h-5 w-5 transition-colors duration-300",
+                                                isActive(item.url) ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400 group-hover/btn:text-indigo-600 dark:group-hover/btn:text-indigo-300"
+                                            )} />
                                         </div>
                                         <span className={cn(
-                                            "font-medium transition-colors duration-300",
-                                            isActive(item.url) ? "text-primary font-bold" : "text-slate-600"
+                                            "font-semibold text-sm tracking-tight transition-all duration-300",
+                                            isActive(item.url) ? "opacity-100" : "opacity-80 group-hover/btn:opacity-100"
                                         )}>{item.title}</span>
+                                        
+                                        {isActive(item.url) && (
+                                            <div className="absolute left-0 top-3 bottom-3 w-1 bg-indigo-600 dark:bg-indigo-400 rounded-r-full" />
+                                        )}
                                     </a>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>

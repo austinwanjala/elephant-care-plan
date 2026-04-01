@@ -3,11 +3,11 @@ import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { useSidebar, Sidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { UserPlus, Landmark, Receipt, LogOut, LayoutDashboard, Search, CalendarClock, MessageSquare, ClipboardPlus, Contact2 } from "lucide-react";
+import { UserPlus, Landmark, Receipt, LogOut, Building2, Search, CalendarClock, MessageSquare, ClipboardPlus, Contact2, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 const menuItems = [
-    { title: "Dashboard", url: "/reception", icon: LayoutDashboard },
+    { title: "Dashboard", url: "/reception", icon: Building2 },
     { title: "Register Visit", url: "/reception/register-visit", icon: ClipboardPlus },
     { title: "Add Member", url: "/reception/add-member", icon: UserPlus },
     { title: "Search Member", url: "/reception/search", icon: Contact2 },
@@ -54,16 +54,33 @@ export function ReceptionSidebar() {
     }, []);
 
     return (
-        <Sidebar collapsible="icon" className="border-r border-border">
-            <SidebarHeader className="p-4 border-b border-border">
-                <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center shrink-0 p-1.5 bg-white/60 dark:bg-white/10 rounded-xl shadow-sm border border-slate-200/50 backdrop-blur-sm">
-                        <img src="/img/elephantlogo.jpg" alt="Elephant Logo" className="h-11 w-auto min-w-[40px] object-contain" />
+        <Sidebar collapsible="icon" className="border-r border-border/60 transition-all duration-500">
+            <SidebarHeader className="p-4 border-b border-border/40 bg-white/50 dark:bg-slate-950/50 backdrop-blur-md">
+                <div className={cn("flex items-center transition-all duration-500", collapsed ? "justify-center gap-0" : "gap-4")}>
+                    <div className={cn(
+                        "flex items-center justify-center shrink-0 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800/80 backdrop-blur-xl transform transition-all duration-500",
+                        collapsed ? "p-1.5 h-10 w-10 shadow-none border-transparent" : "p-2.5 h-16 w-16 shadow-xl shadow-blue-500/10"
+                    )}>
+                        <img 
+                            src="/img/elephantlogo.jpg" 
+                            alt="Elephant Logo" 
+                            className={cn(
+                                "w-auto object-contain rounded-xl transition-all duration-500", 
+                                collapsed ? "h-7" : "h-12"
+                            )} 
+                        />
                     </div>
                     {!collapsed && (
-                        <div>
-                            <span className="text-lg font-serif font-bold text-foreground">{settings.app_name || "Elephant Dental"}</span>
-                            <span className="ml-2 px-2 py-0.5 bg-secondary text-secondary-foreground text-xs rounded-full">Reception</span>
+                        <div className="flex flex-col overflow-hidden animate-in fade-in slide-in-from-left-4 duration-700">
+                            <span className="text-xl font-serif font-black text-slate-900 dark:text-white leading-[1.1] truncate tracking-tight">
+                                {settings.app_name || "Elephant Dental"}
+                            </span>
+                            <div className="flex items-center gap-2 mt-1.5 px-3 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full w-fit shadow-lg shadow-blue-500/20">
+                                <div className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+                                <span className="text-[11px] font-black uppercase tracking-[0.1em] text-white">
+                                    Reception Portal
+                                </span>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -73,36 +90,46 @@ export function ReceptionSidebar() {
             <SidebarContent>
                 <SidebarGroup>
                     <SidebarGroupLabel>Front Desk</SidebarGroupLabel>
-                    <SidebarMenu>
+                    <SidebarMenu className="gap-2 px-2">
                         {menuItems.map((item) => (
                             <SidebarMenuItem key={item.title}>
                                 <SidebarMenuButton
                                     asChild
                                     isActive={isActive(item.url)}
                                     tooltip={item.title}
-                                    className="h-11 transition-all duration-300"
+                                    className={cn(
+                                        "h-12 w-full transition-all duration-300 rounded-xl group/btn relative overflow-hidden",
+                                        isActive(item.url) 
+                                            ? "bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400" 
+                                            : "text-slate-600 dark:text-slate-400 hover:bg-slate-100/50 dark:hover:bg-slate-800/50"
+                                    )}
                                 >
                                     <a
                                         href={item.url}
                                         onClick={(e) => { e.preventDefault(); navigate(item.url); }}
-                                        className="flex items-center gap-3 justify-between w-full"
+                                        className="flex items-center gap-3 w-full px-3"
                                     >
-                                        <div className="flex items-center gap-3">
-                                            <div className={cn(
-                                                "flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300",
-                                                isActive(item.url)
-                                                    ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-110"
-                                                    : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
-                                            )}>
-                                                <item.icon className="h-4 w-4" />
-                                            </div>
-                                            <span className={cn(
-                                                "font-medium transition-colors duration-300",
-                                                isActive(item.url) ? "text-primary font-bold" : "text-slate-600"
-                                            )}>{item.title}</span>
+                                        <div className={cn(
+                                            "flex items-center justify-center transition-all duration-300",
+                                            isActive(item.url) ? "transform scale-110" : "group-hover/btn:scale-110"
+                                        )}>
+                                            <item.icon className={cn(
+                                                "h-5 w-5 transition-colors duration-300",
+                                                isActive(item.url) ? "text-blue-600 dark:text-blue-400" : "text-slate-400 group-hover/btn:text-slate-600 dark:group-hover/btn:text-slate-200"
+                                            )} />
                                         </div>
+                                        <span className={cn(
+                                            "font-semibold text-sm tracking-tight transition-all duration-300",
+                                            isActive(item.url) ? "opacity-100" : "opacity-80 group-hover/btn:opacity-100"
+                                        )}>{item.title}</span>
+                                        
+                                        {/* Professional Active Indicator */}
+                                        {isActive(item.url) && (
+                                            <div className="absolute left-0 top-3 bottom-3 w-1 bg-blue-600 dark:bg-blue-400 rounded-r-full animate-in slide-in-from-left-full duration-500" />
+                                        )}
+                                        
                                         {item.title === "Billing & Claims" && pendingBillsCount > 0 && (
-                                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white shrink-0">
+                                            <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white shadow-lg shadow-red-500/30">
                                                 {pendingBillsCount}
                                             </span>
                                         )}

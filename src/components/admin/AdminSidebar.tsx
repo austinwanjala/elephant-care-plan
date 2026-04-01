@@ -180,14 +180,19 @@ export function AdminSidebar() {
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Management</SidebarGroupLabel>
-          <SidebarMenu>
+          <SidebarMenu className="gap-2 px-2">
             {menuItems.map((item) => (
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton
                   asChild
                   isActive={isActive(item.url)}
                   tooltip={item.title}
-                  className="h-11 transition-all duration-300"
+                  className={cn(
+                    "h-12 w-full transition-all duration-300 rounded-xl group/btn relative overflow-hidden",
+                    isActive(item.url)
+                      ? "bg-primary/10 text-primary"
+                      : "text-slate-600 dark:text-slate-400 hover:bg-slate-100/50 dark:hover:bg-slate-800/50"
+                  )}
                 >
                   <a
                     href={item.url}
@@ -195,24 +200,29 @@ export function AdminSidebar() {
                       e.preventDefault();
                       navigate(item.url);
                     }}
-                    className="flex items-center gap-3 justify-between w-full"
+                    className="flex items-center gap-3 w-full px-3"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className={cn(
-                        "flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300",
-                        isActive(item.url)
-                          ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-110"
-                          : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
-                      )}>
-                        <item.icon className="h-4 w-4" />
-                      </div>
-                      <span className={cn(
-                        "font-medium transition-colors duration-300",
-                        isActive(item.url) ? "text-primary font-bold" : "text-slate-600"
-                      )}>{item.title}</span>
+                    <div className={cn(
+                      "flex items-center justify-center transition-all duration-300",
+                      isActive(item.url) ? "transform scale-110" : "group-hover/btn:scale-110"
+                    )}>
+                      <item.icon className={cn(
+                        "h-5 w-5 transition-colors duration-300",
+                        isActive(item.url) ? "text-primary" : "text-slate-400 group-hover/btn:text-primary"
+                      )} />
                     </div>
+                    <span className={cn(
+                      "font-semibold text-sm tracking-tight transition-all duration-300",
+                      isActive(item.url) ? "opacity-100" : "opacity-80 group-hover/btn:opacity-100"
+                    )}>{item.title}</span>
+
+                    {/* Professional Active Indicator */}
+                    {isActive(item.url) && (
+                      <div className="absolute left-0 top-3 bottom-3 w-1 bg-primary rounded-r-full animate-in slide-in-from-left-full duration-500" />
+                    )}
+
                     {item.title === "Marketer Claims" && pendingClaimsCount > 0 && (
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white shrink-0">
+                      <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white shadow-lg shadow-red-500/30">
                         {pendingClaimsCount}
                       </span>
                     )}
@@ -225,14 +235,19 @@ export function AdminSidebar() {
 
         <SidebarGroup>
           <SidebarGroupLabel>Configuration</SidebarGroupLabel>
-          <SidebarMenu>
+          <SidebarMenu className="gap-2 px-2">
             {settingsMenuItems.map((item) => (
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton
                   asChild
                   isActive={isActive(item.url)}
                   tooltip={item.title}
-                  className="h-11 transition-all duration-300"
+                  className={cn(
+                    "h-12 w-full transition-all duration-300 rounded-xl group/btn relative overflow-hidden",
+                    isActive(item.url)
+                      ? "bg-primary/10 text-primary"
+                      : "text-slate-600 dark:text-slate-400 hover:bg-slate-100/50 dark:hover:bg-slate-800/50"
+                  )}
                 >
                   <a
                     href={item.url}
@@ -240,20 +255,26 @@ export function AdminSidebar() {
                       e.preventDefault();
                       navigate(item.url);
                     }}
-                    className="flex items-center gap-3"
+                    className="flex items-center gap-3 w-full px-3"
                   >
                     <div className={cn(
-                      "flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300",
-                      isActive(item.url)
-                        ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-110"
-                        : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
+                      "flex items-center justify-center transition-all duration-300",
+                      isActive(item.url) ? "transform scale-110" : "group-hover/btn:scale-110"
                     )}>
-                      <item.icon className="h-4 w-4" />
+                      <item.icon className={cn(
+                        "h-5 w-5 transition-colors duration-300",
+                        isActive(item.url) ? "text-primary" : "text-slate-400 group-hover/btn:text-primary"
+                      )} />
                     </div>
                     <span className={cn(
-                      "font-medium transition-colors duration-300",
-                      isActive(item.url) ? "text-primary font-bold" : "text-slate-600"
+                      "font-semibold text-sm tracking-tight transition-all duration-300",
+                      isActive(item.url) ? "opacity-100" : "opacity-80 group-hover/btn:opacity-100"
                     )}>{item.title}</span>
+
+                    {/* Professional Active Indicator */}
+                    {isActive(item.url) && (
+                      <div className="absolute left-0 top-3 bottom-3 w-1 bg-primary rounded-r-full animate-in slide-in-from-left-full duration-500" />
+                    )}
                   </a>
                 </SidebarMenuButton>
               </SidebarMenuItem>

@@ -180,22 +180,15 @@ async function ensureModelsLoaded() {
 }
 
 /**
- * Robust detection helper: Try SSD first (accurate), then Tiny (fast backup)
+ * Robust detection helper: Enforces high-quality SSD detection
+ * Removing TinyFaceDetector fallback prevents generic/blurry embeddings
+ * that lead to cross-member false positives.
  */
 async function detectFaceDescriptor(img: any) {
-  // Try SSD for maximum accuracy
-  let result = await faceapi.detectSingleFace(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.4 }))
+  // Use SSD exclusively for maximum accuracy and strictly enforce high confidence
+  return await faceapi.detectSingleFace(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 }))
     .withFaceLandmarks()
     .withFaceDescriptor();
-  
-  if (!result) {
-    console.warn("[Biometric] SSD detection failed, trying TinyFaceDetector fallback...");
-    // Fallback to Tiny with permissive settings for difficult lighting
-    result = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.2 }))
-      .withFaceLandmarks()
-      .withFaceDescriptor();
-  }
-  return result;
 }
 
 export async function registerFace(params: { memberId?: string; imageBase64: string }) {
@@ -297,7 +290,10 @@ export async function verifyFace(params: { memberId?: string; imageBase64: strin
 
     // 4. Compare using Euclidean distance
     const distance = faceapi.euclideanDistance(capturedDesc.descriptor, storedDesc.descriptor);
-    const threshold = 0.6; // Industry standard for face-api matching (lower is stricter)
+    
+    // STRICT Threshold: 0.45 instead of the loose 0.6 default.
+    // This prevents different people under similar lighting from false-matching.
+    const threshold = 0.45; 
     const matches = distance < threshold;
 
     console.log(`[Biometric] Face match distance: ${distance.toFixed(4)} (Threshold: ${threshold})`);

@@ -160,30 +160,18 @@ const Login = () => {
 
       // Check branch suspension status for branch-level users
       if (role !== "super_admin" && role !== "admin" && role !== "auditor") {
-        let userBranchId = null;
+        // @ts-ignore
+        const { data: branchStatus, error: statusError } = await supabase.rpc('check_user_branch_status', { p_user_id: userId });
         
-        // Try getting branch_id from staff table
-        const { data: staffData } = await supabase.from("staff").select("branch_id").eq("user_id", userId).limit(1).maybeSingle();
-        if (staffData?.branch_id) {
-            userBranchId = staffData.branch_id;
-        } else {
-            // Try getting branch_id from members table
-            const { data: memberData } = await supabase.from("members").select("branch_id").eq("user_id", userId).limit(1).maybeSingle();
-            if (memberData?.branch_id) userBranchId = memberData.branch_id;
-        }
-
-        if (userBranchId) {
-            const { data: branchData } = await supabase.from("branches").select("status").eq("id", userBranchId).limit(1).maybeSingle();
-            if (branchData && (branchData.status === 'suspended' || branchData.status === 'terminated')) {
-                toast({
-                    title: "Branch Suspended",
-                    description: "Your branch operations are currently suspended by the auditor. Please contact management.",
-                    variant: "destructive",
-                });
-                await supabase.auth.signOut();
-                resetForm();
-                return;
-            }
+        if (!statusError && ((branchStatus as unknown as string) === 'suspended' || (branchStatus as unknown as string) === 'terminated')) {
+            toast({
+                title: "Branch Suspended",
+                description: "Your branch operations are currently suspended by the auditor. Please contact management.",
+                variant: "destructive",
+            });
+            await supabase.auth.signOut();
+            resetForm();
+            return;
         }
       }
 

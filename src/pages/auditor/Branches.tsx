@@ -104,6 +104,7 @@ export default function AuditorBranches() {
             }
 
             // 4. Notify Branch Directors
+            // @ts-ignore
             const { error: notifyError } = await supabase.rpc("notify_branch_directors", {
                 p_branch_id: selectedBranch.id,
                 p_title: `Auditor Sanction: ${selectedBranch.name}`,
@@ -114,23 +115,14 @@ export default function AuditorBranches() {
             if (notifyError) console.error("Error sending notification:", notifyError.message);
 
             // 5. Notify All System Admins & Super Admins
-            const { data: adminRoles } = await supabase
-                .from("user_roles")
-                .select("user_id")
-                .in("role", ["admin", "super_admin"]);
-                
-            const adminIds = adminRoles?.map(r => r.user_id) || [];
-            if (adminIds.length > 0) {
-                const adminNotifications = adminIds.map(id => ({
-                    recipient_id: id,
-                    sender_id: user?.id || null,
-                    title: `Auditor Alert: ${selectedBranch.name} Sanctioned`,
-                    message: `Auditor issued a Level ${warningLevel} warning to ${selectedBranch.name}. Fine: KES ${fineAmount}. Reason: ${reason}. Branch status is now ${newStatus}.`,
-                    type: 'warning',
-                    is_read: false
-                }));
-                await supabase.from("notifications").insert(adminNotifications);
-            }
+            // @ts-ignore
+            const { error: notifyAdminsError } = await supabase.rpc("notify_admins", {
+                p_title: `Auditor Alert: ${selectedBranch.name} Sanctioned`,
+                p_message: `Auditor issued a Level ${warningLevel} warning to ${selectedBranch.name}. Fine: KES ${fineAmount}. Reason: ${reason}. Branch status is now ${newStatus}.`,
+                p_type: 'warning'
+            });
+            
+            if (notifyAdminsError) console.error("Error sending notification to admins:", notifyAdminsError.message);
 
             toast({ title: "Sanction Applied", description: `Branch fined and set to ${newStatus}. Director & Admins notified.` });
             setFineDialogOpen(false);

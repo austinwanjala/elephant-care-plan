@@ -158,11 +158,63 @@ export async function verifyExternalBiometric(params: {
   }
 }
 
+let modelsLoaded = false;
+const MODEL_URL = 'https://raw.githubusercontent.com/vladmandic/face-api/master/model/';
+
+async function ensureModelsLoaded() {
+  if (modelsLoaded) return;
+  console.log("[Biometric] Loading AI models for facial recognition...");
+  try {
+    await Promise.all([
+      faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
+      faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+      faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+      faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+    ]);
+    modelsLoaded = true;
+    console.log("[Biometric] Models loaded successfully.");
+  } catch (err) {
+    console.error("[Biometric] Failed to load models:", err);
+    throw new Error("Facial recognition engine failed to initialize. Please check your internet connection.");
+  }
+}
+
+/**
+ * Robust detection helper: Try SSD first (accurate), then Tiny (fast backup)
+ */
+async function detectFaceDescriptor(img: any) {
+  // Try SSD for maximum accuracy
+  let result = await faceapi.detectSingleFace(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.4 }))
+    .withFaceLandmarks()
+    .withFaceDescriptor();
+  
+  if (!result) {
+    console.warn("[Biometric] SSD detection failed, trying TinyFaceDetector fallback...");
+    // Fallback to Tiny with permissive settings for difficult lighting
+    result = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.2 }))
+      .withFaceLandmarks()
+      .withFaceDescriptor();
+  }
+  return result;
+}
+
 export async function registerFace(params: { memberId?: string; imageBase64: string }) {
   const { data: { user } } = await supabase.auth.getUser();
   const tid = params.memberId || user?.id;
   if (!tid) throw new Error("Target ID not found.");
 
+  // 1. Ensure models are ready
+  await ensureModelsLoaded();
+
+  // 2. Validate that the image being registered actually contains a face
+  const img = await faceapi.fetchImage(params.imageBase64);
+  const detection = await detectFaceDescriptor(img);
+  
+  if (!detection) {
+    throw new Error("Face not clearly visible in the photo. Please ensure good lighting, look directly at the camera, and remove any masks or dark glasses.");
+  }
+
+  // 3. Fetch current biometric data
   const { data: member, error: memErr } = await supabase
     .from("members")
     .select("biometric_data")
@@ -180,6 +232,7 @@ export async function registerFace(params: { memberId?: string; imageBase64: str
     }
   }
 
+  // Store the base64 image as the template
   bios.face_template = params.imageBase64;
 
   const { error: upErr } = await supabase
@@ -221,30 +274,28 @@ export async function verifyFace(params: { memberId?: string; imageBase64: strin
   }
 
   try {
-    const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
-    console.log("[Biometric] Loading AI models for facial matching...");
-    // Load models from CDN to ensure they are complete and not corrupted locally
-    await Promise.all([
-      faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-      faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL),
-      faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
-    ]);
+    // 1. Ensure models are ready
+    await ensureModelsLoaded();
 
-    // Create image elements for processing
+    // 2. Create image elements for processing
     const capturedImg = await faceapi.fetchImage(params.imageBase64);
     const storedImg = await faceapi.fetchImage(bios.face_template);
 
-    // Get descriptors for both images
-    // Note: We use TinyFaceDetector for speed and reduced memory
-    const capturedDesc = await faceapi.detectSingleFace(capturedImg, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks(true).withFaceDescriptor();
-    const storedDesc = await faceapi.detectSingleFace(storedImg, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks(true).withFaceDescriptor();
+    // 3. Get descriptors for both images using robust detection
+    const capturedDesc = await detectFaceDescriptor(capturedImg);
+    const storedDesc = await detectFaceDescriptor(storedImg);
 
-    if (!capturedDesc || !storedDesc) {
-      console.warn("[Biometric] No face detected in one or both images.");
-      return { success: false, reason: "Face not clearly visible. Please ensure good lighting.", storedImage: bios.face_template };
+    if (!capturedDesc) {
+      console.warn("[Biometric] No face detected in captured image.");
+      return { success: false, reason: "Face not clearly visible in current photo. Please check your lighting and look straight at the camera.", storedImage: bios.face_template };
     }
 
-    // Compare using Euclidean distance
+    if (!storedDesc) {
+      console.warn("[Biometric] No face detected in stored template.");
+      return { success: false, reason: "The stored profile image is unclear. Please re-register the member's face.", storedImage: bios.face_template };
+    }
+
+    // 4. Compare using Euclidean distance
     const distance = faceapi.euclideanDistance(capturedDesc.descriptor, storedDesc.descriptor);
     const threshold = 0.6; // Industry standard for face-api matching (lower is stricter)
     const matches = distance < threshold;
@@ -255,12 +306,10 @@ export async function verifyFace(params: { memberId?: string; imageBase64: strin
       success: matches, 
       reason: matches ? "Match confirmed" : "Faces do not match. Identity rejected.",
       storedImage: bios.face_template,
-      score: (1 - distance) * 100
+      score: Math.max(0, (1 - distance / threshold) * 100) // Normalized confidence score
     };
   } catch (error: any) {
     console.error("[Biometric] AI matching failed:", error);
-    // Return true with a warning if the engine fails, or strictly false.
-    // Given the user wants "match exactly", let's be strict.
-    return { success: false, reason: "Verification platform error. Please retry.", storedImage: bios.face_template };
+    return { success: false, reason: error.message || "Verification platform error. Please retry.", storedImage: bios.face_template };
   }
 }

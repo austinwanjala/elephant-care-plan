@@ -45,6 +45,7 @@ export function DirectorLayout({ children }: DirectorLayoutProps) {
             .from("user_roles")
             .select("role")
             .eq("user_id", user.id)
+            .limit(1)
             .maybeSingle();
 
         if (roleError) {
@@ -78,6 +79,7 @@ export function DirectorLayout({ children }: DirectorLayoutProps) {
             .from("staff")
             .select("full_name")
             .eq("user_id", user.id)
+            .limit(1)
             .maybeSingle();
 
         if (staffData) {

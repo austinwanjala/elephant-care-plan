@@ -2567,7 +2567,7 @@ export default function Consultation() {
                                 <input
                                     type="file"
                                     className="hidden"
-                                    accept="image/jpeg,image/png,image/jpg,application/pdf"
+                                    accept="image/jpg,image/png,image/jpg,application/pdf"
                                     multiple
                                     disabled={uploading}
                                     onChange={async (e) => {

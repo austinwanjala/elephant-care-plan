@@ -61,8 +61,8 @@ export function MemberSidebar() {
     <Sidebar collapsible="icon" className="border-r border-border">
       <SidebarHeader className="p-4 border-b border-border">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden">
-            <img src="/img/elephantlogo.jpeg" alt="Elephant Logo" className="w-8 h-8 object-contain" />
+          <div className="flex items-center justify-center shrink-0 p-1.5 bg-white/60 dark:bg-white/10 rounded-xl shadow-sm border border-slate-200/50 backdrop-blur-sm">
+            <img src="/img/elephantlogo.jpg" alt="Elephant Logo" className="h-11 w-auto min-w-[40px] object-contain" />
           </div>
           {!collapsed && (
             <div>

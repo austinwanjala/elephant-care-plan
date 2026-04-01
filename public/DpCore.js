@@ -1,8 +1,9 @@
 (function (global, factory) {
     typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
-    typeof define === 'function' && define.amd ? define(['exports'], factory) :
-    (global = global || self, factory((global.dp = global.dp || {}, global.dp.core = global.dp.core || {})));
-}(this, function (exports) { 'use strict';
+        typeof define === 'function' && define.amd ? define(['exports'], factory) :
+            (global = global || self, factory((global.dp = global.dp || {}, global.dp.core = global.dp.core || {})));
+}(this, function (exports) {
+    'use strict';
 
     /**
      * Provides a way to construct sanitized URLs from a base URL, a path and a query object
@@ -31,9 +32,11 @@
         Url.getSanitizedQuery = function (query) {
             return Object
                 .keys(query)
-                .map(function (key) { return [key, query[key]]
-                .map(encodeURIComponent)
-                .join("="); })
+                .map(function (key) {
+                    return [key, query[key]]
+                        .map(encodeURIComponent)
+                        .join("=");
+                })
                 .join("&");
         };
         /** Constructs an URL string from a base URL, a path and a query object.
@@ -123,18 +126,18 @@
      */
     var BioSampleHeader = /** @class */ (function () {
         function BioSampleHeader(
-        /** Biometric factor. Must be set to 8 for fingerprint. */
-        Factor, 
-        /** Format owner (vendor) information. */
-        Format, 
-        /** Biometric sample representation type. */
-        Type, 
-        /** Purpose of the biometric sample. */
-        Purpose, 
-        /** Quality of biometric sample. If we don't support quality it should be set to -1.  */
-        Quality, 
-        /** Encryption of biometric sample. */
-        Encryption) {
+            /** Biometric factor. Must be set to 8 for fingerprint. */
+            Factor,
+            /** Format owner (vendor) information. */
+            Format,
+            /** Biometric sample representation type. */
+            Type,
+            /** Purpose of the biometric sample. */
+            Purpose,
+            /** Quality of biometric sample. If we don't support quality it should be set to -1.  */
+            Quality,
+            /** Encryption of biometric sample. */
+            Encryption) {
             this.Factor = Factor;
             this.Format = Format;
             this.Type = Type;
@@ -149,10 +152,10 @@
      */
     var BioSample = /** @class */ (function () {
         function BioSample(
-        /** Biometric sample header. */
-        Header, 
-        /** Base64url encoded biometric sample data */
-        Data) {
+            /** Biometric sample header. */
+            Header,
+            /** Base64url encoded biometric sample data */
+            Data) {
             this.Header = Header;
             this.Data = Data;
             /** A version info. */
@@ -176,7 +179,7 @@
     and limitations under the License.
     ***************************************************************************** */
 
-    var __assign = function() {
+    var __assign = function () {
         __assign = Object.assign || function __assign(t) {
             for (var s, i = 1, n = arguments.length; i < n; i++) {
                 s = arguments[i];
@@ -654,8 +657,8 @@
     /** Finger enrollment data. */
     var Finger = /** @class */ (function () {
         function Finger(
-        /** Finger position. */
-        position) {
+            /** Finger position. */
+            position) {
             this.position = position;
         }
         /** Creates the finger enrollment data from a plain JSON object. */
@@ -667,31 +670,31 @@
     }());
 
     (function (FaceImageType) {
-        FaceImageType[FaceImageType["Jpeg"] = 1] = "Jpeg";
+        FaceImageType[FaceImageType["jpg"] = 1] = "jpg";
     })(exports.FaceImageType || (exports.FaceImageType = {}));
     /**
      * Face image data.
      */
     var FaceImage = /** @class */ (function () {
         function FaceImage(
-        /** Base64url-encoded image data. */
-        ImageData, 
-        /** Image format. */
-        ImageType) {
-            if (ImageType === void 0) { ImageType = exports.FaceImageType.Jpeg; }
+            /** Base64url-encoded image data. */
+            ImageData,
+            /** Image format. */
+            ImageType) {
+            if (ImageType === void 0) { ImageType = exports.FaceImageType.jpg; }
             this.ImageData = ImageData;
             this.ImageType = ImageType;
             /** Version info. */
             this.Version = 1;
         }
-        /** Extracts face image from a data URL. Only `data:image/jpeg;base64` is supported for now. */
+        /** Extracts face image from a data URL. Only `data:image/jpg;base64` is supported for now. */
         FaceImage.fromDataURL = function (image) {
-            return new FaceImage(image.replace("data:image/jpeg;base64,", ""));
+            return new FaceImage(image.replace("data:image/jpg;base64,", ""));
         };
         /** Extracts face image from a browser's canvas object.  */
         FaceImage.fromCanvas = function (canvas, quality) {
             if (quality === void 0) { quality = 1.0; }
-            return FaceImage.fromDataURL(canvas.toDataURL("image/jpeg", quality));
+            return FaceImage.fromDataURL(canvas.toDataURL("image/jpg", quality));
         };
         /** Exports the face image data to a {@link BioSample} object. */
         FaceImage.prototype.toBioSample = function (format, purpose, sdkVersion) {
@@ -717,16 +720,16 @@
     var Question = /** @class */ (function () {
         /** Constructs a security question. */
         function Question(
-        /** An index of a question in a question list. */
-        number, 
-        /** A question language ID. */
-        lang_id, 
-        /** A question sublanguage ID. */
-        sublang_id, 
-        /** A keyboard layout for the answer. */
-        keyboard_layout, 
-        /** A text of the security question (only when {@link Question.type} === {@link QuestionType.Custom}) */
-        text) {
+            /** An index of a question in a question list. */
+            number,
+            /** A question language ID. */
+            lang_id,
+            /** A question sublanguage ID. */
+            sublang_id,
+            /** A keyboard layout for the answer. */
+            keyboard_layout,
+            /** A text of the security question (only when {@link Question.type} === {@link QuestionType.Custom}) */
+            text) {
             this.number = number;
             this.lang_id = lang_id;
             this.sublang_id = sublang_id;

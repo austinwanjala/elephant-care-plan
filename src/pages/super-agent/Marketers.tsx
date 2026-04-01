@@ -23,6 +23,8 @@ export default function SuperAgentMarketers() {
     const [createOpen, setCreateOpen] = useState(false);
     const [selectedMarketer, setSelectedMarketer] = useState<any>(null);
     const [profileOpen, setProfileOpen] = useState(false);
+    const [marketerMembers, setMarketerMembers] = useState<any[]>([]);
+    const [loadingMembers, setLoadingMembers] = useState(false);
     const [formData, setFormData] = useState({
         fullName: "",
         email: "",
@@ -35,6 +37,32 @@ export default function SuperAgentMarketers() {
         loadMarketers();
     }, []);
 
+    useEffect(() => {
+        if (selectedMarketer?.id && profileOpen) {
+            loadMarketerMembers(selectedMarketer.id);
+        } else {
+            setMarketerMembers([]);
+        }
+    }, [selectedMarketer, profileOpen]);
+
+    const loadMarketerMembers = async (marketerId: string) => {
+        setLoadingMembers(true);
+        try {
+            const { data, error } = await supabase
+                .from("members")
+                .select("id, full_name, created_at, is_active, member_number")
+                .eq("marketer_id", marketerId)
+                .order("created_at", { ascending: false });
+
+            if (error) throw error;
+            setMarketerMembers(data || []);
+        } catch (error: any) {
+            console.error("Error loading marketer members:", error);
+        } finally {
+            setLoadingMembers(false);
+        }
+    };
+
     const loadMarketers = async () => {
         setLoading(true);
         try {
@@ -45,7 +73,7 @@ export default function SuperAgentMarketers() {
 
             // Map the RPC row names to match the component format
             const mappedData = (data || []).map((m: any) => ({
-                id: m.user_id,
+                id: m.id || m.user_id,
                 user_id: m.user_id,
                 staff: [{ full_name: m.full_name, is_active: m.is_active }],
                 total_members: m.total_members || 0
@@ -241,6 +269,40 @@ export default function SuperAgentMarketers() {
                                         <p className="text-xs text-indigo-500 font-semibold mb-1 uppercase tracking-wider">Generated Members</p>
                                         <p className="text-3xl font-black text-indigo-900">{selectedMarketer.total_members}</p>
                                     </div>
+                                </div>
+
+                                <div className="mt-6 border-t pt-4">
+                                    <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                                        <Users className="h-4 w-4 text-indigo-600" /> Referred Members
+                                    </h3>
+                                    
+                                    {loadingMembers ? (
+                                        <div className="flex justify-center py-4">
+                                            <Loader2 className="h-5 w-5 animate-spin text-indigo-400" />
+                                        </div>
+                                    ) : marketerMembers.length === 0 ? (
+                                        <div className="text-center py-6 text-slate-500 text-sm bg-slate-50 rounded-lg border border-slate-100">
+                                            No members recruited yet.
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
+                                            {marketerMembers.map((member) => (
+                                                <div key={member.id} className="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-lg hover:border-indigo-100 transition-colors">
+                                                    <div>
+                                                        <p className="font-semibold text-sm text-slate-900">{member.full_name}</p>
+                                                        <p className="text-xs text-slate-500 flex items-center gap-2 mt-1">
+                                                            <span>#{member.member_number}</span>
+                                                            <span className="h-1 w-1 bg-slate-300 rounded-full" />
+                                                            <span>{new Date(member.created_at).toLocaleDateString()}</span>
+                                                        </p>
+                                                    </div>
+                                                    <Badge variant={member.is_active ? "default" : "secondary"} className={member.is_active ? "bg-emerald-100 text-emerald-800 border-0 shadow-none hover:bg-emerald-100" : "bg-slate-100 text-slate-600 border-0 shadow-none hover:bg-slate-100"}>
+                                                        {member.is_active ? "Active" : "Inactive"}
+                                                    </Badge>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </>

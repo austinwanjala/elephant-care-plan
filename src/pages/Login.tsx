@@ -158,6 +158,35 @@ const Login = () => {
         return;
       }
 
+      // Check branch suspension status for branch-level users
+      if (role !== "super_admin" && role !== "admin" && role !== "auditor") {
+        let userBranchId = null;
+        
+        // Try getting branch_id from staff table
+        const { data: staffData } = await supabase.from("staff").select("branch_id").eq("user_id", userId).limit(1).maybeSingle();
+        if (staffData?.branch_id) {
+            userBranchId = staffData.branch_id;
+        } else {
+            // Try getting branch_id from members table
+            const { data: memberData } = await supabase.from("members").select("branch_id").eq("user_id", userId).limit(1).maybeSingle();
+            if (memberData?.branch_id) userBranchId = memberData.branch_id;
+        }
+
+        if (userBranchId) {
+            const { data: branchData } = await supabase.from("branches").select("status").eq("id", userBranchId).limit(1).maybeSingle();
+            if (branchData && (branchData.status === 'suspended' || branchData.status === 'terminated')) {
+                toast({
+                    title: "Branch Suspended",
+                    description: "Your branch operations are currently suspended by the auditor. Please contact management.",
+                    variant: "destructive",
+                });
+                await supabase.auth.signOut();
+                resetForm();
+                return;
+            }
+        }
+      }
+
       toast({
         title: "Welcome back!",
         description: "You have successfully logged in.",
@@ -215,10 +244,28 @@ const Login = () => {
           .limit(1)
           .maybeSingle();
 
-        if (memberProfile && memberProfile.is_active && memberProfile.membership_category_id) {
-          navigate("/dashboard");
+        if (memberProfile) {
+          // If they have an assigned scheme but are inactive, they have been administratively suspended/deactivated.
+          if (!memberProfile.is_active && memberProfile.membership_category_id) {
+            toast({
+              title: "Account Deactivated",
+              description: "Your account has been deactivated. Please contact the administrator.",
+              variant: "destructive",
+            });
+            await supabase.auth.signOut();
+            resetForm();
+            return;
+          }
+
+          if (memberProfile.is_active && memberProfile.membership_category_id) {
+            navigate("/dashboard");
+          } else {
+            // Unassigned scheme users just go to scheme selection
+            navigate("/dashboard/scheme-selection");
+          }
         } else {
-          navigate("/dashboard/scheme-selection");
+           // Fallback if somehow profile failed
+           navigate("/dashboard/scheme-selection");
         }
       }
     } catch (error: any) {

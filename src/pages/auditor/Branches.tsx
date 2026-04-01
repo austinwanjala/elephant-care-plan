@@ -103,7 +103,36 @@ export default function AuditorBranches() {
                 if (updateError) throw updateError;
             }
 
-            toast({ title: "Sanction Applied", description: `Branch has been fined and set to ${newStatus}.` });
+            // 4. Notify Branch Directors
+            const { error: notifyError } = await supabase.rpc("notify_branch_directors", {
+                p_branch_id: selectedBranch.id,
+                p_title: `Auditor Sanction: ${selectedBranch.name}`,
+                p_message: `A Level ${warningLevel} warning was issued by an Auditor. Reason: ${reason}. Total fine applied: KES ${fineAmount}. Branch status is now set to ${newStatus}.`,
+                p_type: "warning"
+            });
+            
+            if (notifyError) console.error("Error sending notification:", notifyError.message);
+
+            // 5. Notify All System Admins & Super Admins
+            const { data: adminRoles } = await supabase
+                .from("user_roles")
+                .select("user_id")
+                .in("role", ["admin", "super_admin"]);
+                
+            const adminIds = adminRoles?.map(r => r.user_id) || [];
+            if (adminIds.length > 0) {
+                const adminNotifications = adminIds.map(id => ({
+                    recipient_id: id,
+                    sender_id: user?.id || null,
+                    title: `Auditor Alert: ${selectedBranch.name} Sanctioned`,
+                    message: `Auditor issued a Level ${warningLevel} warning to ${selectedBranch.name}. Fine: KES ${fineAmount}. Reason: ${reason}. Branch status is now ${newStatus}.`,
+                    type: 'warning',
+                    is_read: false
+                }));
+                await supabase.from("notifications").insert(adminNotifications);
+            }
+
+            toast({ title: "Sanction Applied", description: `Branch fined and set to ${newStatus}. Director & Admins notified.` });
             setFineDialogOpen(false);
             loadBranches();
         } catch (error: any) {

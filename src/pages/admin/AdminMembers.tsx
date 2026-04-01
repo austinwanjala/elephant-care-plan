@@ -281,10 +281,38 @@ export default function AdminMembers() {
     }
   };
 
-  const handleDeleteMember = async (id: string) => {
-    if (!confirm("Deactivate member?")) return;
-    await supabase.from("members").update({ is_active: false }).eq("id", id);
+  const handleToggleActive = async (m: Member) => {
+    const action = m.is_active ? "Deactivate" : "Activate";
+    if (!confirm(`${action} member ${m.full_name}?`)) return;
+    await supabase.from("members").update({ is_active: !m.is_active }).eq("id", m.id);
+    toast({ title: "Success", description: `Member ${action}d.` });
     loadData();
+  };
+
+  const handleHardDeleteMember = async (m: Member) => {
+    if (!confirm(`WARNING: Are you absolutely sure you want to permanently DELETE ${m.full_name} from the system?\n\nThis will remove their portal access forever. This action CANNOT be undone.`)) return;
+    
+    setLoading(true);
+    try {
+      const { data: memberProfile } = await supabase.from('members').select('user_id').eq('id', m.id).single();
+      if (!memberProfile?.user_id) throw new Error("Linked user account not found");
+
+      const { error } = await supabase.functions.invoke("admin-delete-user", {
+        body: { userId: memberProfile.user_id }
+      });
+      
+      if (error) {
+          const errJSON = await error.context?.json().catch(() => ({}));
+          throw new Error(errJSON?.error || error.message);
+      }
+      
+      toast({ title: "Deleted", description: "Member permanently deleted from the system." });
+      loadData();
+    } catch (e: any) {
+      toast({ title: "Deletion Failed", description: e.message || "Could not delete user. They might have active dependencies.", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleBiometricCaptureComplete = async (data: string) => {
@@ -440,7 +468,20 @@ export default function AdminMembers() {
                         <DropdownMenuItem onClick={() => { setSelectedMember(m); setHistoryDialogOpen(true); }}><History className="mr-2 h-4 w-4" /> View History</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => { setSelectedMember(m); setCardDialogOpen(true); }}><CreditCardIcon className="mr-2 h-4 w-4" /> Digital Card</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => { setSelectedMember(m); setBiometricDialogOpen(true); }}><UserCheck className="mr-2 h-4 w-4" /> {m.biometric_data ? "Update Face ID" : "Enroll Face ID"}</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteMember(m.id)}><Trash2 className="mr-2 h-4 w-4" /> Deactivate</DropdownMenuItem>
+                        
+                        <div className="h-px bg-slate-200 my-1" />
+                        
+                        <DropdownMenuItem 
+                            className={m.is_active ? "text-amber-600 focus:bg-amber-50" : "text-emerald-600 focus:bg-emerald-50"} 
+                            onClick={() => handleToggleActive(m)}
+                        >
+                            {m.is_active ? <Switch className="mr-2 h-4 w-4 scale-75" checked={true} /> : <Switch className="mr-2 h-4 w-4 scale-75" checked={false} />}
+                            {m.is_active ? "Suspend / Deactivate" : "Activate Member"}
+                        </DropdownMenuItem>
+                        
+                        <DropdownMenuItem className="text-red-600 focus:bg-red-50 focus:text-red-700 font-bold" onClick={() => handleHardDeleteMember(m)}>
+                            <Trash2 className="mr-2 h-4 w-4" /> Permanent Delete
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

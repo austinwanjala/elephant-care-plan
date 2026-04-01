@@ -161,16 +161,36 @@ export function AdminSidebar() {
   };
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-border">
-      <SidebarHeader className="p-4 border-b border-border">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center shrink-0 p-1.5 bg-white/60 dark:bg-white/10 rounded-xl shadow-sm border border-slate-200/50 backdrop-blur-sm">
-            <img src="/img/elephantlogo.jpg" alt="Elephant Logo" className="h-11 w-auto min-w-[40px] object-contain" />
+    <Sidebar collapsible="icon" className="border-r border-border/60 transition-all duration-500">
+      <SidebarHeader className="p-4 border-b border-border/40 bg-white/50 dark:bg-slate-950/50 backdrop-blur-md">
+        <div className={cn("flex items-center transition-all duration-500", collapsed ? "justify-center gap-0" : "gap-4")}>
+          <div className={cn(
+            "flex items-center justify-center shrink-0 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800/80 backdrop-blur-xl transform transition-all duration-500",
+            collapsed ? "p-1.5 h-10 w-10 shadow-none border-transparent" : "p-2.5 h-16 w-16 shadow-xl shadow-primary/10"
+          )}>
+            <img 
+              src="/img/elephantlogo.jpg" 
+              alt="Elephant Logo" 
+              className={cn(
+                "w-auto object-contain rounded-xl transition-all duration-500", 
+                collapsed ? "h-7" : "h-12"
+              )} 
+            />
           </div>
           {!collapsed && (
-            <div>
-              <span className="text-lg font-serif font-bold text-foreground">{settings.app_name || "Elephant Dental"}</span>
-              <span className="ml-2 px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">{roleLabel}</span>
+            <div className="flex flex-col overflow-hidden animate-in fade-in slide-in-from-left-4 duration-700">
+              <span className="text-xl font-serif font-black text-slate-900 dark:text-white leading-[1.1] truncate tracking-tight">
+                {settings.app_name || "Elephant Dental"}
+              </span>
+              <div className={cn(
+                "flex items-center gap-2 mt-1.5 px-3 py-1 rounded-full w-fit shadow-lg shadow-primary/20",
+                roleLabel === "Super Admin" ? "bg-gradient-to-r from-indigo-600 to-violet-600" : "bg-gradient-to-r from-blue-600 to-indigo-600"
+              )}>
+                <div className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+                <span className="text-[11px] font-black uppercase tracking-[0.1em] text-white">
+                  {roleLabel}
+                </span>
+              </div>
             </div>
           )}
         </div>
@@ -208,7 +228,7 @@ export function AdminSidebar() {
                     )}>
                       <item.icon className={cn(
                         "h-5 w-5 transition-colors duration-300",
-                        isActive(item.url) ? "text-primary" : "text-slate-400 group-hover/btn:text-primary"
+                        isActive(item.url) ? "text-primary" : "text-slate-600 dark:text-slate-300 group-hover/btn:text-primary"
                       )} />
                     </div>
                     <span className={cn(
@@ -263,7 +283,7 @@ export function AdminSidebar() {
                     )}>
                       <item.icon className={cn(
                         "h-5 w-5 transition-colors duration-300",
-                        isActive(item.url) ? "text-primary" : "text-slate-400 group-hover/btn:text-primary"
+                        isActive(item.url) ? "text-primary" : "text-slate-600 dark:text-slate-300 group-hover/btn:text-primary"
                       )} />
                     </div>
                     <span className={cn(

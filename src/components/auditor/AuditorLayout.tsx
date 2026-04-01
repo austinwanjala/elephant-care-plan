@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Outlet, Link, useLocation, useNavigate } from "react-router-dom"; // Add useNavigate here
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import {
     LayoutDashboard,
@@ -7,29 +7,179 @@ import {
     ClipboardCheck,
     Banknote,
     LogOut,
-    Menu,
-    X,
     ShieldCheck,
-    Fingerprint,
+    Activity,
     MessageSquare,
-    Building2
+    Building2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { NotificationBell } from "../notifications/NotificationBell";
-
 import { useSystemSettings } from "@/hooks/useSystemSettings";
+import {
+    SidebarProvider,
+    SidebarInset,
+    SidebarTrigger,
+    Sidebar,
+    SidebarHeader,
+    SidebarContent,
+    SidebarGroup,
+    SidebarGroupLabel,
+    SidebarMenu,
+    SidebarMenuItem,
+    SidebarMenuButton,
+    SidebarFooter,
+    useSidebar,
+} from "@/components/ui/sidebar";
+
+const navItems = [
+    { icon: LayoutDashboard, label: "Dashboard", href: "/auditor" },
+    { icon: Users, label: "Members", href: "/auditor/members" },
+    { icon: ClipboardCheck, label: "Visits", href: "/auditor/visits" },
+    { icon: Banknote, label: "Financials", href: "/auditor/financials" },
+    { icon: Building2, label: "Branches", href: "/auditor/branches" },
+    { icon: Activity, label: "System Logs", href: "/auditor/logs" },
+    { icon: MessageSquare, label: "Messages", href: "/auditor/messages" },
+];
+
+function AuditorSidebar({
+    userName,
+    userEmail,
+    onLogout,
+    settings,
+}: {
+    userName: string | null;
+    userEmail: string | null;
+    onLogout: () => void;
+    settings: any;
+}) {
+    const { state } = useSidebar();
+    const collapsed = state === "collapsed";
+    const location = useLocation();
+    const navigate = useNavigate();
+
+    const isActive = (href: string) => {
+        if (href === "/auditor") return location.pathname === "/auditor";
+        return location.pathname.startsWith(href);
+    };
+
+    return (
+        <Sidebar collapsible="icon" className="border-r border-border/60 transition-all duration-500">
+            <SidebarHeader className="p-4 border-b border-border/40 bg-white/50 dark:bg-slate-950/50 backdrop-blur-md">
+                <div className={cn("flex items-center transition-all duration-500", collapsed ? "justify-center gap-0" : "gap-4")}>
+                    <div className={cn(
+                        "flex items-center justify-center shrink-0 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 backdrop-blur-xl transform transition-all duration-500",
+                        collapsed ? "p-1.5 h-10 w-10 shadow-none border-transparent" : "p-2.5 h-16 w-16 shadow-xl shadow-emerald-500/10"
+                    )}>
+                        <img
+                            src="/img/elephantlogo.jpg"
+                            alt="Elephant Logo"
+                            className={cn(
+                                "w-auto object-contain rounded-xl transition-all duration-500",
+                                collapsed ? "h-7" : "h-12"
+                            )}
+                        />
+                    </div>
+                    {!collapsed && (
+                        <div className="flex flex-col overflow-hidden animate-in fade-in slide-in-from-left-4 duration-700">
+                            <span className="text-xl font-serif font-black text-slate-900 dark:text-white leading-[1.1] truncate tracking-tight">
+                                {settings.app_name || "Elephant Dental"}
+                            </span>
+                            <div className="flex items-center gap-2 mt-1.5 px-3 py-1 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-full w-fit shadow-lg shadow-emerald-500/20">
+                                <div className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+                                <span className="text-[11px] font-black uppercase tracking-[0.1em] text-white">
+                                    Auditor Portal
+                                </span>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </SidebarHeader>
+
+            <SidebarContent>
+                <SidebarGroup>
+                    <SidebarGroupLabel className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">
+                        Compliance & Oversight
+                    </SidebarGroupLabel>
+                    <SidebarMenu className="gap-2 px-2">
+                        {navItems.map((item) => (
+                            <SidebarMenuItem key={item.href}>
+                                <SidebarMenuButton
+                                    asChild
+                                    isActive={isActive(item.href)}
+                                    tooltip={item.label}
+                                    className={cn(
+                                        "h-12 w-full transition-all duration-300 rounded-xl group/btn relative overflow-hidden",
+                                        isActive(item.href)
+                                            ? "bg-emerald-50 dark:bg-emerald-900/10 text-emerald-700 dark:text-emerald-400"
+                                            : "text-slate-600 dark:text-slate-400 hover:bg-slate-100/50 dark:hover:bg-slate-800/50"
+                                    )}
+                                >
+                                    <a
+                                        href={item.href}
+                                        onClick={(e) => { e.preventDefault(); navigate(item.href); }}
+                                        className="flex items-center gap-3 w-full px-3"
+                                    >
+                                        <div className={cn(
+                                            "flex items-center justify-center transition-all duration-300",
+                                            isActive(item.href) ? "transform scale-110" : "group-hover/btn:scale-110"
+                                        )}>
+                                            <item.icon className={cn(
+                                                "h-5 w-5 transition-colors duration-300",
+                                                isActive(item.href)
+                                                    ? "text-emerald-600 dark:text-emerald-400"
+                                                    : "text-slate-600 dark:text-slate-300 group-hover/btn:text-emerald-600 dark:group-hover/btn:text-emerald-300"
+                                            )} />
+                                        </div>
+                                        <span className={cn(
+                                            "font-semibold text-sm tracking-tight transition-all duration-300",
+                                            isActive(item.href) ? "opacity-100" : "opacity-80 group-hover/btn:opacity-100"
+                                        )}>{item.label}</span>
+
+                                        {isActive(item.href) && (
+                                            <div className="absolute left-0 top-3 bottom-3 w-1 bg-emerald-600 dark:bg-emerald-400 rounded-r-full animate-in slide-in-from-left-full duration-500" />
+                                        )}
+                                    </a>
+                                </SidebarMenuButton>
+                            </SidebarMenuItem>
+                        ))}
+                    </SidebarMenu>
+                </SidebarGroup>
+            </SidebarContent>
+
+            <SidebarFooter className="p-4 border-t border-border/40">
+                {!collapsed && (
+                    <div className="flex items-center gap-3 px-3 py-3 mb-2 bg-emerald-50/50 dark:bg-slate-800/50 rounded-xl border border-emerald-100 dark:border-slate-700/50 animate-in fade-in duration-500">
+                        <div className="h-9 w-9 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-black text-sm shadow-lg shadow-emerald-500/20 shrink-0">
+                            {userName ? userName.charAt(0).toUpperCase() : "A"}
+                        </div>
+                        <div className="overflow-hidden flex-1">
+                            <p className="text-sm font-bold truncate text-slate-800 dark:text-white">{userName || "Auditor"}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{userEmail}</p>
+                        </div>
+                        <ShieldCheck className="h-4 w-4 text-emerald-500 shrink-0" />
+                    </div>
+                )}
+                <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-3 h-11 rounded-xl text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/10 hover:text-rose-600 transition-all duration-300"
+                    onClick={onLogout}
+                >
+                    <LogOut className="h-5 w-5" />
+                    {!collapsed && <span className="font-semibold">Sign Out</span>}
+                </Button>
+            </SidebarFooter>
+        </Sidebar>
+    );
+}
 
 export const AuditorLayout = () => {
-    const [sidebarOpen, setSidebarOpen] = useState(true);
     const [userEmail, setUserEmail] = useState<string | null>(null);
     const [userName, setUserName] = useState<string | null>(null);
-    const location = useLocation();
-    const navigate = useNavigate(); // Add hook usage
+    const navigate = useNavigate();
     const { toast } = useToast();
     const { settings } = useSystemSettings();
-
     const [role, setRole] = useState<string | null>(null);
 
     useEffect(() => {
@@ -41,13 +191,9 @@ export const AuditorLayout = () => {
     useEffect(() => {
         const checkAuth = async () => {
             const { data: { user } } = await supabase.auth.getUser();
-            if (!user) {
-                navigate("/login");
-                return;
-            }
+            if (!user) { navigate("/login"); return; }
             setUserEmail(user.email);
 
-            // Verify Role
             const { data: roleData } = await supabase
                 .from("user_roles")
                 .select("role")
@@ -58,26 +204,18 @@ export const AuditorLayout = () => {
             setRole(userRole);
 
             if (userRole !== "auditor" && userRole !== "super_admin" && userRole !== "admin") {
-                toast({
-                    title: "Access Denied",
-                    description: "This portal is restricted to Auditors.",
-                    variant: "destructive",
-                });
+                toast({ title: "Access Denied", description: "This portal is restricted to Auditors.", variant: "destructive" });
                 navigate("/login");
                 return;
             }
 
-
-            // Fetch Auditor Name (from staff table, assuming auditors are staff or separate)
             const { data: staffData } = await supabase
                 .from("staff")
                 .select("full_name")
                 .eq("user_id", user.id)
                 .maybeSingle();
 
-            if (staffData) {
-                setUserName(staffData.full_name);
-            }
+            if (staffData) setUserName(staffData.full_name);
         };
 
         checkAuth();
@@ -88,103 +226,31 @@ export const AuditorLayout = () => {
         navigate("/login");
     };
 
-    const navItems = [
-        { icon: LayoutDashboard, label: "Dashboard", href: "/auditor" },
-        { icon: Users, label: "Members", href: "/auditor/members" },
-        { icon: ClipboardCheck, label: "Visits", href: "/auditor/visits" },
-        { icon: Banknote, label: "Financials", href: "/auditor/financials" },
-        { icon: Building2, label: "Branches", href: "/auditor/branches" },
-        { icon: Fingerprint, label: "System Logs", href: "/auditor/logs" },
-        { icon: MessageSquare, label: "Messages", href: "/auditor/messages" },
-    ];
-
     return (
-        <div className="min-h-screen bg-slate-50 flex">
-            {/* Sidebar */}
-            <aside
-                className={cn(
-                    "bg-slate-900 text-white fixed inset-y-0 left-0 z-50 w-64 transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0",
-                    sidebarOpen ? "translate-x-0" : "-translate-x-full"
-                )}
-            >
-                <div className="h-full flex flex-col">
-                    <div className="p-6 border-b border-slate-800 flex items-center gap-3">
-                        <ShieldCheck className="h-8 w-8 text-emerald-400" />
-                        <div>
-                            <h1 className="font-bold text-xl tracking-wide">{settings.app_name || "Elephant Dental"}</h1>
-                            <p className="text-xs text-slate-400">Auditor Portal</p>
+        <SidebarProvider>
+            <div className="min-h-screen flex w-full bg-background">
+                <AuditorSidebar
+                    userName={userName}
+                    userEmail={userEmail}
+                    onLogout={handleLogout}
+                    settings={settings}
+                />
+                <SidebarInset className="flex-1">
+                    <header className="h-14 border-b border-border/60 flex items-center px-4 sticky top-0 bg-background/95 backdrop-blur z-40">
+                        <SidebarTrigger className="mr-4" />
+                        <span className="font-semibold text-slate-700 dark:text-slate-200">Auditor Portal</span>
+                        <div className="ml-auto flex items-center gap-4 text-sm text-slate-600">
+                            <NotificationBell />
+                            <span className="hidden md:inline">
+                                Welcome, <span className="font-bold text-emerald-700">{userName || "Auditor"}</span>
+                            </span>
                         </div>
-                        <button
-                            className="ml-auto lg:hidden"
-                            onClick={() => setSidebarOpen(false)}
-                        >
-                            <X className="h-6 w-6" />
-                        </button>
-                    </div>
-
-
-                    <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-                        {navItems.map((item) => {
-                            const Icon = item.icon;
-                            const isActive = location.pathname === item.href;
-                            return (
-                                <Link
-                                    key={item.href}
-                                    to={item.href}
-                                    className={cn(
-                                        "flex items-center gap-3 px-4 py-3 rounded-lg transition-colors",
-                                        isActive
-                                            ? "bg-emerald-600 text-white"
-                                            : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                                    )}
-                                >
-                                    <Icon className="h-5 w-5" />
-                                    <span className="font-medium">{item.label}</span>
-                                </Link>
-                            );
-                        })}
-                    </nav>
-
-                    <div className="p-4 border-t border-slate-800">
-                        <div className="flex items-center gap-3 px-4 py-3 mb-2">
-                            <div className="h-8 w-8 rounded-full bg-emerald-900/50 flex items-center justify-center text-emerald-400 font-bold border border-emerald-700">
-                                {userName ? userName.charAt(0) : "A"}
-                            </div>
-                            <div className="overflow-hidden">
-                                <p className="text-sm font-medium truncate text-white">{userName || "Auditor"}</p>
-                                <p className="text-xs text-slate-400 truncate">{userEmail}</p>
-                            </div>
-                        </div>
-                        <Button
-                            variant="destructive"
-                            className="w-full justify-start select-none"
-                            onClick={handleLogout}
-                        >
-                            <LogOut className="mr-2 h-4 w-4" /> Sign Out
-                        </Button>
-                    </div>
-                </div>
-            </aside>
-
-            {/* Main Content */}
-            <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-                <header className="bg-white border-b shadow-sm p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)} className="lg:hidden">
-                            <Menu className="h-6 w-6" />
-                        </Button>
-                        <h1 className="font-bold text-lg text-slate-800 lg:hidden">Auditor Portal</h1>
-                    </div>
-                    <div className="flex items-center gap-4 text-sm text-slate-600">
-                        <NotificationBell />
-                        <span className="hidden md:inline">Welcome, <span className="font-bold text-slate-800">{userName || "Auditor"}</span></span>
-                    </div>
-                </header>
-
-                <main className="flex-1 overflow-auto p-4 md:p-8">
-                    <Outlet />
-                </main>
+                    </header>
+                    <main className="p-6">
+                        <Outlet />
+                    </main>
+                </SidebarInset>
             </div>
-        </div>
+        </SidebarProvider>
     );
 };

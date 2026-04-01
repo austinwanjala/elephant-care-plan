@@ -108,6 +108,7 @@ import StaffMessages from "./pages/staff/Messages";
 import SuperAgentDashboard from "./pages/super-agent/Dashboard";
 import SuperAgentMarketers from "./pages/super-agent/Marketers";
 import SuperAgentCommissions from "./pages/super-agent/Commissions";
+import SuperAgentAddMember from "./pages/super-agent/AddMember";
 
 import { DynamicTheme } from "./components/DynamicTheme";
 
@@ -263,6 +264,7 @@ const App = () => (
             <Route index element={<SuperAgentDashboard />} />
             <Route path="marketers" element={<SuperAgentMarketers />} />
             <Route path="commissions" element={<SuperAgentCommissions />} />
+            <Route path="add-member" element={<SuperAgentAddMember />} />
           </Route>
 
           {/* 404 Route */}

@@ -125,7 +125,7 @@ export function MarketerSidebar() {
                                         )}>
                                             <item.icon className={cn(
                                                 "h-5 w-5 transition-colors duration-300",
-                                                isActive(item.url) ? "text-purple-600 dark:text-purple-400" : "text-slate-400 group-hover/btn:text-purple-600 dark:group-hover/btn:text-purple-300"
+                                                isActive(item.url) ? "text-purple-600 dark:text-purple-400" : "text-slate-600 dark:text-slate-300 group-hover/btn:text-purple-600 dark:group-hover/btn:text-purple-300"
                                             )} />
                                         </div>
                                         <span className={cn(

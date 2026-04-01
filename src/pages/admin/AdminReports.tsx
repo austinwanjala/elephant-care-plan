@@ -24,6 +24,7 @@ export default function AdminReports() {
     const [loading, setLoading] = useState(true);
     const [branches, setBranches] = useState<any[]>([]);
     const [selectedBranchId, setSelectedBranchId] = useState<string>("all");
+    const [selectedMonth, setSelectedMonth] = useState<string>(format(new Date(), "yyyy-MM"));
     const [visits, setVisits] = useState<any[]>([]);
     const [stats, setStats] = useState({
         totalRevenue: 0,
@@ -41,10 +42,10 @@ export default function AdminReports() {
     }, []);
 
     useEffect(() => {
-        if (selectedBranchId) {
-            fetchMetrics(selectedBranchId);
+        if (selectedBranchId && selectedMonth) {
+            fetchMetrics(selectedBranchId, selectedMonth);
         }
-    }, [selectedBranchId]);
+    }, [selectedBranchId, selectedMonth]);
 
     const loadInitialData = async () => {
         setLoading(true);
@@ -53,7 +54,7 @@ export default function AdminReports() {
             const { data: branchesData } = await supabase.from("branches").select("id, name").order("name");
             setBranches(branchesData || []);
 
-            await fetchMetrics("all");
+            await fetchMetrics("all", selectedMonth);
         } catch (error: any) {
             toast({ title: "Error loading reports", description: error.message, variant: "destructive" });
         } finally {
@@ -61,11 +62,12 @@ export default function AdminReports() {
         }
     };
 
-    const fetchMetrics = async (branchId: string) => {
+    const fetchMetrics = async (branchId: string, monthStr: string) => {
         setLoading(true);
         try {
-            const startOfMonthDate = format(startOfMonth(new Date()), "yyyy-MM-dd");
-            const endOfMonthDate = format(endOfMonth(new Date()), "yyyy-MM-dd");
+            const targetDate = new Date(`${monthStr}-01T00:00:00`);
+            const startOfMonthDate = format(startOfMonth(targetDate), "yyyy-MM-dd");
+            const endOfMonthDate = format(endOfMonth(targetDate), "yyyy-MM-dd");
 
             let query = supabase
                 .from("visits")
@@ -153,7 +155,22 @@ export default function AdminReports() {
                     <h1 className="text-3xl font-bold tracking-tight">System Reports</h1>
                     <p className="text-muted-foreground">Aggregated performance metrics across all branches.</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                    <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                        <SelectTrigger className="w-[180px]">
+                            <SelectValue placeholder="Select Month" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {Array.from({ length: 12 }).map((_, i) => {
+                                const d = subMonths(new Date(), i);
+                                const val = format(d, "yyyy-MM");
+                                const label = format(d, "MMMM yyyy");
+                                return (
+                                    <SelectItem key={val} value={val}>{label}</SelectItem>
+                                );
+                            })}
+                        </SelectContent>
+                    </Select>
                     <Select value={selectedBranchId} onValueChange={setSelectedBranchId}>
                         <SelectTrigger className="w-[180px]">
                             <SelectValue placeholder="All Branches" />
@@ -182,7 +199,7 @@ export default function AdminReports() {
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-bold">KES {stats.totalRevenue.toLocaleString()}</div>
-                            <p className="text-xs text-muted-foreground">Current Month</p>
+                            <p className="text-xs text-muted-foreground">{format(new Date(`${selectedMonth}-01T00:00:00`), "MMMM yyyy")}</p>
                         </CardContent>
                     </Card>
 

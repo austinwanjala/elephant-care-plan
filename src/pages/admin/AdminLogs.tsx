@@ -71,7 +71,7 @@ export default function AdminLogs() {
 
         const enhancedLogs = combinedLogs.map(log => ({
             ...log,
-            user_name: userMap[log.user_id] || log.user_id || "System"
+            user_name: log.actor_name || userMap[log.user_id] || log.user_id || "System"
         }));
 
         if (auditLogsResult.error) console.error("Error fetching audit logs:", auditLogsResult.error);

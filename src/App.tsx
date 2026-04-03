@@ -77,6 +77,7 @@ import AdminVisits from "./pages/admin/AdminVisits";
 import AdminAppointments from "./pages/admin/AdminAppointments";
 import AdminServices from "./pages/admin/AdminServices";
 import AdminBranchPayments from "./pages/admin/AdminBranchPayments";
+import AdminBranchFines from "./pages/admin/AdminBranchFines";
 import AdminMarketerClaims from "./pages/admin/AdminMarketerClaims";
 import AdminMarketerCommissions from "./pages/admin/AdminMarketerCommissions";
 import AdminCommissionSettings from "./pages/admin/AdminCommissionSettings";
@@ -199,6 +200,7 @@ const App = () => (
             <Route path="appointments" element={<AdminAppointments />} />
             <Route path="services" element={<AdminServices />} />
             <Route path="branch-payments" element={<AdminBranchPayments />} />
+            <Route path="branch-fines" element={<AdminBranchFines />} />
             <Route path="marketer-claims" element={<AdminMarketerClaims />} />
             <Route path="marketer-commissions" element={<AdminMarketerCommissions />} />
             <Route path="commission-settings" element={<AdminCommissionSettings />} />
@@ -224,6 +226,7 @@ const App = () => (
             <Route path="appointments" element={<AdminAppointments />} />
             <Route path="services" element={<AdminServices />} />
             <Route path="branch-payments" element={<AdminBranchPayments />} />
+            <Route path="branch-fines" element={<AdminBranchFines />} />
             <Route path="marketer-claims" element={<AdminMarketerClaims />} />
             <Route path="marketer-commissions" element={<AdminMarketerCommissions />} />
             <Route path="commission-settings" element={<AdminCommissionSettings />} />
@@ -246,6 +249,7 @@ const App = () => (
             <Route index element={<FinanceDashboard />} />
             <Route path="marketer-payments" element={<AdminMarketerClaims />} />
             <Route path="branch-payments" element={<AdminBranchPayments />} />
+            <Route path="branch-fines" element={<AdminBranchFines />} />
             <Route path="history" element={<AdminBranchPayments />} />
             <Route path="messages" element={<StaffMessages />} />
           </Route>

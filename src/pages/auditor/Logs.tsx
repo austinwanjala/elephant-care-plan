@@ -45,7 +45,7 @@ export default function AuditorLogs() {
         const to = from + PAGE_SIZE - 1;
 
         let query = (supabase as any)
-            .from("audit_logs")
+            .from("system_logs")
             .select("*", { count: "exact" })
             .order("created_at", { ascending: false })
             .range(from, to);
@@ -182,150 +182,141 @@ export default function AuditorLogs() {
                 </div>
             </div>
 
-            {/* Logs Table */}
-            <Card className="border-border/50 shadow-sm overflow-hidden">
-                <CardHeader className="flex flex-row items-center justify-between px-6 py-4 border-b border-border/50 bg-slate-50/50 dark:bg-slate-900/30">
-                    <CardTitle className="flex items-center gap-2 text-base">
-                        <Clock className="h-4 w-4 text-emerald-600" />
+            {/* Logs Grid */}
+            <div className="space-y-4">
+                <div className="flex flex-row items-center justify-between px-2 py-1">
+                    <h2 className="flex items-center gap-2 text-lg font-bold text-slate-800 dark:text-slate-200">
+                        <Clock className="h-5 w-5 text-emerald-600" />
                         Recent Activity
                         <Badge variant="secondary" className="ml-2 text-xs font-bold">{filteredLogs.length} shown</Badge>
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <Table>
-                            <TableHeader>
-                                <TableRow className="bg-slate-50/50 dark:bg-slate-900/20 hover:bg-transparent">
-                                    <TableHead className="font-black text-xs uppercase tracking-wider text-slate-500 pl-6">Timestamp</TableHead>
-                                    <TableHead className="font-black text-xs uppercase tracking-wider text-slate-500">Action</TableHead>
-                                    <TableHead className="font-black text-xs uppercase tracking-wider text-slate-500">User / Actor</TableHead>
-                                    <TableHead className="font-black text-xs uppercase tracking-wider text-slate-500">Details Preview</TableHead>
-                                    <TableHead className="font-black text-xs uppercase tracking-wider text-slate-500 text-right pr-6">Inspect</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {loading ? (
-                                    <TableRow>
-                                        <TableCell colSpan={5} className="text-center h-32">
-                                            <div className="flex flex-col items-center gap-2">
-                                                <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
-                                                <p className="text-sm text-slate-500">Loading audit logs...</p>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ) : filteredLogs.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={5} className="text-center h-32">
-                                            <div className="flex flex-col items-center gap-2">
-                                                <Activity className="h-8 w-8 text-slate-300" />
-                                                <p className="text-sm text-slate-500">No logs found matching your criteria.</p>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    filteredLogs.map((log, idx) => (
-                                        <TableRow key={log.id} className={idx % 2 === 0 ? "bg-white dark:bg-transparent" : "bg-slate-50/40 dark:bg-slate-900/10"}>
-                                            <TableCell className="pl-6">
-                                                <div className="flex items-center gap-2">
-                                                    <Clock className="h-3 w-3 text-slate-400 shrink-0" />
-                                                    <span className="font-mono text-[11px] text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                                                        {format(new Date(log.created_at), "MMM d, yyyy HH:mm:ss")}
-                                                    </span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${getActionColor(log.action)}`}>
-                                                    {log.action}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-2">
-                                                    <div className="h-7 w-7 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white text-[10px] font-black shrink-0 shadow-sm">
-                                                        {(userMap[log.user_id] || "S").charAt(0).toUpperCase()}
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-semibold text-xs text-slate-800 dark:text-slate-200">{userMap[log.user_id] || "System"}</p>
-                                                        <p className="text-[9px] font-mono text-slate-400 truncate max-w-[100px]">{log.user_id ? `${log.user_id.slice(0, 8)}...` : "—"}</p>
-                                                    </div>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="max-w-[250px]">
-                                                <p className="text-[11px] text-slate-500 truncate font-mono">
+                    </h2>
+                </div>
+                
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center h-48 gap-3 bg-white dark:bg-slate-900/30 rounded-xl border border-border/50 shadow-sm">
+                        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+                        <p className="text-sm font-medium text-slate-500">Loading audit logs...</p>
+                    </div>
+                ) : filteredLogs.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-48 gap-3 bg-white dark:bg-slate-900/30 rounded-xl border border-border/50 shadow-sm">
+                        <Activity className="h-8 w-8 text-slate-300" />
+                        <p className="text-sm font-medium text-slate-500">No logs found matching your criteria.</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {filteredLogs.map((log) => (
+                            <Card key={log.id} className="border-border/50 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col bg-white dark:bg-slate-900/50">
+                                <div className="p-4 border-b border-border/50 bg-slate-50/80 dark:bg-slate-900/80 flex justify-between items-start gap-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white text-sm font-black shrink-0 shadow-md">
+                                            {(userMap[log.user_id] || "S").charAt(0).toUpperCase()}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="font-bold text-sm text-slate-900 dark:text-slate-100 truncate">
+                                                {log.actor_name || userMap[log.user_id] || "System"}
+                                            </p>
+                                            <p className="text-[10px] font-mono text-slate-400 truncate mt-0.5">
+                                                {log.user_id || "N/A"}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <span className={`shrink-0 inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider shadow-sm ${getActionColor(log.action)}`}>
+                                        {log.action}
+                                    </span>
+                                </div>
+                                <CardContent className="p-5 flex-1 flex flex-col justify-between gap-4">
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/30 px-3 py-2 rounded-lg border border-border/40">
+                                            <Clock className="h-4 w-4 text-emerald-500" />
+                                            <span className="text-sm font-mono font-medium">
+                                                {format(new Date(log.created_at), "MMM d, yyyy HH:mm:ss")}
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <div className="bg-slate-100/50 dark:bg-slate-900/50 border border-border/50 p-3 rounded-xl shadow-inner">
+                                                <p className="text-xs text-slate-600 dark:text-slate-400 font-mono line-clamp-3 leading-relaxed">
                                                     {JSON.stringify(log.details)}
                                                 </p>
-                                            </TableCell>
-                                            <TableCell className="text-right pr-6">
-                                                <Dialog>
-                                                    <DialogTrigger asChild>
-                                                        <Button variant="ghost" size="sm"
-                                                            className="h-8 w-8 p-0 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:text-emerald-700 transition-colors">
-                                                            <Eye className="h-4 w-4" />
-                                                        </Button>
-                                                    </DialogTrigger>
-                                                    <DialogContent className="max-w-2xl">
-                                                        <DialogHeader>
-                                                            <DialogTitle className="flex items-center gap-2">
-                                                                <Activity className="h-5 w-5 text-emerald-600" />
-                                                                Audit Log Details
-                                                            </DialogTitle>
-                                                        </DialogHeader>
-                                                        <div className="space-y-4">
-                                                            <div className="grid grid-cols-2 gap-4 text-sm border border-border/60 p-4 rounded-xl bg-slate-50/80 dark:bg-slate-900/50">
-                                                                <div>
-                                                                    <span className="font-black text-xs uppercase tracking-wider text-slate-400 block mb-1">Timestamp</span>
-                                                                    <span className="font-mono text-sm">{new Date(log.created_at).toLocaleString()}</span>
-                                                                </div>
-                                                                <div>
-                                                                    <span className="font-black text-xs uppercase tracking-wider text-slate-400 block mb-1">Action</span>
-                                                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${getActionColor(log.action)}`}>{log.action}</span>
-                                                                </div>
-                                                                <div>
-                                                                    <span className="font-black text-xs uppercase tracking-wider text-slate-400 block mb-1">User Name</span>
-                                                                    <span className="font-semibold">{userMap[log.user_id] || "System"}</span>
-                                                                </div>
-                                                                <div>
-                                                                    <span className="font-black text-xs uppercase tracking-wider text-slate-400 block mb-1">User ID</span>
-                                                                    <span className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">{log.user_id || "N/A"}</span>
-                                                                </div>
-                                                            </div>
-                                                            <div>
-                                                                <span className="font-black text-xs uppercase tracking-wider text-slate-400 block mb-2">Full Event Details</span>
-                                                                <pre className="bg-slate-950 text-emerald-400 p-4 rounded-xl overflow-x-auto text-xs font-mono leading-relaxed">
-                                                                    {JSON.stringify(log.details, null, 2)}
-                                                                </pre>
-                                                            </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="pt-4 border-t border-border/50 mt-auto">
+                                        <Dialog>
+                                            <DialogTrigger asChild>
+                                                <Button variant="outline" size="sm" className="w-full gap-2 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50 shadow-sm hover:shadow transition-all">
+                                                    <Eye className="h-4 w-4" />
+                                                    Inspect Details
+                                                </Button>
+                                            </DialogTrigger>
+                                            <DialogContent className="max-w-2xl">
+                                                <DialogHeader>
+                                                    <DialogTitle className="flex items-center gap-2 text-xl">
+                                                        <div className="h-8 w-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                                                            <Activity className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                                                         </div>
-                                                    </DialogContent>
-                                                </Dialog>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
+                                                        Audit Log Details
+                                                    </DialogTitle>
+                                                </DialogHeader>
+                                                <div className="space-y-5 py-2">
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border border-border/60 p-5 rounded-2xl bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-900/50 shadow-sm">
+                                                        <div>
+                                                            <span className="font-black text-[10px] uppercase tracking-widest text-slate-400 block mb-1.5 flex items-center gap-1.5"><Clock className="h-3 w-3" /> Timestamp</span>
+                                                            <span className="font-mono text-sm font-medium text-slate-800 dark:text-slate-200">{new Date(log.created_at).toLocaleString()}</span>
+                                                        </div>
+                                                        <div>
+                                                            <span className="font-black text-[10px] uppercase tracking-widest text-slate-400 block mb-1.5 overflow-hidden"><Activity className="h-3 w-3 inline mr-1.5" /> Action</span>
+                                                            <span className={`inline-flex items-center px-3 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider ${getActionColor(log.action)}`}>{log.action}</span>
+                                                        </div>
+                                                        <div>
+                                                            <span className="font-black text-[10px] uppercase tracking-widest text-slate-400 block mb-1.5"><User className="h-3 w-3 inline mr-1.5" /> User Name</span>
+                                                            <span className="font-bold text-sm text-slate-800 dark:text-slate-200">{log.actor_name || userMap[log.user_id] || "System"}</span>
+                                                        </div>
+                                                        <div>
+                                                            <span className="font-black text-[10px] uppercase tracking-widest text-slate-400 block mb-1.5"><Shield className="h-3 w-3 inline mr-1.5" /> User ID</span>
+                                                            <span className="font-mono text-[11px] bg-slate-200/50 dark:bg-slate-800 px-2.5 py-1 rounded-md text-slate-600 dark:text-slate-400 font-medium">{log.user_id || "N/A"}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <span className="font-black text-[10px] uppercase tracking-widest text-slate-400 block mb-2 px-1">Full Event Data</span>
+                                                        <div className="relative">
+                                                            <div className="absolute top-0 left-0 w-full h-4 bg-gradient-to-b from-slate-950 to-transparent rounded-t-xl z-10 opacity-50 block"></div>
+                                                            <pre className="bg-slate-950 text-emerald-400 p-5 rounded-2xl overflow-auto max-h-[50vh] text-xs font-mono leading-relaxed shadow-inner">
+                                                                {JSON.stringify(log.details, null, 2)}
+                                                            </pre>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </DialogContent>
+                                        </Dialog>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        ))}
                     </div>
-
-                    {/* Pagination */}
-                    <div className="flex items-center justify-between px-6 py-4 border-t border-border/50 bg-slate-50/30 dark:bg-slate-900/10">
-                        <p className="text-xs text-slate-500 font-medium">
+                )}
+                
+                {/* Pagination */}
+                <Card className="border-border/50 shadow-sm mt-6">
+                    <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <p className="text-sm text-slate-500 font-medium">
                             Showing <span className="font-bold text-slate-700 dark:text-slate-300">{((currentPage - 1) * PAGE_SIZE) + 1}–{Math.min(currentPage * PAGE_SIZE, totalCount)}</span> of <span className="font-bold text-slate-700 dark:text-slate-300">{totalCount.toLocaleString()}</span> logs
                         </p>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-3">
                             <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => p - 1)} disabled={currentPage === 1 || loading}
-                                className="h-8 gap-1">
+                                className="h-9 px-4 gap-2 shadow-sm font-medium">
                                 <ChevronLeft className="h-4 w-4" /> Previous
                             </Button>
-                            <div className="flex items-center px-3 py-1 bg-white dark:bg-slate-900 border border-border/60 rounded-lg text-xs font-bold">
-                                {currentPage} / {totalPages || 1}
+                            <div className="flex items-center px-4 py-1.5 bg-slate-100 dark:bg-slate-800 border border-border/60 rounded-lg text-sm font-bold shadow-inner">
+                                {currentPage} <span className="text-slate-400 mx-1">/</span> {totalPages || 1}
                             </div>
                             <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage >= totalPages || loading}
-                                className="h-8 gap-1">
+                                className="h-9 px-4 gap-2 shadow-sm font-medium">
                                 Next <ChevronRight className="h-4 w-4" />
                             </Button>
                         </div>
-                    </div>
-                </CardContent>
-            </Card>
+                    </CardContent>
+                </Card>
+            </div>
         </div>
     );
 }

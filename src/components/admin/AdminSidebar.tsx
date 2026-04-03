@@ -87,6 +87,7 @@ export function AdminSidebar() {
     { title: "Appointments", url: `${basePath}/appointments`, icon: CalendarDays },
     { title: "Services", url: `${basePath}/services`, icon: Stethoscope },
     { title: "Branch Payments", url: `${basePath}/branch-payments`, icon: Landmark },
+    { title: "Branch Fines", url: `${basePath}/branch-fines`, icon: ShieldAlert },
     { title: "Marketer Commissions", url: `${basePath}/marketer-commissions`, icon: BadgePercent },
     { title: "Marketer Claims", url: `${basePath}/marketer-claims`, icon: Receipt },
     { title: "Payments", url: `${basePath}/payments`, icon: Banknote },

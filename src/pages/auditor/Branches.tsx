@@ -46,7 +46,7 @@ export default function AuditorBranches() {
             .select(`
                 *,
                 branch_fines(
-                    id, amount, warning_level, reason, status
+                    id, amount, warning_level, reason, status, created_at, payment_amount_submitted, payment_submitted_at
                 )
             `)
             .order("created_at", { ascending: false });
@@ -142,7 +142,7 @@ export default function AuditorBranches() {
         }
     };
 
-    const handleRestoreBranch = async (branchId: string) => {
+    const handleRestoreBranch = async (branchId: string, previousStatus: string) => {
         setActionLoading(true);
         try {
             const { error } = await supabase
@@ -151,7 +151,16 @@ export default function AuditorBranches() {
                 .eq("id", branchId);
 
             if (error) throw error;
-            toast({ title: "Branch Restored", description: "The branch is now active again." });
+
+            // Resolve the fines that caused the suspension/termination to allow login
+            await supabase
+                .from("branch_fines")
+                .update({ status: 'resolved' })
+                .eq("branch_id", branchId)
+                .gte("warning_level", 2)
+                .eq("status", "unpaid");
+
+            toast({ title: "Branch Restored", description: `The branch has been ${previousStatus === 'terminated' ? 'unterminated' : 'unsuspended'} and users can now login.` });
             loadBranches();
         } catch (error: any) {
             toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -174,6 +183,7 @@ export default function AuditorBranches() {
             case "active": return <Badge className="bg-emerald-100 text-emerald-800">Active</Badge>;
             case "suspended": return <Badge className="bg-amber-100 text-amber-800">Suspended</Badge>;
             case "terminated": return <Badge className="bg-rose-100 text-rose-800">Terminated</Badge>;
+            case "waiting_approval": return <Badge className="bg-blue-100 text-blue-800 border-blue-200">Waiting Approval</Badge>;
             default: return <Badge variant="outline" className="capitalize">{status}</Badge>;
         }
     };
@@ -215,23 +225,47 @@ export default function AuditorBranches() {
                                     ? `Lvl ${Math.max(...branch.branch_fines.map((f: any) => f.warning_level))} Reached`
                                     : "No Fines";
 
+                                const activeHighLevelFines = branch.branch_fines?.filter((f: any) => f.warning_level >= 2 && (f.status === 'unpaid' || f.status === 'waiting_approval')) || [];
+                                const maxActiveWarningLevel = activeHighLevelFines.length > 0 ? Math.max(...activeHighLevelFines.map((f: any) => f.warning_level)) : 0;
+                                const isWaitingApproval = activeHighLevelFines.some((f: any) => f.status === 'waiting_approval');
+                                
+                                const isSuspendedOrTerminated = branch.status === 'suspended' || branch.status === 'terminated' || maxActiveWarningLevel >= 2;
+                                const isTerminated = branch.status === 'terminated' || maxActiveWarningLevel >= 3;
+
+                                let displayStatus = branch.status || (branch.is_active ? 'active' : 'suspended');
+                                if (isWaitingApproval) displayStatus = 'waiting_approval';
+                                else if (isTerminated) displayStatus = 'terminated';
+                                else if (isSuspendedOrTerminated) displayStatus = 'suspended';
+
+                                const recentlyPaidFine = branch.branch_fines
+                                    ?.filter((f: any) => (f.status === 'paid' || f.status === 'waiting_approval') && f.payment_amount_submitted)
+                                    .sort((a: any, b: any) => new Date(b.payment_submitted_at || b.created_at).getTime() - new Date(a.payment_submitted_at || a.created_at).getTime())[0];
+
                                 return (
                                     <TableRow key={branch.id}>
                                         <TableCell className="font-medium">{branch.name}</TableCell>
                                         <TableCell>{branch.location}</TableCell>
-                                        <TableCell>{getStatusBadge(branch.status || (branch.is_active ? 'active' : 'suspended'))}</TableCell>
+                                        <TableCell>{getStatusBadge(displayStatus)}</TableCell>
                                         <TableCell>
-                                            <div className="flex flex-col">
+                                            <div className="flex flex-col gap-1">
                                                 <span className="font-semibold text-rose-600">KES {finesTotal.toLocaleString()}</span>
                                                 <span className="text-xs text-muted-foreground">{maxWarningText}</span>
+                                                {recentlyPaidFine && (
+                                                    <div className="mt-1 text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-1.5 rounded-lg border border-emerald-100 w-fit">
+                                                        LAST PMT: KES {Number(recentlyPaidFine.payment_amount_submitted).toLocaleString()}<br/>
+                                                        <span className="text-[8px] text-slate-500 font-bold uppercase tracking-widest block pt-0.5">
+                                                            {new Date(recentlyPaidFine.payment_submitted_at || recentlyPaidFine.created_at).toLocaleDateString()}
+                                                        </span>
+                                                    </div>
+                                                )}
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex justify-end gap-2">
-                                                {(branch.status === 'suspended' || branch.status === 'terminated') ? (
-                                                     <Button size="sm" variant="outline" className="border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={() => handleRestoreBranch(branch.id)} disabled={actionLoading}>
+                                                {isSuspendedOrTerminated ? (
+                                                     <Button size="sm" variant="outline" className="border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={() => handleRestoreBranch(branch.id, isTerminated ? 'terminated' : 'suspended')} disabled={actionLoading}>
                                                         <PlayCircle className="h-4 w-4 mr-1" />
-                                                        Restore
+                                                        {isTerminated ? 'Unterminate' : 'Unsuspend'}
                                                     </Button>
                                                 ) : (
                                                     <>

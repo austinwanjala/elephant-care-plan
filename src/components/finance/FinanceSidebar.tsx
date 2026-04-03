@@ -2,13 +2,14 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useSidebar, Sidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Coins, Receipt, Landmark, LogOut, LayoutDashboard, MessageSquare } from "lucide-react";
+import { Coins, Receipt, Landmark, LogOut, LayoutDashboard, MessageSquare, ShieldAlert } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 const menuItems = [
     { title: "Dashboard", url: "/finance", icon: LayoutDashboard },
     { title: "Marketer Payments", url: "/finance/marketer-payments", icon: Coins },
     { title: "Branch Payments", url: "/finance/branch-payments", icon: Landmark },
+    { title: "Branch Fines", url: "/finance/branch-fines", icon: ShieldAlert },
     { title: "Payment History", url: "/finance/history", icon: Receipt },
     { title: "Messages", url: "/finance/messages", icon: MessageSquare },
 ];

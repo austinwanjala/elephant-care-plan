@@ -42,6 +42,7 @@ import {
     TableHeader,
     TableRow
 } from "@/components/ui/table";
+import { BranchFinesBanner } from "@/components/director/BranchFinesBanner";
 
 export default function DirectorDashboard() {
     const [loading, setLoading] = useState(true);
@@ -213,6 +214,8 @@ export default function DirectorDashboard() {
                         <p className="text-emerald-400 mt-2 font-black tracking-widest uppercase text-xs md:text-sm drop-shadow-md">Comprehensive oversight for {branchName}</p>
                     </div>
                 </div>
+
+                <BranchFinesBanner />
 
                 <div className="flex flex-col md:flex-row md:items-center justify-end gap-6">
                     <div className="flex items-center gap-3 bg-white/70 backdrop-blur-md px-6 py-3 rounded-2xl border border-slate-200 shadow-xl shadow-slate-100/50 text-slate-700 font-black text-sm uppercase tracking-wider">

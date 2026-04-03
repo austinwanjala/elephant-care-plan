@@ -159,7 +159,7 @@ const Login = () => {
       }
 
       // Check branch suspension status for branch-level users
-      if (role !== "super_admin" && role !== "admin" && role !== "auditor") {
+      if (role !== "super_admin" && role !== "admin" && role !== "auditor" && role !== "finance" && role !== "branch_director") {
         let userBranchId = null;
         
         // Try getting branch_id from staff table
@@ -174,7 +174,18 @@ const Login = () => {
 
         if (userBranchId) {
             const { data: branchData } = await supabase.from("branches").select("status").eq("id", userBranchId).limit(1).maybeSingle();
-            if (branchData && (branchData.status === 'suspended' || branchData.status === 'terminated')) {
+            
+            // Also check if there are any active (unpaid) high-level warnings issued by the auditor
+            // Level 2 = Suspension, Level 3 = Termination
+            const { data: activeFines } = await supabase.from("branch_fines")
+                .select("warning_level")
+                .eq("branch_id", userBranchId)
+                .gte("warning_level", 2)
+                .eq("status", "unpaid")
+                .limit(1)
+                .maybeSingle();
+
+            if ((branchData && (branchData.status === 'suspended' || branchData.status === 'terminated')) || activeFines) {
                 toast({
                     title: "Branch Suspended",
                     description: "Your branch operations are currently suspended by the auditor. Please contact management.",

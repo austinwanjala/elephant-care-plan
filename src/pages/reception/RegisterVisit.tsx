@@ -22,6 +22,18 @@ import {
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
+const getVerificationPhoto = (biometricData: any, imageUrlFallback: any) => {
+    if (biometricData) {
+        try {
+            const parsed = typeof biometricData === 'string' ? JSON.parse(biometricData) : biometricData;
+            if (parsed?.face_template) return parsed.face_template;
+        } catch {
+            // ignore JSON parse errors
+        }
+    }
+    return imageUrlFallback || null;
+};
+
 export default function RegisterVisit() {
     const [searchTerm, setSearchTerm] = useState("");
     const [searching, setSearching] = useState(false);
@@ -36,6 +48,7 @@ export default function RegisterVisit() {
     const [selectedDoctorId, setSelectedDoctorId] = useState<string>("");
     const [selectedDependant, setSelectedDependant] = useState<any>(null);
     const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+    const [expandedImage, setExpandedImage] = useState<string | null>(null);
     const [ongoingStages, setOngoingStages] = useState<any[]>([]);
     const [searchResults, setSearchResults] = useState<any[]>([]);
     const [selectionDialogOpen, setSelectionDialogOpen] = useState(false);
@@ -128,7 +141,7 @@ export default function RegisterVisit() {
             // 1. Search Members (Principal)
             const { data: principalMatches, error: principalError } = await supabase
                 .from("members")
-                .select("id, full_name, phone, id_number, member_number, biometric_data, is_active, coverage_balance, membership_categories(name), branches(name)")
+                .select("id, full_name, phone, id_number, member_number, biometric_data, image_url, is_active, coverage_balance, membership_categories(name), branches(name)")
                 .or(
                     `phone.ilike.*${safeTerm}*,id_number.ilike.*${safeTerm}*,member_number.ilike.*${safeTerm}*,full_name.ilike.*${safeTerm}*`
                 )
@@ -156,7 +169,7 @@ export default function RegisterVisit() {
             if (additionalIds.length > 0) {
                 const { data: extraMembers } = await supabase
                     .from("members")
-                    .select("id, full_name, phone, id_number, member_number, biometric_data, is_active, coverage_balance, membership_categories(name), branches(name)")
+                    .select("id, full_name, phone, id_number, member_number, biometric_data, image_url, is_active, coverage_balance, membership_categories(name), branches(name)")
                     .in("id", additionalIds);
 
                 if (extraMembers) {
@@ -393,9 +406,13 @@ export default function RegisterVisit() {
                                             onClick={() => handleSelectMember(m)}
                                         >
                                             <div className="flex items-center gap-3">
-                                                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                                                    {m.full_name.charAt(0)}
-                                                </div>
+                                                {getVerificationPhoto(m.biometric_data, m.image_url) ? (
+                                                    <img src={getVerificationPhoto(m.biometric_data, m.image_url)} alt={m.full_name} className="h-10 w-10 rounded-full object-cover border border-slate-200" />
+                                                ) : (
+                                                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                                                        {m.full_name.charAt(0)}
+                                                    </div>
+                                                )}
                                                 <div>
                                                     <p className="font-bold text-slate-900 leading-none group-hover:text-primary transition-colors">{m.full_name}</p>
                                                     <p className="text-[10px] text-slate-500 mt-1 flex items-center gap-2">
@@ -428,9 +445,23 @@ export default function RegisterVisit() {
                     <Card className="border-primary/50">
                         <CardHeader className="bg-primary/5">
                             <div className="flex justify-between items-start">
-                                <div>
-                                    <CardTitle>{member.full_name}</CardTitle>
-                                    <CardDescription>Principal Member #{member.member_number}</CardDescription>
+                                <div className="flex items-center gap-4">
+                                    {getVerificationPhoto(member.biometric_data, member.image_url) ? (
+                                        <div 
+                                            className="h-14 w-14 rounded-full overflow-hidden border-2 border-primary/20 shadow-sm shrink-0 cursor-pointer hover:border-primary transition-colors"
+                                            onClick={() => setExpandedImage(getVerificationPhoto(member.biometric_data, member.image_url))}
+                                        >
+                                            <img src={getVerificationPhoto(member.biometric_data, member.image_url)} alt={member.full_name} className="h-full w-full object-cover hover:scale-110 transition-transform duration-300" />
+                                        </div>
+                                    ) : (
+                                        <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xl shrink-0">
+                                            {member.full_name.charAt(0)}
+                                        </div>
+                                    )}
+                                    <div>
+                                        <CardTitle>{member.full_name}</CardTitle>
+                                        <CardDescription>Principal Member #{member.member_number}</CardDescription>
+                                    </div>
                                 </div>
                                 <Badge variant={member.is_active ? "default" : "destructive"}>
                                     {member.is_active ? "Active" : "Inactive"}
@@ -656,13 +687,16 @@ export default function RegisterVisit() {
 
                                                         {/* Dependant photo if available */}
                                                         {dep.image_url && (
-                                                            <div className="flex items-center gap-3 bg-muted/30 rounded-lg p-2">
+                                                            <div 
+                                                                className="flex items-center gap-3 bg-muted/30 rounded-lg p-2 cursor-pointer group hover:bg-muted/50 transition-colors"
+                                                                onClick={() => setExpandedImage(dep.image_url)}
+                                                            >
                                                                 <img
                                                                     src={dep.image_url}
                                                                     alt={dep.full_name}
-                                                                    className="h-14 w-11 object-cover rounded border"
+                                                                    className="h-14 w-11 object-cover rounded border shadow-sm group-hover:scale-105 transition-transform duration-300"
                                                                 />
-                                                                <div className="text-xs text-muted-foreground">ID photo on file</div>
+                                                                <div className="text-xs text-muted-foreground group-hover:text-primary transition-colors">Click to expand ID photo</div>
                                                             </div>
                                                         )}
 
@@ -825,7 +859,7 @@ export default function RegisterVisit() {
                                     </div>
                                     <div>
                                         <Label className="text-muted-foreground">ID / Birth Cert</Label>
-                                        <p className="font-medium">{selectedDependant.id_number}</p>
+                                        <p className="font-medium capitalize">{selectedDependant.relationship}</p>
                                     </div>
                                 </div>
                             </div>
@@ -834,6 +868,20 @@ export default function RegisterVisit() {
                 </DialogContent>
             </Dialog>
 
+            <Dialog open={!!expandedImage} onOpenChange={(open) => !open && setExpandedImage(null)}>
+                <DialogContent className="max-w-3xl border-none bg-transparent shadow-none p-0 overflow-hidden flex justify-center items-center">
+                    {expandedImage && (
+                        <div className="relative rounded-xl overflow-hidden bg-black/90 p-2 shadow-2xl border border-white/10">
+                            <img 
+                                src={expandedImage} 
+                                alt="Expanded view" 
+                                className="max-w-full max-h-[85vh] object-contain rounded-lg" 
+                            />
+                            <div className="absolute inset-0 ring-1 ring-inset ring-white/10 rounded-lg pointer-events-none"></div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

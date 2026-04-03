@@ -1012,6 +1012,7 @@ export type Database = {
           full_name: string
           id: string
           id_number: string
+          image_url: string | null
           is_active: boolean | null
           marketer_code: string | null
           marketer_id: string | null
@@ -1041,6 +1042,7 @@ export type Database = {
           full_name: string
           id?: string
           id_number: string
+          image_url?: string | null
           is_active?: boolean | null
           marketer_code?: string | null
           marketer_id?: string | null
@@ -1070,6 +1072,7 @@ export type Database = {
           full_name?: string
           id?: string
           id_number?: string
+          image_url?: string | null
           is_active?: boolean | null
           marketer_code?: string | null
           marketer_id?: string | null

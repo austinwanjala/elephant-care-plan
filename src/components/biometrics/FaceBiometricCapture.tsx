@@ -188,7 +188,7 @@ export default function FaceBiometricCapture({
           )}
         </div>
 
-        <div className="relative aspect-video rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-900 border-2 border-dashed border-slate-300 dark:border-slate-700">
+        <div className="relative aspect-[3/4] md:aspect-video w-full max-h-[75vh] rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-900 border-2 border-dashed border-slate-300 dark:border-slate-700">
           {!capturedImage ? (
             devices.length > 0 ? (
               <>

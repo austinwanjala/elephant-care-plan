@@ -196,6 +196,8 @@ export default function FaceBiometricCapture({
                   key={`${selectedDeviceId}_${webcamKey}`}
                   audio={false}
                   ref={webcamRef}
+                  forceScreenshotSourceSize={true}
+                  screenshotQuality={1}
                   onUserMedia={() => {
                     console.log("[Biometric] Hardware stream engaged for device:", selectedDeviceId || facingMode);
                     refreshDevices();

@@ -189,7 +189,7 @@ async function detectFaceDescriptor(img: any) {
   // Mobile cameras often apply post-processing (beautification, HDR artifacts, noise)
   // that slightly confuses the generic face bounding box algorithm, despite having high-res data.
   // Lowering this only helps FIND the face. The strict Euclidean Identity Match prevents false positives later.
-  return await faceapi.detectSingleFace(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.3 }))
+  return await faceapi.detectSingleFace(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.15 }))
     .withFaceLandmarks()
     .withFaceDescriptor();
 }

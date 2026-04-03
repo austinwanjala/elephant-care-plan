@@ -113,8 +113,14 @@ export default function AddMember() {
         }
         setLoading(true);
         try {
+            const phone = formData.phone.trim();
+            if (phone.length < 10) throw new Error("Mobile phone number must be at least 10 digits.");
+            
+            const idNumber = formData.idNumber.trim();
+            if (idNumber.length < 7) throw new Error("ID number must be at least 7 digits.");
+
             const ageInt = parseInt(formData.age);
-            if (isNaN(ageInt)) throw new Error("Please enter a valid age.");
+            if (isNaN(ageInt) || ageInt <= 0) throw new Error("Please enter a valid age greater than 0.");
 
             const category = categories.find(c => c.id === selectedCategory);
 
@@ -439,15 +445,15 @@ export default function AddMember() {
                             </div>
                             <div className="space-y-2">
                                 <Label>Phone (M-Pesa) *</Label>
-                                <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} required placeholder="e.g. +254700000000" />
+                                <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} required minLength={10} placeholder="e.g. +254700000000" />
                             </div>
                             <div className="space-y-2">
                                 <Label>ID Number *</Label>
-                                <Input value={formData.idNumber} onChange={(e) => setFormData({ ...formData, idNumber: e.target.value })} required placeholder="e.g. 12345678" />
+                                <Input value={formData.idNumber} onChange={(e) => setFormData({ ...formData, idNumber: e.target.value })} required minLength={7} placeholder="e.g. 12345678" />
                             </div>
                             <div className="space-y-2">
                                 <Label>Age *</Label>
-                                <Input type="number" value={formData.age} onChange={(e) => setFormData({ ...formData, age: e.target.value })} required placeholder="e.g. 30" />
+                                <Input type="number" value={formData.age} onChange={(e) => setFormData({ ...formData, age: e.target.value })} required min={1} placeholder="e.g. 30" />
                             </div>
                             <div className="space-y-2">
                                 <Label>Temporary Password *</Label>

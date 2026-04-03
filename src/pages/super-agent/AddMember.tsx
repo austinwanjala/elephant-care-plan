@@ -140,8 +140,14 @@ export default function SuperAgentAddMember() {
     }
     setLoading(true);
     try {
+      const phone = formData.phone.trim();
+      if (phone.length < 10) throw new Error("Mobile phone number must be at least 10 digits.");
+      
+      const idNumber = formData.idNumber.trim();
+      if (idNumber.length < 7) throw new Error("ID number must be at least 7 digits.");
+
       const ageInt = parseInt(formData.age);
-      if (isNaN(ageInt)) throw new Error("Please enter a valid age.");
+      if (isNaN(ageInt) || ageInt <= 0) throw new Error("Please enter a valid age greater than 0.");
 
       const { data: authData, error: authError } = await supabase.functions.invoke("admin-create-user", {
         body: {
@@ -250,11 +256,11 @@ export default function SuperAgentAddMember() {
                   {[
                     { label: "Full Name *", key: "fullName", type: "text", placeholder: "e.g. John Doe" },
                     { label: "Email *", key: "email", type: "email", placeholder: "e.g. john@example.com" },
-                    { label: "Phone *", key: "phone", type: "text", placeholder: "e.g. +254700000000", hint: "Phone used for M-Pesa STK Prompt" },
-                    { label: "ID Number *", key: "idNumber", type: "text", placeholder: "e.g. 12345678" },
-                    { label: "Age *", key: "age", type: "number", placeholder: "e.g. 30" },
-                    { label: "Account Password *", key: "password", type: "password", placeholder: "Min. 6 characters" },
-                  ].map(({ label, key, type, placeholder, hint }) => (
+                    { label: "Phone *", key: "phone", type: "text", placeholder: "e.g. +254700000000", hint: "Phone used for M-Pesa STK Prompt", minLength: 10 },
+                    { label: "ID Number *", key: "idNumber", type: "text", placeholder: "e.g. 12345678", minLength: 7 },
+                    { label: "Age *", key: "age", type: "number", placeholder: "e.g. 30", min: 1 },
+                    { label: "Account Password *", key: "password", type: "password", placeholder: "Min. 6 characters", minLength: 6 },
+                  ].map(({ label, key, type, placeholder, hint, minLength, min }) => (
                     <div key={key} className="space-y-2">
                       <Label className="text-foreground/80 font-semibold">{label}</Label>
                       <Input
@@ -265,7 +271,8 @@ export default function SuperAgentAddMember() {
                         required
                         placeholder={placeholder}
                         disabled={isAwaitingPayment}
-                        minLength={key === "password" ? 6 : undefined}
+                        minLength={minLength}
+                        min={min}
                       />
                       {hint && <p className="text-[10px] text-muted-foreground italic">{hint}</p>}
                     </div>

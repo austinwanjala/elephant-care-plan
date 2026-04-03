@@ -175,8 +175,14 @@ export default function MarketerAddMember() {
     setLoading(true);
 
     try {
+      const phone = formData.phone.trim();
+      if (phone.length < 10) throw new Error("Mobile phone number must be at least 10 digits.");
+      
+      const idNumber = formData.idNumber.trim();
+      if (idNumber.length < 7) throw new Error("ID number must be at least 7 digits.");
+
       const ageInt = parseInt(formData.age);
-      if (isNaN(ageInt)) throw new Error("Please enter a valid age.");
+      if (isNaN(ageInt) || ageInt <= 0) throw new Error("Please enter a valid age greater than 0.");
 
       const { data: authData, error: authError } = await supabase.functions.invoke("admin-create-user", {
         body: {
@@ -342,6 +348,7 @@ export default function MarketerAddMember() {
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                       required
+                      minLength={10}
                       placeholder="e.g. +254700000000"
                       disabled={isAwaitingPayment}
                     />
@@ -354,6 +361,7 @@ export default function MarketerAddMember() {
                       value={formData.idNumber}
                       onChange={(e) => setFormData({ ...formData, idNumber: e.target.value })}
                       required
+                      minLength={7}
                       placeholder="e.g. 12345678"
                       disabled={isAwaitingPayment}
                     />
@@ -366,6 +374,7 @@ export default function MarketerAddMember() {
                       value={formData.age}
                       onChange={(e) => setFormData({ ...formData, age: e.target.value })}
                       required
+                      min={1}
                       placeholder="e.g. 30"
                       disabled={isAwaitingPayment}
                     />

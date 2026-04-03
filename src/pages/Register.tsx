@@ -184,6 +184,16 @@ const Register = () => {
       toast({ title: "Missing Info", description: "Please fill in all dependant details.", variant: "destructive" });
       return;
     }
+
+    if (newDep.idNumber && newDep.idNumber.trim().length > 0 && newDep.idNumber.trim().length < 7) {
+      toast({ title: "Invalid ID", description: "Dependant ID number must be at least 7 digits if provided.", variant: "destructive" });
+      return;
+    }
+
+    if (calculateAge(newDep.dob) <= 0) {
+      toast({ title: "Invalid Age", description: "Dependant age must be greater than 0.", variant: "destructive" });
+      return;
+    }
     if (dependants.length >= 5) {
       toast({ title: "Limit Reached", description: "Maximum 5 dependants allowed.", variant: "destructive" });
       return;
@@ -215,6 +225,21 @@ const Register = () => {
         description: "Please select a marketer from the list.",
         variant: "destructive",
       });
+      return;
+    }
+
+    if (formData.phone.trim().length < 10) {
+      toast({ title: "Invalid Phone", description: "Mobile phone number must be at least 10 digits.", variant: "destructive" });
+      return;
+    }
+
+    if (formData.idNumber.trim().length < 7) {
+      toast({ title: "Invalid ID", description: "ID number must be at least 7 digits.", variant: "destructive" });
+      return;
+    }
+
+    if (calculateAge(formData.dob) <= 0) {
+      toast({ title: "Invalid Age", description: "Age must be greater than 0.", variant: "destructive" });
       return;
     }
 
@@ -380,11 +405,11 @@ const Register = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phone">Phone Number</Label>
-                  <Input id="phone" placeholder="0712 345 678" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} required />
+                  <Input id="phone" placeholder="0712 345 678" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} required minLength={10} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="idNumber">National ID / Passport</Label>
-                  <Input id="idNumber" placeholder="12345678" value={formData.idNumber} onChange={(e) => setFormData({ ...formData, idNumber: e.target.value })} required />
+                  <Input id="idNumber" placeholder="12345678" value={formData.idNumber} onChange={(e) => setFormData({ ...formData, idNumber: e.target.value })} required minLength={7} />
                 </div>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
@@ -569,7 +594,7 @@ const Register = () => {
             </div>
             <div className="space-y-2">
               <Label>ID Number (Optional)</Label>
-              <Input value={newDep.idNumber} onChange={(e) => setNewDep({ ...newDep, idNumber: e.target.value })} />
+              <Input value={newDep.idNumber} onChange={(e) => setNewDep({ ...newDep, idNumber: e.target.value })} minLength={7} />
             </div>
             <div className="space-y-2">
               <Label>Gender</Label>

@@ -121,6 +121,12 @@ export default function AdminMembers() {
     try {
       if (!formData.dob) throw new Error("Date of Birth is required.");
 
+      const phone = formData.phone.trim();
+      if (phone.length < 10) throw new Error("Mobile phone number must be at least 10 digits.");
+      
+      const idNumber = formData.idNumber.trim();
+      if (idNumber.length < 7) throw new Error("ID number must be at least 7 digits.");
+
       const today = new Date();
       const birthDate = new Date(formData.dob);
       let calculatedAge = today.getFullYear() - birthDate.getFullYear();
@@ -128,6 +134,8 @@ export default function AdminMembers() {
       if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
         calculatedAge--;
       }
+      
+      if (calculatedAge <= 0) throw new Error("Age must be greater than 0.");
 
       const { data, error } = await supabase.functions.invoke("admin-create-user", {
         body: {
@@ -351,8 +359,8 @@ export default function AdminMembers() {
               <div className="grid md:grid-cols-2 gap-4 py-4">
                 <div className="space-y-2"><Label>Full Name *</Label><Input value={formData.fullName} onChange={e => setFormData({ ...formData, fullName: e.target.value })} required /></div>
                 <div className="space-y-2"><Label>Email *</Label><Input type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} required /></div>
-                <div className="space-y-2"><Label>Phone *</Label><Input value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} required /></div>
-                <div className="space-y-2"><Label>ID Number *</Label><Input value={formData.idNumber} onChange={e => setFormData({ ...formData, idNumber: e.target.value })} required /></div>
+                <div className="space-y-2"><Label>Phone *</Label><Input value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} required minLength={10} /></div>
+                <div className="space-y-2"><Label>ID Number *</Label><Input value={formData.idNumber} onChange={e => setFormData({ ...formData, idNumber: e.target.value })} required minLength={7} /></div>
                 <div className="space-y-2"><Label>Date of Birth *</Label><Input type="date" max={new Date().toISOString().split("T")[0]} value={formData.dob} onChange={e => setFormData({ ...formData, dob: e.target.value })} required /></div>
                 <div className="space-y-2"><Label>Password *</Label><Input type="password" value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} required /></div>
                 <div className="space-y-2 md:col-span-2">

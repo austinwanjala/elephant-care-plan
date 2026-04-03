@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 
 export default function SuperAgentCommissions() {
     const [commissions, setCommissions] = useState<any[]>([]);
+    const [claims, setClaims] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [claimLoading, setClaimLoading] = useState(false);
     const { toast } = useToast();
@@ -30,13 +31,13 @@ export default function SuperAgentCommissions() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
+            // Fetch all global super agent transactions regardless of limiting user_id
             const { data, error } = await supabase
                 .from("super_agent_commissions" as any)
                 .select(`
                     id, amount, status, created_at, marketer_id,
-                    member:member_id (full_name, member_number)
+                    member:member_id (full_name, member_number, marketer_id)
                 `)
-                .eq("super_agent_id", user.id)
                 .order("created_at", { ascending: false });
 
             if (error) throw error;
@@ -44,26 +45,52 @@ export default function SuperAgentCommissions() {
             const fetchedCommissions = (data as any[]) || [];
             
             // Fetch marketer names manually
-            const marketerIds = [...new Set(fetchedCommissions.filter(c => c.marketer_id).map(c => c.marketer_id))];
+            const marketerIds = [...new Set(fetchedCommissions.map(c => c.marketer_id || c.member?.marketer_id).filter(Boolean))];
             const marketersMap: Record<string, string> = {};
             
             if (marketerIds.length > 0) {
-                const { data: staffData } = await supabase
-                    .from("staff")
-                    .select("user_id, full_name")
-                    .in("user_id", marketerIds);
+                const { data: mData } = await supabase
+                    .from("marketers")
+                    .select("id, full_name")
+                    .in("id", marketerIds);
                     
-                staffData?.forEach(s => {
-                    marketersMap[s.user_id] = s.full_name;
+                mData?.forEach(m => {
+                    marketersMap[m.id] = m.full_name;
                 });
             }
             
-            const processedCommissions = fetchedCommissions.map(c => ({
-                ...c,
-                marketerName: marketersMap[c.marketer_id] || "Unknown"
-            }));
+            // Fetch claims history first
+            const { data: claimsData } = await supabase
+                .from("super_agent_claims" as any)
+                .select("*")
+                .order("created_at", { ascending: false });
+                
+            const fetchedClaims = (claimsData as any[]) || [];
+            setClaims(fetchedClaims);
+            
+            const processedCommissions = fetchedCommissions.map(c => {
+                const actMarketerId = c.marketer_id || c.member?.marketer_id;
+                let actualStatus = c.status;
+
+                // Sync historical status computationally with claims if there was a desync
+                if (actualStatus !== 'paid') {
+                    const resolvedByPaidClaim = fetchedClaims.some(claim => 
+                        claim.status === 'paid' && new Date(claim.created_at) >= new Date(c.created_at)
+                    );
+                    if (resolvedByPaidClaim) {
+                        actualStatus = 'paid';
+                    }
+                }
+
+                return {
+                    ...c,
+                    status: actualStatus,
+                    marketerName: actMarketerId ? (marketersMap[actMarketerId] || "Unknown") : "Platform"
+                };
+            });
 
             setCommissions(processedCommissions);
+
         } catch (error: any) {
             toast({ title: "Error", description: error.message, variant: "destructive" });
         } finally {
@@ -97,7 +124,7 @@ export default function SuperAgentCommissions() {
 
             if (claimError) throw claimError;
 
-            // Update commissions
+            // Update commissions dynamically
             const { error: updateError } = await supabase
                 .from("super_agent_commissions" as any)
                 .update({ status: 'pending' })
@@ -106,7 +133,10 @@ export default function SuperAgentCommissions() {
             if (updateError) throw updateError;
 
             toast({ title: "Claim Submitted Successfully", description: `You have requested payout for KES ${totalAmount.toLocaleString()}` });
-            loadCommissions();
+            
+            // Instantly optimistically update the ledger visually right away so Available goes to exactly 0 to block multiclicks cleanly
+            setCommissions(prev => prev.map(c => c.status === 'unclaimed' ? { ...c, status: 'pending' } : c));
+            
         } catch (error: any) {
             toast({ title: "Error", description: error.message, variant: "destructive" });
         } finally {
@@ -116,7 +146,7 @@ export default function SuperAgentCommissions() {
 
     const unclaimedCommissions = commissions.filter(c => c.status === 'unclaimed');
     const unclaimedTotal = unclaimedCommissions.reduce((acc, curr) => acc + (curr.amount || 0), 0);
-    const pendingTotal = commissions.filter(c => c.status === 'pending').reduce((acc, curr) => acc + (curr.amount || 0), 0);
+    const pendingTotal = commissions.filter(c => c.status === 'pending' || c.status === 'finance_review').reduce((acc, curr) => acc + (curr.amount || 0), 0);
     const paidTotal = commissions.filter(c => c.status === 'paid').reduce((acc, curr) => acc + (curr.amount || 0), 0);
 
     if (loading) {
@@ -225,11 +255,67 @@ export default function SuperAgentCommissions() {
                                         <TableCell>
                                             <Badge variant="outline" className={
                                                 c.status === 'unclaimed' ? "bg-indigo-50 text-indigo-700 border-indigo-200" :
-                                                c.status === 'pending' ? "bg-amber-50 text-amber-700 border-amber-200" :
-                                                "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                                (c.status === 'pending' || c.status === 'finance_review') ? "bg-amber-50 text-amber-700 border-amber-200" :
+                                                c.status === 'paid' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                                                "bg-slate-50 text-slate-700 border-slate-200"
                                             }>
-                                                {c.status.toUpperCase()}
+                                                {c.status.replace('_', ' ').toUpperCase()}
                                             </Badge>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            )}
+                        </TableBody>
+                    </Table>
+                </div>
+            </div>
+
+            <div className="mt-8">
+                <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <Download className="h-5 w-5 text-indigo-500" />
+                    Claims History
+                </h3>
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <Table>
+                        <TableHeader className="bg-slate-50 border-b border-slate-200">
+                            <TableRow>
+                                <TableHead className="py-4 text-slate-600">Date Submitted</TableHead>
+                                <TableHead className="py-4 text-slate-600">Referrals In Claim</TableHead>
+                                <TableHead className="py-4 text-slate-600">Amount requested</TableHead>
+                                <TableHead className="py-4 text-slate-600">Status</TableHead>
+                                <TableHead className="py-4 text-slate-600">Paid Date</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {claims.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="text-center py-8 text-slate-500">
+                                        No claims submitted yet.
+                                    </TableCell>
+                                </TableRow>
+                            ) : (
+                                claims.map((claim) => (
+                                    <TableRow key={claim.id} className="hover:bg-slate-50/50 transition-colors">
+                                        <TableCell className="text-slate-600 font-medium">
+                                            {new Date(claim.created_at).toLocaleDateString()}
+                                        </TableCell>
+                                        <TableCell>
+                                            {claim.referral_count} referrals
+                                        </TableCell>
+                                        <TableCell className="font-bold text-indigo-700">
+                                            KES {claim.amount?.toLocaleString()}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant="outline" className={
+                                                claim.status === 'paid' ? "bg-emerald-50 text-emerald-700 border-emerald-200" : 
+                                                claim.status === 'rejected' ? "bg-red-50 text-red-700 border-red-200" :
+                                                "bg-amber-50 text-amber-700 border-amber-200"
+                                            }>
+                                                {claim.status.replace('_', ' ').toUpperCase()}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell className="text-slate-500 text-sm">
+                                            {claim.paid_at ? new Date(claim.paid_at).toLocaleDateString() : '-'}
                                         </TableCell>
                                     </TableRow>
                                 ))

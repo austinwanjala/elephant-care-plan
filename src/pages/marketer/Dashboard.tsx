@@ -54,12 +54,16 @@ export default function MarketerDashboard() {
 
             const { data: configData } = await (supabase as any)
                 .from("marketer_commission_config")
-                .select("commission_per_referral")
+                .select("commission_per_referral, super_agent_cut_percent")
                 .order("updated_at", { ascending: false })
                 .limit(1)
                 .maybeSingle();
 
-            const rate = configData?.commission_per_referral || 0;
+            const baseRate = configData?.commission_per_referral || 0;
+            const saCutPercent = configData?.super_agent_cut_percent || 0;
+            
+            // Calculate strict net claimable commission per referral explicitly
+            const netRate = baseRate - ((baseRate * saCutPercent) / 100);
 
             const { data: members, error: membersError } = await supabase
                 .from("members")
@@ -73,16 +77,46 @@ export default function MarketerDashboard() {
 
             const { data: commissions, error: commissionsError } = await (supabase as any)
                 .from("marketer_commissions")
-                .select("amount, status")
+                .select(`
+                    status,
+                    members (
+                        membership_categories ( marketer_commission )
+                    )
+                `)
                 .eq("marketer_id", mData.id);
 
             if (commissionsError) throw commissionsError;
 
-            const pendingActivation = commissions?.filter((c: any) => c.status === 'pending_activation').length || 0;
-            const claimableTotal = commissions?.filter((c: any) => c.status === 'claimable').reduce((sum: number, c: any) => sum + Number(c.amount || 0), 0) || 0;
-            const earnedTotal = commissions?.filter((c: any) => ['claimable', 'claimed', 'paid'].includes(c.status)).reduce((sum: number, c: any) => sum + Number(c.amount || 0), 0) || 0;
-            const paidTotal = commissions?.filter((c: any) => c.status === 'paid').reduce((sum: number, c: any) => sum + Number(c.amount || 0), 0) || 0;
-            const claimedTotal = commissions?.filter((c: any) => c.status === 'claimed').reduce((sum: number, c: any) => sum + Number(c.amount || 0), 0) || 0;
+            const pendingActivationCount = commissions?.filter((c: any) => c.status === 'pending_activation').length || 0;
+            
+            let claimableTotal = 0;
+            let earnedTotal = 0;
+            let paidTotal = 0;
+            let claimedTotal = 0;
+
+            if (commissions) {
+                commissions.forEach((c: any) => {
+                    let memberObj = Array.isArray(c.members) ? c.members[0] : (c.member || c.members);
+                    let catObj = Array.isArray(memberObj?.membership_categories) ? memberObj?.membership_categories[0] : (memberObj?.membership_category || memberObj?.membership_categories);
+                    let schemaBase = catObj?.marketer_commission;
+                    
+                    let activeBase = (schemaBase && Number(schemaBase) > 0) ? Number(schemaBase) : baseRate;
+                    let activeNet = activeBase - ((activeBase * saCutPercent) / 100);
+                    
+                    if (['claimable', 'unclaimed', 'claimed', 'paid', 'pending'].includes(c.status)) {
+                        earnedTotal += activeNet;
+                    }
+                    if (c.status === 'unclaimed' || c.status === 'claimable') {
+                        claimableTotal += activeNet;
+                    }
+                    if (c.status === 'paid') {
+                        paidTotal += activeNet;
+                    }
+                    if (c.status === 'claimed') {
+                        claimedTotal += activeNet;
+                    }
+                });
+            }
 
             setStats({
                 activeCount: members?.filter((m: any) => m.is_active).length || 0,
@@ -90,7 +124,7 @@ export default function MarketerDashboard() {
                 totalPaid: paidTotal,
                 claimable: claimableTotal,
                 pendingClaims: claimedTotal,
-                commissionRate: rate
+                commissionRate: netRate
             });
 
         } catch (error: any) {
@@ -156,7 +190,7 @@ export default function MarketerDashboard() {
                     <CardContent>
                         <div className="text-2xl font-bold">{stats.activeCount}</div>
                         <p className="text-xs text-muted-foreground mt-1 text-blue-600 font-medium">
-                            @ KES {stats.commissionRate.toLocaleString()} each
+                            Varies by scheme (Default: KES {stats.commissionRate.toLocaleString()})
                         </p>
                     </CardContent>
                 </Card>

@@ -47,7 +47,154 @@
 </head>
 
 <body>
-  <div id="root"></div>
+  <div id="root">
+    <style>
+      #initial-loader {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        background-color: #f8fafc;
+        z-index: 9999;
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      }
+      
+      .elephant-container {
+        position: relative;
+        margin-bottom: 2rem;
+      }
+
+      .full-elephant-animation {
+        width: 180px;
+        height: auto;
+        /* The entire elephant bobs up and down subtly as it walks */
+        animation: body-bounce 0.5s infinite alternate ease-in-out;
+      }
+
+      @keyframes body-bounce {
+        0% { transform: translateY(0); }
+        100% { transform: translateY(-6px); }
+      }
+
+      .leg-swing {
+        transform-origin: top center;
+        transform-box: fill-box;
+      }
+
+      .swing-1 {
+        animation: leg-swing 0.6s infinite alternate ease-in-out;
+      }
+
+      .swing-2 {
+        animation: leg-swing 0.6s infinite alternate ease-in-out -0.6s;
+      }
+
+      @keyframes leg-swing {
+        0% { transform: rotate(-25deg); }
+        100% { transform: rotate(25deg); }
+      }
+
+      .tail-wag {
+        transform-origin: top right;
+        transform-box: fill-box;
+        animation: tail-wag 0.8s infinite alternate ease-in-out;
+      }
+
+      @keyframes tail-wag {
+        0% { transform: rotate(-10deg); }
+        100% { transform: rotate(20deg); }
+      }
+
+      .trunk-swing {
+        transform-origin: top left;
+        transform-box: fill-box;
+        animation: trunk-swing 1s infinite alternate ease-in-out;
+      }
+
+      @keyframes trunk-swing {
+        0% { transform: rotate(-5deg); }
+        100% { transform: rotate(10deg); }
+      }
+
+      .ear-flap {
+        transform-origin: center right;
+        transform-box: fill-box;
+        animation: ear-flap 0.6s infinite alternate ease-in-out;
+      }
+
+      @keyframes ear-flap {
+        0% { transform: scaleX(1); }
+        100% { transform: scaleX(0.7); }
+      }
+
+      .loading-text {
+        color: #0f172a;
+        font-size: 1.25rem;
+        font-weight: 600;
+        letter-spacing: 0.025em;
+        animation: pulse-opacity 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
+      
+      .loading-subtitle {
+        color: #64748b;
+        font-size: 0.875rem;
+        margin-top: 0.5rem;
+        animation: pulse-opacity 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        animation-delay: 0.2s;
+      }
+
+      @keyframes pulse-opacity {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+    </style>
+    <div id="initial-loader">
+      <div class="elephant-container">
+        <svg class="full-elephant-animation" viewBox="0 0 200 150" xmlns="http://www.w3.org/2000/svg">
+          <!-- Background Legs (Darker slate) -->
+          <g class="leg-swing swing-2">
+            <rect x="70" y="80" width="16" height="45" rx="8" fill="#64748b" />
+          </g>
+          <g class="leg-swing swing-1">
+            <rect x="130" y="80" width="16" height="45" rx="8" fill="#64748b" />
+          </g>
+          
+          <!-- Tail -->
+          <path class="tail-wag" d="M 65 72 Q 40 80 50 100" stroke="#94a3b8" stroke-width="5" fill="none" stroke-linecap="round" />
+        
+          <!-- Body -->
+          <ellipse cx="110" cy="75" rx="45" ry="35" fill="#94a3b8" />
+          
+          <!-- Head -->
+          <circle cx="155" cy="70" r="26" fill="#94a3b8" />
+          
+          <!-- Trunk -->
+          <path class="trunk-swing" d="M 175 62 Q 195 80 185 105 Q 175 115 180 120" stroke="#94a3b8" stroke-width="15" fill="none" stroke-linecap="round" />
+          
+          <!-- Foreground Legs (Lighter slate) -->
+          <g class="leg-swing swing-1">
+            <rect x="80" y="85" width="18" height="45" rx="9" fill="#94a3b8" />
+          </g>
+          <g class="leg-swing swing-2">
+            <rect x="140" y="85" width="18" height="45" rx="9" fill="#94a3b8" />
+          </g>
+        
+          <!-- Ear -->
+          <path class="ear-flap" d="M 148 60 C 110 50, 110 100, 148 90 Z" fill="#cbd5e1" />
+          
+          <!-- Eye -->
+          <circle cx="165" cy="62" r="3" fill="#1e293b" />
+        </svg>
+      </div>
+      <div class="loading-text">Loading Elephant Care Plan...</div>
+      <div class="loading-subtitle">Preparing your dashboard</div>
+    </div>
+  </div>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 

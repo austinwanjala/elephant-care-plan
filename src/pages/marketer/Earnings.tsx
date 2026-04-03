@@ -30,6 +30,7 @@ export default function MarketerEarnings() {
     const [marketer, setMarketer] = useState<MarketerInfo | null>(null);
     const [commissionRate, setCommissionRate] = useState<number>(0);
     const [activeReferrals, setActiveReferrals] = useState<number>(0);
+    const [commissionsState, setCommissionsState] = useState({ earned: 0, claimable: 0 });
     const [claims, setClaims] = useState<Claim[]>([]);
     const { toast } = useToast();
     const navigate = useNavigate();
@@ -62,13 +63,18 @@ export default function MarketerEarnings() {
         // Fetch commission config
         const { data: configData } = await (supabase as any)
             .from("marketer_commission_config")
-            .select("commission_per_referral")
+            .select("commission_per_referral, super_agent_cut_percent")
             .order("updated_at", { ascending: false })
             .limit(1)
             .maybeSingle();
 
+        const baseRate = configData ? configData.commission_per_referral : 0;
+        const saCutPercent = configData ? (configData.super_agent_cut_percent || 0) : 0;
+        
+        let netBaseRate = 0;
         if (configData) {
-            setCommissionRate(configData.commission_per_referral);
+            netBaseRate = baseRate - ((baseRate * saCutPercent) / 100);
+            setCommissionRate(netBaseRate);
         }
 
         // Fetch active referrals count
@@ -79,6 +85,45 @@ export default function MarketerEarnings() {
             .eq("is_active", true);
 
         setActiveReferrals(count || 0);
+
+        // Fetch commissions securely logic incorporating schema levels
+        const { data: commsData, error: commsError } = await (supabase as any)
+            .from("marketer_commissions")
+            .select(`
+                status,
+                members (
+                    membership_categories ( marketer_commission )
+                )
+            `)
+            .eq("marketer_id", mData.id);
+
+        if (commsError) {
+            console.error(commsError);
+        }
+
+        let earned = 0;
+        let claimable = 0;
+        if (commsData) {
+            // Count rows strictly and multiply securely honoring individual scheme overrides
+            commsData.forEach((c: any) => {
+                let memberObj = Array.isArray(c.members) ? c.members[0] : (c.member || c.members);
+                let catObj = Array.isArray(memberObj?.membership_categories) ? memberObj?.membership_categories[0] : (memberObj?.membership_category || memberObj?.membership_categories);
+                let schemaBase = catObj?.marketer_commission;
+                
+                let activeBase = (schemaBase && Number(schemaBase) > 0) ? Number(schemaBase) : baseRate;
+                let activeNet = activeBase - ((activeBase * saCutPercent) / 100);
+                
+                if (['claimable', 'unclaimed', 'claimed', 'paid', 'pending'].includes(c.status)) {
+                    earned += activeNet;
+                }
+                
+                if (c.status === 'unclaimed' || c.status === 'claimable') {
+                    claimable += activeNet;
+                }
+            });
+        }
+
+        setCommissionsState({ earned, claimable });
 
         // Fetch claims history
         const { data: claimsData } = await (supabase as any)
@@ -126,11 +171,11 @@ export default function MarketerEarnings() {
         return <div className="p-8 text-center text-muted-foreground">No marketer account found.</div>;
     }
 
-    // Calculate earnings
-    const totalEarned = activeReferrals * commissionRate;
+    // Use absolute database aggregates computed dynamically
+    const totalEarned = commissionsState.earned;
+    const claimableAmount = commissionsState.claimable;
     const totalPaid = claims.filter(c => c.status === 'paid').reduce((sum, c) => sum + c.amount, 0);
-    const pendingClaims = claims.filter(c => c.status === 'pending').reduce((sum, c) => sum + c.amount, 0);
-    const claimableAmount = Math.max(0, totalEarned - totalPaid - pendingClaims);
+    const pendingClaims = claims.filter(c => c.status === 'pending' || c.status === 'finance_review').reduce((sum, c) => sum + c.amount, 0);
 
     return (
         <div className="space-y-6">
@@ -155,7 +200,7 @@ export default function MarketerEarnings() {
                     <CardContent>
                         <div className="text-2xl font-bold">{activeReferrals}</div>
                         <p className="text-xs text-muted-foreground mt-1">
-                            @ KES {commissionRate.toLocaleString()} each
+                            Varies by scheme (Default: KES {commissionRate.toLocaleString()})
                         </p>
                     </CardContent>
                 </Card>
@@ -246,10 +291,10 @@ export default function MarketerEarnings() {
                                             <TableCell className="font-bold text-emerald-700">KES {claim.amount.toLocaleString()}</TableCell>
                                             <TableCell>
                                                 <Badge
-                                                    variant={claim.status === 'paid' ? 'default' : claim.status === 'pending' ? 'secondary' : 'destructive'}
-                                                    className={claim.status === 'paid' ? 'bg-green-600' : ''}
+                                                    variant={claim.status === 'paid' ? 'default' : (claim.status === 'pending' || claim.status === 'finance_review') ? 'secondary' : 'destructive'}
+                                                    className={claim.status === 'paid' ? 'bg-green-600' : claim.status === 'finance_review' ? 'bg-blue-100 text-blue-800' : ''}
                                                 >
-                                                    {claim.status.toUpperCase()}
+                                                    {claim.status.replace('_', ' ').toUpperCase()}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell>

@@ -111,6 +111,7 @@ import SuperAgentCommissions from "./pages/super-agent/Commissions";
 import SuperAgentAddMember from "./pages/super-agent/AddMember";
 
 import { DynamicTheme } from "./components/DynamicTheme";
+import { InactivityTracker } from "./components/InactivityTracker";
 
 const queryClient = new QueryClient();
 
@@ -121,6 +122,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <InactivityTracker />
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Index />} />

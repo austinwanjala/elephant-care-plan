@@ -25,18 +25,17 @@ export default function SuperAgentDashboard() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
-            // Marketers Count
-            // Note: If super agent is in charge of ALL marketers:
-            const { count: marketersCount } = await supabase
-                .from("user_roles")
-                .select("*", { count: 'exact', head: true })
-                .eq("role", "marketer");
+            // Marketers Count utilizing safe RPC to respect RLS
+            const { data: marketersData } = await supabase.rpc("super_agent_get_marketers" as any);
+            const marketersCount = marketersData ? marketersData.length : 0;
 
             // Super agent commissions stat
-            const { data: commissions } = await supabase
+            // Fetch system-wide super agent commissions universally for the master agents and admins
+            const { data } = await supabase
                 .from("super_agent_commissions" as any)
-                .select("amount, status")
-                .eq("super_agent_id", user.id);
+                .select("amount, status");
+            
+            const commissions = (data as any[]) || [];
 
             let totalComm = 0;
             let pendingComm = 0;
@@ -45,7 +44,10 @@ export default function SuperAgentDashboard() {
             if (commissions) {
                 totalComm = commissions.reduce((acc, curr) => acc + (curr.amount || 0), 0);
                 pendingComm = commissions.filter(c => c.status === 'unclaimed').reduce((acc, curr) => acc + (curr.amount || 0), 0);
-                recentRef = commissions.length;
+            }
+
+            if (marketersData) {
+                recentRef = marketersData.reduce((acc: number, curr: any) => acc + (Number(curr.total_members) || 0), 0);
             }
 
             setStats({

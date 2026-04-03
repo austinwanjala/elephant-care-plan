@@ -185,8 +185,11 @@ async function ensureModelsLoaded() {
  * that lead to cross-member false positives.
  */
 async function detectFaceDescriptor(img: any) {
-  // Use SSD exclusively for maximum accuracy and strictly enforce high confidence
-  return await faceapi.detectSingleFace(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 }))
+  // Use SSD exclusively for maximum accuracy, but lowered minConfidence to 0.3
+  // Mobile cameras often apply post-processing (beautification, HDR artifacts, noise)
+  // that slightly confuses the generic face bounding box algorithm, despite having high-res data.
+  // Lowering this only helps FIND the face. The strict Euclidean Identity Match prevents false positives later.
+  return await faceapi.detectSingleFace(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.3 }))
     .withFaceLandmarks()
     .withFaceDescriptor();
 }

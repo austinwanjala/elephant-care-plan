@@ -203,12 +203,12 @@ export default function FaceBiometricCapture({
                   screenshotFormat="image/jpg"
                   videoConstraints={selectedDeviceId ? {
                     deviceId: { exact: selectedDeviceId },
-                    width: 1280,
-                    height: 720,
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
                   } : {
                     facingMode: facingMode,
-                    width: 1280,
-                    height: 720,
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
                   }}
                   className="w-full h-full object-cover"
                 />

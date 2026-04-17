@@ -180,18 +180,68 @@ async function ensureModelsLoaded() {
 }
 
 /**
+ * Normalizes an image for processing. Mobile photos are often huge (12MP+)
+ * which can overwhelm the SSD detector and memory. Downscaling to a reasonable
+ * max dimension improves reliability and speed.
+ */
+async function getNormalizedImage(imageBase64: string): Promise<HTMLCanvasElement | HTMLImageElement> {
+  try {
+    const img = await faceapi.fetchImage(imageBase64);
+    
+    // If image is already reasonable, just return it
+    if (img.width <= 1024 && img.height <= 1024) return img;
+
+    const canvas = document.createElement('canvas');
+    const maxDim = 1024;
+    let width = img.width;
+    let height = img.height;
+
+    if (width > height) {
+      if (width > maxDim) {
+        height *= maxDim / width;
+        width = maxDim;
+      }
+    } else {
+      if (height > maxDim) {
+        width *= maxDim / height;
+        height = maxDim;
+      }
+    }
+
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.drawImage(img, 0, 0, width, height);
+      return canvas;
+    }
+    return img;
+  } catch (err) {
+    console.error("[Biometric] Image normalization failed, using raw image:", err);
+    return faceapi.fetchImage(imageBase64);
+  }
+}
+
+/**
  * Robust detection helper: Enforces high-quality SSD detection
- * Removing TinyFaceDetector fallback prevents generic/blurry embeddings
- * that lead to cross-member false positives.
+ * Now includes TinyFaceDetector fallback for mobile/blurry scenarios.
  */
 async function detectFaceDescriptor(img: any) {
-  // Use SSD exclusively for maximum accuracy, but lowered minConfidence to 0.3
-  // Mobile cameras often apply post-processing (beautification, HDR artifacts, noise)
-  // that slightly confuses the generic face bounding box algorithm, despite having high-res data.
-  // Lowering this only helps FIND the face. The strict Euclidean Identity Match prevents false positives later.
-  return await faceapi.detectSingleFace(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.15 }))
+  // 1. Primary: SSD Mobilenet for high accuracy
+  let detection = await faceapi.detectSingleFace(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.2 }))
     .withFaceLandmarks()
     .withFaceDescriptor();
+  
+  if (detection) return detection;
+
+  // 2. Secondary: TinyFaceDetector is much more forgiving with blur, noise, and lighting artifacts
+  // common in mobile cameras and high-compression photos.
+  console.log("[Biometric] Primary SSD detection failed. Trying robust TinyFace fallback...");
+  detection = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.15 }))
+    .withFaceLandmarks()
+    .withFaceDescriptor();
+
+  return detection;
 }
 
 export async function registerFace(params: { memberId?: string; imageBase64: string; targetTable?: 'members' | 'dependants' }) {
@@ -203,7 +253,7 @@ export async function registerFace(params: { memberId?: string; imageBase64: str
   await ensureModelsLoaded();
 
   // 2. Validate that the image being registered actually contains a face
-  const img = await faceapi.fetchImage(params.imageBase64);
+  const img = await getNormalizedImage(params.imageBase64);
   const detection = await detectFaceDescriptor(img);
   
   if (!detection) {
@@ -276,8 +326,8 @@ export async function verifyFace(params: { memberId?: string; imageBase64: strin
     await ensureModelsLoaded();
 
     // 2. Create image elements for processing
-    const capturedImg = await faceapi.fetchImage(params.imageBase64);
-    const storedImg = await faceapi.fetchImage(bios.face_template);
+    const capturedImg = await getNormalizedImage(params.imageBase64);
+    const storedImg = await getNormalizedImage(bios.face_template);
 
     // 3. Get descriptors for both images using robust detection
     const capturedDesc = await detectFaceDescriptor(capturedImg);

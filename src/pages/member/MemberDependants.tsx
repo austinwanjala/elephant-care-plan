@@ -9,6 +9,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2, ArrowLeft, Plus, Trash, Users, Camera, User, ImagePlus, AlertCircle, Pencil } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { BiometricCapture } from "@/components/BiometricCapture";
+import { Fingerprint } from "lucide-react";
 
 const calculateAge = (dob: string) => {
   if (!dob) return 0;
@@ -30,6 +32,7 @@ interface Dependant {
   relationship: string | null;
   gender: string | null;
   image_url: string | null;
+  biometric_data?: string | null;
 }
 
 const MemberDependants = () => {
@@ -60,6 +63,8 @@ const MemberDependants = () => {
     gender: "male",
   });
   const [editImageFile, setEditImageFile] = useState<File | null>(null);
+  const [faceEnrollOpen, setFaceEnrollOpen] = useState(false);
+  const [enrollTarget, setEnrollTarget] = useState<Dependant | null>(null);
 
   useEffect(() => {
     fetchDependants();
@@ -491,7 +496,19 @@ const MemberDependants = () => {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1">
+                   <div className="flex items-center gap-1">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => {
+                        setEnrollTarget(dep);
+                        setFaceEnrollOpen(true);
+                      }}
+                      title="Face ID Enrollment"
+                      className={dep.biometric_data ? "text-green-600" : "text-slate-400"}
+                    >
+                      <Fingerprint className="h-4 w-4" />
+                    </Button>
                     <Button variant="ghost" size="icon" onClick={() => openEdit(dep)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
@@ -601,6 +618,35 @@ const MemberDependants = () => {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={faceEnrollOpen} onOpenChange={setFaceEnrollOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Face ID Enrollment</DialogTitle>
+            <DialogDescription>
+              Register facial biometrics for {enrollTarget?.full_name}. This will be used for visit authorization.
+            </DialogDescription>
+          </DialogHeader>
+          {enrollTarget && (
+            <div className="py-4">
+              <BiometricCapture
+                mode="register"
+                userId={enrollTarget.id}
+                userName={enrollTarget.full_name}
+                targetTable="dependants"
+                onCaptureComplete={() => {
+                  setFaceEnrollOpen(false);
+                  fetchDependants();
+                  toast({ title: "Enrollment Complete", description: "Face ID has been registered." });
+                }}
+              />
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFaceEnrollOpen(false)}>Close</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

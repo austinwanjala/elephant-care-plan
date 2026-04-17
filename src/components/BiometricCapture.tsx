@@ -15,6 +15,7 @@ interface BiometricCaptureProps {
   className?: string;
   memberId?: string;
   allowExternal?: boolean;
+  targetTable?: 'members' | 'dependants';
 }
 
 /**
@@ -30,6 +31,7 @@ export const BiometricCapture = ({
   className,
   memberId,
   allowExternal = true,
+  targetTable = "members",
 }: BiometricCaptureProps) => {
   const [captured, setCaptured] = useState(false);
   const [verified, setVerified] = useState<boolean | null>(null);
@@ -45,6 +47,7 @@ export const BiometricCapture = ({
           mode={mode}
           memberId={effectiveMemberId}
           userName={userName}
+          targetTable={targetTable}
           onSuccess={() => onVerificationComplete?.(true)}
         />
       </div>
@@ -52,7 +55,7 @@ export const BiometricCapture = ({
       {mode === "verify" && !credentialId && !verified && (
         <p className="text-[11px] text-amber-600 bg-amber-50 dark:bg-amber-950/20 p-2 rounded-md border border-amber-200 dark:border-amber-800">
           <AlertCircle className="h-3 w-3 inline mr-1" />
-          Note: Ensure the member has Face ID registered before attempting verification.
+          Note: Ensure the {targetTable === 'dependants' ? 'dependant' : 'member'} has Face ID registered before attempting verification.
         </p>
       )}
     </div>

@@ -21,6 +21,7 @@ interface FaceBiometricCaptureProps {
   userName?: string;
   onSuccess?: () => void;
   className?: string;
+  targetTable?: 'members' | 'dependants';
 }
 
 export default function FaceBiometricCapture({
@@ -29,9 +30,11 @@ export default function FaceBiometricCapture({
   userName,
   onSuccess,
   className,
+  targetTable = "members",
 }: FaceBiometricCaptureProps) {
   const { toast } = useToast();
   const webcamRef = useRef<Webcam>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [status, setStatus] = useState<"idle" | "capturing" | "verifying" | "success" | "error">("idle");
@@ -78,6 +81,18 @@ export default function FaceBiometricCapture({
     }
   }, [webcamRef]);
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCapturedImage(reader.result as string);
+        setStatus("capturing");
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleAction = async () => {
     if (!capturedImage) return;
     setIsProcessing(true);
@@ -85,7 +100,7 @@ export default function FaceBiometricCapture({
 
     try {
       if (mode === "register") {
-        await registerFace({ memberId, imageBase64: capturedImage });
+        await registerFace({ memberId, imageBase64: capturedImage, targetTable });
         toast({
           title: "Registration Success",
           description: `Face profile for ${userName || 'the member'} securely registered.`,
@@ -93,11 +108,9 @@ export default function FaceBiometricCapture({
         setStatus("success");
         onSuccess?.();
       } else {
-        const result = await verifyFace({ memberId, imageBase64: capturedImage });
+        const result = await verifyFace({ memberId, imageBase64: capturedImage, targetTable });
         if (result.success && result.storedImage) {
           setStoredImage(result.storedImage);
-          // For now, we simulate a match by showing comparison. 
-          // In real-world, we'd use face-api.js embeddings.
           setStatus("success");
           toast({
             title: "Verification Success",
@@ -130,6 +143,7 @@ export default function FaceBiometricCapture({
     setStoredImage(null);
     setStatus("idle");
     setIsProcessing(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   return (
@@ -151,8 +165,16 @@ export default function FaceBiometricCapture({
           </div>
           {!capturedImage && (
             <div className="ml-auto flex items-center gap-2">
+              <input
+                type="file"
+                accept="image/*"
+                capture="user"
+                className="hidden"
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+              />
               {devices.length > 0 && (
-                <div className="w-48 lg:w-56 overflow-hidden">
+                <div className="w-48 lg:w-56 overflow-hidden hidden md:block">
                   <Select value={selectedDeviceId} onValueChange={(val) => {
                     setSelectedDeviceId(val);
                     setWebcamKey(prev => prev + 1);
@@ -223,33 +245,31 @@ export default function FaceBiometricCapture({
                 <div className="absolute inset-0 pointer-events-none">
                   {/* Modern Square Frame with Corner Brackets */}
                   <div className="absolute inset-[15%] border-[1px] border-white/20 rounded-2xl flex items-center justify-center overflow-hidden">
-                    {/* Scanning Grid (Subtle) */}
                     <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff10_1px,transparent_1px),linear-gradient(to_bottom,#ffffff10_1px,transparent_1px)] bg-[size:20px_20px]"></div>
-
-                    {/* Diagnostic Corner Accents */}
                     <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-blue-500/80 rounded-tl-xl shadow-[0_0_10px_rgba(59,130,246,0.5)]"></div>
                     <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-blue-500/80 rounded-tr-xl shadow-[0_0_10px_rgba(59,130,246,0.5)]"></div>
                     <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-blue-500/80 rounded-bl-xl shadow-[0_0_10px_rgba(59,130,246,0.5)]"></div>
                     <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-blue-500/80 rounded-br-xl shadow-[0_0_10px_rgba(59,130,246,0.5)]"></div>
-
-                    {/* Central Verification Pulse */}
                     <div className="w-2/3 h-5/6 border-2 border-blue-400/40 rounded-2xl border-dashed animate-pulse flex items-center justify-center">
                       <div className="w-full h-[1px] bg-gradient-to-r from-transparent via-blue-400/80 to-transparent animate-[scan_3s_linear_infinite]"></div>
                     </div>
                   </div>
-
-                  {/* Backdrop darkening for focus */}
                   <div className="absolute inset-0 bg-slate-950/20"></div>
                 </div>
               </>
             ) : (
               <div className="flex flex-col items-center justify-center h-full p-8 text-slate-400 bg-slate-50 dark:bg-slate-900">
                 <Camera className="h-12 w-12 mb-4 opacity-20" />
-                <p className="text-xs font-bold uppercase tracking-widest">Hardware Disconnected</p>
-                <p className="text-[10px] mt-1">Connect an external webcam to proceed with Face ID.</p>
-                <Button variant="outline" size="sm" className="mt-4 h-8 text-[10px]" onClick={() => window.location.reload()}>
-                  <RefreshCcw className="h-3 w-3 mr-2" /> Refresh System
-                </Button>
+                <p className="text-xs font-bold uppercase tracking-widest text-center">Hardware Disconnected or Unauthorized</p>
+                <p className="text-[10px] mt-1 text-center">Use the native camera or refresh the system.</p>
+                <div className="flex gap-2 mt-4">
+                  <Button variant="outline" size="sm" className="h-8 text-[10px]" onClick={() => fileInputRef.current?.click()}>
+                    <RefreshCcw className="h-3 w-3 mr-2" /> Use Mobile Camera
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-8 text-[10px]" onClick={() => window.location.reload()}>
+                    <RefreshCcw className="h-3 w-3 mr-2" /> Refresh
+                  </Button>
+                </div>
               </div>
             )
           ) : (
@@ -257,8 +277,6 @@ export default function FaceBiometricCapture({
               <div className={cn("relative flex-1 bg-slate-900 border-r border-white/10 overflow-hidden", storedImage && "w-1/2")}>
                 <img src={capturedImage} alt="Captured" className="w-full h-full object-cover grayscale-0" />
                 <div className="absolute top-2 left-2 bg-black/50 backdrop-blur-md text-[10px] text-white px-2 py-1 rounded">Captured</div>
-
-                {/* Scanning Animation */}
                 {isProcessing && mode === "verify" && (
                   <>
                     <div className="absolute inset-0 bg-blue-500/10 pointer-events-none"></div>
@@ -296,13 +314,23 @@ export default function FaceBiometricCapture({
 
         <div className="flex gap-4">
           {!capturedImage ? (
-            <Button
-              onClick={capture}
-              className="flex-1 h-12 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg transition-all hover:scale-[1.02]"
-            >
-              <Camera className="mr-2 h-5 w-5" />
-              Capture Photo
-            </Button>
+            <>
+              <Button
+                onClick={capture}
+                className="flex-[2] h-12 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg transition-all hover:scale-[1.02]"
+              >
+                <Camera className="mr-2 h-5 w-5" />
+                Capture Photo
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1 h-12 rounded-xl text-xs flex flex-col items-center justify-center gap-0.5 leading-tight"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <UserPlus className="h-4 w-4" />
+                <span>Device Camera</span>
+              </Button>
+            </>
           ) : (
             <>
               <Button

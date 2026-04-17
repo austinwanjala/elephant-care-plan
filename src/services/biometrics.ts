@@ -194,7 +194,7 @@ async function detectFaceDescriptor(img: any) {
     .withFaceDescriptor();
 }
 
-export async function registerFace(params: { memberId?: string; imageBase64: string }) {
+export async function registerFace(params: { memberId?: string; imageBase64: string; targetTable?: 'members' | 'dependants' }) {
   const { data: { user } } = await supabase.auth.getUser();
   const tid = params.memberId || user?.id;
   if (!tid) throw new Error("Target ID not found.");
@@ -210,9 +210,10 @@ export async function registerFace(params: { memberId?: string; imageBase64: str
     throw new Error("Face not clearly visible in the photo. Please ensure good lighting, look directly at the camera, and remove any masks or dark glasses.");
   }
 
-  // 3. Fetch current biometric data
-  const { data: member, error: memErr } = await supabase
-    .from("members")
+  // 3. Fetch current biometric data from the specified table
+  const table = params.targetTable || "members";
+  const { data: profile, error: memErr } = await supabase
+    .from(table)
     .select("biometric_data")
     .eq("id", tid)
     .maybeSingle();
@@ -220,11 +221,11 @@ export async function registerFace(params: { memberId?: string; imageBase64: str
   if (memErr) throw memErr;
 
   let bios: any = {};
-  if (member?.biometric_data) {
-    if (typeof member.biometric_data === "string") {
-      try { bios = JSON.parse(member.biometric_data); } catch { bios = {}; }
+  if (profile?.biometric_data) {
+    if (typeof profile.biometric_data === "string") {
+      try { bios = JSON.parse(profile.biometric_data); } catch { bios = {}; }
     } else {
-      bios = member.biometric_data;
+      bios = profile.biometric_data;
     }
   }
 
@@ -232,7 +233,7 @@ export async function registerFace(params: { memberId?: string; imageBase64: str
   bios.face_template = params.imageBase64;
 
   const { error: upErr } = await supabase
-    .from("members")
+    .from(table)
     .update({ 
       biometric_data: JSON.stringify(bios), 
       updated_at: new Date().toISOString() 
@@ -243,13 +244,14 @@ export async function registerFace(params: { memberId?: string; imageBase64: str
   return { success: true };
 }
 
-export async function verifyFace(params: { memberId?: string; imageBase64: string }) {
+export async function verifyFace(params: { memberId?: string; imageBase64: string; targetTable?: 'members' | 'dependants' }) {
   const { data: { user } } = await supabase.auth.getUser();
   const tid = params.memberId || user?.id;
   if (!tid) throw new Error("Target ID not found.");
 
-  const { data: member, error: memErr } = await supabase
-    .from("members")
+  const table = params.targetTable || "members";
+  const { data: profile, error: memErr } = await supabase
+    .from(table)
     .select("biometric_data")
     .eq("id", tid)
     .maybeSingle();
@@ -257,16 +259,16 @@ export async function verifyFace(params: { memberId?: string; imageBase64: strin
   if (memErr) throw memErr;
   
   let bios: any = {};
-  if (member?.biometric_data) {
-    if (typeof member.biometric_data === "string") {
-      try { bios = JSON.parse(member.biometric_data); } catch { bios = {}; }
+  if (profile?.biometric_data) {
+    if (typeof profile.biometric_data === "string") {
+      try { bios = JSON.parse(profile.biometric_data); } catch { bios = {}; }
     } else {
-      bios = member.biometric_data;
+      bios = profile.biometric_data;
     }
   }
 
   if (!bios.face_template) {
-    return { success: false, reason: "No face registered for this member." };
+    return { success: false, reason: "No face registered for this profile." };
   }
 
   try {
@@ -288,14 +290,13 @@ export async function verifyFace(params: { memberId?: string; imageBase64: strin
 
     if (!storedDesc) {
       console.warn("[Biometric] No face detected in stored template.");
-      return { success: false, reason: "The stored profile image is unclear. Please re-register the member's face.", storedImage: bios.face_template };
+      return { success: false, reason: "The stored profile image is unclear. Please re-register the profile's face.", storedImage: bios.face_template };
     }
 
     // 4. Compare using Euclidean distance
     const distance = faceapi.euclideanDistance(capturedDesc.descriptor, storedDesc.descriptor);
     
     // STRICT Threshold: 0.45 instead of the loose 0.6 default.
-    // This prevents different people under similar lighting from false-matching.
     const threshold = 0.45; 
     const matches = distance < threshold;
 

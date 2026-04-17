@@ -199,7 +199,7 @@ export default function RegisterVisit() {
         // Fetch dependants
         const { data: dependantsData } = await supabase
             .from("dependants")
-            .select("*")
+            .select("*, biometric_data")
             .eq("member_id", data.id)
             .eq("is_active", true);
 
@@ -235,17 +235,25 @@ export default function RegisterVisit() {
     };
 
     const handleBiometricCaptureComplete = async (credentialData: string) => {
-        if (!member) return;
+        if (!selectedPatientId) return;
+        const isDep = selectedPatientId !== member?.id;
+        const table = isDep ? "dependants" : "members";
+        
         try {
             const { error } = await supabase
-                .from("members")
+                .from(table)
                 .update({ biometric_data: credentialData })
-                .eq("id", member.id);
+                .eq("id", selectedPatientId);
             if (error) throw error;
 
-            setMember((prev: any) => ({ ...prev, biometric_data: credentialData }));
+            if (isDep) {
+                setDependants(prev => prev.map(d => d.id === selectedPatientId ? { ...d, biometric_data: credentialData } : d));
+            } else {
+                setMember((prev: any) => ({ ...prev, biometric_data: credentialData }));
+            }
+            
             setBiometricsVerified(true);
-            toast({ title: "Success", description: "Biometrics registered and saved to member profile." });
+            toast({ title: "Success", description: "Biometrics registered and saved to patient profile." });
         } catch (error: any) {
             toast({ title: "Capture failed", description: error.message, variant: "destructive" });
         }
@@ -261,7 +269,7 @@ export default function RegisterVisit() {
     const handleRegisterVisit = async () => {
         if (!member || !receptionistId || !receptionistBranchId) return;
         if (!biometricsVerified) {
-            toast({ title: "Biometrics required", description: "Please verify principal member identity first.", variant: "destructive" });
+            toast({ title: "Biometrics required", description: "Please verify patient identity first.", variant: "destructive" });
             return;
         }
         if (!member.is_active) {
@@ -737,61 +745,73 @@ export default function RegisterVisit() {
                                 <CardTitle className="text-lg">Authorization & Assignment</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-6">
-                                {showBiometrics ? (
-                                    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
-                                        <div className="flex items-center justify-between">
-                                            <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
-                                                <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-                                                Live Facial Recognition
-                                            </h4>
-                                            <Button variant="ghost" size="sm" onClick={() => setShowBiometrics(false)} className="text-xs text-slate-500">Cancel</Button>
-                                        </div>
-                                        {member.biometric_data ? (
-                                            <BiometricCapture
-                                                mode="verify"
-                                                userId={member.id}
-                                                credentialId={member.biometric_data}
-                                                onVerificationComplete={handleBiometricVerificationComplete}
-                                            />
-                                        ) : (
-                                            <div className="space-y-4">
-                                                <div className="p-4 border rounded-lg bg-yellow-50/20 text-yellow-700 flex items-center gap-3 border-yellow-200 shadow-sm border-dashed">
-                                                    <Fingerprint className="h-6 w-6 shrink-0" />
-                                                    <div className="text-xs">
-                                                        <p className="font-bold uppercase tracking-wide">First-Time Enrollment</p>
-                                                        <p>No Face ID on record. Member must enroll their biometric profile now to authorize this visit.</p>
-                                                    </div>
-                                                </div>
-                                                <BiometricCapture
-                                                    mode="register"
-                                                    userId={member.id}
-                                                    userName={member.full_name}
-                                                    onCaptureComplete={handleBiometricCaptureComplete}
-                                                />
+                                {(() => {
+                                    const activePatient = selectedPatientId === member?.id 
+                                        ? member 
+                                        : dependants.find(d => d.id === selectedPatientId);
+                                    
+                                    if (!activePatient) return null;
+                                    const bioData = activePatient.biometric_data;
+                                    const isDep = selectedPatientId !== member?.id;
+
+                                    return showBiometrics ? (
+                                        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
+                                            <div className="flex items-center justify-between">
+                                                <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                                                    <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                                                    Live Facial Recognition
+                                                </h4>
+                                                <Button variant="ghost" size="sm" onClick={() => setShowBiometrics(false)} className="text-xs text-slate-500">Cancel</Button>
                                             </div>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div className="flex flex-col items-center gap-4 py-8 border-2 border-dashed rounded-xl bg-slate-50/50 hover:bg-white transition-all group">
-                                        <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
-                                            <ShieldCheck className="h-8 w-8" />
-                                        </div>
-                                        <div className="text-center">
-                                            <h3 className="font-bold text-slate-900 italic">Identity Verification Required</h3>
-                                            <p className="text-xs text-slate-500 mt-1">Please confirm the principal member's identity before proceeding.</p>
-                                        </div>
-                                        <Button 
-                                            onClick={() => setShowBiometrics(true)}
-                                            className="px-8 shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90 rounded-full h-11"
-                                        >
-                                            {member.biometric_data ? (
-                                                <><UserCheck className="mr-2 h-4 w-4" /> Verify Face ID</>
+                                            {bioData ? (
+                                                <BiometricCapture
+                                                    mode="verify"
+                                                    userId={activePatient.id}
+                                                    credentialId={bioData}
+                                                    targetTable={isDep ? 'dependants' : 'members'}
+                                                    onVerificationComplete={handleBiometricVerificationComplete}
+                                                />
                                             ) : (
-                                                <><UserCheck className="mr-2 h-4 w-4" /> Enroll for Face ID</>
+                                                <div className="space-y-4">
+                                                    <div className="p-4 border rounded-lg bg-yellow-50/20 text-yellow-700 flex items-center gap-3 border-yellow-200 shadow-sm border-dashed">
+                                                        <Fingerprint className="h-6 w-6 shrink-0" />
+                                                        <div className="text-xs">
+                                                            <p className="font-bold uppercase tracking-wide">First-Time Enrollment</p>
+                                                            <p>No Face ID on record for this {isDep ? 'dependant' : 'member'}. Enroll their biometric profile now to authorize this visit.</p>
+                                                        </div>
+                                                    </div>
+                                                    <BiometricCapture
+                                                        mode="register"
+                                                        userId={activePatient.id}
+                                                        userName={activePatient.full_name}
+                                                        targetTable={isDep ? 'dependants' : 'members'}
+                                                        onCaptureComplete={handleBiometricCaptureComplete}
+                                                    />
+                                                </div>
                                             )}
-                                        </Button>
-                                    </div>
-                                )}
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-col items-center gap-4 py-8 border-2 border-dashed rounded-xl bg-slate-50/50 hover:bg-white transition-all group">
+                                            <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                                                <ShieldCheck className="h-8 w-8" />
+                                            </div>
+                                            <div className="text-center">
+                                                <h3 className="font-bold text-slate-900 italic">Identity Verification Required</h3>
+                                                <p className="text-xs text-slate-500 mt-1">Please confirm the {isDep ? "dependant's" : "principal member's"} identity before proceeding.</p>
+                                            </div>
+                                            <Button 
+                                                onClick={() => setShowBiometrics(true)}
+                                                className="px-8 shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90 rounded-full h-11"
+                                            >
+                                                {bioData ? (
+                                                    <><UserCheck className="mr-2 h-4 w-4" /> Verify Face ID</>
+                                                ) : (
+                                                    <><UserCheck className="mr-2 h-4 w-4" /> Enroll for Face ID</>
+                                                )}
+                                            </Button>
+                                        </div>
+                                    );
+                                })()}
 
                                 <div className="space-y-2">
                                     <Label>Assign Doctor <span className="text-destructive">*</span></Label>

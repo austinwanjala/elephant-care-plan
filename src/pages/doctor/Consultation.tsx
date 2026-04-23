@@ -107,10 +107,41 @@ export default function Consultation() {
     const [followAllStages, setFollowAllStages] = useState(false);
     const [treatmentJustCompleted, setTreatmentJustCompleted] = useState<{ name: string; tooth: number | null; stages: number } | null>(null);
 
-    if (loading || !visit || !doctorId || !doctorBranchId) {
+    const [error, setError] = useState<string | null>(null);
+
+    if (loading) {
         return (
-            <div className="p-8 text-center min-h-[400px] flex items-center justify-center">
-                <Loader2 className="animate-spin h-8 w-8 text-primary mx-auto" />
+            <div className="p-8 text-center min-h-[400px] flex flex-col items-center justify-center gap-4">
+                <Loader2 className="animate-spin h-10 w-10 text-primary mx-auto" />
+                <div className="text-slate-500 animate-pulse font-medium">
+                    Preparing clinical environment...
+                    {!doctorId && <p className="text-[10px] mt-2 opacity-50 italic">Retrieving doctor profile...</p>}
+                    {doctorId && !visit && <p className="text-[10px] mt-2 opacity-50 italic">Fetching patient records...</p>}
+                </div>
+            </div>
+        );
+    }
+
+    if (error || !visit || !doctorId || !doctorBranchId) {
+        return (
+            <div className="p-12 text-center min-h-[400px] flex flex-col items-center justify-center gap-6 bg-slate-50 rounded-2xl border border-dashed border-slate-200 m-8">
+                <div className="h-16 w-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center">
+                    <AlertTriangle className="h-8 w-8" />
+                </div>
+                <div className="space-y-2 max-w-md">
+                    <h2 className="text-xl font-bold text-slate-900">Consultation Unavailable</h2>
+                    <p className="text-slate-500 text-sm">
+                        {error || "We couldn't load the necessary data to start this consultation. This might be due to missing permissions or a network issue."}
+                    </p>
+                </div>
+                <div className="flex gap-3">
+                    <Button variant="outline" onClick={() => navigate("/doctor")} className="rounded-xl">
+                        Back to Dashboard
+                    </Button>
+                    <Button onClick={() => window.location.reload()} className="rounded-xl bg-primary">
+                        Try Again
+                    </Button>
+                </div>
             </div>
         );
     }
@@ -128,201 +159,241 @@ export default function Consultation() {
         }
     }, [doctorId, doctorBranchId]);
 
-    const fetchDoctorInfo = async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-            navigate("/login");
-            return;
+    // Safety watchdog: If loading persists for > 10s, show error
+    useEffect(() => {
+        if (loading) {
+            const timer = setTimeout(() => {
+                if (loading) {
+                    console.error("[Consultation] Loading timeout reached.");
+                    setError("Loading is taking longer than expected. Please check your connection or refresh.");
+                    setLoading(false);
+                }
+            }, 10000);
+            return () => clearTimeout(timer);
         }
-        const { data: staffData, error: staffError } = await supabase
-            .from("staff")
-            .select("id, branch_id")
-            .eq("user_id", user.id)
-            .maybeSingle();
+    }, [loading]);
 
-        if (staffError || !staffData) {
-            toast({ title: "Error", description: "Could not retrieve doctor profile.", variant: "destructive" });
-            navigate("/doctor");
-            return;
+    const fetchDoctorInfo = async () => {
+        try {
+            const { data: { user }, error: authError } = await supabase.auth.getUser();
+            if (authError || !user) {
+                console.error("[Consultation] Auth error:", authError);
+                navigate("/login");
+                return;
+            }
+            const { data: staffData, error: staffError } = await supabase
+                .from("staff")
+                .select("id, branch_id")
+                .eq("user_id", user.id)
+                .maybeSingle();
+
+            if (staffError || !staffData) {
+                console.error("[Consultation] Staff error:", staffError);
+                setError("Doctor profile not found.");
+                toast({ title: "Error", description: "Could not retrieve doctor profile.", variant: "destructive" });
+                return;
+            }
+
+            if (!staffData.branch_id) {
+                console.warn("[Consultation] Doctor branch_id is missing");
+                setError("Your profile is not assigned to a branch. Please contact the administrator.");
+                setLoading(false);
+                return;
+            }
+
+            setDoctorId(staffData.id);
+            setDoctorBranchId(staffData.branch_id);
+        } catch (err: any) {
+            console.error("[Consultation] fetchDoctorInfo crash:", err);
+            setError("An error occurred while identifying your profile.");
+            toast({ title: "Error", description: "An unexpected error occurred while fetching your profile.", variant: "destructive" });
         }
-        setDoctorId(staffData.id);
-        setDoctorBranchId(staffData.branch_id);
     };
 
     const loadVisitData = async () => {
+        if (!visitId || !doctorId) {
+            console.warn("[Consultation] loadVisitData aborted: Missing visitId or doctorId", { visitId, doctorId });
+            setError("Missing visit or doctor credentials.");
+            setLoading(false);
+            return;
+        }
+        console.log("[Consultation] Starting loadVisitData for visitId:", visitId);
         setLoading(true);
-        const { data, error } = await (supabase
-            .from("visits")
-            .select("*, members(*), dependants(*)")
-            .eq("id", visitId)
-            .single() as any);
+        setError(null);
+        try {
+            const { data, error: fetchError } = await (supabase
+                .from("visits")
+                .select("*, members(*), dependants(*)")
+                .eq("id", visitId)
+                .single() as any);
 
-        if (error || !data) {
-            toast({ title: "Error loading visit", description: error?.message || "Visit not found", variant: "destructive" });
-            navigate("/doctor");
-            return;
-        }
-
-        // Security check: Only allow the assigned doctor or the doctor currently attending to view the visit
-        if (data.assigned_doctor_id !== doctorId && data.doctor_id !== doctorId) {
-            toast({
-                title: "Access Denied",
-                description: "You are not authorized to view this patient as they are not allocated to you.",
-                variant: "destructive"
-            });
-            navigate("/doctor");
-            return;
-        }
-
-        setVisit(data);
-
-        if (data.diagnosis_locked_at) {
-            setDiagnosisLockedAt(data.diagnosis_locked_at);
-            setConsultationMode('treatment');
-        } else {
-            setConsultationMode('diagnosis');
-        }
-
-        // Fetch raw service_stages rows (no join — avoids silent empty results from schema mismatches)
-        // Strict separation: principal visits only see stages with dependant_id IS NULL,
-        // dependant visits only see stages for that specific dependant_id.
-        let stagesBaseQuery = (supabase as any)
-            .from("service_stages")
-            .select("*")
-            .eq("member_id", data.member_id);
-
-        if (data.dependant_id) {
-            stagesBaseQuery = stagesBaseQuery.eq("dependant_id", data.dependant_id);
-        } else {
-            stagesBaseQuery = stagesBaseQuery.is("dependant_id", null);
-        }
-
-        const { data: rawStages, error: rawStagesError } = await stagesBaseQuery;
-
-        if (rawStagesError) {
-            console.error("[Consultation] Could not fetch service_stages:", rawStagesError.message);
-        }
-
-        if (rawStages && rawStages.length > 0) {
-            // Enrich with service data (name + stage_names) via a separate query
-            // Separating this prevents a join schema mismatch from silently returning []
-            const serviceIds = [...new Set(rawStages.map((s: any) => s.service_id))];
-            const { data: servicesData } = await (supabase as any)
-                .from("services")
-                .select("id, name, stage_names")
-                .in("id", serviceIds);
-
-            const servicesMap: Record<string, any> = {};
-            (servicesData || []).forEach((svc: any) => { servicesMap[svc.id] = svc; });
-
-            const enrichedStages = rawStages.map((s: any) => ({
-                ...s,
-                services: servicesMap[s.service_id] || { name: 'Unknown Service', stage_names: [] }
-            }));
-
-            const active = enrichedStages.filter((s: any) => s.status === 'in_progress');
-            setActiveStages(active);
-            setAllMemberStages(enrichedStages);
-        } else {
-            setActiveStages([]);
-            setAllMemberStages([]);
-        }
-
-        // Fetch past visits with X-rays and stages
-        const { data: visitsData } = await supabase
-            .from("visits")
-            .select(`
-                    id, 
-                    created_at, 
-                    diagnosis, 
-                    treatment_notes, 
-                    treatment_done,
-                    tca,
-                    periodontal_status,
-                    xray_urls, 
-                    status,
-                    doctor:doctor_id(full_name),
-                    branches(name),
-                    service_stages(*, services(name, stage_names))
-                `)
-            .eq("member_id", data.member_id)
-            .neq("id", visitId) // Exclude current visit
-            .order("created_at", { ascending: false });
-
-        if (visitsData) setPastVisits(visitsData);
-
-        let recordsQuery = (supabase as any)
-            .from("dental_records")
-            .select("tooth_number, status, condition, color, visit_id")
-            .eq("member_id", data.member_id);
-
-        if (data.dependant_id) {
-            recordsQuery = recordsQuery.eq("dependant_id", data.dependant_id);
-        } else {
-            recordsQuery = recordsQuery.is("dependant_id", null);
-        }
-
-        const { data: records, error: recordsError } = await recordsQuery;
-
-        if (records) {
-            const conditions: Record<number, string> = {};
-            const history: Record<number, boolean> = {};
-
-            records.forEach((r: any) => {
-                if (r.condition) conditions[r.tooth_number] = r.condition;
-                else if (r.status) conditions[r.tooth_number] = r.status;
-
-                // Any tooth with an existing record is locked
-                history[r.tooth_number] = true;
-            });
-            setToothConditions(conditions);
-            setExistingConditions(history);
-
-            // If we have existing records (history) OR current visit records, default to treatment mode
-            // so doctor can immediately start treating existing conditions.
-            // Unless it's a fresh visit with NO history.
-            if (records.length > 0 && !data.diagnosis_locked_at) {
-                setConsultationMode('treatment');
+            if (fetchError || !data) {
+                console.error("[Consultation] Visit fetch error:", fetchError);
+                setError("Visit details could not be found. Please ensure the visit ID is correct.");
+                toast({ title: "Error loading visit", description: fetchError?.message || "Visit not found", variant: "destructive" });
+                return;
             }
 
-            // For display in Treatment Mode, we want to overlay treatment status (e.g. in_progress)
-            // But keep underlying condition visible if not hidden?
-            // DentalChart takes a single status.
-            // We will compute `toothStatus` derived state during render or use effect.
-        }
+            // Normalize relational data (handle array-vs-object inconsistencies)
+            const normalizedVisit = {
+                ...data,
+                members: Array.isArray(data.members) ? data.members[0] : data.members,
+                dependants: Array.isArray(data.dependants) ? data.dependants[0] : data.dependants
+            };
 
-        let historyQuery = supabase
-            .from("dental_chart_records")
-            .select("tooth_number, service_id, created_at")
-            .eq("member_id", data.member_id);
+            // Security check: Only allow the assigned doctor or the doctor currently attending to view the visit
+            if (normalizedVisit.assigned_doctor_id && normalizedVisit.assigned_doctor_id !== doctorId && normalizedVisit.doctor_id !== doctorId) {
+                console.warn("[Consultation] Access denied: visit assigned to another doctor", { assigned: normalizedVisit.assigned_doctor_id, current: doctorId });
+                setError("Access Denied: This patient is allocated to another doctor.");
+                toast({
+                    title: "Access Denied",
+                    description: "You are not authorized to view this patient as they are not allocated to you.",
+                    variant: "destructive"
+                });
+                return;
+            }
 
-        if (data.dependant_id) {
-            historyQuery = historyQuery.eq("dependant_id", data.dependant_id);
-        } else {
-            historyQuery = historyQuery.is("dependant_id", null);
-        }
+            setVisit(normalizedVisit);
 
-        const { data: history } = await historyQuery;
+            if (normalizedVisit.diagnosis_locked_at) {
+                setDiagnosisLockedAt(normalizedVisit.diagnosis_locked_at);
+                setConsultationMode('treatment');
+            } else {
+                setConsultationMode('diagnosis');
+            }
 
-        if (history) {
-            setServiceHistory(history);
-        }
+            // Fetch raw service_stages rows
+            let stagesBaseQuery = (supabase as any)
+                .from("service_stages")
+                .select("*")
+                .eq("member_id", normalizedVisit.member_id);
 
-        if (data.diagnosis) setDiagnosis(data.diagnosis);
-        if (data.treatment_notes) setTreatmentNotes(data.treatment_notes);
-        if (data.treatment_done) setTreatmentDone(data.treatment_done);
-        if (data.tca) setTca(data.tca);
-        if (data.periodontal_status) setPeriodontalStatus(data.periodontal_status || []);
-        if (data.xray_urls && Array.isArray(data.xray_urls)) setXrayUrls(data.xray_urls);
+            if (normalizedVisit.dependant_id) {
+                stagesBaseQuery = stagesBaseQuery.eq("dependant_id", normalizedVisit.dependant_id);
+            } else {
+                stagesBaseQuery = stagesBaseQuery.is("dependant_id", null);
+            }
 
-        if (data.status === 'registered' && doctorId) {
-            await supabase
+            const { data: rawStages, error: rawStagesError } = await stagesBaseQuery;
+
+            if (rawStagesError) {
+                console.error("[Consultation] Could not fetch service_stages:", rawStagesError.message);
+            }
+
+            if (rawStages && rawStages.length > 0) {
+                const serviceIds = [...new Set(rawStages.map((s: any) => s.service_id))];
+                const { data: servicesData } = await (supabase as any)
+                    .from("services")
+                    .select("id, name, stage_names")
+                    .in("id", serviceIds);
+
+                const servicesMap: Record<string, any> = {};
+                (servicesData || []).forEach((svc: any) => { servicesMap[svc.id] = svc; });
+
+                const enrichedStages = rawStages.map((s: any) => ({
+                    ...s,
+                    services: servicesMap[s.service_id] || { name: 'Unknown Service', stage_names: [] }
+                }));
+
+                const active = enrichedStages.filter((s: any) => s.status === 'in_progress');
+                setActiveStages(active);
+                setAllMemberStages(enrichedStages);
+            } else {
+                setActiveStages([]);
+                setAllMemberStages([]);
+            }
+
+            // Fetch past visits
+            const { data: visitsData, error: pastVisitsError } = await supabase
                 .from("visits")
-                .update({ status: 'with_doctor', doctor_id: doctorId, assigned_doctor_id: doctorId })
-                .eq("id", visitId);
-        }
+                .select(`
+                        id, 
+                        created_at, 
+                        diagnosis, 
+                        treatment_notes, 
+                        treatment_done,
+                        tca,
+                        periodontal_status,
+                        xray_urls, 
+                        status,
+                        doctor:doctor_id(full_name),
+                        branches(name),
+                        service_stages(*, services(name, stage_names))
+                    `)
+                .eq("member_id", normalizedVisit.member_id)
+                .neq("id", visitId)
+                .order("created_at", { ascending: false });
 
-        setLoading(false);
+            if (pastVisitsError) console.error("[Consultation] Past visits error:", pastVisitsError);
+            if (visitsData) setPastVisits(visitsData);
+
+            let recordsQuery = (supabase as any)
+                .from("dental_records")
+                .select("tooth_number, status, condition, color, visit_id")
+                .eq("member_id", normalizedVisit.member_id);
+
+            if (normalizedVisit.dependant_id) {
+                recordsQuery = recordsQuery.eq("dependant_id", normalizedVisit.dependant_id);
+            } else {
+                recordsQuery = recordsQuery.is("dependant_id", null);
+            }
+
+            const { data: records, error: recordsError } = await recordsQuery;
+            if (recordsError) console.error("[Consultation] Dental records error:", recordsError);
+
+            if (records) {
+                const conditions: Record<number, string> = {};
+                const history: Record<number, boolean> = {};
+
+                records.forEach((r: any) => {
+                    if (r.condition) conditions[r.tooth_number] = r.condition;
+                    else if (r.status) conditions[r.tooth_number] = r.status;
+                    history[r.tooth_number] = true;
+                });
+                setToothConditions(conditions);
+                setExistingConditions(history);
+
+                if (records.length > 0 && !normalizedVisit.diagnosis_locked_at) {
+                    setConsultationMode('treatment');
+                }
+            }
+
+            let historyQuery = supabase
+                .from("dental_chart_records")
+                .select("tooth_number, service_id, created_at")
+                .eq("member_id", normalizedVisit.member_id);
+
+            if (normalizedVisit.dependant_id) {
+                historyQuery = historyQuery.eq("dependant_id", normalizedVisit.dependant_id);
+            } else {
+                historyQuery = historyQuery.is("dependant_id", null);
+            }
+
+            const { data: history, error: historyError } = await historyQuery;
+            if (historyError) console.error("[Consultation] Service history error:", historyError);
+            if (history) setServiceHistory(history);
+
+            if (normalizedVisit.diagnosis) setDiagnosis(normalizedVisit.diagnosis);
+            if (normalizedVisit.treatment_notes) setTreatmentNotes(normalizedVisit.treatment_notes);
+            if (normalizedVisit.treatment_done) setTreatmentDone(normalizedVisit.treatment_done);
+            if (normalizedVisit.tca) setTca(normalizedVisit.tca);
+            if (normalizedVisit.periodontal_status) setPeriodontalStatus(normalizedVisit.periodontal_status || []);
+            if (normalizedVisit.xray_urls && Array.isArray(normalizedVisit.xray_urls)) setXrayUrls(normalizedVisit.xray_urls);
+
+            if (normalizedVisit.status === 'registered' && doctorId) {
+                await supabase
+                    .from("visits")
+                    .update({ status: 'with_doctor', doctor_id: doctorId, assigned_doctor_id: doctorId })
+                    .eq("id", visitId);
+            }
+            console.log("[Consultation] loadVisitData completed successfully");
+        } catch (err: any) {
+            console.error("[Consultation] loadVisitData fatal crash:", err);
+            setError("A critical error occurred while loading patient data.");
+            toast({ title: "Error", description: "Failed to load clinical data correctly. Please refresh.", variant: "destructive" });
+        } finally {
+            setLoading(false);
+        }
     };
 
     // Calculate age (approximation or exact if available)
@@ -1409,8 +1480,8 @@ export default function Consultation() {
     };
 
     // Determine patient details (Principal or Dependant)
-    const patientName = visit.dependants?.full_name || visit.members.full_name;
-    const patientDob = visit.dependants?.dob || visit.members.dob;
+    const patientName = visit?.dependants?.full_name || visit?.members?.full_name || 'Unknown Patient';
+    const patientDob = visit?.dependants?.dob || visit?.members?.dob;
 
     const patientAge = getPatientAge();
     const isChild = patientAge <= 14;
@@ -1445,11 +1516,11 @@ export default function Consultation() {
                                 </Badge>
                             </div>
                             <div className="flex items-center gap-4 text-sm font-medium text-slate-500 overflow-x-auto whitespace-nowrap pb-1">
-                                <span className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-primary" /> {visit.members.member_number}</span>
+                                <span className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-primary" /> {visit?.members?.member_number || 'N/A'}</span>
                                 <span className="h-1 w-1 rounded-full bg-slate-300" />
                                 <span>{patientAge} Years Old</span>
                                 <span className="h-1 w-1 rounded-full bg-slate-300" />
-                                <span className="flex items-center gap-1.5"><ClipboardList className="w-4 h-4" /> {visit.dependants?.document_number || visit.members.id_number || 'No ID Provided'}</span>
+                                <span className="flex items-center gap-1.5"><ClipboardList className="w-4 h-4" /> {visit?.dependants?.document_number || visit?.members?.id_number || 'No ID Provided'}</span>
                             </div>
                         </div>
                     </div>
@@ -1476,11 +1547,11 @@ export default function Consultation() {
                     </div>
                 </div>
 
-                {visit.dependants && (
+                {visit?.dependants && (
                     <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-2 text-sm">
                         <span className="text-slate-400 font-medium">Principal Account:</span>
-                        <span className="font-bold text-slate-700">{visit.members.full_name}</span>
-                        <Badge variant="outline" className="text-[10px] font-bold px-1.5 h-5 leading-none bg-slate-50">{visit.members.member_number}</Badge>
+                        <span className="font-bold text-slate-700">{visit?.members?.full_name || 'N/A'}</span>
+                        <Badge variant="outline" className="text-[10px] font-bold px-1.5 h-5 leading-none bg-slate-50">{visit?.members?.member_number || 'N/A'}</Badge>
                     </div>
                 )}
             </div>
@@ -2038,7 +2109,7 @@ export default function Consultation() {
                                     <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
                                         <div className="flex flex-col">
                                             <span className="text-[10px] font-black text-slate-400 uppercase leading-none mb-1">Coverage Balance</span>
-                                            <span className="text-lg font-black text-slate-900">KES {visit.members.coverage_balance?.toLocaleString()}</span>
+                                            <span className="text-lg font-black text-slate-900">KES {visit?.members?.coverage_balance?.toLocaleString() || 0}</span>
                                         </div>
                                         <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600">
                                             <CreditCard className="w-5 h-5" />
@@ -2068,7 +2139,7 @@ export default function Consultation() {
                                             <div className="flex flex-col">
                                                 <span className="text-[10px] font-black text-slate-400 uppercase">Estimated Deduction</span>
                                                 <span className="text-xl font-black text-primary">
-                                                    KES {Math.min(selectedServices.filter(s => !s.service.is_multi_stage_update).reduce((acc, s) => acc + Number(s.service.benefit_cost), 0) + (chargeConsultation && consultationService ? Number(consultationService.benefit_cost) : 0), visit.members.coverage_balance || 0).toLocaleString()}
+                                                    KES {Math.min(selectedServices.filter(s => !s.service.is_multi_stage_update).reduce((acc, s) => acc + Number(s.service.benefit_cost), 0) + (chargeConsultation && consultationService ? Number(consultationService.benefit_cost) : 0), visit?.members?.coverage_balance || 0).toLocaleString()}
                                                 </span>
                                             </div>
                                         </div>
@@ -2480,6 +2551,9 @@ export default function Consultation() {
                                                                 </div>
                                                             </DialogTrigger>
                                                             <DialogContent className="max-w-4xl p-0 bg-black border-0">
+                                                                <DialogHeader className="sr-only">
+                                                                    <DialogTitle>X-Ray Image View</DialogTitle>
+                                                                </DialogHeader>
                                                                 <img src={url} alt="X-ray view" className="max-h-[85vh] w-auto mx-auto object-contain" />
                                                             </DialogContent>
                                                         </Dialog>
@@ -2548,7 +2622,7 @@ export default function Consultation() {
                                         </div>
                                     </DialogTrigger>
                                     <DialogContent className="max-w-4xl p-0 bg-black border-0">
-                                        <DialogHeader className="hidden"><DialogTitle>X-Ray {idx + 1}</DialogTitle></DialogHeader>
+                                        <DialogHeader className="sr-only"><DialogTitle>X-Ray {idx + 1}</DialogTitle></DialogHeader>
                                         {url.toLowerCase().endsWith('.pdf') ? (
                                             <iframe src={url} className="w-full" style={{ height: '85vh' }} title={`X-Ray PDF ${idx + 1}`} />
                                         ) : (

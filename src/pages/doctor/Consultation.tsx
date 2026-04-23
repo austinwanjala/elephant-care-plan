@@ -329,17 +329,14 @@ export default function Consultation() {
     const getPatientAge = () => {
         if (!visit) return 0;
 
-        const dep = Array.isArray(visit.dependants) ? visit.dependants[0] : visit.dependants;
-        const mem = Array.isArray(visit.members) ? visit.members[0] : visit.members;
-
         let dob;
         // Prioritize dependant DOB if it's a dependant visit
-        if (visit.dependant_id && dep?.dob) {
-            dob = dep.dob;
-        } else if (mem?.dob) {
-            dob = mem.dob;
-        } else if (mem?.age) {
-            return mem.age;
+        if (visit.dependant_id && visit.dependants?.dob) {
+            dob = visit.dependants.dob;
+        } else if (visit.members?.dob) {
+            dob = visit.members.dob;
+        } else if (visit.members?.age) {
+            return visit.members.age;
         }
 
         if (!dob) return 0;
@@ -1412,10 +1409,8 @@ export default function Consultation() {
     };
 
     // Determine patient details (Principal or Dependant)
-    const activeDep = Array.isArray(visit.dependants) ? visit.dependants[0] : visit.dependants;
-    const activeMem = Array.isArray(visit.members) ? visit.members[0] : visit.members;
-    const patientName = activeDep?.full_name || activeMem?.full_name || "Unknown Patient";
-    const patientDob = activeDep?.dob || activeMem?.dob;
+    const patientName = visit.dependants?.full_name || visit.members.full_name;
+    const patientDob = visit.dependants?.dob || visit.members.dob;
 
     const patientAge = getPatientAge();
     const isChild = patientAge <= 14;

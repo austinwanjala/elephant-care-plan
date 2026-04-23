@@ -77,7 +77,10 @@ export default function MemberProfile() {
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!profile) return;
+    if (editForm.phone.trim().length !== 10) {
+      toast({ title: "Invalid Phone", description: "Phone number must be exactly 10 digits.", variant: "destructive" });
+      return;
+    }
     setIsSaving(true);
 
     try {
@@ -256,8 +259,13 @@ export default function MemberProfile() {
               <Input
                 id="phone"
                 value={editForm.phone}
-                onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, "").slice(0, 10);
+                  setEditForm({ ...editForm, phone: value });
+                }}
                 required
+                maxLength={10}
+                minLength={10}
               />
             </div>
             <div className="space-y-2">

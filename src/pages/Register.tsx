@@ -228,8 +228,8 @@ const Register = () => {
       return;
     }
 
-    if (formData.phone.trim().length < 10) {
-      toast({ title: "Invalid Phone", description: "Mobile phone number must be at least 10 digits.", variant: "destructive" });
+    if (formData.phone.trim().length !== 10) {
+      toast({ title: "Invalid Phone", description: "Mobile phone number must be exactly 10 digits.", variant: "destructive" });
       return;
     }
 
@@ -405,7 +405,18 @@ const Register = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phone">Phone Number</Label>
-                  <Input id="phone" placeholder="0712 345 678" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} required minLength={10} />
+                  <Input 
+                    id="phone" 
+                    placeholder="0712345678" 
+                    value={formData.phone} 
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, "").slice(0, 10);
+                      setFormData({ ...formData, phone: value });
+                    }} 
+                    required 
+                    maxLength={10}
+                    minLength={10} 
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="idNumber">National ID / Passport</Label>

@@ -93,6 +93,11 @@ export default function SuperAgentMarketers() {
             return;
         }
 
+        if (formData.phone && formData.phone.trim().length !== 10) {
+            toast({ title: "Invalid Phone", description: "Phone number must be exactly 10 digits if provided.", variant: "destructive" });
+            return;
+        }
+
         setCreateLoading(true);
         try {
             const { error } = await supabase.functions.invoke("admin-create-user", {
@@ -167,7 +172,16 @@ export default function SuperAgentMarketers() {
                             </div>
                             <div className="space-y-2">
                                 <Label>Phone Number</Label>
-                                <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="0712 345 678" />
+                                <Input 
+                                    value={formData.phone} 
+                                    onChange={(e) => {
+                                        const value = e.target.value.replace(/\D/g, "").slice(0, 10);
+                                        setFormData({ ...formData, phone: value });
+                                    }} 
+                                    placeholder="0712345678" 
+                                    maxLength={10}
+                                    minLength={10}
+                                />
                             </div>
                             <div className="space-y-2">
                                 <Label>Temporary Password</Label>

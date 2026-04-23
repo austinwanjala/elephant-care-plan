@@ -114,6 +114,10 @@ export default function AdminStaff() {
   };
 
   const handleUpdateUser = async () => {
+    if (editingUser.phone && editingUser.phone.trim().length !== 10) {
+      toast({ title: "Invalid Phone", description: "Phone number must be exactly 10 digits.", variant: "destructive" });
+      return;
+    }
     setLoading(true);
     try {
       const table = editingUser.type === 'marketer' ? 'marketers' : 'staff';
@@ -156,6 +160,10 @@ export default function AdminStaff() {
     try {
       if (!formData.email || !formData.password || !formData.fullName) {
         throw new Error("Email, Password and Full Name are required.");
+      }
+
+      if (formData.phone && formData.phone.trim().length !== 10) {
+        throw new Error("Phone number must be exactly 10 digits if provided.");
       }
 
       const { data, error } = await supabase.functions.invoke("admin-create-user", {
@@ -335,7 +343,16 @@ export default function AdminStaff() {
                 </div>
                 <div className="space-y-2">
                   <Label>Phone Number</Label>
-                  <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="0712 345 678" />
+                  <Input 
+                    value={formData.phone} 
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, "").slice(0, 10);
+                      setFormData({ ...formData, phone: value });
+                    }} 
+                    placeholder="0712345678" 
+                    maxLength={10}
+                    minLength={10}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Target Portal Role *</Label>
@@ -403,7 +420,12 @@ export default function AdminStaff() {
                     <Label>Phone</Label>
                     <Input
                       value={editingUser.phone || ''}
-                      onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, "").slice(0, 10);
+                        setEditingUser({ ...editingUser, phone: value });
+                      }}
+                      maxLength={10}
+                      minLength={10}
                     />
                   </div>
 

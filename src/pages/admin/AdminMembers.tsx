@@ -213,10 +213,12 @@ export default function AdminMembers() {
         whatsapp_opt_in: (formData as any).whatsappOptIn || false,
       };
 
-      // 2. If scheme changed, update limits and balance
+      // 2. If scheme changed, update membership info
       if (categoryChanged && selectedCategory) {
         updates.benefit_limit = selectedCategory.benefit_amount;
-        updates.coverage_balance = (selectedMember.coverage_balance || 0) + selectedCategory.benefit_amount;
+        // NOTE: We don't manually update coverage_balance here because the 
+        // payments table has a database trigger (update_coverage_on_payment) 
+        // that automatically adds NEW.coverage_added to the member's balance.
         updates.is_active = true;
       }
 

@@ -105,10 +105,10 @@ const MemberSchemeSelection = () => {
     try {
       // Save scheme selection before initiating payment
       const { error: schemeErr } = await supabase
+        .from("members")
         .update({
           membership_category_id: selectedCategory.id,
           scheme_selected: true,
-          benefit_limit: selectedCategory.benefit_amount,
         })
         .eq("id", member.id);
 

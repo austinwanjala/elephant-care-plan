@@ -216,9 +216,7 @@ export default function AdminMembers() {
       // 2. If scheme changed, update limits and balance
       if (categoryChanged && selectedCategory) {
         updates.benefit_limit = selectedCategory.benefit_amount;
-        // coverage_balance will be updated automatically by the payment trigger 
-        // which runs when we insert the record in step 3 below.
-        // We do NOT add it here to avoid double-charging the balance.
+        updates.coverage_balance = (selectedMember.coverage_balance || 0) + selectedCategory.benefit_amount;
         updates.is_active = true;
       }
 

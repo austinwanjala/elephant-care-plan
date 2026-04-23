@@ -310,15 +310,8 @@ export default function DoctorPatientHistory() {
                                                         <div className="text-[10px] text-muted-foreground">{visit.branches?.name}</div>
                                                     </td>
                                                     <td className="py-3 px-3 text-sm">
-                                                        {(() => {
-                                                            const dep = Array.isArray(visit.dependants) ? visit.dependants[0] : visit.dependants;
-                                                            return (
-                                                                <>
-                                                                    <div>{dep?.full_name || 'Principal'}</div>
-                                                                    <div className="text-[10px] text-muted-foreground">Dr. {visit.doctor?.full_name || 'N/A'}</div>
-                                                                </>
-                                                            );
-                                                        })()}
+                                                        <div>{visit.dependants?.full_name || 'Principal'}</div>
+                                                        <div className="text-[10px] text-muted-foreground">Dr. {visit.doctor?.full_name || 'N/A'}</div>
                                                     </td>
                                                     <td className="py-3 px-3 text-sm max-w-[320px]">
                                                         <div className="space-y-1.5">
@@ -393,12 +386,7 @@ export default function DoctorPatientHistory() {
                                                                     <div className="grid grid-cols-2 gap-4">
                                                                         <div className="p-3 bg-muted/30 rounded-lg">
                                                                             <Label className="text-[10px] uppercase font-bold text-muted-foreground">Patient</Label>
-                                                                            <p className="font-medium text-sm">
-                                                                                {(() => {
-                                                                                    const dep = Array.isArray(visit.dependants) ? visit.dependants[0] : visit.dependants;
-                                                                                    return dep?.full_name || member.full_name;
-                                                                                })()}
-                                                                            </p>
+                                                                            <p className="font-medium text-sm">{visit.dependants?.full_name || member.full_name}</p>
                                                                         </div>
                                                                         <div className="p-3 bg-muted/30 rounded-lg">
                                                                             <Label className="text-[10px] uppercase font-bold text-muted-foreground">Provider/Location</Label>

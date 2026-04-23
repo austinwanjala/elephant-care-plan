@@ -101,15 +101,12 @@ export default function DoctorQueue() {
                         </TableRow>
                     ) : (
                         visitList.map((visit) => {
-                            const dep = Array.isArray(visit.dependants) ? visit.dependants[0] : visit.dependants;
-                            const mem = Array.isArray(visit.members) ? visit.members[0] : visit.members;
-                            
-                            const patientName = dep?.full_name || mem?.full_name || "Unknown Patient";
+                            const patientName = visit.dependants?.full_name || visit.members?.full_name;
                             const isToday = visit.created_at.startsWith(todayStr);
 
                             const getAge = () => {
-                                if (dep?.dob) {
-                                    const birthDate = new Date(dep.dob);
+                                if (visit.dependants?.dob) {
+                                    const birthDate = new Date(visit.dependants.dob);
                                     const today = new Date();
                                     let age = today.getFullYear() - birthDate.getFullYear();
                                     const m = today.getMonth() - birthDate.getMonth();
@@ -118,7 +115,7 @@ export default function DoctorQueue() {
                                     }
                                     return age;
                                 }
-                                return mem?.age || "N/A";
+                                return visit.members?.age || "N/A";
                             };
 
                             return (
@@ -132,15 +129,12 @@ export default function DoctorQueue() {
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        <div className="font-medium flex items-center gap-2">
-                                            {patientName}
-                                            {dep && <Badge variant="outline" className="text-[9px] h-4 bg-blue-50 text-blue-700">Dep</Badge>}
-                                        </div>
+                                        <div className="font-medium">{patientName}</div>
                                         <div className="text-xs text-muted-foreground">Age: {getAge()}</div>
                                     </TableCell>
                                     <TableCell>
-                                        <div className="text-sm">{mem?.member_number}</div>
-                                        {dep && (
+                                        <div className="text-sm">{visit.members?.member_number}</div>
+                                        {visit.dependants && (
                                             <div className="text-xs text-muted-foreground">Dependant</div>
                                         )}
                                     </TableCell>

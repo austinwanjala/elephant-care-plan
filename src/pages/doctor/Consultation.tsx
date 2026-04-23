@@ -158,13 +158,30 @@ export default function Consultation() {
             .single() as any);
 
         if (error || !data) {
+            console.error("[Consultation] Visit fetch error:", error);
             toast({ title: "Error loading visit", description: error?.message || "Visit not found", variant: "destructive" });
             navigate("/doctor");
             return;
         }
 
+        // Normalize relational data (handle both object and array response from Supabase)
+        const normalizedVisit = {
+            ...data,
+            members: Array.isArray(data.members) ? data.members[0] : data.members,
+            dependants: Array.isArray(data.dependants) ? data.dependants[0] : data.dependants
+        };
+
+        console.log("[Consultation] Loaded visit data:", normalizedVisit);
+
         // Security check: Only allow the assigned doctor or the doctor currently attending to view the visit
-        if (data.assigned_doctor_id !== doctorId && data.doctor_id !== doctorId) {
+        const isAssigned = normalizedVisit.assigned_doctor_id === doctorId || normalizedVisit.doctor_id === doctorId;
+        
+        if (!isAssigned) {
+            console.warn("[Consultation] Security mismatch:", { 
+                assigned: normalizedVisit.assigned_doctor_id, 
+                current: normalizedVisit.doctor_id, 
+                me: doctorId 
+            });
             toast({
                 title: "Access Denied",
                 description: "You are not authorized to view this patient as they are not allocated to you.",
@@ -174,7 +191,7 @@ export default function Consultation() {
             return;
         }
 
-        setVisit(data);
+        setVisit(normalizedVisit);
 
         if (data.diagnosis_locked_at) {
             setDiagnosisLockedAt(data.diagnosis_locked_at);
@@ -329,26 +346,34 @@ export default function Consultation() {
     const getPatientAge = () => {
         if (!visit) return 0;
 
+        const member = visit.members;
+        const dependant = visit.dependants;
+
         let dob;
         // Prioritize dependant DOB if it's a dependant visit
-        if (visit.dependant_id && visit.dependants?.dob) {
-            dob = visit.dependants.dob;
-        } else if (visit.members?.dob) {
-            dob = visit.members.dob;
-        } else if (visit.members?.age) {
-            return visit.members.age;
+        if (visit.dependant_id && dependant?.dob) {
+            dob = dependant.dob;
+        } else if (member?.dob) {
+            dob = member.dob;
+        } else if (member?.age) {
+            return member.age;
         }
 
         if (!dob) return 0;
 
-        const birthDate = new Date(dob);
-        const today = new Date();
-        let age = today.getFullYear() - birthDate.getFullYear();
-        const m = today.getMonth() - birthDate.getMonth();
-        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-            age--;
+        try {
+            const birthDate = new Date(dob);
+            if (isNaN(birthDate.getTime())) return 0;
+            const today = new Date();
+            let age = today.getFullYear() - birthDate.getFullYear();
+            const m = today.getMonth() - birthDate.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                age--;
+            }
+            return age;
+        } catch (e) {
+            return 0;
         }
-        return age;
     };
 
     // Auto-set chart mode based on age when visit loads
@@ -1409,8 +1434,10 @@ export default function Consultation() {
     };
 
     // Determine patient details (Principal or Dependant)
-    const patientName = visit.dependants?.full_name || visit.members.full_name;
-    const patientDob = visit.dependants?.dob || visit.members.dob;
+    const member = visit.members;
+    const dependant = visit.dependants;
+    const patientName = dependant?.full_name || member?.full_name || "Unknown Patient";
+    const patientDob = dependant?.dob || member?.dob;
 
     const patientAge = getPatientAge();
     const isChild = patientAge <= 14;
@@ -1445,11 +1472,11 @@ export default function Consultation() {
                                 </Badge>
                             </div>
                             <div className="flex items-center gap-4 text-sm font-medium text-slate-500 overflow-x-auto whitespace-nowrap pb-1">
-                                <span className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-primary" /> {visit.members.member_number}</span>
+                                <span className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-primary" /> {member?.member_number}</span>
                                 <span className="h-1 w-1 rounded-full bg-slate-300" />
                                 <span>{patientAge} Years Old</span>
                                 <span className="h-1 w-1 rounded-full bg-slate-300" />
-                                <span className="flex items-center gap-1.5"><ClipboardList className="w-4 h-4" /> {visit.dependants?.document_number || visit.members.id_number || 'No ID Provided'}</span>
+                                <span className="flex items-center gap-1.5"><ClipboardList className="w-4 h-4" /> {dependant?.document_number || member?.id_number || 'No ID Provided'}</span>
                             </div>
                         </div>
                     </div>
@@ -1476,11 +1503,11 @@ export default function Consultation() {
                     </div>
                 </div>
 
-                {visit.dependants && (
+                {dependant && (
                     <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-2 text-sm">
                         <span className="text-slate-400 font-medium">Principal Account:</span>
-                        <span className="font-bold text-slate-700">{visit.members.full_name}</span>
-                        <Badge variant="outline" className="text-[10px] font-bold px-1.5 h-5 leading-none bg-slate-50">{visit.members.member_number}</Badge>
+                        <span className="font-bold text-slate-700">{member?.full_name}</span>
+                        <Badge variant="outline" className="text-[10px] font-bold px-1.5 h-5 leading-none bg-slate-50">{member?.member_number}</Badge>
                     </div>
                 )}
             </div>

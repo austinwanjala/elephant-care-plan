@@ -101,12 +101,14 @@ export default function DoctorQueue() {
                         </TableRow>
                     ) : (
                         visitList.map((visit) => {
-                            const patientName = visit.dependants?.full_name || visit.members?.full_name;
+                            const member = Array.isArray(visit.members) ? visit.members[0] : visit.members;
+                            const dependant = Array.isArray(visit.dependants) ? visit.dependants[0] : visit.dependants;
+                            const patientName = dependant?.full_name || member?.full_name;
                             const isToday = visit.created_at.startsWith(todayStr);
 
                             const getAge = () => {
-                                if (visit.dependants?.dob) {
-                                    const birthDate = new Date(visit.dependants.dob);
+                                if (dependant?.dob) {
+                                    const birthDate = new Date(dependant.dob);
                                     const today = new Date();
                                     let age = today.getFullYear() - birthDate.getFullYear();
                                     const m = today.getMonth() - birthDate.getMonth();
@@ -115,7 +117,7 @@ export default function DoctorQueue() {
                                     }
                                     return age;
                                 }
-                                return visit.members?.age || "N/A";
+                                return member?.age || "N/A";
                             };
 
                             return (
@@ -133,8 +135,8 @@ export default function DoctorQueue() {
                                         <div className="text-xs text-muted-foreground">Age: {getAge()}</div>
                                     </TableCell>
                                     <TableCell>
-                                        <div className="text-sm">{visit.members?.member_number}</div>
-                                        {visit.dependants && (
+                                        <div className="text-sm">{member?.member_number}</div>
+                                        {dependant && (
                                             <div className="text-xs text-muted-foreground">Dependant</div>
                                         )}
                                     </TableCell>

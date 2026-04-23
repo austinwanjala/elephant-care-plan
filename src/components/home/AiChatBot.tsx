@@ -6,7 +6,7 @@ import {
     Sparkles,
     Minimize2,
     Trash2,
-    User,
+    User as UserIcon,
     Bot,
     Loader2,
     ChevronDown,
@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Message {
-    role: "user" | "assistant";
+    role: "user" | "assistant" | "system";
     content: string;
 }
 
@@ -35,7 +35,10 @@ function escapeHtml(input: string) {
 function toSafeChatHtml(content: string) {
     // Escape first (prevents any HTML injection), then apply a tiny subset of markdown.
     const escaped = escapeHtml(content || "");
-    return escaped.replace(/\*\*(.*?)\*\*/g, "<b>$1</b>").replace(/\n/g, "<br />");
+    return escaped
+        .replace(/\*\*(.*?)\*\*/g, "<b>$1</b>")
+        .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" class="text-emerald-600 font-bold hover:underline" target="_blank">$1</a>')
+        .replace(/\n/g, "<br />");
 }
 
 function getOfflineResponse(message: string) {
@@ -43,13 +46,13 @@ function getOfflineResponse(message: string) {
     const msg = (message || "").toLowerCase();
 
     if (msg.includes("register") || msg.includes("join")) {
-        fallbackResponse += "To join, click **'Get Started'** at the top of our page. It takes just a few minutes!";
+        fallbackResponse += "To join, click [**'Get Started'**](/register) at the top of our page. It takes just a few minutes!";
     } else if (msg.includes("500") || msg.includes("1000") || msg.includes("coverage")) {
         fallbackResponse += "Our **2x Coverage** means every KES 500 you contribute gives you KES 1,000 in dental benefits instantly!";
     } else if (msg.includes("branch") || msg.includes("location") || msg.includes("where")) {
         fallbackResponse += "Our Head Office is in **Meru**, and we have branches expanding across Kenya. Contact us for the one nearest to you.";
     } else if (msg.includes("contact") || msg.includes("phone") || msg.includes("email")) {
-        fallbackResponse += "You can reach us on **+254 710 500 500** or email **info@elephantdental.org**.";
+        fallbackResponse += "You can reach us on **+254 710 500 500** or email [**info@elephantdental.org**](mailto:info@elephantdental.org).";
     } else {
         fallbackResponse += "Please tell me what you need help with (registration, coverage, branches, or payments).";
     }
@@ -59,7 +62,7 @@ function getOfflineResponse(message: string) {
 
 async function invokeAiChatbot(params: { message: string; history: Message[] }) {
     // Keep the UI responsive: if the function call hangs or errors, we fall back to offline.
-    const timeoutMs = 12000;
+    const timeoutMs = 15000;
 
     const timeout = new Promise<{ response: string }>((_resolve, reject) => {
         const id = setTimeout(() => {
@@ -85,7 +88,9 @@ export const AiChatBot = () => {
     const [message, setMessage] = useState("");
     const [history, setHistory] = useState<Message[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [userName, setUserName] = useState<string | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const quickActions = [
         "How do I join?",
@@ -95,7 +100,24 @@ export const AiChatBot = () => {
     ];
 
     useEffect(() => {
-        // Show nudge after 3 seconds if chat isn't open
+        // Fetch user name if logged in
+        const fetchUser = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: member } = await supabase
+                    .from("members")
+                    .select("full_name")
+                    .eq("user_id", user.id)
+                    .maybeSingle();
+                
+                if (member?.full_name) {
+                    setUserName(member.full_name.split(' ')[0]);
+                }
+            }
+        };
+        fetchUser();
+
+        // Show nudge after 4 seconds if chat isn't open
         const timer = setTimeout(() => {
             if (!isOpen) {
                 setShowNudge(true);
@@ -106,10 +128,10 @@ export const AiChatBot = () => {
     }, [isOpen]);
 
     useEffect(() => {
-        if (scrollRef.current) {
-            scrollRef.current.scrollIntoView({ behavior: "smooth" });
+        if (messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
         }
-    }, [history]);
+    }, [history, isLoading]);
 
     const handleSendMessage = async (text?: string) => {
         const messageText = text || message;
@@ -153,7 +175,7 @@ export const AiChatBot = () => {
                 <div className="relative pointer-events-auto">
                     {showNudge && (
                         <div className="absolute -top-16 right-0 bg-white px-4 py-2 rounded-2xl shadow-xl text-emerald-800 text-sm font-bold animate-in slide-in-from-bottom-2 fade-in duration-500 border border-emerald-100 flex items-center gap-2 whitespace-nowrap">
-                            <span>Hi! I'm Effie. Questions?</span>
+                            <span>{userName ? `Hi ${userName}! Questions?` : "Hi! I'm Effie. Questions?"}</span>
                             <button
                                 onClick={(e) => { e.stopPropagation(); setShowNudge(false); }}
                                 className="hover:text-red-500 transition-colors"
@@ -230,7 +252,8 @@ export const AiChatBot = () => {
                                         </div>
                                         <div className="bg-white border border-slate-100 p-3 rounded-2xl rounded-tl-none shadow-sm max-w-[85%]">
                                             <p className="text-sm text-slate-800 leading-relaxed">
-                                                Karibu! I'm <b>Effie</b>, your premium Elephant Dental assistant. 🐘
+                                                {userName ? `Karibu, **${userName}**! ` : "Karibu! "}
+                                                I'm <b>Effie</b>, your premium Elephant Dental assistant. 🐘
                                                 <br /><br />
                                                 My goal is to help you double your coverage and find the best dental care in Kenya.
                                                 <br /><br />
@@ -251,7 +274,7 @@ export const AiChatBot = () => {
                                                 "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border transition-colors",
                                                 msg.role === "user" ? "bg-slate-200 border-slate-300" : "bg-emerald-100 border-emerald-200"
                                             )}>
-                                                {msg.role === "user" ? <User className="w-4 h-4 text-slate-600" /> : <Bot className="w-4 h-4 text-emerald-600" />}
+                                                {msg.role === "user" ? <UserIcon className="w-4 h-4 text-slate-600" /> : <Bot className="w-4 h-4 text-emerald-600" />}
                                             </div>
                                             <div className={cn(
                                                 "p-3 rounded-2xl shadow-sm max-w-[85%] text-sm leading-relaxed transition-all",
@@ -275,7 +298,7 @@ export const AiChatBot = () => {
                                         </div>
                                     )}
 
-                                    <div ref={scrollRef} />
+                                    <div ref={messagesEndRef} />
                                 </div>
                             </ScrollArea>
 
@@ -344,3 +367,4 @@ export const AiChatBot = () => {
         </div>
     );
 };
+

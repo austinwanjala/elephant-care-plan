@@ -18,6 +18,7 @@ export default function ReceptionSearchMember() {
     const [searching, setSearching] = useState(false);
     const [searchResults, setSearchResults] = useState<any[]>([]);
     const [member, setMember] = useState<any>(null);
+    const [enrollmentTarget, setEnrollmentTarget] = useState<{ id: string, name: string, table: 'members' | 'dependants' } | null>(null);
     const [biometricDialogOpen, setBiometricDialogOpen] = useState(false);
     const [scanDialogOpen, setScanDialogOpen] = useState(false);
     const { toast } = useToast();
@@ -183,7 +184,24 @@ export default function ReceptionSearchMember() {
                                                     </p>
                                                 </div>
                                             </div>
-                                            <Button size="sm" variant="ghost" className="text-xs group-hover:text-primary">Select</Button>
+                                            <div className="flex items-center gap-2">
+                                                {!res.biometric_data && (
+                                                    <Button 
+                                                        size="sm" 
+                                                        variant="outline" 
+                                                        className="h-7 px-2 text-[10px] font-bold bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setMember(res);
+                                                            setEnrollmentTarget({ id: res.id, name: res.full_name, table: 'members' });
+                                                            setBiometricDialogOpen(true);
+                                                        }}
+                                                    >
+                                                        Enroll
+                                                    </Button>
+                                                )}
+                                                <Button size="sm" variant="ghost" className="text-xs group-hover:text-primary">Select</Button>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
@@ -232,10 +250,22 @@ export default function ReceptionSearchMember() {
                                 <Badge variant={member.is_active ? "default" : "destructive"}>
                                     {member.is_active ? "Active" : "Inactive"}
                                 </Badge>
-                                {member.biometric_data && (
+                                {member.biometric_data ? (
                                     <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200">
                                         <ShieldCheck className="h-3 w-3 mr-1" /> Biometric Identity Verified
                                     </Badge>
+                                ) : (
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm" 
+                                        className="bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100 hover:text-amber-700 h-8 text-[10px] font-black uppercase tracking-widest"
+                                        onClick={() => {
+                                            setEnrollmentTarget({ id: member.id, name: member.full_name, table: 'members' });
+                                            setBiometricDialogOpen(true);
+                                        }}
+                                    >
+                                        Enroll Face ID
+                                    </Button>
                                 )}
                             </div>
                         </div>
@@ -304,6 +334,23 @@ export default function ReceptionSearchMember() {
                                             <p>DOB: {new Date(dep.dob).toLocaleDateString()}</p>
                                             <p>ID: {dep.id_number}</p>
                                         </div>
+                                        {dep.biometric_data ? (
+                                            <Badge variant="secondary" className="mt-3 w-full bg-blue-100 text-blue-700 border-blue-200 text-[9px] uppercase font-black">
+                                                Verified
+                                            </Badge>
+                                        ) : (
+                                            <Button 
+                                                size="sm" 
+                                                variant="outline" 
+                                                className="mt-3 w-full bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100 hover:text-amber-700 h-8 text-[9px] font-black uppercase tracking-widest"
+                                                onClick={() => {
+                                                    setEnrollmentTarget({ id: dep.id, name: dep.full_name, table: 'dependants' });
+                                                    setBiometricDialogOpen(true);
+                                                }}
+                                            >
+                                                Enroll Face ID
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
                             ))}
@@ -312,22 +359,37 @@ export default function ReceptionSearchMember() {
                 </Card>
             )}
 
-            <Dialog open={biometricDialogOpen} onOpenChange={setBiometricDialogOpen}>
+            <Dialog open={biometricDialogOpen} onOpenChange={(open) => {
+                setBiometricDialogOpen(open);
+                if (!open) setEnrollmentTarget(null);
+            }}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Capture Member Biometrics</DialogTitle>
+                        <DialogTitle>Capture Face ID Profile</DialogTitle>
                     </DialogHeader>
-                    {member && (
+                    {enrollmentTarget && (
                         <BiometricCapture
                             mode="register"
-                            userId={member.id}
-                            userName={member.full_name}
-                            onCaptureComplete={async (data) => {
-                                await supabase.from("members").update({ biometric_data: data }).eq("id", member.id);
+                            userId={enrollmentTarget.id}
+                            userName={enrollmentTarget.name}
+                            targetTable={enrollmentTarget.table}
+                            onVerificationComplete={async () => {
+                                // FaceBiometricCapture already records to DB.
+                                // We just need to refresh the local member state.
+                                if (member) {
+                                    const { data: updatedMember } = await supabase
+                                        .from("members")
+                                        .select("*, membership_categories(name), branches(name), dependants(*)")
+                                        .eq("id", member.id)
+                                        .maybeSingle();
+                                    
+                                    if (updatedMember) {
+                                        setMember(updatedMember);
+                                    }
+                                }
                                 setBiometricDialogOpen(false);
-                                toast({ title: "Biometrics Updated", description: "Member biometrics captured successfully." });
-                                // Refresh member data?
-                                setMember({ ...member, biometric_data: data });
+                                setEnrollmentTarget(null);
+                                toast({ title: "Profile Secured", description: "Biometric identity has been mapped successfully." });
                             }}
                         />
                     )}

@@ -122,13 +122,16 @@ const DoctorSchedule = () => {
                             ) : (
                                 <div className="space-y-4">
                                     {appointments.map((appt: any) => {
-                                        const patientName = appt.dependants
-                                            ? `${appt.dependants.full_name} (Dep)`
-                                            : appt.members.full_name;
+                                        const dep = Array.isArray(appt.dependants) ? appt.dependants[0] : appt.dependants;
+                                        const mem = Array.isArray(appt.members) ? appt.members[0] : appt.members;
+                                        
+                                        const patientName = dep
+                                            ? `${dep.full_name} (Dep)`
+                                            : mem?.full_name || "Unknown Patient";
 
-                                        const extraInfo = appt.dependants
-                                            ? `DOB: ${appt.dependants.dob}`
-                                            : `Age: ${appt.members.age || 'N/A'}`;
+                                        const extraInfo = dep
+                                            ? `DOB: ${dep.dob}`
+                                            : `Age: ${mem?.age || 'N/A'}`;
 
                                         return (
                                             <div key={appt.id} className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 border rounded-lg hover:bg-slate-50 transition-colors">

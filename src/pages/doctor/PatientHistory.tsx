@@ -126,7 +126,14 @@ export default function DoctorPatientHistory() {
         if (visitsError) {
             toast({ title: "Error fetching visits", description: visitsError.message, variant: "destructive" });
         } else {
-            setVisits(visitsData || []);
+            // Normalize relational data (handle array-vs-object inconsistencies)
+            const normalizedVisits = (visitsData || []).map(v => ({
+                ...v,
+                dependants: Array.isArray(v.dependants) ? v.dependants[0] : v.dependants,
+                doctor: Array.isArray(v.doctor) ? v.doctor[0] : v.doctor,
+                branches: Array.isArray(v.branches) ? v.branches[0] : v.branches
+            }));
+            setVisits(normalizedVisits);
         }
 
         // Fetch dental records

@@ -50,7 +50,18 @@ export default function DoctorQueue() {
         if (error) {
             toast({ title: "Error fetching queue", description: error.message, variant: "destructive" });
         } else {
-            setVisits(data || []);
+            // Normalize relational data (handle array-vs-object inconsistencies)
+            const normalizedData = (data || []).map(v => {
+                const dep = (Array.isArray(v.dependants) && v.dependants.length > 0) ? v.dependants[0] : (Array.isArray(v.dependants) ? null : v.dependants);
+                const mem = (Array.isArray(v.members) && v.members.length > 0) ? v.members[0] : (Array.isArray(v.members) ? null : v.members);
+
+                return {
+                    ...v,
+                    members: mem,
+                    dependants: dep
+                };
+            });
+            setVisits(normalizedData);
         }
         setLoading(false);
     };
@@ -101,12 +112,15 @@ export default function DoctorQueue() {
                         </TableRow>
                     ) : (
                         visitList.map((visit) => {
-                            const patientName = visit.dependants?.full_name || visit.members?.full_name;
+                            const dep = Array.isArray(visit.dependants) ? visit.dependants[0] : visit.dependants;
+                            const mem = Array.isArray(visit.members) ? visit.members[0] : visit.members;
+
+                            const patientName = dep ? `${dep.full_name} (Dep)` : (mem?.full_name || "Unknown");
                             const isToday = visit.created_at.startsWith(todayStr);
 
                             const getAge = () => {
-                                if (visit.dependants?.dob) {
-                                    const birthDate = new Date(visit.dependants.dob);
+                                if (dep?.dob) {
+                                    const birthDate = new Date(dep.dob);
                                     const today = new Date();
                                     let age = today.getFullYear() - birthDate.getFullYear();
                                     const m = today.getMonth() - birthDate.getMonth();
@@ -115,7 +129,7 @@ export default function DoctorQueue() {
                                     }
                                     return age;
                                 }
-                                return visit.members?.age || "N/A";
+                                return mem?.age || "N/A";
                             };
 
                             return (

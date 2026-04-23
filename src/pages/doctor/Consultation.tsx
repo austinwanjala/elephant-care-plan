@@ -109,70 +109,41 @@ export default function Consultation() {
 
     const [error, setError] = useState<string | null>(null);
 
-    if (loading) {
-        return (
-            <div className="p-8 text-center min-h-[400px] flex flex-col items-center justify-center gap-4">
-                <Loader2 className="animate-spin h-10 w-10 text-primary mx-auto" />
-                <div className="text-slate-500 animate-pulse font-medium">
-                    Preparing clinical environment...
-                    {!doctorId && <p className="text-[10px] mt-2 opacity-50 italic">Retrieving doctor profile...</p>}
-                    {doctorId && !visit && <p className="text-[10px] mt-2 opacity-50 italic">Fetching patient records...</p>}
-                </div>
-            </div>
-        );
-    }
+    // --- Helper Functions ---
+    const getPatientAge = () => {
+        if (!visit) return 0;
 
-    if (error || !visit || !doctorId || !doctorBranchId) {
-        return (
-            <div className="p-12 text-center min-h-[400px] flex flex-col items-center justify-center gap-6 bg-slate-50 rounded-2xl border border-dashed border-slate-200 m-8">
-                <div className="h-16 w-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center">
-                    <AlertTriangle className="h-8 w-8" />
-                </div>
-                <div className="space-y-2 max-w-md">
-                    <h2 className="text-xl font-bold text-slate-900">Consultation Unavailable</h2>
-                    <p className="text-slate-500 text-sm">
-                        {error || "We couldn't load the necessary data to start this consultation. This might be due to missing permissions or a network issue."}
-                    </p>
-                </div>
-                <div className="flex gap-3">
-                    <Button variant="outline" onClick={() => navigate("/doctor")} className="rounded-xl">
-                        Back to Dashboard
-                    </Button>
-                    <Button onClick={() => window.location.reload()} className="rounded-xl bg-primary">
-                        Try Again
-                    </Button>
-                </div>
-            </div>
-        );
-    }
+        const dep = visit.dependants;
+        const mem = visit.members;
 
-    useEffect(() => {
-        if (visitId) {
-            fetchDoctorInfo();
+        if (dep?.dob) {
+            const birthDate = new Date(dep.dob);
+            const today = new Date();
+            let age = today.getFullYear() - birthDate.getFullYear();
+            const m = today.getMonth() - birthDate.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                age--;
+            }
+            return age;
         }
-    }, [visitId]);
 
-    useEffect(() => {
-        if (doctorId && doctorBranchId) {
-            loadVisitData();
-            loadServices(doctorBranchId);
-        }
-    }, [doctorId, doctorBranchId]);
+        return mem?.age || 0;
+    };
 
-    // Safety watchdog: If loading persists for > 10s, show error
-    useEffect(() => {
-        if (loading) {
-            const timer = setTimeout(() => {
-                if (loading) {
-                    console.error("[Consultation] Loading timeout reached.");
-                    setError("Loading is taking longer than expected. Please check your connection or refresh.");
-                    setLoading(false);
-                }
-            }, 10000);
-            return () => clearTimeout(timer);
-        }
-    }, [loading]);
+    const getPatientName = () => {
+        if (!visit) return "Loading...";
+        const dep = visit.dependants;
+        const mem = visit.members;
+        return dep ? `${dep.full_name} (Dep)` : (mem?.full_name || "Unknown");
+    };
 
+    const getStageName = (service: any, stageNum: number) => {
+        const total = service?.total_stages || '?';
+        const customName = (service?.stage_names && service.stage_names[stageNum - 1]) ? ` - ${service.stage_names[stageNum - 1]}` : '';
+        return `Stage ${stageNum} of ${total}${customName}`;
+    };
+
+    // --- Async Data Functions ---
     const fetchDoctorInfo = async () => {
         try {
             const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -210,6 +181,45 @@ export default function Consultation() {
         }
     };
 
+    const loadServices = async (branchId: string) => {
+        try {
+            const { data: servicesData, error: servicesError } = await supabase
+                .from("services")
+                .select("*, service_preapprovals(branch_id)")
+                .eq("is_active", true);
+
+            if (servicesError) {
+                toast({ title: "Error loading services", description: servicesError.message, variant: "destructive" });
+                return;
+            }
+
+            const { data: branchData } = await supabase
+                .from("branches")
+                .select("is_globally_preapproved_for_services")
+                .eq("id", branchId)
+                .single();
+
+            const filteredServices = servicesData?.filter(service => {
+                if (service.approval_type === 'all_branches') return true;
+                if (branchData?.is_globally_preapproved_for_services) return true;
+                return service.service_preapprovals.some((preapproval: any) => preapproval.branch_id === branchId);
+            }) || [];
+
+            const normalServices = filteredServices.filter(s => {
+                if (s.name.toLowerCase().includes('consultation')) {
+                    setConsultationService(s);
+                    return false;
+                }
+                return true;
+            });
+
+            setAvailableServices(normalServices);
+        } catch (error: any) {
+            console.error("[Consultation] loadServices error:", error);
+            toast({ title: "Error", description: "Failed to load services", variant: "destructive" });
+        }
+    };
+
     const loadVisitData = async () => {
         if (!visitId || !doctorId) {
             console.warn("[Consultation] loadVisitData aborted: Missing visitId or doctorId", { visitId, doctorId });
@@ -237,8 +247,8 @@ export default function Consultation() {
             // Normalize relational data (handle array-vs-object inconsistencies)
             const normalizedVisit = {
                 ...data,
-                members: Array.isArray(data.members) ? data.members[0] : data.members,
-                dependants: Array.isArray(data.dependants) ? data.dependants[0] : data.dependants
+                members: (Array.isArray(data.members) && data.members.length > 0) ? data.members[0] : (Array.isArray(data.members) ? null : data.members),
+                dependants: (Array.isArray(data.dependants) && data.dependants.length > 0) ? data.dependants[0] : (Array.isArray(data.dependants) ? null : data.dependants)
             };
 
             // Security check: Only allow the assigned doctor or the doctor currently attending to view the visit
@@ -396,31 +406,34 @@ export default function Consultation() {
         }
     };
 
-    // Calculate age (approximation or exact if available)
-    const getPatientAge = () => {
-        if (!visit) return 0;
 
-        let dob;
-        // Prioritize dependant DOB if it's a dependant visit
-        if (visit.dependant_id && visit.dependants?.dob) {
-            dob = visit.dependants.dob;
-        } else if (visit.members?.dob) {
-            dob = visit.members.dob;
-        } else if (visit.members?.age) {
-            return visit.members.age;
+    useEffect(() => {
+        if (visitId) {
+            fetchDoctorInfo();
         }
+    }, [visitId]);
 
-        if (!dob) return 0;
-
-        const birthDate = new Date(dob);
-        const today = new Date();
-        let age = today.getFullYear() - birthDate.getFullYear();
-        const m = today.getMonth() - birthDate.getMonth();
-        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-            age--;
+    useEffect(() => {
+        if (doctorId && doctorBranchId) {
+            loadVisitData();
+            loadServices(doctorBranchId);
         }
-        return age;
-    };
+    }, [doctorId, doctorBranchId]);
+
+    // Safety watchdog: If loading persists for > 10s, show error
+    useEffect(() => {
+        if (loading) {
+            const timer = setTimeout(() => {
+                if (loading) {
+                    console.error("[Consultation] Loading timeout reached.");
+                    setError("Loading is taking longer than expected. Please check your connection or refresh.");
+                    setLoading(false);
+                }
+            }, 10000);
+            return () => clearTimeout(timer);
+        }
+    }, [loading]);
+
 
     // Auto-set chart mode based on age when visit loads
     useEffect(() => {
@@ -465,45 +478,44 @@ export default function Consultation() {
         setToothStatus(effectiveStatus);
     }, [toothConditions, activeStages, allMemberStages, selectedServices]);
 
-    const loadServices = async (branchId: string) => {
-        const { data: servicesData, error: servicesError } = await supabase
-            .from("services")
-            .select("*, service_preapprovals(branch_id)")
-            .eq("is_active", true);
+    if (loading) {
+        return (
+            <div className="p-8 text-center min-h-[400px] flex flex-col items-center justify-center gap-4">
+                <Loader2 className="animate-spin h-10 w-10 text-primary mx-auto" />
+                <div className="text-slate-500 animate-pulse font-medium">
+                    Preparing clinical environment...
+                    {!doctorId && <p className="text-[10px] mt-2 opacity-50 italic">Retrieving doctor profile...</p>}
+                    {doctorId && !visit && <p className="text-[10px] mt-2 opacity-50 italic">Fetching patient records...</p>}
+                </div>
+            </div>
+        );
+    }
 
-        if (servicesError) {
-            toast({ title: "Error loading services", description: servicesError.message, variant: "destructive" });
-            return;
-        }
+    if (error || !visit || !doctorId || !doctorBranchId) {
+        return (
+            <div className="p-12 text-center min-h-[400px] flex flex-col items-center justify-center gap-6 bg-slate-50 rounded-2xl border border-dashed border-slate-200 m-8">
+                <div className="h-16 w-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center">
+                    <AlertTriangle className="h-8 w-8" />
+                </div>
+                <div className="space-y-2 max-w-md">
+                    <h2 className="text-xl font-bold text-slate-900">Consultation Unavailable</h2>
+                    <p className="text-slate-500 text-sm">
+                        {error || "We couldn't load the necessary data to start this consultation. This might be due to missing permissions or a network issue."}
+                    </p>
+                </div>
+                <div className="flex gap-3">
+                    <Button variant="outline" onClick={() => navigate("/doctor")} className="rounded-xl">
+                        Back to Dashboard
+                    </Button>
+                    <Button onClick={() => window.location.reload()} className="rounded-xl bg-primary">
+                        Try Again
+                    </Button>
+                </div>
+            </div>
+        );
+    }
 
-        const { data: branchData } = await supabase
-            .from("branches")
-            .select("is_globally_preapproved_for_services")
-            .eq("id", branchId)
-            .single();
 
-        const filteredServices = servicesData?.filter(service => {
-            if (service.approval_type === 'all_branches') return true;
-            if (branchData?.is_globally_preapproved_for_services) return true;
-            return service.service_preapprovals.some((preapproval: any) => preapproval.branch_id === branchId);
-        }) || [];
-
-        const normalServices = filteredServices.filter(s => {
-            if (s.name.toLowerCase().includes('consultation')) {
-                setConsultationService(s);
-                return false;
-            }
-            return true;
-        });
-
-        setAvailableServices(normalServices);
-    };
-
-    const getStageName = (service: any, stageNum: number) => {
-        const total = service?.total_stages || '?';
-        const customName = (service?.stage_names && service.stage_names[stageNum - 1]) ? ` - ${service.stage_names[stageNum - 1]}` : '';
-        return `Stage ${stageNum} of ${total}${customName}`;
-    };
 
     const handleToothClick = (toothId: number) => {
         if (consultationMode === 'diagnosis') {
@@ -1480,11 +1492,10 @@ export default function Consultation() {
     };
 
     // Determine patient details (Principal or Dependant)
-    const patientName = visit?.dependants?.full_name || visit?.members?.full_name || 'Unknown Patient';
-    const patientDob = visit?.dependants?.dob || visit?.members?.dob;
-
+    const patientName = getPatientName();
+    const isChild = getPatientAge() < 13;
     const patientAge = getPatientAge();
-    const isChild = patientAge <= 14;
+    const patientDob = visit?.dependants?.dob || visit?.members?.dob;
 
     return (
         <div className="space-y-6 max-w-[1600px] mx-auto pb-20">

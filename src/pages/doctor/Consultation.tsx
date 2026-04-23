@@ -150,179 +150,183 @@ export default function Consultation() {
     };
 
     const loadVisitData = async () => {
-        setLoading(true);
-        const { data, error } = await (supabase
-            .from("visits")
-            .select("*, members(*), dependants(*)")
-            .eq("id", visitId)
-            .single() as any);
+        try {
+            const { data, error } = await (supabase
+                .from("visits")
+                .select("*, members(*), dependants(*)")
+                .eq("id", visitId)
+                .single() as any);
 
-        if (error || !data) {
-            toast({ title: "Error loading visit", description: error?.message || "Visit not found", variant: "destructive" });
-            navigate("/doctor");
-            return;
-        }
-
-        // Security check: Only allow the assigned doctor or the doctor currently attending to view the visit
-        if (data.assigned_doctor_id !== doctorId && data.doctor_id !== doctorId) {
-            toast({
-                title: "Access Denied",
-                description: "You are not authorized to view this patient as they are not allocated to you.",
-                variant: "destructive"
-            });
-            navigate("/doctor");
-            return;
-        }
-
-        setVisit(data);
-
-        if (data.diagnosis_locked_at) {
-            setDiagnosisLockedAt(data.diagnosis_locked_at);
-            setConsultationMode('treatment');
-        } else {
-            setConsultationMode('diagnosis');
-        }
-
-        // Fetch raw service_stages rows (no join — avoids silent empty results from schema mismatches)
-        // Strict separation: principal visits only see stages with dependant_id IS NULL,
-        // dependant visits only see stages for that specific dependant_id.
-        let stagesBaseQuery = (supabase as any)
-            .from("service_stages")
-            .select("*")
-            .eq("member_id", data.member_id);
-
-        if (data.dependant_id) {
-            stagesBaseQuery = stagesBaseQuery.eq("dependant_id", data.dependant_id);
-        } else {
-            stagesBaseQuery = stagesBaseQuery.is("dependant_id", null);
-        }
-
-        const { data: rawStages, error: rawStagesError } = await stagesBaseQuery;
-
-        if (rawStagesError) {
-            console.error("[Consultation] Could not fetch service_stages:", rawStagesError.message);
-        }
-
-        if (rawStages && rawStages.length > 0) {
-            // Enrich with service data (name + stage_names) via a separate query
-            // Separating this prevents a join schema mismatch from silently returning []
-            const serviceIds = [...new Set(rawStages.map((s: any) => s.service_id))];
-            const { data: servicesData } = await (supabase as any)
-                .from("services")
-                .select("id, name, stage_names")
-                .in("id", serviceIds);
-
-            const servicesMap: Record<string, any> = {};
-            (servicesData || []).forEach((svc: any) => { servicesMap[svc.id] = svc; });
-
-            const enrichedStages = rawStages.map((s: any) => ({
-                ...s,
-                services: servicesMap[s.service_id] || { name: 'Unknown Service', stage_names: [] }
-            }));
-
-            const active = enrichedStages.filter((s: any) => s.status === 'in_progress');
-            setActiveStages(active);
-            setAllMemberStages(enrichedStages);
-        } else {
-            setActiveStages([]);
-            setAllMemberStages([]);
-        }
-
-        // Fetch past visits with X-rays and stages
-        const { data: visitsData } = await supabase
-            .from("visits")
-            .select(`
-                    id, 
-                    created_at, 
-                    diagnosis, 
-                    treatment_notes, 
-                    treatment_done,
-                    tca,
-                    periodontal_status,
-                    xray_urls, 
-                    status,
-                    doctor:doctor_id(full_name),
-                    branches(name),
-                    service_stages(*, services(name, stage_names))
-                `)
-            .eq("member_id", data.member_id)
-            .neq("id", visitId) // Exclude current visit
-            .order("created_at", { ascending: false });
-
-        if (visitsData) setPastVisits(visitsData);
-
-        let recordsQuery = (supabase as any)
-            .from("dental_records")
-            .select("tooth_number, status, condition, color, visit_id")
-            .eq("member_id", data.member_id);
-
-        if (data.dependant_id) {
-            recordsQuery = recordsQuery.eq("dependant_id", data.dependant_id);
-        } else {
-            recordsQuery = recordsQuery.is("dependant_id", null);
-        }
-
-        const { data: records, error: recordsError } = await recordsQuery;
-
-        if (records) {
-            const conditions: Record<number, string> = {};
-            const history: Record<number, boolean> = {};
-
-            records.forEach((r: any) => {
-                if (r.condition) conditions[r.tooth_number] = r.condition;
-                else if (r.status) conditions[r.tooth_number] = r.status;
-
-                // Any tooth with an existing record is locked
-                history[r.tooth_number] = true;
-            });
-            setToothConditions(conditions);
-            setExistingConditions(history);
-
-            // If we have existing records (history) OR current visit records, default to treatment mode
-            // so doctor can immediately start treating existing conditions.
-            // Unless it's a fresh visit with NO history.
-            if (records.length > 0 && !data.diagnosis_locked_at) {
-                setConsultationMode('treatment');
+            if (error || !data) {
+                console.error("Visit fetch error:", error);
+                toast({ title: "Error loading visit", description: error?.message || "Visit not found", variant: "destructive" });
+                navigate("/doctor");
+                return;
             }
 
-            // For display in Treatment Mode, we want to overlay treatment status (e.g. in_progress)
-            // But keep underlying condition visible if not hidden?
-            // DentalChart takes a single status.
-            // We will compute `toothStatus` derived state during render or use effect.
-        }
+            // Normalize joined data in case it's returned as an array
+            if (Array.isArray(data.members)) data.members = data.members[0];
+            if (Array.isArray(data.dependants)) data.dependants = data.dependants[0];
 
-        let historyQuery = supabase
-            .from("dental_chart_records")
-            .select("tooth_number, service_id, created_at")
-            .eq("member_id", data.member_id);
+            // Security check
+            if (data.assigned_doctor_id !== doctorId && data.doctor_id !== doctorId) {
+                toast({
+                    title: "Access Denied",
+                    description: "You are not authorized to view this patient as they are not allocated to you.",
+                    variant: "destructive"
+                });
+                navigate("/doctor");
+                return;
+            }
 
-        if (data.dependant_id) {
-            historyQuery = historyQuery.eq("dependant_id", data.dependant_id);
-        } else {
-            historyQuery = historyQuery.is("dependant_id", null);
-        }
+            setVisit(data);
 
-        const { data: history } = await historyQuery;
+            if (data.diagnosis_locked_at) {
+                setDiagnosisLockedAt(data.diagnosis_locked_at);
+                setConsultationMode('treatment');
+            } else {
+                setConsultationMode('diagnosis');
+            }
 
-        if (history) {
-            setServiceHistory(history);
-        }
+            // Fetch raw service_stages rows (no join — avoids silent empty results from schema mismatches)
+            // Strict separation: principal visits only see stages with dependant_id IS NULL,
+            // dependant visits only see stages for that specific dependant_id.
+            let stagesBaseQuery = (supabase as any)
+                .from("service_stages")
+                .select("*")
+                .eq("member_id", data.member_id);
 
-        if (data.diagnosis) setDiagnosis(data.diagnosis);
-        if (data.treatment_notes) setTreatmentNotes(data.treatment_notes);
-        if (data.treatment_done) setTreatmentDone(data.treatment_done);
-        if (data.tca) setTca(data.tca);
-        if (data.periodontal_status) setPeriodontalStatus(data.periodontal_status || []);
-        if (data.xray_urls && Array.isArray(data.xray_urls)) setXrayUrls(data.xray_urls);
+            if (data.dependant_id) {
+                stagesBaseQuery = stagesBaseQuery.eq("dependant_id", data.dependant_id);
+            } else {
+                stagesBaseQuery = stagesBaseQuery.is("dependant_id", null);
+            }
 
-        if (data.status === 'registered' && doctorId) {
-            await supabase
+            const { data: rawStages, error: rawStagesError } = await stagesBaseQuery;
+
+            if (rawStagesError) {
+                console.error("[Consultation] Could not fetch service_stages:", rawStagesError.message);
+            }
+
+            if (rawStages && rawStages.length > 0) {
+                // Enrich with service data (name + stage_names) via a separate query
+                // Separating this prevents a join schema mismatch from silently returning []
+                const serviceIds = [...new Set(rawStages.map((s: any) => s.service_id))];
+                const { data: servicesData } = await (supabase as any)
+                    .from("services")
+                    .select("id, name, stage_names")
+                    .in("id", serviceIds);
+
+                const servicesMap: Record<string, any> = {};
+                (servicesData || []).forEach((svc: any) => { servicesMap[svc.id] = svc; });
+
+                const enrichedStages = rawStages.map((s: any) => ({
+                    ...s,
+                    services: servicesMap[s.service_id] || { name: 'Unknown Service', stage_names: [] }
+                }));
+
+                const active = enrichedStages.filter((s: any) => s.status === 'in_progress');
+                setActiveStages(active);
+                setAllMemberStages(enrichedStages);
+            } else {
+                setActiveStages([]);
+                setAllMemberStages([]);
+            }
+
+            // Fetch past visits with X-rays and stages
+            const { data: visitsData } = await supabase
                 .from("visits")
-                .update({ status: 'with_doctor', doctor_id: doctorId, assigned_doctor_id: doctorId })
-                .eq("id", visitId);
-        }
+                .select(`
+                        id, 
+                        created_at, 
+                        diagnosis, 
+                        treatment_notes, 
+                        treatment_done,
+                        tca,
+                        periodontal_status,
+                        xray_urls, 
+                        status,
+                        doctor:doctor_id(full_name),
+                        branches(name),
+                        service_stages(*, services(name, stage_names))
+                    `)
+                .eq("member_id", data.member_id)
+                .neq("id", visitId) // Exclude current visit
+                .order("created_at", { ascending: false });
 
-        setLoading(false);
+            if (visitsData) setPastVisits(visitsData);
+
+            let recordsQuery = (supabase as any)
+                .from("dental_records")
+                .select("tooth_number, status, condition, color, visit_id")
+                .eq("member_id", data.member_id);
+
+            if (data.dependant_id) {
+                recordsQuery = recordsQuery.eq("dependant_id", data.dependant_id);
+            } else {
+                recordsQuery = recordsQuery.is("dependant_id", null);
+            }
+
+            const { data: records, error: recordsError } = await recordsQuery;
+
+            if (records) {
+                const conditions: Record<number, string> = {};
+                const history: Record<number, boolean> = {};
+
+                records.forEach((r: any) => {
+                    if (r.condition) conditions[r.tooth_number] = r.condition;
+                    else if (r.status) conditions[r.tooth_number] = r.status;
+
+                    // Any tooth with an existing record is locked
+                    history[r.tooth_number] = true;
+                });
+                setToothConditions(conditions);
+                setExistingConditions(history);
+
+                // If we have existing records (history) OR current visit records, default to treatment mode
+                // so doctor can immediately start treating existing conditions.
+                // Unless it's a fresh visit with NO history.
+                if (records.length > 0 && !data.diagnosis_locked_at) {
+                    setConsultationMode('treatment');
+                }
+            }
+
+            let historyQuery = supabase
+                .from("dental_chart_records")
+                .select("tooth_number, service_id, created_at")
+                .eq("member_id", data.member_id);
+
+            if (data.dependant_id) {
+                historyQuery = historyQuery.eq("dependant_id", data.dependant_id);
+            } else {
+                historyQuery = historyQuery.is("dependant_id", null);
+            }
+
+            const { data: history } = await historyQuery;
+
+            if (history) {
+                setServiceHistory(history);
+            }
+
+            if (data.diagnosis) setDiagnosis(data.diagnosis);
+            if (data.treatment_notes) setTreatmentNotes(data.treatment_notes);
+            if (data.treatment_done) setTreatmentDone(data.treatment_done);
+            if (data.tca) setTca(data.tca);
+            if (data.periodontal_status) setPeriodontalStatus(data.periodontal_status || []);
+            if (data.xray_urls && Array.isArray(data.xray_urls)) setXrayUrls(data.xray_urls);
+
+            if (data.status === 'registered' && doctorId) {
+                await supabase
+                    .from("visits")
+                    .update({ status: 'with_doctor', doctor_id: doctorId, assigned_doctor_id: doctorId })
+                    .eq("id", visitId);
+            }
+        } catch (err: any) {
+            console.error("Critical error in loadVisitData:", err);
+            toast({ title: "Unexpected Error", description: "A technical error occurred while loading visit data.", variant: "destructive" });
+        } finally {
+            setLoading(false);
+        }
     };
 
     // Calculate age (approximation or exact if available)
@@ -1409,8 +1413,11 @@ export default function Consultation() {
     };
 
     // Determine patient details (Principal or Dependant)
-    const patientName = visit.dependants?.full_name || visit.members.full_name;
-    const patientDob = visit.dependants?.dob || visit.members.dob;
+    const member = visit?.members;
+    const dependant = visit?.dependants;
+
+    const patientName = dependant?.full_name || member?.full_name || "Unknown Patient";
+    const patientDob = dependant?.dob || member?.dob;
 
     const patientAge = getPatientAge();
     const isChild = patientAge <= 14;
@@ -1445,11 +1452,11 @@ export default function Consultation() {
                                 </Badge>
                             </div>
                             <div className="flex items-center gap-4 text-sm font-medium text-slate-500 overflow-x-auto whitespace-nowrap pb-1">
-                                <span className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-primary" /> {visit.members.member_number}</span>
+                                <span className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-primary" /> {member?.member_number || 'N/A'}</span>
                                 <span className="h-1 w-1 rounded-full bg-slate-300" />
                                 <span>{patientAge} Years Old</span>
                                 <span className="h-1 w-1 rounded-full bg-slate-300" />
-                                <span className="flex items-center gap-1.5"><ClipboardList className="w-4 h-4" /> {visit.dependants?.document_number || visit.members.id_number || 'No ID Provided'}</span>
+                                <span className="flex items-center gap-1.5"><ClipboardList className="w-4 h-4" /> {dependant?.document_number || member?.id_number || 'No ID Provided'}</span>
                             </div>
                         </div>
                     </div>
@@ -1476,11 +1483,11 @@ export default function Consultation() {
                     </div>
                 </div>
 
-                {visit.dependants && (
+                {dependant && (
                     <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-2 text-sm">
                         <span className="text-slate-400 font-medium">Principal Account:</span>
-                        <span className="font-bold text-slate-700">{visit.members.full_name}</span>
-                        <Badge variant="outline" className="text-[10px] font-bold px-1.5 h-5 leading-none bg-slate-50">{visit.members.member_number}</Badge>
+                        <span className="font-bold text-slate-700">{member?.full_name}</span>
+                        <Badge variant="outline" className="text-[10px] font-bold px-1.5 h-5 leading-none bg-slate-50">{member?.member_number}</Badge>
                     </div>
                 )}
             </div>
@@ -2038,7 +2045,7 @@ export default function Consultation() {
                                     <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
                                         <div className="flex flex-col">
                                             <span className="text-[10px] font-black text-slate-400 uppercase leading-none mb-1">Coverage Balance</span>
-                                            <span className="text-lg font-black text-slate-900">KES {visit.members.coverage_balance?.toLocaleString()}</span>
+                                            <span className="text-lg font-black text-slate-900">KES {member?.coverage_balance?.toLocaleString() || '0'}</span>
                                         </div>
                                         <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600">
                                             <CreditCard className="w-5 h-5" />
@@ -2068,7 +2075,7 @@ export default function Consultation() {
                                             <div className="flex flex-col">
                                                 <span className="text-[10px] font-black text-slate-400 uppercase">Estimated Deduction</span>
                                                 <span className="text-xl font-black text-primary">
-                                                    KES {Math.min(selectedServices.filter(s => !s.service.is_multi_stage_update).reduce((acc, s) => acc + Number(s.service.benefit_cost), 0) + (chargeConsultation && consultationService ? Number(consultationService.benefit_cost) : 0), visit.members.coverage_balance || 0).toLocaleString()}
+                                                    KES {Math.min(selectedServices.filter(s => !s.service.is_multi_stage_update).reduce((acc, s) => acc + Number(s.service.benefit_cost), 0) + (chargeConsultation && consultationService ? Number(consultationService.benefit_cost) : 0), member?.coverage_balance || 0).toLocaleString()}
                                                 </span>
                                             </div>
                                         </div>

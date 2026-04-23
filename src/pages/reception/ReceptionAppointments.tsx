@@ -23,6 +23,8 @@ const ReceptionAppointments = () => {
     const [checkInAppointmentId, setCheckInAppointmentId] = useState<string | null>(null);
     const [checkInMemberId, setCheckInMemberId] = useState<string | null>(null);
     const [checkInBiometricsId, setCheckInBiometricsId] = useState<string | null>(null);
+    const [checkInIsDependant, setCheckInIsDependant] = useState(false);
+    const [checkInPatientName, setCheckInPatientName] = useState("");
 
     // Filters
     const [searchQuery, setSearchQuery] = useState("");
@@ -70,7 +72,7 @@ const ReceptionAppointments = () => {
                 .select(`
                     *,
                     members (id, full_name, phone, biometric_data),
-                    dependants (full_name),
+                    dependants (id, full_name, biometric_data),
                     staff (full_name)
                 `)
                 .eq("branch_id", branchId)
@@ -122,8 +124,18 @@ const ReceptionAppointments = () => {
 
     const handleInitialCheckIn = (appt: any) => {
         setCheckInAppointmentId(appt.id);
-        setCheckInMemberId(appt.members.id);
-        setCheckInBiometricsId(appt.members.biometric_data);
+        const isDep = !!appt.dependants;
+        setCheckInIsDependant(isDep);
+        
+        if (isDep) {
+            setCheckInMemberId(appt.dependants.id);
+            setCheckInBiometricsId(appt.dependants.biometric_data);
+            setCheckInPatientName(appt.dependants.full_name);
+        } else {
+            setCheckInMemberId(appt.members.id);
+            setCheckInBiometricsId(appt.members.biometric_data);
+            setCheckInPatientName(appt.members.full_name);
+        }
     };
 
     const handleBiometricVerification = (success: boolean) => {
@@ -377,13 +389,15 @@ const ReceptionAppointments = () => {
                     <div className="py-4 space-y-4">
                         {checkInBiometricsId ? (
                             <div className="space-y-4">
-                                <div className="bg-blue-50 text-blue-800 p-3 rounded-md text-sm border border-blue-100">
-                                    Biometric data record found. Please ask member to scan fingerprint.
+                                <div className="bg-blue-50 text-blue-800 p-3 rounded-md text-sm border border-blue-100 flex items-center gap-2">
+                                    <Fingerprint className="h-4 w-4" /> Biometric profile found. Verify {checkInPatientName}'s identity.
                                 </div>
                                 <BiometricCapture
                                     mode="verify"
                                     userId={checkInMemberId!}
+                                    userName={checkInPatientName}
                                     credentialId={checkInBiometricsId}
+                                    targetTable={checkInIsDependant ? 'dependants' : 'members'}
                                     onVerificationComplete={handleBiometricVerification}
                                 />
                                 <div className="relative">
@@ -400,13 +414,27 @@ const ReceptionAppointments = () => {
                             </div>
                         ) : (
                             <div className="space-y-4">
-                                <div className="bg-yellow-50 text-yellow-800 p-3 rounded-md text-sm flex items-center gap-2 border border-yellow-100">
-                                    <Fingerprint className="h-4 w-4" /> No biometric data found for this member.
+                                <div className="bg-amber-50 text-amber-800 p-3 rounded-md text-sm flex items-center gap-2 border border-amber-100">
+                                    <Fingerprint className="h-4 w-4" /> No biometric record found for {checkInPatientName}.
                                 </div>
-                                <div className="text-sm text-muted-foreground p-2">
-                                    Please verify the patient's ID (National ID, Passport) manually.
+                                <div className="p-1 rounded-xl border-2 border-dashed border-slate-200">
+                                    <BiometricCapture
+                                        mode="register"
+                                        userId={checkInMemberId!}
+                                        userName={checkInPatientName}
+                                        targetTable={checkInIsDependant ? 'dependants' : 'members'}
+                                        onVerificationComplete={(success) => handleBiometricVerification(success)}
+                                    />
                                 </div>
-                                <Button className="w-full" onClick={handleManualCheckIn}>
+                                <div className="relative">
+                                    <div className="absolute inset-0 flex items-center">
+                                        <span className="w-full border-t" />
+                                    </div>
+                                    <div className="relative flex justify-center text-xs uppercase">
+                                        <span className="bg-background px-2 text-muted-foreground">Or</span>
+                                    </div>
+                                </div>
+                                <Button variant="outline" className="w-full" onClick={handleManualCheckIn}>
                                     Verify ID & Check In Manually
                                 </Button>
                             </div>

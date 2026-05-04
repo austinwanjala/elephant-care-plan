@@ -198,7 +198,7 @@ export default function AdminMembershipCategories() {
                 <Select value={formData.level} onValueChange={(value) => setFormData({ ...formData, level: value })} required>
                   <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>
                   <SelectContent>
-                    {["level_1", "level_2", "level_3", "level_4", "level_5", "level_6"].map((level) => (
+                    {["level_1", "level_2", "level_3", "level_4", "level_5", "level_6", "level_7", "level_8", "level_9", "level_10"].map((level) => (
                       <SelectItem key={level} value={level}>{level.replace('_', ' ').toUpperCase()}</SelectItem>
                     ))}
                   </SelectContent>
@@ -283,7 +283,7 @@ export default function AdminMembershipCategories() {
               <Select value={formData.level} onValueChange={(value) => setFormData({ ...formData, level: value })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {["level_1", "level_2", "level_3", "level_4", "level_5", "level_6"].map((level) => (
+                  {["level_1", "level_2", "level_3", "level_4", "level_5", "level_6", "level_7", "level_8", "level_9", "level_10"].map((level) => (
                     <SelectItem key={level} value={level}>{level.replace('_', ' ').toUpperCase()}</SelectItem>
                   ))}
                 </SelectContent>

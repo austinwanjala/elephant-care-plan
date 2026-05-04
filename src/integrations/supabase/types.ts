@@ -1731,6 +1731,10 @@ export type Database = {
       | "level_4"
       | "level_5"
       | "level_6"
+      | "level_7"
+      | "level_8"
+      | "level_9"
+      | "level_10"
       payment_status: "pending" | "completed" | "failed"
     }
     CompositeTypes: {
@@ -1881,6 +1885,10 @@ export const Constants = {
         "level_4",
         "level_5",
         "level_6",
+        "level_7",
+        "level_8",
+        "level_9",
+        "level_10",
       ],
       payment_status: ["pending", "completed", "failed"],
     },
